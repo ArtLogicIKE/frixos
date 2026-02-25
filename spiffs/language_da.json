@@ -1,0 +1,270 @@
+{
+  "menu": {
+    "settings": "Indstillinger",
+    "advanced": "Avanceret",
+    "integrations": "Integrationer",
+    "status": "Status",
+    "update": "Opdater",
+    "restart": "Genstart"
+  },
+  "common": {
+    "save_settings": "Gem indstillinger",
+    "cancel": "Annuller"
+  },
+  "settings": {
+    "connection": {
+      "title": "Forbindelsesindstillinger *",
+      "wifi_ssid": "WiFi SSID",
+      "wifi_password": "WiFi-adgangskode",
+      "hostname": "Værtsnavn",
+      "fahrenheit": "Temperatur i Fahrenheit",
+      "hour12": "Tid i 12-timers format",
+      "auto_update": "Kontroller automatisk for firmware-opdateringer",
+      "restart_note": "* Ændring af forbindelsesindstillinger vil genstarte enheden."
+    },
+    "wifi": {
+      "available_networks": "Tilgængelige WiFi-netværk",
+      "scanning": "Søger efter netværk...",
+      "scan_button": "Scan tilgængelige netværk"
+    }
+  },
+  "advanced": {
+    "display": {
+      "title": "Displayindstillinger",
+      "x_offset": "X-forskydning",
+      "y_offset": "Y-forskydning",
+      "rotation": "Displayrotation",
+      "show_scroll": "Vis rullende informationsbesked",
+      "show_weather": "Vis vejrudsigtsikon og månefase",
+      "show_leading_zero": "Vis 0 for encifret time",
+      "disable_dots_breathe": "Deaktiver åndingseffekt for tidspunkter",
+      "show_grid": "Vis gitter",
+      "mirror": "Spejlvend display"
+    },
+    "day": {
+      "title": "Dagindstillinger",
+      "font": "Skrifttype",
+      "color_filter": "Farvefilter",
+      "message_color": "Rullende beskedfarve"
+    },
+    "night": {
+      "title": "Natindstillinger",
+      "font": "Skrifttype",
+      "color_filter": "Farvefilter",
+      "message_color": "Rullende beskedfarve"
+    },
+    "color_filter": {
+      "none": "Ingen",
+      "red": "Rød",
+      "green": "Grøn",
+      "blue": "Blå",
+      "bw": "Sort-hvid"
+    },
+    "fonts": {
+      "title": "Skrifttypeprøver"
+    },
+    "location": {
+      "title": "Placeringsindstillinger *",
+      "latitude": "Breddegrad",
+      "longitude": "Længdegrad",
+      "timezone": "Tidszone",
+      "timezone_placeholder": "Indtast tidszone i POSIX-format KUN hvis automatisk detektion ikke virker",
+      "help_text": "Du kan finde en liste over POSIX-tidszoner <a href=\"https://leo.leung.xyz/wiki/Timezone\" target=\"_blank\">her</a>. Lat/Lon påvirker kun vejrdata.",
+      "restart_note": "* Ændring af placeringsindstillinger vil genstarte enheden."
+    },
+    "wifi_hours": {
+      "title": "WiFi-aktive timer",
+      "start": "Start",
+      "end": "Slut"
+    },
+    "brightness": {
+      "title": "Projektionslysstyrkeindstillinger",
+      "auto_dimming": "Automatiske dæmpningsindstillinger",
+      "day_threshold": "Dagtærskel (lux)",
+      "light_sensitivity": "Lysfølsomhed (lux)",
+      "sensitivity_help": "Følsomhed hjælper med at undgå uønskede lysstyrkeændringer. Mørk = Tærskel - Følsomhed, Lys = Tærskel + Følsomhed.",
+      "full_brightness": "Bevar fuld lysstyrke (reducerer LED-levetid)",
+      "led_levels": "LED-lysstyrkeniveauer (%)",
+      "led_day": "Lysstyrke (dag)",
+      "led_night": "Lysstyrke (nat)",
+      "pwm_frequency": "PWM-frekvens",
+      "max_power": "Maksimal effekt"
+    },
+    "message": {
+      "title": "Rullende besked",
+      "font_size": "Skriftstørrelse",
+      "scroll_delay": "Rulleforsinkelse",
+      "scroll_delay_help": "Animeringsforsinkelse i millisekunder (30-500)",
+      "message": "Besked",
+      "message_placeholder": "Indtast din besked",
+      "tokens_title": "Tilgængelige tokens:",
+      "token_device": "Enhedsnavn",
+      "token_greeting": "Tidsbaseret hilsen (God morgen/Eftermiddag/Aften/Nat)",
+      "token_day": "Aktuel ugedag",
+      "token_date": "Aktuel dato",
+      "token_mon": "Aktuel måned",
+      "token_temp": "Aktuel temperatur",
+      "token_hum": "Aktuel luftfugtighed",
+      "token_high": "Dagens højeste temperatur",
+      "token_low": "Dagens laveste temperatur",
+      "token_rise": "Solopgangstid",
+      "token_set": "Solnedgangstid",
+      "token_ha": "Hent indstillinger fra Home Assistant (kræver aktiveret integration)",
+      "token_stock": "Hent aktiekurs (kræver aktiveret aktieintegration med Finnhub.io)",
+      "token_cgm_glucose": "Seneste glukoseaflæsning fra din CGM-enhed, formateret, f.eks. 157 mg/dl (+3 @ 12:01). (kræver aktiv CGM-integration)",
+      "token_cgm_reading": "Seneste glukoseaflæsning, ren, f.eks. 157",
+      "tokens_note": "Bemærk: Tokens er store og små bogstaver og skal være i kantede parenteser.",
+      "default_message": "Standardbesked: [device].local/ [greeting] [day], [date] [mon], nu [temp] i dag [high]-[low], fugt. [hum], sol [rise]-[set]"
+    }
+  },
+  "status": {
+    "support": {
+      "title": "Del information med support",
+      "send_email": "Send e-mail",
+      "copy_clipboard": "Kopiér til udklipsholder",
+      "help_text": "Hvis du har brug for support, skal du dele ovenstående oplysninger med os. Klik på \"send e-mail\" for at sende os en besked; hvis det ikke virker, kopiér oplysningerne til din udklipsholder og send dem via e-mail til support@buyfrixos.com."
+    },
+    "sensor": {
+      "title": "Sensordata",
+      "light_level": "Aktuelt lysniveau (lux)",
+      "last_time_update": "Sidste tidsopdatering",
+      "timezone": "Tidszone",
+      "moon_phase": "Månefase",
+      "last_weather_update": "Sidste vejropdatering",
+      "latitude": "Breddegrad",
+      "longitude": "Længdegrad",
+      "uptime": "Oppetid"
+    },
+    "system": {
+      "title": "Systeminformation",
+      "app_name": "Applikationsnavn",
+      "version": "Version",
+      "fw_version": "Firmware-version",
+      "power_on_hours": "Driftstimer",
+      "mac_address": "MAC-adresse",
+      "ip_address": "IP-adresse",
+      "chip_revision": "Chiprevision",
+      "flash_size": "SPI-flashstørrelse",
+      "cpu_freq": "CPU-frekvens",
+      "compile_time": "Kompileringstid",
+      "free_heap": "Ledig heap-hukommelse",
+      "min_free_heap": "Min. ledig heap"
+    },
+    "refresh_button": "Opdater status"
+  },
+  "integrations": {
+    "ha": {
+      "title": "Home Assistant",
+      "server_url": "Server-URL",
+      "token": "LL adgangstoken",
+      "token_placeholder": "Indtast dit token",
+      "refresh_interval": "Opdatering (min.)"
+    },
+    "stock": {
+      "title": "Aktiekurstjeneste (via Finnhub.io)",
+      "api_key": "API-nøgle",
+      "api_key_placeholder": "Indtast din Finnhub API-nøgle",
+      "refresh_interval": "Opdatering (min.)"
+    },
+    "dexcom": {
+      "title": "Dexcom G5/6",
+      "region": "Region",
+      "disabled": "Deaktiveret",
+      "japan": "Japan",
+      "rest_of_world": "Resten af verden"
+    },
+    "freestyle": {
+      "title": "FreeStyle Libre",
+      "region": "Region",
+      "disabled": "Disabled",
+      "enabled": "Aktiveret",
+      "japan": "Japan",
+      "rest_of_world": "Resten af verden"
+    },
+    "glucose_monitors": {
+      "title": "Glukoseovervågning",
+      "high_threshold": "Høj (mg/dL)",
+      "low_threshold": "Lav (mg/dL)",
+      "refresh_interval": "Opdatering (min.)",
+      "display_unit": "Visningsenhed",
+      "validity_duration": "Gyldighed (min.)",
+      "username": "Brugernavn",
+      "username_placeholder": "Indtast dit brugernavn",
+      "password": "Adgangskode",
+      "password_placeholder": "Indtast din adgangskode",
+      "cgm_device_title": "CGM-enhed",
+      "alternate_time_cgm": {
+        "title": "Skift tid/CGM",
+        "description": "Skift projektionsvisning mellem tid og CGM-målinger",
+        "time": "Tid (sek)",
+        "cgm": "CGM (sek)"
+      }
+    }
+  },
+  "update": {
+    "title": "Upload firmware / filer",
+    "auto_check": "Din enhed kontrollerer og installerer automatisk ny firmware.",
+    "manual_info": "Hvis vores support har instrueret dig i at installere en specifik firmware-version manuelt, eller hvis du ønsker at uploade en tilpasset skrifttype, kan du gøre det her.",
+    "select_file": "Vælg en firmware-fil (.bin) eller anden fil til upload til enheden.",
+    "upload_button": "Upload fil",
+    "firmware_instructions_title": "Instruktioner til firmware-opdatering",
+    "firmware_step1": "Klik på knappen \"Vælg fil\" og vælg firmware-filen (.bin) fra din computer.",
+    "firmware_step2": "Klik på knappen \"Upload firmware\" for at starte opdateringsprocessen.",
+    "firmware_step3": "Vent indtil opdateringen er færdig. Sluk ikke eller frakobl enheden under opdateringen.",
+    "firmware_step4": "Enheden genstarter automatisk, når opdateringen er færdig.",
+    "firmware_warning": "<strong>Advarsel:</strong> Upload af forkert firmware kan få enheden til at fungere forkert. Sørg for at bruge den korrekte firmware til din enhed.",
+    "file_instructions_title": "Instruktioner til upload af brugerfiler",
+    "file_step1": "Klik på knappen \"Vælg fil\" og vælg filen (f.eks. user-font.jpg) fra din computer.",
+    "file_step2": "Klik på knappen \"Upload firmware\" for at starte upload-processen.",
+    "file_step3": "Vent indtil upload'en er færdig. Sluk ikke eller frakobl enheden under upload'en.",
+    "file_step4": "Du kan nu uploade en anden fil eller lukke dette vindue."
+  },
+  "restart": {
+    "title": "Enhedsgenstart",
+    "description": "Brug denne indstilling til at genstarte din Frixos-enhed.",
+    "button": "Genstart enhed",
+    "confirm_title": "Bekræft genstart",
+    "confirm_message": "Er du sikker på, at du vil genstarte enheden?",
+    "unavailable_message": "Enheden vil være midlertidigt utilgængelig under genstart.",
+    "confirm_button": "Genstart"
+  },
+  "messages": {
+    "error_loading_settings": "Fejl ved indlæsning af indstillinger",
+    "sensor_data_refreshed": "Sensordata opdateret",
+    "failed_refresh_sensor": "Kunne ikke opdatere sensordata",
+    "correct_form_errors": "Ret venligst de fremhævede felter før indsendelse",
+    "invalid_hostname": "Ugyldigt værtsnavn: ",
+    "saving_settings": "Gemmer indstillinger...",
+    "network_settings_changed": "Netværksindstillinger ændret. Enheden vil genstarte...",
+    "device_will_restart": "Enheden vil genstarte om ",
+    "settings_saved": "Indstillinger gemt succesfuldt",
+    "error_saving_settings": "Fejl ved gemning af indstillinger: ",
+    "error_saving_unknown": "Fejl ved gemning af indstillinger. Tjek konsollen for detaljer.",
+    "failed_fetch_status": "Kunne ikke hente statusdata",
+    "select_firmware_file": "Vælg venligst en firmware-fil eller anden fil at uploade",
+    "uploading_file": "Uploader fil... Sluk ikke enheden.",
+    "firmware_update_success": "Firmware-opdatering lykkedes! Enheden genstarter...",
+    "file_upload_success": "Filupload lykkedes!",
+    "update_failed": "Opdatering fejlede: ",
+    "invalid_response": "Ugyldigt svar fra serveren",
+    "upload_failed_status": "Upload fejlede med status: ",
+    "network_error_upload": "Netværksfejl under upload",
+    "upload_aborted": "Upload afbrudt",
+    "sending_reset": "Sender genstartskommando...",
+    "device_restarting": "Enheden genstarter. Denne side vil opdateres om ",
+    "device_restarting_seconds": " sekunder.",
+    "failed_restart": "Kunne ikke genstarte enheden: ",
+    "error_reset_connection": "Fejl ved afsendelse af genstartskommando: Forbindelse mistet",
+    "correct_form_before_save": "Ret venligst formularfejl før gemning.",
+    "dexcom_credentials_required": "brugernavn og adgangskode kræves når aktiveret",
+    "dexcom_refresh_range": "opdateringsinterval skal være mellem 1 og 60 minutter",
+    "glucose_high_range": "Højt glukosetærskelværdi skal være mellem 1 og 400 mg/dL",
+    "glucose_low_range": "Lavt glukosetærskelværdi skal være mellem 1 og 400 mg/dL",
+    "glucose_low_less_than_high": "Lavt glukosetærskelværdi skal være lavere end højt tærskelværdi",
+    "freestyle_credentials_required": "Libre-brugernavn og adgangskode kræves når aktiveret",
+    "freestyle_refresh_range": "Libre opdateringsinterval skal være mellem 1 og 60 minutter",
+    "error_preparing_info": "Fejl ved forberedelse af systeminformation: ",
+    "info_copied_clipboard": "Systeminformation kopieret til udklipsholder",
+    "failed_copy_clipboard": "Kunne ikke kopiere til udklipsholder"
+  }
+}

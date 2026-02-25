@@ -1,0 +1,270 @@
+{
+  "menu": {
+    "settings": "Inställningar",
+    "advanced": "Avancerat",
+    "integrations": "Integrationer",
+    "status": "Status",
+    "update": "Uppdatera",
+    "restart": "Starta om"
+  },
+  "common": {
+    "save_settings": "Spara inställningar",
+    "cancel": "Avbryt"
+  },
+  "settings": {
+    "connection": {
+      "title": "Anslutningsinställningar *",
+      "wifi_ssid": "WiFi SSID",
+      "wifi_password": "WiFi-lösenord",
+      "hostname": "Värdnamn",
+      "fahrenheit": "Temperatur i Fahrenheit",
+      "hour12": "Tid i 12-timmarsformat",
+      "auto_update": "Kontrollera automatiskt efter firmware-uppdateringar",
+      "restart_note": "* Ändring av anslutningsinställningar kommer att starta om enheten."
+    },
+    "wifi": {
+      "available_networks": "Tillgängliga WiFi-nätverk",
+      "scanning": "Söker efter nätverk...",
+      "scan_button": "Skanna tillgängliga nätverk"
+    }
+  },
+  "advanced": {
+    "display": {
+      "title": "Displayinställningar",
+      "x_offset": "X-offset",
+      "y_offset": "Y-offset",
+      "rotation": "Displayrotation",
+      "show_scroll": "Visa rullande informationsmeddelande",
+      "show_weather": "Visa väderprognos-ikon och månfas",
+      "show_leading_zero": "Visa 0 för ensiffrig timme",
+      "disable_dots_breathe": "Inaktivera andningseffekt för tidsklocka",
+      "show_grid": "Visa rutnät",
+      "mirror": "Spegla display"
+    },
+    "day": {
+      "title": "Daginställningar",
+      "font": "Typsnitt",
+      "color_filter": "Färgfilter",
+      "message_color": "Rullande meddelandefärg"
+    },
+    "night": {
+      "title": "Nattinställningar",
+      "font": "Typsnitt",
+      "color_filter": "Färgfilter",
+      "message_color": "Rullande meddelandefärg"
+    },
+    "color_filter": {
+      "none": "Ingen",
+      "red": "Röd",
+      "green": "Grön",
+      "blue": "Blå",
+      "bw": "Svartvit"
+    },
+    "fonts": {
+      "title": "Typsnittsprover"
+    },
+    "location": {
+      "title": "Platsinställningar *",
+      "latitude": "Latitud",
+      "longitude": "Longitud",
+      "timezone": "Tidszon",
+      "timezone_placeholder": "Ange tidszon i POSIX-format ENDAST om automatisk detektering inte fungerar",
+      "help_text": "Du kan hitta en lista över POSIX-tidszoner <a href=\"https://leo.leung.xyz/wiki/Timezone\" target=\"_blank\">här</a>. Lat/Lon påverkar endast väderdata.",
+      "restart_note": "* Ändring av platsinställningar kommer att starta om enheten."
+    },
+    "wifi_hours": {
+      "title": "WiFi-aktiva timmar",
+      "start": "Start",
+      "end": "Slut"
+    },
+    "brightness": {
+      "title": "Projektionsljushetsinställningar",
+      "auto_dimming": "Automatiska dämningsinställningar",
+      "day_threshold": "Dagtröskel (lux)",
+      "light_sensitivity": "Ljuskänslighet (lux)",
+      "sensitivity_help": "Känslighet hjälper till att undvika oönskade ljusstyrkförändringar. Mörk = Tröskel - Känslighet, Ljus = Tröskel + Känslighet.",
+      "full_brightness": "Behåll full ljusstyrka (minskar LED-livslängd)",
+      "led_levels": "LED-ljusstyrksnivåer (%)",
+      "led_day": "Ljusstyrka (dag)",
+      "led_night": "Ljusstyrka (natt)",
+      "pwm_frequency": "PWM-frekvens",
+      "max_power": "Maximal effekt"
+    },
+    "message": {
+      "title": "Rullande meddelande",
+      "font_size": "Teckenstorlek",
+      "scroll_delay": "Rullningsfördröjning",
+      "scroll_delay_help": "Animeringsfördröjning i millisekunder (30-500)",
+      "message": "Meddelande",
+      "message_placeholder": "Ange ditt meddelande",
+      "tokens_title": "Tillgängliga tokens:",
+      "token_device": "Enhetsnamn",
+      "token_greeting": "Tidsbaserad hälsning (God morgon/Eftermiddag/Kväll/Natt)",
+      "token_day": "Aktuell veckodag",
+      "token_date": "Aktuellt datum",
+      "token_mon": "Aktuell månad",
+      "token_temp": "Aktuell temperatur",
+      "token_hum": "Aktuell luftfuktighet",
+      "token_high": "Dagens högsta temperatur",
+      "token_low": "Dagens lägsta temperatur",
+      "token_rise": "Soluppgångstid",
+      "token_set": "Solnedgångstid",
+      "token_ha": "Hämta inställningar från Home Assistant (kräver aktiverad integration)",
+      "token_stock": "Hämta aktiekurs (kräver aktiverad aktieintegration med Finnhub.io)",
+      "token_cgm_glucose": "Senaste glukosavläsningen från din CGM-enhet, formaterad, t.ex. 157 mg/dl (+3 @ 12:01). (kräver aktiv CGM-integration)",
+      "token_cgm_reading": "Senaste glukosavläsningen, enkel, t.ex. 157",
+      "tokens_note": "Obs: Tokens är skiftlägeskänsliga och måste vara inom hakparenteser.",
+      "default_message": "Standardmeddelande: [device].local/ [greeting] [day], [date] [mon], nu [temp] idag [high]-[low], fukt. [hum], sol [rise]-[set]"
+    }
+  },
+  "status": {
+    "support": {
+      "title": "Dela information med support",
+      "send_email": "Skicka e-post",
+      "copy_clipboard": "Kopiera till urklipp",
+      "help_text": "Om du behöver support, vänligen dela informationen ovan med oss. Klicka på \"skicka e-post\" för att skicka oss ett meddelande; om det inte fungerar, kopiera informationen till urklipp och skicka den via e-post till support@buyfrixos.com."
+    },
+    "sensor": {
+      "title": "Sensordata",
+      "light_level": "Aktuell ljusnivå (lux)",
+      "last_time_update": "Senaste tidsuppdatering",
+      "timezone": "Tidszon",
+      "moon_phase": "Månfas",
+      "last_weather_update": "Senaste väderuppdatering",
+      "latitude": "Latitud",
+      "longitude": "Longitud",
+      "uptime": "Drifttid"
+    },
+    "system": {
+      "title": "Systeminformation",
+      "app_name": "Applikationsnamn",
+      "version": "Version",
+      "fw_version": "Firmware-version",
+      "power_on_hours": "Drifttimmar",
+      "mac_address": "MAC-adress",
+      "ip_address": "IP-adress",
+      "chip_revision": "Chiprevision",
+      "flash_size": "SPI-flashstorlek",
+      "cpu_freq": "CPU-frekvens",
+      "compile_time": "Kompileringstid",
+      "free_heap": "Ledigt heap-minne",
+      "min_free_heap": "Min ledigt heap"
+    },
+    "refresh_button": "Uppdatera status"
+  },
+  "integrations": {
+    "ha": {
+      "title": "Home Assistant",
+      "server_url": "Server-URL",
+      "token": "LL åtkomsttoken",
+      "token_placeholder": "Ange din token",
+      "refresh_interval": "Uppdatering (min.)"
+    },
+    "stock": {
+      "title": "Aktiekurstjänst (via Finnhub.io)",
+      "api_key": "API-nyckel",
+      "api_key_placeholder": "Ange din Finnhub API-nyckel",
+      "refresh_interval": "Uppdatering (min.)"
+    },
+    "dexcom": {
+      "title": "Dexcom G5/6",
+      "region": "Region",
+      "disabled": "Inaktiverad",
+      "japan": "Japan",
+      "rest_of_world": "Övriga världen"
+    },
+    "freestyle": {
+      "title": "FreeStyle Libre",
+      "region": "Região",
+      "disabled": "Disabled",
+      "enabled": "Aktiverad",
+      "japan": "Japan",
+      "rest_of_world": "Övriga världen"
+    },
+    "glucose_monitors": {
+      "title": "Glukosövervakning",
+      "high_threshold": "Högt (mg/dL)",
+      "low_threshold": "Lågt (mg/dL)",
+      "refresh_interval": "Uppdatering (min.)",
+      "display_unit": "Visningsenhet",
+      "validity_duration": "Giltighet (min.)",
+      "username": "Användarnamn",
+      "username_placeholder": "Ange ditt användarnamn",
+      "password": "Lösenord",
+      "password_placeholder": "Ange ditt lösenord",
+      "cgm_device_title": "CGM-enhet",
+      "alternate_time_cgm": {
+        "title": "Växla tid/CGM",
+        "description": "Växla projektionsvisning mellan tid och CGM-mätningar",
+        "time": "Tid (sek)",
+        "cgm": "CGM (sek)"
+      }
+    }
+  },
+  "update": {
+    "title": "Ladda upp firmware / filer",
+    "auto_check": "Din enhet kontrollerar och installerar automatiskt ny firmware.",
+    "manual_info": "Om vår support har instruerat dig att manuellt installera en specifik firmware-version, eller om du vill ladda upp ett anpassat typsnitt, kan du göra det här.",
+    "select_file": "Välj en firmware-fil (.bin) eller annan fil att ladda upp till enheten.",
+    "upload_button": "Ladda upp fil",
+    "firmware_instructions_title": "Instruktioner för firmware-uppdatering",
+    "firmware_step1": "Klicka på knappen \"Välj fil\" och välj firmware-filen (.bin) från din dator.",
+    "firmware_step2": "Klicka på knappen \"Ladda upp firmware\" för att starta uppdateringsprocessen.",
+    "firmware_step3": "Vänta tills uppdateringen är klar. Stäng inte av eller koppla från enheten under uppdateringen.",
+    "firmware_step4": "Enheten startar automatiskt om när uppdateringen är klar.",
+    "firmware_warning": "<strong>Varning:</strong> Att ladda upp felaktig firmware kan orsaka funktionsfel i enheten. Se till att använda rätt firmware för din enhet.",
+    "file_instructions_title": "Instruktioner för uppladdning av användarfiler",
+    "file_step1": "Klicka på knappen \"Välj fil\" och välj filen (t.ex. user-font.jpg) från din dator.",
+    "file_step2": "Klicka på knappen \"Ladda upp firmware\" för att starta uppladdningsprocessen.",
+    "file_step3": "Vänta tills uppladdningen är klar. Stäng inte av eller koppla från enheten under uppladdningen.",
+    "file_step4": "Du kan nu ladda upp en annan fil eller stänga det här fönstret."
+  },
+  "restart": {
+    "title": "Enhetsåterställning",
+    "description": "Använd det här alternativet för att starta om din Frixos-enhet.",
+    "button": "Starta om enheten",
+    "confirm_title": "Bekräfta omstart",
+    "confirm_message": "Är du säker på att du vill starta om enheten?",
+    "unavailable_message": "Enheten kommer att vara tillfälligt otillgänglig under omstarten.",
+    "confirm_button": "Starta om"
+  },
+  "messages": {
+    "error_loading_settings": "Fel vid laddning av inställningar",
+    "sensor_data_refreshed": "Sensordata uppdaterade",
+    "failed_refresh_sensor": "Misslyckades med att uppdatera sensordata",
+    "correct_form_errors": "Vänligen korrigera de markerade fälten innan du skickar",
+    "invalid_hostname": "Ogiltigt värdnamn: ",
+    "saving_settings": "Sparar inställningar...",
+    "network_settings_changed": "Nätverksinställningar ändrade. Enheten kommer att starta om...",
+    "device_will_restart": "Enheten kommer att starta om om ",
+    "settings_saved": "Inställningar sparade framgångsrikt",
+    "error_saving_settings": "Fel vid sparande av inställningar: ",
+    "error_saving_unknown": "Fel vid sparande av inställningar. Kontrollera konsolen för detaljer.",
+    "failed_fetch_status": "Misslyckades med att hämta statusdata",
+    "select_firmware_file": "Vänligen välj en firmware-fil eller annan fil att ladda upp",
+    "uploading_file": "Laddar upp fil... Stäng inte av enheten.",
+    "firmware_update_success": "Firmware-uppdatering lyckades! Enheten startar om...",
+    "file_upload_success": "Filuppladdning lyckades!",
+    "update_failed": "Uppdatering misslyckades: ",
+    "invalid_response": "Ogiltigt svar från servern",
+    "upload_failed_status": "Uppladdning misslyckades med status: ",
+    "network_error_upload": "Nätverksfel under uppladdning",
+    "upload_aborted": "Uppladdning avbruten",
+    "sending_reset": "Skickar omstartskommando...",
+    "device_restarting": "Enheten startar om. Denna sida kommer att uppdateras om ",
+    "device_restarting_seconds": " sekunder.",
+    "failed_restart": "Misslyckades med att starta om enheten: ",
+    "error_reset_connection": "Fel vid skickande av omstartskommando: Anslutning förlorad",
+    "correct_form_before_save": "Vänligen korrigera formulärfel innan du sparar.",
+    "dexcom_credentials_required": "användarnamn och lösenord krävs när aktiverat",
+    "dexcom_refresh_range": "uppdateringsintervall måste vara mellan 1 och 60 minuter",
+    "glucose_high_range": "Högt glukoströskelvärde måste vara mellan 1 och 400 mg/dL",
+    "glucose_low_range": "Lågt glukoströskelvärde måste vara mellan 1 och 400 mg/dL",
+    "glucose_low_less_than_high": "Lågt glukoströskelvärde måste vara lägre än högt tröskelvärde",
+    "freestyle_credentials_required": "Freestyle Libre-användarnamn och lösenord krävs när aktiverat",
+    "freestyle_refresh_range": "Freestyle Libre-uppdateringsintervall måste vara mellan 1 och 60 minuter",
+    "error_preparing_info": "Fel vid förberedelse av systeminformation: ",
+    "info_copied_clipboard": "Systeminformation kopierad till urklipp",
+    "failed_copy_clipboard": "Misslyckades med att kopiera till urklipp"
+  }
+}

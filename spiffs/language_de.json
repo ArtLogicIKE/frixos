@@ -1,0 +1,270 @@
+{
+  "menu": {
+    "settings": "Einstellungen",
+    "advanced": "Erweitert",
+    "integrations": "Integrationen",
+    "status": "Status",
+    "update": "Aktualisieren",
+    "restart": "Neustart"
+  },
+  "common": {
+    "save_settings": "Einstellungen speichern",
+    "cancel": "Abbrechen"
+  },
+  "settings": {
+    "connection": {
+      "title": "Verbindungseinstellungen *",
+      "wifi_ssid": "WiFi SSID",
+      "wifi_password": "WiFi-Passwort",
+      "hostname": "Hostname",
+      "fahrenheit": "Temperatur in Fahrenheit",
+      "hour12": "Zeit im 12-Stunden-Format",
+      "auto_update": "Automatisch nach Firmware-Updates suchen",
+      "restart_note": "* Änderungen der Verbindungseinstellungen starten das Gerät neu."
+    },
+    "wifi": {
+      "available_networks": "Verfügbare WiFi-Netzwerke",
+      "scanning": "Suche nach Netzwerken...",
+      "scan_button": "Verfügbare Netzwerke scannen"
+    }
+  },
+  "advanced": {
+    "display": {
+      "title": "Display-Einstellungen",
+      "x_offset": "X-Versatz",
+      "y_offset": "Y-Versatz",
+      "rotation": "Display-Rotation",
+      "show_scroll": "Laufende Informationsnachricht anzeigen",
+      "show_weather": "Wettervorhersage-Symbol und Mondphase anzeigen",
+      "show_leading_zero": "0 für einstellige Stunde anzeigen",
+      "disable_dots_breathe": "Atmung der Zeitanzeige-Punkte deaktivieren",
+      "show_grid": "Raster anzeigen",
+      "mirror": "Display spiegeln"
+    },
+    "day": {
+      "title": "Tag-Einstellungen",
+      "font": "Schriftart",
+      "color_filter": "Farbfilter",
+      "message_color": "Nachrichtenfarbe"
+    },
+    "night": {
+      "title": "Nacht-Einstellungen",
+      "font": "Schriftart",
+      "color_filter": "Farbfilter",
+      "message_color": "Nachrichtenfarbe"
+    },
+    "color_filter": {
+      "none": "Keine",
+      "red": "Rot",
+      "green": "Grün",
+      "blue": "Blau",
+      "bw": "Schwarz-Weiß"
+    },
+    "fonts": {
+      "title": "Schriftmuster"
+    },
+    "location": {
+      "title": "Standorteinstellungen *",
+      "latitude": "Breitengrad",
+      "longitude": "Längengrad",
+      "timezone": "Zeitzone",
+      "timezone_placeholder": "Zeitzone nur im POSIX-Format eingeben, wenn automatische Erkennung nicht funktioniert",
+      "help_text": "Eine Liste von POSIX-Zeitzonen finden Sie <a href=\"https://leo.leung.xyz/wiki/Timezone\" target=\"_blank\">hier</a>. Lat/Lon beeinflussen nur Wetterdaten.",
+      "restart_note": "* Änderungen der Standorteinstellungen starten das Gerät neu."
+    },
+    "wifi_hours": {
+      "title": "WiFi-Aktive Stunden",
+      "start": "Start",
+      "end": "Ende"
+    },
+    "brightness": {
+      "title": "Projektionshelligkeitseinstellungen",
+      "auto_dimming": "Automatische Dimmeinstellungen",
+      "day_threshold": "Tag-Schwellenwert (Lux)",
+      "light_sensitivity": "Lichtempfindlichkeit (Lux)",
+      "sensitivity_help": "Die Empfindlichkeit hilft, unerwünschte Helligkeitsänderungen zu vermeiden. Dunkel = Schwellenwert - Empfindlichkeit, Hell = Schwellenwert + Empfindlichkeit.",
+      "full_brightness": "Volle Helligkeit beibehalten (reduziert LED-Lebensdauer)",
+      "led_levels": "LED-Helligkeitsstufen (%)",
+      "led_day": "Helligkeit (Tag)",
+      "led_night": "Helligkeit (Nacht)",
+      "pwm_frequency": "PWM-Frequenz",
+      "max_power": "Maximale Leistung"
+    },
+    "message": {
+      "title": "Laufende Nachricht",
+      "font_size": "Schriftgröße",
+      "scroll_delay": "Scroll-Verzögerung",
+      "scroll_delay_help": "Animationsverzögerung in Millisekunden (30-500)",
+      "message": "Nachricht",
+      "message_placeholder": "Geben Sie Ihre Nachricht ein",
+      "tokens_title": "Verfügbare Token:",
+      "token_device": "Gerätename",
+      "token_greeting": "Zeitbasierte Begrüßung (Guten Morgen/Nachmittag/Abend/Nacht)",
+      "token_day": "Aktueller Wochentag",
+      "token_date": "Aktuelles Datum",
+      "token_mon": "Aktueller Monat",
+      "token_temp": "Aktuelle Temperatur",
+      "token_hum": "Aktuelle Luftfeuchtigkeit",
+      "token_high": "Heutige Höchsttemperatur",
+      "token_low": "Heutige Tiefsttemperatur",
+      "token_rise": "Sonnenaufgangszeit",
+      "token_set": "Sonnenuntergangszeit",
+      "token_ha": "Einstellungen von Home Assistant abrufen (benötigt aktivierte Integration)",
+      "token_stock": "Aktienkurs abrufen (benötigt aktivierte Aktienintegration mit Finnhub.io)",
+      "token_cgm_glucose": "Neueste Glukosewerte von Ihrem CGM-Gerät, formatiert, z.B. 157 mg/dl (+3 @ 12:01). (benötigt aktive CGM-Integration)",
+      "token_cgm_reading": "Neuester Glukosewert, einfach, z.B. 157",
+      "tokens_note": "Hinweis: Token sind Groß-/Kleinschreibung beachtend und müssen in eckigen Klammern stehen.",
+      "default_message": "Standardnachricht: [device].local/ [greeting] [day], [date] [mon], jetzt [temp] heute [high]-[low], Feuchte [hum], Sonne [rise]-[set]"
+    }
+  },
+  "status": {
+    "support": {
+      "title": "Informationen mit Support teilen",
+      "send_email": "E-Mail senden",
+      "copy_clipboard": "In Zwischenablage kopieren",
+      "help_text": "Falls Sie Unterstützung benötigen, teilen Sie uns bitte die obigen Informationen mit. Klicken Sie auf \"E-Mail senden\", um uns eine Nachricht zu senden; falls das nicht funktioniert, kopieren Sie die Informationen in Ihre Zwischenablage und senden Sie sie per E-Mail an support@buyfrixos.com."
+    },
+    "sensor": {
+      "title": "Sensordaten",
+      "light_level": "Aktueller Lichtwert (Lux)",
+      "last_time_update": "Letzte Zeitaktualisierung",
+      "timezone": "Zeitzone",
+      "moon_phase": "Mondphase",
+      "last_weather_update": "Letzte Wetteraktualisierung",
+      "latitude": "Breitengrad",
+      "longitude": "Längengrad",
+      "uptime": "Betriebszeit"
+    },
+    "system": {
+      "title": "Systeminformationen",
+      "app_name": "Anwendungsname",
+      "version": "Version",
+      "fw_version": "Firmware-Version",
+      "power_on_hours": "Betriebsstunden",
+      "mac_address": "MAC-Adresse",
+      "ip_address": "IP-Adresse",
+      "chip_revision": "Chip-Revision",
+      "flash_size": "SPI-Flash-Größe",
+      "cpu_freq": "CPU-Frequenz",
+      "compile_time": "Kompilierzeit",
+      "free_heap": "Freier Heap-Speicher",
+      "min_free_heap": "Min. freier Heap"
+    },
+    "refresh_button": "Status aktualisieren"
+  },
+  "integrations": {
+    "ha": {
+      "title": "Home Assistant",
+      "server_url": "Server-URL",
+      "token": "LL Zugangstoken",
+      "token_placeholder": "Geben Sie Ihr Token ein",
+      "refresh_interval": "Aktualisierung (Min.)"
+    },
+    "stock": {
+      "title": "Aktienkurs-Service (via Finnhub.io)",
+      "api_key": "API-Schlüssel",
+      "api_key_placeholder": "Geben Sie Ihren Finnhub API-Schlüssel ein",
+      "refresh_interval": "Aktualisierung (Min.)"
+    },
+    "dexcom": {
+      "title": "Dexcom G5/6",
+      "region": "Region",
+      "disabled": "Deaktiviert",
+      "japan": "Japan",
+      "rest_of_world": "Rest der Welt"
+    },
+    "freestyle": {
+      "title": "FreeStyle Libre",
+      "region": "Region",
+      "disabled": "Disabled",
+      "enabled": "Aktiviert",
+      "japan": "Japan",
+      "rest_of_world": "Rest der Welt"
+    },
+    "glucose_monitors": {
+      "title": "Glukose-Überwachung",
+      "high_threshold": "Hoch (mg/dL)",
+      "low_threshold": "Niedrig (mg/dL)",
+      "refresh_interval": "Aktualisierung (Min.)",
+      "display_unit": "Anzeigeeinheit",
+      "validity_duration": "Gültigkeit (Min.)",
+      "username": "Benutzername",
+      "username_placeholder": "Geben Sie Ihren Benutzernamen ein",
+      "password": "Passwort",
+      "password_placeholder": "Geben Sie Ihr Passwort ein",
+      "cgm_device_title": "CGM-Gerät",
+      "alternate_time_cgm": {
+        "title": "Alternierende Zeit/CGM",
+        "description": "Alternierende Projektionsanzeige zwischen Zeit und CGM-Messungen",
+        "time": "Zeit (Sek.)",
+        "cgm": "CGM (Sek.)"
+      }
+    }
+  },
+  "update": {
+    "title": "Firmware / Dateien hochladen",
+    "auto_check": "Ihr Gerät überprüft und installiert neue Firmware automatisch.",
+    "manual_info": "Falls Sie von unserem Support angewiesen wurden, eine bestimmte Firmware-Version manuell zu installieren, oder wenn Sie z.B. eine benutzerdefinierte Schriftart hochladen möchten, können Sie dies hier tun.",
+    "select_file": "Wählen Sie eine Firmware-Datei (.bin) oder andere Datei zum Hochladen auf das Gerät.",
+    "upload_button": "Datei hochladen",
+    "firmware_instructions_title": "Firmware-Update-Anleitung",
+    "firmware_step1": "Klicken Sie auf die Schaltfläche \"Datei auswählen\" und wählen Sie die Firmware-Datei (.bin) von Ihrem Computer aus.",
+    "firmware_step2": "Klicken Sie auf die Schaltfläche \"Firmware hochladen\", um den Update-Vorgang zu starten.",
+    "firmware_step3": "Warten Sie, bis das Update abgeschlossen ist. Schalten Sie das Gerät während des Updates nicht aus und trennen Sie es nicht.",
+    "firmware_step4": "Das Gerät wird nach Abschluss des Updates automatisch neu starten.",
+    "firmware_warning": "<strong>Warnung:</strong> Das Hochladen falscher Firmware kann zu Fehlfunktionen des Geräts führen. Stellen Sie sicher, dass Sie die richtige Firmware für Ihr Gerät verwenden.",
+    "file_instructions_title": "Anleitung zum Hochladen von Benutzerdateien",
+    "file_step1": "Klicken Sie auf die Schaltfläche \"Datei auswählen\" und wählen Sie die Datei (z.B. user-font.jpg) von Ihrem Computer aus.",
+    "file_step2": "Klicken Sie auf die Schaltfläche \"Firmware hochladen\", um den Upload-Vorgang zu starten.",
+    "file_step3": "Warten Sie, bis der Upload abgeschlossen ist. Schalten Sie das Gerät während des Uploads nicht aus und trennen Sie es nicht.",
+    "file_step4": "Sie können jetzt eine weitere Datei hochladen oder dieses Fenster schließen."
+  },
+  "restart": {
+    "title": "Gerät zurücksetzen",
+    "description": "Verwenden Sie diese Option, um Ihr Frixos-Gerät neu zu starten.",
+    "button": "Gerät neu starten",
+    "confirm_title": "Neustart bestätigen",
+    "confirm_message": "Sind Sie sicher, dass Sie das Gerät neu starten möchten?",
+    "unavailable_message": "Das Gerät wird während des Neustarts vorübergehend nicht verfügbar sein.",
+    "confirm_button": "Neu starten"
+  },
+  "messages": {
+    "error_loading_settings": "Fehler beim Laden der Einstellungen",
+    "sensor_data_refreshed": "Sensordaten aktualisiert",
+    "failed_refresh_sensor": "Fehler beim Aktualisieren der Sensordaten",
+    "correct_form_errors": "Bitte korrigieren Sie die hervorgehobenen Felder vor dem Absenden",
+    "invalid_hostname": "Ungültiger Hostname: ",
+    "saving_settings": "Einstellungen werden gespeichert...",
+    "network_settings_changed": "Netzwerkeinstellungen geändert. Gerät wird neu gestartet...",
+    "device_will_restart": "Gerät wird neu gestartet in ",
+    "settings_saved": "Einstellungen erfolgreich gespeichert",
+    "error_saving_settings": "Fehler beim Speichern der Einstellungen: ",
+    "error_saving_unknown": "Fehler beim Speichern der Einstellungen. Details in der Konsole prüfen.",
+    "failed_fetch_status": "Fehler beim Abrufen der Statusdaten",
+    "select_firmware_file": "Bitte wählen Sie eine Firmware-Datei oder andere Datei zum Hochladen",
+    "uploading_file": "Datei wird hochgeladen... Gerät nicht ausschalten.",
+    "firmware_update_success": "Firmware-Update erfolgreich! Gerät wird neu gestartet...",
+    "file_upload_success": "Datei-Upload erfolgreich!",
+    "update_failed": "Update fehlgeschlagen: ",
+    "invalid_response": "Ungültige Antwort vom Server",
+    "upload_failed_status": "Upload fehlgeschlagen mit Status: ",
+    "network_error_upload": "Netzwerkfehler beim Upload",
+    "upload_aborted": "Upload abgebrochen",
+    "sending_reset": "Neustart-Befehl wird gesendet...",
+    "device_restarting": "Gerät wird neu gestartet. Diese Seite wird in ",
+    "device_restarting_seconds": " Sekunden aktualisiert.",
+    "failed_restart": "Neustart des Geräts fehlgeschlagen: ",
+    "error_reset_connection": "Fehler beim Senden des Neustart-Befehls: Verbindung verloren",
+    "correct_form_before_save": "Bitte korrigieren Sie die Formularfehler vor dem Speichern.",
+    "dexcom_credentials_required": "Benutzername und -Passwort sind erforderlich, wenn aktiviert",
+    "dexcom_refresh_range": "Aktualisierungsintervall muss zwischen 1 und 60 Minuten liegen",
+    "glucose_high_range": "Hoher Glukose-Schwellenwert muss zwischen 1 und 400 mg/dL liegen",
+    "glucose_low_range": "Niedriger Glukose-Schwellenwert muss zwischen 1 und 400 mg/dL liegen",
+    "glucose_low_less_than_high": "Niedriger Glukose-Schwellenwert muss niedriger als hoher Schwellenwert sein",
+    "freestyle_credentials_required": "Libre-Benutzername und -Passwort sind erforderlich, wenn aktiviert",
+    "freestyle_refresh_range": "Libre-Aktualisierungsintervall muss zwischen 1 und 60 Minuten liegen",
+    "error_preparing_info": "Fehler beim Vorbereiten der Systeminformationen: ",
+    "info_copied_clipboard": "Systeminformationen in die Zwischenablage kopiert",
+    "failed_copy_clipboard": "Fehler beim Kopieren in die Zwischenablage"
+  }
+}

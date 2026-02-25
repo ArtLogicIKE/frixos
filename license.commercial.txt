@@ -1,0 +1,14 @@
+FRIXOS FIRMWARE - COMMERCIAL LICENSE
+
+Commercial use of this software requires a license from ArtLogic.
+
+Commercial use includes any use intended to generate revenue, such as:
+- Selling the software
+- Selling devices that include or run this software
+- Selling installation, configuration, or support services for this software
+
+To obtain a commercial license, please contact:
+
+  licensing@artlogic.gr
+
+ArtLogic will provide terms, pricing, and licensing arrangements for commercial use.

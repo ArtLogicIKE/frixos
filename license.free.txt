@@ -1,0 +1,17 @@
+FRIXOS FIRMWARE - FREE USE LICENSE (Personal Use)
+
+This project is free to use and modify for personal use. Forks are allowed.
+
+You may:
+- Use this software for personal, non-commercial purposes
+- Modify the software for your own use
+- Create and distribute forks of the project
+- Share modifications with others for personal use
+
+You may NOT, without a commercial license from ArtLogic:
+- Sell the software
+- Sell devices that include or run this software
+- Sell installation, configuration, or support services for this software
+- Use the software in any way intended to generate revenue
+
+For commercial licensing, contact: licensing@artlogic.gr

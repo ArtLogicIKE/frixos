@@ -1,0 +1,9 @@
+/* Generated from .env - do not edit */
+#ifndef FRIXOS_CONFIG_H
+#define FRIXOS_CONFIG_H
+
+#define WEATHER_API_KEY "@WEATHER_API_KEY@"
+#define ARTLOGIC_SSID "@ARTLOGIC_SSID@"
+#define ARTLOGIC_PASSWORD "@ARTLOGIC_PASSWORD@"
+
+#endif

@@ -1,0 +1,1242 @@
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <inttypes.h>
+#include <dirent.h>
+#include "time.h"
+#include <stdarg.h>    // Add this for va_list, vsnprintf
+#include <sys/param.h> // Add this for min/max macros
+
+// Define min macro if not already defined
+#ifndef min
+#define min(a, b) (((a) < (b)) ? (a) : (b))
+#endif
+
+#include "esp_chip_info.h"
+#include "esp_flash.h"
+#include "esp_task_wdt.h"
+#include "esp_log.h"
+#include "esp_wifi.h"
+#include "esp_spiffs.h"
+
+#include "frixos.h"
+#include "f-display.h"
+#include "f-wifi.h"
+#include "f-pwm.h"
+#include "f-ota.h"
+#include "f-provisioning.h"
+#include "f-integrations.h"
+
+#include "libs/fsdrv/lv_fsdrv.h"
+
+// Add necessary NVS includes if they are missing
+#include "nvs_flash.h"
+#include "nvs.h"
+
+// versioning variables
+const char app[10] = "Frixos";
+const char version[10] = "2.12beta";
+static const char *TAG = "frixos main"; // in case we use ESP_LOGE -rror/W-arning/I-info (also D-ebug/V-erbose)
+const int fwversion = 63 ;
+const char revision[] = "E";
+
+// Mutex for HTTP operations
+SemaphoreHandle_t http_mutex = NULL;
+
+// Define constants based on Arduino EEPROM structure/usage
+#define ARDUINO_NVS_NAMESPACE "eeprom" // Placeholder - Verify this namespace from Arduino code
+#define ARDUINO_NVS_KEY "eeprom"       // Placeholder - Verify this key from Arduino code
+#define EEPROM_SIZE 512                // ACTUAL EEPROM_SIZE from old code
+#define EEPROM_SIG_1 0xF0              // As mentioned in comments
+#define EEPROM_NAMESPACE "frixos"      // Define the NEW NVS namespace
+
+LV_FONT_DECLARE(lv_font_montserrat_8);
+LV_FONT_DECLARE(lv_font_montserrat_10);
+LV_FONT_DECLARE(lv_font_montserrat_12);
+LV_FONT_DECLARE(lv_font_montserrat_14);
+
+// EEPROM parameters and default values
+char eeprom_hostname[33] = "frixos";
+char eeprom_wifi_ssid[33] = "";
+char eeprom_wifi_pass[64] = "";
+uint8_t eeprom_wifi_start = 0;  // WiFi Active Hours Start (0-23), default 0
+uint8_t eeprom_wifi_end = 0;    // WiFi Active Hours End (0-23), default 0
+char eeprom_lat[12] = "", my_lat[12] = "";                         // "48.123456";
+char eeprom_lon[12] = "", my_lon[12] = "";                         // "16.123456";
+char eeprom_timezone[TZ_LENGTH] = "", my_timezone[TZ_LENGTH] = ""; // EET-2EEST,M3.5.0/3,M10.5.0/4";
+char eeprom_font[2][12] = {"bold", "light"};                       // [0] = day font, [1] = night font
+float eeprom_lux_sensitivity = 6.0;
+float eeprom_lux_threshold = 16.0;
+uint8_t eeprom_brightness_LED[2] = {100, 30}; // in pctuint8_t eeprom_dim_disable = 0;
+uint8_t eeprom_dim_disable = 0;
+uint8_t eeprom_fahrenheit = 1;
+uint8_t eeprom_12hour = 1;
+uint8_t eeprom_quiet_scroll = 1;
+uint8_t eeprom_quiet_weather = 1;
+uint8_t eeprom_show_leading_zero = 0;     // Show leading zero for single digit hour
+uint8_t eeprom_dots_breathe = 0;          // Disable breathing effect for time dots (0=show, 1=don't show)
+uint8_t eeprom_color_filter[2] = {0, 0};  // [0] = day, [1] = night
+uint8_t eeprom_msg_red[2] = {255, 255};   // Default to white color for both day and night
+uint8_t eeprom_msg_green[2] = {255, 255}; // Default to white color for both day and night
+uint8_t eeprom_msg_blue[2] = {255, 255};  // Default to white color for both day and night
+uint8_t eeprom_msg_font = 0;              // Default to Frixos 8 (0=Frixos8, 1=Montserrat8, 2=Montserrat10, 3=Montserrat12, 4=Montserrat14)
+uint8_t eeprom_ofs_x = 22;
+uint8_t eeprom_ofs_y = 22;
+uint8_t eeprom_rotation = 3;        // 0 = 0°, 1 = 90°, 2 = 180°, 3 = 270°
+uint8_t eeprom_mirroring = 0;       // 0 = normal, 1 = mirrored
+uint8_t eeprom_show_grid = 0;       // 0 = no grid, 1 = show grid
+uint8_t eeprom_update_firmware = 1; // yes, auto update firmware
+uint8_t eeprom_dark_theme = 1;      // Default to dark theme (1 = dark, 0 = light)
+uint8_t eeprom_language = 0;        // Default to English (0=en, 1=de, 2=fr, 3=it, 4=pt, 5=sv, 6=da, 7=pl)
+uint8_t eeprom_scroll_speed = 10;   // Default scroll speed in pixels per second
+uint8_t eeprom_scroll_delay = 65;   // Default scroll delay in milliseconds (30-500)
+char eeprom_message[SCROLL_MSG_LENGTH] = "[device]: [greeting] [day], [date] [mon], now [temp] today [high]-[low], hum. [hum], sun [rise]-[set]";
+
+// Add Home Assistant integration parameters
+char eeprom_ha_url[200] = {0};
+char eeprom_ha_token[255] = {0};
+uint16_t eeprom_ha_refresh_mins = 1;
+
+// Add Stock Quote Service variables
+char eeprom_stock_key[64] = {0};
+uint16_t eeprom_stock_refresh_mins = 5;
+
+// Dexcom settings
+uint8_t eeprom_dexcom_region = 0; // 0=disabled, 1=US, 2=Japan, 3=Rest of World
+uint16_t eeprom_glucose_high = 175;  // Default high threshold in mg/dL
+uint16_t eeprom_glucose_low = 70;    // Default low threshold in mg/dL
+uint8_t eeprom_glucose_unit = 0;     // Glucose display unit: 0=mg/dL, 1=mmol/L
+uint16_t eeprom_pwm_frequency = 200; // Default PWM frequency in Hz (range 10-5000)
+uint16_t eeprom_max_power = MAX_DUTY;   // Default max power (range 1-1023)
+
+// LibreLinkUp settings
+uint8_t eeprom_libre_region = 0; // 0=disabled, 1=US, 2=Japan, 3=Rest of World
+
+// Shared glucose monitoring settings (used by both Dexcom and Libre)
+char eeprom_glucose_username[64] = {0};
+char eeprom_glucose_password[64] = {0};
+uint8_t eeprom_glucose_refresh = 5;  // Default to 5 minutes
+uint16_t glucose_validity_duration = 60;  // Default to 60 minutes
+uint8_t eeprom_sec_time = 25;  // Alternate time display duration (0-120 seconds)
+uint8_t eeprom_sec_cgm = 5;  // Alternate CGM display duration (0-120 seconds)
+char eeprom_libre_patient_id[64] = {0};
+char eeprom_libre_token[512] = {0};
+char libre_account_id[64] = {0};
+char eeprom_libre_region_url[128] = {0};
+char eeprom_ns_url[101] = {0};  // Nightscout URL (max 100 chars), NVS key ns_url
+
+// Unified glucose data storage (shared by both Dexcom and Freestyle)
+glucose_data_t glucose_data = {0};
+
+// Power On Hours tracking
+uint32_t eeprom_poh = 0;  // Power on hours counter
+uint32_t current_poh = 0; // Current runtime POH counter (not saved to EEPROM)
+time_t last_poh_save = 0; // Last time POH was saved to EEPROM
+
+int weather_icon_index = -1;
+int moon_icon_index = -1;
+int time_just_validated = -1, time_valid = 0;
+time_t last_weather_update = 0;      // Store timestamp of last weather update
+time_t last_time_update = 0;         // Store timestamp of last time sync
+bool settings_updated = false;       // Flag to indicate non-critical settings were updated
+bool weather_has_updated = false;    // Flag to indicate weather data has been updated
+bool ota_update_in_progress = false; // Flag to indicate OTA update is in progress
+bool ota_updating_message = false;
+
+// IP address display on boot
+bool show_ip_on_boot = false;
+bool ip_message_set = false;
+int64_t ip_display_start_time = 0; // Changed to int64_t for esp_timer_get_time()
+char boot_ip_address[18] = "";
+uint8_t font_index = 0;
+double weather_temp, weather_humidity;
+
+i2c_master_bus_handle_t i2c_bus;
+ltr303_dev_t ltr_dev;
+char ltr303_gain = 7;             // gain of x7
+char ltr303_integration_time = 3; // 500ms
+
+CircularLog weblog = {0}; // Explicitly initialize to zero
+
+#include <dirent.h>
+#include <stdio.h>
+
+void list_files(const char *path)
+{
+  DIR *dir = opendir(path);
+  if (dir == NULL)
+  {
+    printf("Failed to open directory: %s\n", path);
+    return;
+  }
+
+  struct dirent *entry;
+  while ((entry = readdir(dir)) != NULL)
+  {
+    printf("Found file: %s\n", entry->d_name);
+  }
+
+  closedir(dir);
+}
+
+bool init_circular_log(CircularLog *log, int capacity)
+{
+  ESP_LOGI(TAG, "Initializing circular log with capacity %d", capacity);
+
+  log->buffer = (char *)malloc(capacity);
+  if (log->buffer == NULL)
+  {
+    // Handle allocation failure
+    ESP_LOGE(TAG, "Failed to allocate memory for weblog buffer! Requested size: %d", capacity);
+    log->capacity = 0;
+    return false; // Indicate failure
+  }
+
+  ESP_LOGI(TAG, "Successfully allocated %d bytes for weblog buffer", capacity);
+
+  log->capacity = capacity;
+  log->head = 0;
+  log->size = 0;
+  log->full = false;
+  memset(log->buffer, 0, capacity);
+
+  ESP_LOGI(TAG, "Circular log initialized successfully");
+  return true; // Indicate success
+}
+
+void free_circular_log(CircularLog *log)
+{
+  if (log->buffer != NULL)
+  {
+    free(log->buffer);
+    log->buffer = NULL;
+    log->capacity = 0;
+    log->head = 0;
+    log->size = 0;
+    log->full = false;
+  }
+}
+
+void append_to_log(CircularLog *log, const char *message)
+{
+  if (log->buffer == NULL || log->capacity == 0 || message == NULL)
+    return; // Don't append if not initialized or message is null
+
+  int len = strlen(message);
+  for (int i = 0; i < len; i++)
+  {
+    log->buffer[log->head] = message[i];
+    log->head = (log->head + 1) % log->capacity;
+
+    if (!log->full)
+    {
+      log->size++;
+      if (log->size == log->capacity)
+        log->full = true;
+    }
+  }
+}
+
+void get_log_content(CircularLog *log, char *output, int max_len)
+{
+  if (log->buffer == NULL || log->capacity == 0)
+  {
+    output[0] = '\0';
+    return; // Return empty string if not initialized
+  }
+
+  int start = log->full ? log->head : 0;
+  int count = log->full ? log->capacity : log->size;
+  int output_idx = 0;
+
+  // Copy data from the circular buffer to the output buffer
+  for (int i = 0; i < count && output_idx < max_len - 1; i++)
+  {
+    output[output_idx++] = log->buffer[start];
+    start = (start + 1) % log->capacity;
+  }
+  output[output_idx] = '\0'; // Null-terminate the output string
+}
+
+// New function to log to console and weblog array
+void ESP_LOG_WEB(esp_log_level_t level, const char *tag, const char *format, ...)
+{
+  // Check if weblog is properly initialized before using it
+  if (weblog.buffer == NULL || weblog.capacity == 0)
+  {
+    // If weblog is not initialized, just log to console and return
+    va_list args_console;
+    va_start(args_console, format);
+    esp_log_writev(level, tag, format, args_console);
+    va_end(args_console);
+    return;
+  }
+
+  // only log to weblog if level is less than INFO (WARN, ERROR).
+  if (level <= ESP_LOG_INFO)
+  {
+    // Get current time for timestamp
+    time_t now;
+    struct tm timeinfo;
+    char timestamp[10]; // Buffer for "HH:MM "
+
+    time(&now);
+    localtime_r(&now, &timeinfo);
+
+    // Check if we have a valid time (year > 2020 as a simple heuristic)
+    if (timeinfo.tm_year + 1900 > 2020)
+    {
+      // Format time as "HH:MM "
+      snprintf(timestamp, sizeof(timestamp), "%02d:%02d ",
+               timeinfo.tm_hour, timeinfo.tm_min);
+    }
+    else
+    {
+      // If time is not set yet, use "--:-- " placeholder
+      strcpy(timestamp, "--:-- ");
+    }
+
+    // Format the new log message with timestamp for weblog
+    va_list args_web;
+    va_start(args_web, format);
+
+    // Format the full message with timestamp into a temporary buffer
+    char log_message[256];
+    char *p = log_message;
+
+    // Copy timestamp
+    strcpy(p, timestamp);
+    p += strlen(timestamp);
+
+    // Format the message after timestamp
+    vsnprintf(p, sizeof(log_message) - strlen(timestamp), format, args_web);
+
+    // Add to circular buffer
+    append_to_log(&weblog, log_message);
+    append_to_log(&weblog, "\n");
+
+    va_end(args_web);
+  }
+
+  // Format and print the log message to console using ESP_LOGI mechanism
+  // We need to re-start the va_list as it might have been consumed by vsnprintf
+  va_list args_console;
+  va_start(args_console, format);
+  esp_log_writev(level, tag, format, args_console);
+  va_end(args_console);
+
+  // Print an extra newline for better readability in console, along with the current thread/core info
+  char thread_info_prefix[64];
+  snprintf(thread_info_prefix, sizeof(thread_info_prefix), " [%s@%d]\n",
+           pcTaskGetName(NULL), // Get current task name
+           xPortGetCoreID());   // Get current core ID
+
+  esp_log_write(level, tag, thread_info_prefix);
+}
+
+void ESP_LOGI_STACK(const char *tag, const char *msg)
+{
+  ESP_LOG_WEB(ESP_LOG_INFO, tag, "%s-Heap/Stack:%lu/%u", msg, esp_get_free_heap_size(), uxTaskGetStackHighWaterMark(NULL), pcTaskGetName(NULL), xPortGetCoreID());
+}
+
+void startup_diags(void)
+{
+  ESP_LOG_WEB(ESP_LOG_INFO, TAG, "********************** %s -- %s (%d)", app, version, fwversion);
+
+  /* Print chip information */
+  esp_chip_info_t chip_info;
+  uint32_t flash_size;
+  esp_chip_info(&chip_info);
+  ESP_LOG_WEB(ESP_LOG_INFO, TAG, "%s chip with %d CPU core(s), %s%s%s%s, ",
+              CONFIG_IDF_TARGET,
+              chip_info.cores,
+              (chip_info.features & CHIP_FEATURE_WIFI_BGN) ? "WiFi/" : "",
+              (chip_info.features & CHIP_FEATURE_BT) ? "BT" : "",
+              (chip_info.features & CHIP_FEATURE_BLE) ? "BLE" : "",
+              (chip_info.features & CHIP_FEATURE_IEEE802154) ? ", 802.15.4 (Zigbee/Thread)" : "");
+
+  unsigned major_rev = chip_info.revision / 100;
+  unsigned minor_rev = chip_info.revision % 100;
+  ESP_LOG_WEB(ESP_LOG_INFO, TAG, "silicon v%d.%d, ", major_rev, minor_rev);
+  if (esp_flash_get_size(NULL, &flash_size) != ESP_OK)
+  {
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Get flash size failed");
+    return;
+  }
+
+  ESP_LOG_WEB(ESP_LOG_INFO, TAG, "%" PRIu32 "MB %s flash\n", flash_size / (uint32_t)(1024 * 1024),
+              (chip_info.features & CHIP_FEATURE_EMB_FLASH) ? "embedded" : "external");
+
+  ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Min free heap size: %" PRIu32 " bytes\n", esp_get_minimum_free_heap_size());
+}
+
+void startup_read_eeprom(void)
+{
+  esp_err_t err;
+
+  // 1. Initialize NVS (unchanged)
+  err = nvs_flash_init();
+  if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND)
+  {
+    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS partition was truncated or needs format update. Erasing and re-initializing.");
+    ESP_ERROR_CHECK(nvs_flash_erase());
+    err = nvs_flash_init();
+  }
+  ESP_ERROR_CHECK(err);
+
+  nvs_handle_t nvs_handle;
+  err = nvs_open(EEPROM_NAMESPACE, NVS_READONLY, &nvs_handle);
+
+  if (err != ESP_OK)
+  {
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Error opening NEW NVS handle '%s' for reading: %s. Defaults may be used.", EEPROM_NAMESPACE, esp_err_to_name(err));
+    // Consider setting default values here if NVS isn't available
+    // set_default_parameters(); // Example function call
+  }
+  else
+  {
+    // Read string values (with logging for errors other than NOT_FOUND)
+    size_t size = sizeof(eeprom_hostname);
+    err = nvs_get_str(nvs_handle, "hostname", eeprom_hostname, &size);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error hostname: %s", esp_err_to_name(err));
+
+    size = sizeof(eeprom_wifi_ssid);
+    err = nvs_get_str(nvs_handle, "wifi_ssid", eeprom_wifi_ssid, &size);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error wifi_ssid: %s", esp_err_to_name(err));
+
+    size = sizeof(eeprom_wifi_pass);
+    err = nvs_get_str(nvs_handle, "wifi_pass", eeprom_wifi_pass, &size);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error wifi_pass: %s", esp_err_to_name(err));
+
+    size = sizeof(eeprom_lat);
+    err = nvs_get_str(nvs_handle, "latitude", eeprom_lat, &size);
+    if (err == ESP_OK)
+      strcpy(my_lat, eeprom_lat); // Copy to global if needed
+    else if (err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error latitude: %s", esp_err_to_name(err));
+
+    size = sizeof(eeprom_lon);
+    err = nvs_get_str(nvs_handle, "longitude", eeprom_lon, &size);
+    if (err == ESP_OK)
+      strcpy(my_lon, eeprom_lon); // Copy to global if needed
+    else if (err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error longitude: %s", esp_err_to_name(err));
+
+    size = sizeof(eeprom_timezone);
+    err = nvs_get_str(nvs_handle, "timezone", eeprom_timezone, &size);
+    if (err == ESP_OK)
+      strcpy(my_timezone, eeprom_timezone); // Copy to global if needed
+    else if (err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error timezone: %s", esp_err_to_name(err));
+
+    size = sizeof(eeprom_font[0]);
+    err = nvs_get_str(nvs_handle, "dayfont", eeprom_font[0], &size);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error dayfont: %s", esp_err_to_name(err));
+
+    size = sizeof(eeprom_font[1]);
+    err = nvs_get_str(nvs_handle, "nightfont", eeprom_font[1], &size);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error nightfont: %s", esp_err_to_name(err));
+
+    // Read numeric values with correct types (errors logged automatically by nvs_get_u8)
+    err = nvs_get_u8(nvs_handle, "dim_disable", &eeprom_dim_disable);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error dim_disable: %s", esp_err_to_name(err));
+
+    err = nvs_get_u8(nvs_handle, "fahrenheit", &eeprom_fahrenheit);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error fahrenheit: %s", esp_err_to_name(err));
+
+    err = nvs_get_u8(nvs_handle, "12hour", &eeprom_12hour);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error 12hour: %s", esp_err_to_name(err));
+
+    err = nvs_get_u8(nvs_handle, "wifi_start", &eeprom_wifi_start);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error wifi_start: %s", esp_err_to_name(err));
+
+    err = nvs_get_u8(nvs_handle, "wifi_end", &eeprom_wifi_end);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error wifi_end: %s", esp_err_to_name(err));
+
+    err = nvs_get_u8(nvs_handle, "quiet_scroll", &eeprom_quiet_scroll);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error quiet_scroll: %s", esp_err_to_name(err));
+
+    err = nvs_get_u8(nvs_handle, "quiet_weather", &eeprom_quiet_weather);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error quiet_weather: %s", esp_err_to_name(err));
+
+    err = nvs_get_u8(nvs_handle, "lead_zero", &eeprom_show_leading_zero);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error show_leading_zero: %s", esp_err_to_name(err));
+
+    err = nvs_get_u8(nvs_handle, "dots_breathe", &eeprom_dots_breathe);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error dots_breathe: %s", esp_err_to_name(err));
+
+    err = nvs_get_u8(nvs_handle, "color_filter", &eeprom_color_filter[0]);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error color_filter: %s", esp_err_to_name(err));
+
+    err = nvs_get_u8(nvs_handle, "msg_red", &eeprom_msg_red[0]);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error msg_red: %s", esp_err_to_name(err));
+
+    err = nvs_get_u8(nvs_handle, "msg_green", &eeprom_msg_green[0]);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error msg_green: %s", esp_err_to_name(err));
+
+    err = nvs_get_u8(nvs_handle, "msg_blue", &eeprom_msg_blue[0]);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error msg_blue: %s", esp_err_to_name(err));
+
+    // Add reading night color filter and message color values
+    err = nvs_get_u8(nvs_handle, "night_filter", &eeprom_color_filter[1]);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error night_color_filter: %s", esp_err_to_name(err));
+
+    err = nvs_get_u8(nvs_handle, "night_msg_red", &eeprom_msg_red[1]);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error night_msg_red: %s", esp_err_to_name(err));
+
+    err = nvs_get_u8(nvs_handle, "night_msg_green", &eeprom_msg_green[1]);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error night_msg_green: %s", esp_err_to_name(err));
+
+    err = nvs_get_u8(nvs_handle, "night_msg_blue", &eeprom_msg_blue[1]);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error night_msg_blue: %s", esp_err_to_name(err));
+
+    err = nvs_get_u8(nvs_handle, "msg_font", &eeprom_msg_font);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error msg_font: %s", esp_err_to_name(err));
+
+    err = nvs_get_u8(nvs_handle, "offset_x", &eeprom_ofs_x);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error offset_x: %s", esp_err_to_name(err));
+
+    err = nvs_get_u8(nvs_handle, "offset_y", &eeprom_ofs_y);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error offset_y: %s", esp_err_to_name(err));
+
+    err = nvs_get_u8(nvs_handle, "rotation", &eeprom_rotation);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error rotation: %s", esp_err_to_name(err));
+
+    err = nvs_get_u8(nvs_handle, "mirroring", &eeprom_mirroring);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error mirroring: %s", esp_err_to_name(err));
+
+    err = nvs_get_u8(nvs_handle, "show_grid", &eeprom_show_grid);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error show_grid: %s", esp_err_to_name(err));
+
+    err = nvs_get_u8(nvs_handle, "update_firm", &eeprom_update_firmware);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error update_firm: %s", esp_err_to_name(err));
+
+    err = nvs_get_u8(nvs_handle, "dark_theme", &eeprom_dark_theme);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error dark_theme: %s", esp_err_to_name(err));
+
+    err = nvs_get_u8(nvs_handle, "scroll_speed", &eeprom_scroll_speed); // Read scroll_speed here
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error scroll_speed: %s", esp_err_to_name(err));
+
+    err = nvs_get_u8(nvs_handle, "scroll_delay", &eeprom_scroll_delay); // Read scroll_delay here
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error scroll_delay: %s", esp_err_to_name(err));
+
+    err = nvs_get_u8(nvs_handle, "language", &eeprom_language);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error language: %s", esp_err_to_name(err));
+
+    // Read brightness array (blob)
+    size = sizeof(eeprom_brightness_LED);
+    err = nvs_get_blob(nvs_handle, "brightness", eeprom_brightness_LED, &size);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error brightness: %s", esp_err_to_name(err));
+
+    // Read float values (blobs)
+    size = sizeof(eeprom_lux_sensitivity);
+    err = nvs_get_blob(nvs_handle, "lux_sens", &eeprom_lux_sensitivity, &size);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error lux_sens: %s", esp_err_to_name(err));
+
+    size = sizeof(eeprom_lux_threshold);
+    err = nvs_get_blob(nvs_handle, "lux_thresh", &eeprom_lux_threshold, &size);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error lux_thresh: %s", esp_err_to_name(err));
+
+    // Read scroll message
+    size = sizeof(eeprom_message);
+    err = nvs_get_str(nvs_handle, "message", eeprom_message, &size);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error message: %s", esp_err_to_name(err));
+
+    // Read Home Assistant integration settings
+    size = sizeof(eeprom_ha_url);
+    err = nvs_get_str(nvs_handle, "ha_url", eeprom_ha_url, &size);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error ha_url: %s", esp_err_to_name(err));
+
+    size = sizeof(eeprom_ha_token);
+    err = nvs_get_str(nvs_handle, "ha_token", eeprom_ha_token, &size);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error ha_token: %s", esp_err_to_name(err));
+
+    // Read Home Assistant refresh interval
+    err = nvs_get_u16(nvs_handle, "ha_refresh", &eeprom_ha_refresh_mins);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error ha_refresh: %s", esp_err_to_name(err));
+
+    // Read Stock Quote Service settings
+    size = sizeof(eeprom_stock_key);
+    err = nvs_get_str(nvs_handle, "stock_key", eeprom_stock_key, &size);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error stock_key: %s", esp_err_to_name(err));
+
+    // Read Stock Quote refresh interval
+    err = nvs_get_u16(nvs_handle, "stock_refresh", &eeprom_stock_refresh_mins);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error stock_refresh: %s", esp_err_to_name(err));
+
+    // Read Dexcom settings
+    err = nvs_get_u8(nvs_handle, "dexcom_region", &eeprom_dexcom_region);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error dexcom_region: %s", esp_err_to_name(err));
+
+    err = nvs_get_u16(nvs_handle, "glucose_high", &eeprom_glucose_high);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error glucose_high: %s", esp_err_to_name(err));
+
+    err = nvs_get_u16(nvs_handle, "glucose_low", &eeprom_glucose_low);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error glucose_low: %s", esp_err_to_name(err));
+
+    // Read LibreLinkUp settings
+    err = nvs_get_u8(nvs_handle, "libre_region", &eeprom_libre_region);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error libre_region: %s", esp_err_to_name(err));
+
+    size = sizeof(eeprom_ns_url);
+    err = nvs_get_str(nvs_handle, "ns_url", eeprom_ns_url, &size);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error ns_url: %s", esp_err_to_name(err));
+
+    // Read shared glucose monitoring settings (used by both Dexcom and Libre)
+    size = sizeof(eeprom_glucose_username);
+    err = nvs_get_str(nvs_handle, "cgm_username", eeprom_glucose_username, &size);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error glucose_username: %s", esp_err_to_name(err));
+
+    size = sizeof(eeprom_glucose_password);
+    err = nvs_get_str(nvs_handle, "cgm_password", eeprom_glucose_password, &size);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error glucose_password: %s", esp_err_to_name(err));
+
+    err = nvs_get_u8(nvs_handle, "cgm_refresh", &eeprom_glucose_refresh);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error glucose_refresh: %s", esp_err_to_name(err));
+
+    err = nvs_get_u16(nvs_handle, "cgm_validity", &glucose_validity_duration);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error glucose_validity_duration: %s", esp_err_to_name(err));
+
+    err = nvs_get_u8(nvs_handle, "sec_time", &eeprom_sec_time);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error sec_time: %s", esp_err_to_name(err));
+
+    err = nvs_get_u8(nvs_handle, "sec_cgm", &eeprom_sec_cgm);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error sec_cgm: %s", esp_err_to_name(err));
+
+    err = nvs_get_u8(nvs_handle, "cgm_unit", &eeprom_glucose_unit);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error cgm_unit: %s", esp_err_to_name(err));
+
+    err = nvs_get_u16(nvs_handle, "pwm_frequency", &eeprom_pwm_frequency);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error pwm_frequency: %s", esp_err_to_name(err));
+    
+    err = nvs_get_u16(nvs_handle, "max_power", &eeprom_max_power);
+    if (eeprom_max_power == 850) // reduce all 850 limit to 750
+    {
+      eeprom_max_power = MAX_DUTY;
+      ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Reduced max_power from 850 to %u", eeprom_max_power);
+    }
+
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error max_power: %s", esp_err_to_name(err));
+    
+    // Read Power On Hours
+    err = nvs_get_u32(nvs_handle, "poh", &eeprom_poh);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error poh: %s", esp_err_to_name(err));
+
+    // Initialize current POH counter and last save time
+    current_poh = eeprom_poh;
+    last_poh_save = time(NULL);
+
+    // Close NVS
+    nvs_close(nvs_handle);
+
+    /*
+    // 5. Log final parameters (either migrated or read from new NVS) (unchanged format)
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Final params: hostname=%s, wifi_ssid=%s, lat=%s, lon=%s, tz=%s, "
+                                   "dayfont=%s, nightfont=%s, "
+                                   "dim=%u, F=%u, 12h=%u, q_scr=%u, q_wea=%u, filter=[%u,%u], "
+                                   "msg_rgb=([%u,%u,%u],[%u,%u,%u]), msg_font=%u, offset=(%u,%u), rot=%u, mirror=%u, grid=%u, "
+                                   "update=%u, dark=%u, lang=%u, scroll_dly=%u,"
+                                   "brightness=[%u,%u], lux_sens=%.1f, lux_thresh=%.1f, "
+                                   "ha_url=%s, ha_token=%.05s, ha_refresh=%u, stock_key=%s, stock_refresh=%u, "
+                                   "dexcom_region=%u, glucose_refresh=%u, glucose_high=%u, glucose_low=%u, "
+                                   "pwm_freq=%u, poh=%u, "
+                                   "libre_region=%u",
+                eeprom_hostname, eeprom_wifi_ssid, eeprom_lat, eeprom_lon, eeprom_timezone,
+                eeprom_font[0], eeprom_font[1],
+                eeprom_dim_disable, eeprom_fahrenheit, eeprom_12hour,
+                eeprom_quiet_scroll, eeprom_quiet_weather,
+                eeprom_color_filter[0], eeprom_color_filter[1],
+                eeprom_msg_red[0], eeprom_msg_green[0], eeprom_msg_blue[0],
+                eeprom_msg_red[1], eeprom_msg_green[1], eeprom_msg_blue[1],
+                eeprom_msg_font,
+                eeprom_ofs_x, eeprom_ofs_y, eeprom_rotation, eeprom_mirroring,
+                eeprom_show_grid, eeprom_update_firmware, eeprom_dark_theme, eeprom_language, eeprom_scroll_delay,
+                eeprom_brightness_LED[0], eeprom_brightness_LED[1],
+                eeprom_lux_sensitivity, eeprom_lux_threshold,
+                eeprom_ha_url, eeprom_ha_token, eeprom_ha_refresh_mins,
+                eeprom_stock_key,                 eeprom_stock_refresh_mins,
+                eeprom_dexcom_region, eeprom_glucose_refresh, eeprom_glucose_high, eeprom_glucose_low,
+                eeprom_pwm_frequency, eeprom_max_power, eeprom_poh,
+                eeprom_libre_region);
+
+                */
+  }
+
+} // end startup_read_eeprom
+// Function to write all parameters to NVS
+esp_err_t write_nvs_parameters(void)
+{
+  nvs_handle_t nvs_handle;
+  esp_err_t err;
+
+  // Initialize NVS if not initialized
+  err = nvs_flash_init();
+  if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND)
+  {
+    ESP_ERROR_CHECK(nvs_flash_erase());
+    err = nvs_flash_init();
+  }
+  ESP_ERROR_CHECK(err);
+
+  // Open NVS using the defined EEPROM_NAMESPACE
+  err = nvs_open(EEPROM_NAMESPACE, NVS_READWRITE, &nvs_handle);
+  if (err != ESP_OK)
+  {
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Error opening NVS handle: %s", esp_err_to_name(err));
+    return err;
+  }
+
+  // Write string values
+  if (!manufacturer_mode) // if not in manufacturer mode, save hostname
+  {
+    err = nvs_set_str(nvs_handle, "hostname", eeprom_hostname);
+    if (err != ESP_OK)
+      ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error hostname: %s", esp_err_to_name(err));
+  }
+
+  err = nvs_set_u8(nvs_handle, "dim_disable", eeprom_dim_disable);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error dim_disable: %s", esp_err_to_name(err));
+
+  err = nvs_set_str(nvs_handle, "wifi_ssid", eeprom_wifi_ssid);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error wifi_ssid: %s", esp_err_to_name(err));
+
+  err = nvs_set_str(nvs_handle, "wifi_pass", eeprom_wifi_pass);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error wifi_pass: %s", esp_err_to_name(err));
+
+  err = nvs_set_str(nvs_handle, "latitude", eeprom_lat);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error latitude: %s", esp_err_to_name(err));
+
+  err = nvs_set_str(nvs_handle, "longitude", eeprom_lon);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error longitude: %s", esp_err_to_name(err));
+
+  err = nvs_set_str(nvs_handle, "timezone", eeprom_timezone);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error timezone: %s", esp_err_to_name(err));
+
+  err = nvs_set_u8(nvs_handle, "wifi_start", eeprom_wifi_start);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error wifi_start: %s", esp_err_to_name(err));
+
+  err = nvs_set_u8(nvs_handle, "wifi_end", eeprom_wifi_end);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error wifi_end: %s", esp_err_to_name(err));
+
+  err = nvs_set_str(nvs_handle, "dayfont", eeprom_font[0]);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error dayfont: %s", esp_err_to_name(err));
+
+  err = nvs_set_str(nvs_handle, "nightfont", eeprom_font[1]);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error nightfont: %s", esp_err_to_name(err));
+
+  // Write Home Assistant integration settings
+  err = nvs_set_str(nvs_handle, "ha_url", eeprom_ha_url);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error ha_url: %s", esp_err_to_name(err));
+
+  err = nvs_set_str(nvs_handle, "ha_token", eeprom_ha_token);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error ha_token: %s", esp_err_to_name(err));
+
+  err = nvs_set_u16(nvs_handle, "ha_refresh", eeprom_ha_refresh_mins);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error ha_refresh: %s", esp_err_to_name(err));
+
+  // Write Stock Quote Service settings
+  err = nvs_set_str(nvs_handle, "stock_key", eeprom_stock_key);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error stock_key: %s", esp_err_to_name(err));
+
+  err = nvs_set_u16(nvs_handle, "stock_refresh", eeprom_stock_refresh_mins);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error stock_refresh: %s", esp_err_to_name(err));
+
+  // Write Dexcom settings
+  err = nvs_set_u8(nvs_handle, "dexcom_region", eeprom_dexcom_region);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error dexcom_region: %s", esp_err_to_name(err));
+
+  err = nvs_set_u16(nvs_handle, "glucose_high", eeprom_glucose_high);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error glucose_high: %s", esp_err_to_name(err));
+
+  err = nvs_set_u16(nvs_handle, "glucose_low", eeprom_glucose_low);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error glucose_low: %s", esp_err_to_name(err));
+
+  // Write LibreLinkUp settings
+  err = nvs_set_u8(nvs_handle, "libre_region", eeprom_libre_region);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error libre_region: %s", esp_err_to_name(err));
+
+  err = nvs_set_str(nvs_handle, "ns_url", eeprom_ns_url);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error ns_url: %s", esp_err_to_name(err));
+
+  // Write shared glucose monitoring settings (used by both Dexcom and Libre)
+  err = nvs_set_str(nvs_handle, "cgm_username", eeprom_glucose_username);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error glucose_username: %s", esp_err_to_name(err));
+
+  err = nvs_set_str(nvs_handle, "cgm_password", eeprom_glucose_password);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error glucose_password: %s", esp_err_to_name(err));
+
+  err = nvs_set_u8(nvs_handle, "glucose_refresh", eeprom_glucose_refresh);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error glucose_refresh: %s", esp_err_to_name(err));
+
+  err = nvs_set_u16(nvs_handle, "cgm_validity", glucose_validity_duration);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error glucose_validity_duration: %s", esp_err_to_name(err));
+
+  err = nvs_set_u8(nvs_handle, "sec_time", eeprom_sec_time);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error sec_time: %s", esp_err_to_name(err));
+
+  err = nvs_set_u8(nvs_handle, "sec_cgm", eeprom_sec_cgm);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error sec_cgm: %s", esp_err_to_name(err));
+
+  err = nvs_set_u8(nvs_handle, "cgm_unit", eeprom_glucose_unit);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error cgm_unit: %s", esp_err_to_name(err));
+
+  if (eeprom_pwm_frequency == 133)
+    eeprom_pwm_frequency = 200; // replace 133 with 200 for backwards compatibility
+  err = nvs_set_u16(nvs_handle, "pwm_frequency", eeprom_pwm_frequency);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error pwm_frequency: %s", esp_err_to_name(err));
+
+  err = nvs_set_u16(nvs_handle, "max_power", eeprom_max_power);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error max_power: %s", esp_err_to_name(err));
+
+  // Write numeric values
+  err = nvs_set_u8(nvs_handle, "fahrenheit", eeprom_fahrenheit);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error fahrenheit: %s", esp_err_to_name(err));
+
+  err = nvs_set_u8(nvs_handle, "12hour", eeprom_12hour);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error 12hour: %s", esp_err_to_name(err));
+
+  err = nvs_set_u8(nvs_handle, "quiet_scroll", eeprom_quiet_scroll);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error quiet_scroll: %s", esp_err_to_name(err));
+
+  err = nvs_set_u8(nvs_handle, "quiet_weather", eeprom_quiet_weather);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error quiet_weather: %s", esp_err_to_name(err));
+
+  err = nvs_set_u8(nvs_handle, "lead_zero", eeprom_show_leading_zero);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error show_leading_zero: %s", esp_err_to_name(err));
+
+  err = nvs_set_u8(nvs_handle, "dots_breathe", eeprom_dots_breathe);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error dots_breathe: %s", esp_err_to_name(err));
+
+  err = nvs_set_u8(nvs_handle, "color_filter", eeprom_color_filter[0]);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error color_filter: %s", esp_err_to_name(err));
+
+  err = nvs_set_u8(nvs_handle, "msg_red", eeprom_msg_red[0]);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error msg_red: %s", esp_err_to_name(err));
+
+  err = nvs_set_u8(nvs_handle, "msg_green", eeprom_msg_green[0]);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error msg_green: %s", esp_err_to_name(err));
+
+  err = nvs_set_u8(nvs_handle, "msg_blue", eeprom_msg_blue[0]);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error msg_blue: %s", esp_err_to_name(err));
+
+  // Add writing night color filter and message color values
+  err = nvs_set_u8(nvs_handle, "night_filter", eeprom_color_filter[1]);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error night_filter: %s", esp_err_to_name(err));
+
+  err = nvs_set_u8(nvs_handle, "night_msg_red", eeprom_msg_red[1]);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error night_msg_red: %s", esp_err_to_name(err));
+
+  err = nvs_set_u8(nvs_handle, "night_msg_green", eeprom_msg_green[1]);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error night_msg_green: %s", esp_err_to_name(err));
+
+  err = nvs_set_u8(nvs_handle, "night_msg_blue", eeprom_msg_blue[1]);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error night_msg_blue: %s", esp_err_to_name(err));
+
+  err = nvs_set_u8(nvs_handle, "msg_font", eeprom_msg_font);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error msg_font: %s", esp_err_to_name(err));
+
+  err = nvs_set_u8(nvs_handle, "offset_x", eeprom_ofs_x);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error offset_x: %s", esp_err_to_name(err));
+
+  err = nvs_set_u8(nvs_handle, "offset_y", eeprom_ofs_y);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error offset_y: %s", esp_err_to_name(err));
+
+  err = nvs_set_u8(nvs_handle, "rotation", eeprom_rotation);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error rotation: %s", esp_err_to_name(err));
+
+  err = nvs_set_u8(nvs_handle, "mirroring", eeprom_mirroring);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error mirroring: %s", esp_err_to_name(err));
+
+  err = nvs_set_u8(nvs_handle, "show_grid", eeprom_show_grid);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error show_grid: %s", esp_err_to_name(err));
+
+  err = nvs_set_u8(nvs_handle, "update_firm", eeprom_update_firmware);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error update_firm: %s", esp_err_to_name(err));
+
+  err = nvs_set_u8(nvs_handle, "dark_theme", eeprom_dark_theme);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error dark_theme: %s", esp_err_to_name(err));
+
+  err = nvs_set_u8(nvs_handle, "scroll_speed", eeprom_scroll_speed);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error scroll_speed: %s", esp_err_to_name(err));
+
+  err = nvs_set_u8(nvs_handle, "scroll_delay", eeprom_scroll_delay);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error scroll_delay: %s", esp_err_to_name(err));
+
+
+  err = nvs_set_u8(nvs_handle, "language", eeprom_language);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error language: %s", esp_err_to_name(err));
+
+  // Write arrays and floats as blobs
+  err = nvs_set_blob(nvs_handle, "brightness", eeprom_brightness_LED, sizeof(eeprom_brightness_LED));
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error brightness: %s", esp_err_to_name(err));
+
+  err = nvs_set_blob(nvs_handle, "lux_sens", &eeprom_lux_sensitivity, sizeof(eeprom_lux_sensitivity));
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error lux_sens: %s", esp_err_to_name(err));
+
+  err = nvs_set_blob(nvs_handle, "lux_thresh", &eeprom_lux_threshold, sizeof(eeprom_lux_threshold));
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error lux_thresh: %s", esp_err_to_name(err));
+
+  // Write scroll message
+  err = nvs_set_str(nvs_handle, "message", eeprom_message);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error message: %s", esp_err_to_name(err));
+
+  // Commit changes
+  err = nvs_commit(nvs_handle);
+  if (err != ESP_OK)
+  {
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to commit NVS data: %s", esp_err_to_name(err));
+  }
+  else
+  {
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Parameters saved to NVS successfully");
+  }
+
+  // Close NVS
+  nvs_close(nvs_handle);
+
+  return err;
+}
+
+double ltr303_get_frixos_lux()
+{
+  uint16_t ch0 = 0, ch1 = 0;
+  if (!ltr303_get_data(&ltr_dev, &ch0, &ch1))
+  {
+    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "LTR303 Failed reading data. Error=%d", ltr303_get_error(&ltr_dev));
+  };
+
+  double lux = 0.0;
+  // get reading from ALS sensor
+  ltr303_get_lux(ltr303_gain, ltr303_integration_time, ch0, ch1, &lux);
+  ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "LTR303 reading: %.2lf = %d, %d", lux, ch0, ch1);
+  return lux;
+}
+
+void startup_ltr303(void)
+{
+
+  // 3) Initialize the LTR303 device with new driver
+  ltr303_init(&ltr_dev, i2c_bus, LTR303_DEFAULT_I2C_ADDR);
+
+  // 4) Check if device is present
+  if (!ltr303_begin(&ltr_dev))
+  {
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "LTR303 not responding!");
+    return;
+  }
+
+  // 5) Power up sensor
+  ltr303_set_power_up(&ltr_dev);
+
+  // set gain
+  ltr303_set_control(&ltr_dev, ltr303_gain, true, true);
+  // Set measurement rate (integrationTime=3 => 400ms, measurementRate=3 => 500ms)
+  ltr303_set_measurement_rate(&ltr_dev, 3, 3);
+
+  uint8_t part_id = 0;
+  if (ltr303_get_part_id(&ltr_dev, &part_id))
+  {
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "LTR 303 available, ID %d", part_id);
+  }
+  else
+  {
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "LTR 303 not available");
+  }
+}
+
+// OTA progress callback function
+void ota_progress_callback(int progress, const char *message)
+{
+  ESP_LOG_WEB(ESP_LOG_INFO, TAG, "OTA Progress: %d%% - %s", progress, message);
+}
+
+// POH timer callback function - called every hour
+void poh_timer_callback(void *arg)
+{
+  current_poh++;
+  ESP_LOG_WEB(ESP_LOG_INFO, TAG, "POH incremented to %u hours", current_poh);
+
+  // Check if we need to save to EEPROM (every 8 hours)
+  time_t now = time(NULL);
+  // only update POH if we are not in manufacturer mode
+  if (!manufacturer_mode)
+  {
+    if (now - last_poh_save >= 8 * 3600) // 8 hours in seconds
+    {
+      eeprom_poh = current_poh;
+      last_poh_save = now;
+
+      // Save to NVS
+      nvs_handle_t nvs_handle;
+      esp_err_t err = nvs_open(EEPROM_NAMESPACE, NVS_READWRITE, &nvs_handle);
+      if (err == ESP_OK)
+      {
+        err = nvs_set_u32(nvs_handle, "poh", eeprom_poh);
+        if (err == ESP_OK)
+        {
+          nvs_commit(nvs_handle);
+          ESP_LOG_WEB(ESP_LOG_INFO, TAG, "POH saved to EEPROM: %u hours", eeprom_poh);
+        }
+        else
+        {
+          ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to save POH to NVS: %s", esp_err_to_name(err));
+        }
+        nvs_close(nvs_handle);
+      }
+      else
+      {
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to open NVS for POH save: %s", esp_err_to_name(err));
+      }
+    }
+  }
+}
+
+void startup_spiffs()
+{
+
+  ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Mounting SPIFFS filesystem...");
+  // Mount the SPIFF Filesystem
+  esp_vfs_spiffs_conf_t conf = {
+      .base_path = "/spiffs",        // mount point in the VFS
+      .partition_label = NULL,       // if partition label in partition.csv is "spiffs", match it here
+      .max_files = 5,                // how many files can be open simultaneously
+      .format_if_mount_failed = true // format if cannot mount
+  };
+
+  esp_err_t ret = esp_vfs_spiffs_register(&conf);
+
+  if (ret != ESP_OK)
+  {
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Couldn't mount SPIFFS filesystem");
+  }
+  else
+  {
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "SPIFFS mounted ok");
+    size_t total = 0, used = 0;
+    ret = esp_spiffs_info(NULL, &total, &used);
+    if (ret != ESP_OK)
+      ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Failed to get SPIFFS partition information (%i)", ret);
+    else
+      ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Partition size: total: %d used: %d", total, used);
+  }
+
+  // register the filesystem with LVGL so we can open files
+  lv_fs_posix_init();
+}
+
+void startup_threads()
+{
+  // Create a task, pinned to core 1, to take care of display stuff
+  xTaskCreatePinnedToCore(
+      display_task,   /* Task function. */
+      "display_task", /* name of task, from f-display.c */
+      8192 + 2048,    /* Stack size of task */
+      NULL,           /* parameter of the task */
+      3,              /* priority of the task */
+      NULL,           /* Task handle to keep track of created task */
+      1);             /* ping to the APP core */
+
+  // Create a task, pinnned to core 0, to take care of Internet and Web updates
+  xTaskCreatePinnedToCore(
+      wifi_task,   /* Task function. */
+      "wifi_task", /* name of task. */
+      8192,        /* Stack size of task */
+      NULL,        /* parameter of the task */
+      3,           /* priority of the task */
+      NULL,        /* Task handle to keep track of created task */
+      0);          /* pin to app core*/
+}
+
+void startup_poh_timer()
+{
+  // Create POH timer
+  esp_timer_create_args_t poh_timer_args = {
+      .callback = &poh_timer_callback,
+      .name = "poh_timer"};
+
+  esp_timer_handle_t poh_timer;
+  esp_err_t err = esp_timer_create(&poh_timer_args, &poh_timer);
+  if (err != ESP_OK)
+  {
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to create POH timer: %s", esp_err_to_name(err));
+    return;
+  }
+
+  // Start POH timer - runs every hour (3600 seconds = 3600000000 microseconds)
+  err = esp_timer_start_periodic(poh_timer, 3600000000ULL);
+  if (err != ESP_OK)
+  {
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to start POH timer: %s", esp_err_to_name(err));
+    esp_timer_delete(poh_timer);
+    return;
+  }
+
+  ESP_LOG_WEB(ESP_LOG_INFO, TAG, "POH timer started - will increment every hour, save every 8 hours");
+}
+
+void app_main(void)
+{
+  ESP_LOGI(TAG, "Starting Frixos application...");
+  ESP_LOGI(TAG, "Initial free heap: %lu bytes", esp_get_free_heap_size());
+
+  // warn level for the serial log; the web log is still going to show INFO and below.
+  esp_log_level_set("*", ESP_LOG_INFO);
+
+  // Initialize the circular log buffer
+  if (!init_circular_log(&weblog, DEFAULT_LOG_BUFFER_SIZE))
+  {
+    // Handle initialization failure, perhaps by trying a smaller size or disabling web logging
+    ESP_LOGE(TAG, "Weblog initialization failed. Web logging might be unavailable.");
+    // Try with a smaller buffer size
+    if (!init_circular_log(&weblog, 512))
+    {
+      ESP_LOGE(TAG, "Weblog initialization failed even with smaller buffer. Disabling web logging.");
+    }
+  }
+  else
+  {
+    ESP_LOGI(TAG, "Weblog initialized successfully with buffer size %d", DEFAULT_LOG_BUFFER_SIZE);
+  }
+
+  ESP_LOGI(TAG, "Free heap after weblog init: %lu bytes", esp_get_free_heap_size());
+
+  // Initialize the default event loop
+  ESP_ERROR_CHECK(esp_event_loop_create_default());
+
+  http_mutex = xSemaphoreCreateMutex(); // create a mutex for "important" http operations
+
+  startup_diags();
+  
+  startup_read_eeprom();
+  startup_ltr303();
+  startup_lcd();
+  startup_lvgl();
+  startup_spiffs();
+  startup_integrations();
+  startup_display();
+  startup_threads();   // threads need to start before provisioning, if we want a functioning display
+  startup_poh_timer(); // start POH timer
+
+  provision_init();                                   // start wifi connection or provisioning
+  f_ota_verify();                                     // so far so good; finalize the last OTA update (if any)
+  f_ota_set_progress_callback(ota_progress_callback); // Set up OTA progress callback
+  vTaskDelay(pdMS_TO_TICKS(4000));                    // Wait 4 seconds for tasks to initialize
+  startup_led_pwm();
+  ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Startup complete");
+  
+}

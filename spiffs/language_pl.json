@@ -1,0 +1,270 @@
+{
+  "menu": {
+    "settings": "Ustawienia",
+    "advanced": "Zaawansowane",
+    "integrations": "Integracje",
+    "status": "Status",
+    "update": "Aktualizacja",
+    "restart": "Restart"
+  },
+  "common": {
+    "save_settings": "Zapisz ustawienia",
+    "cancel": "Anuluj"
+  },
+  "settings": {
+    "connection": {
+      "title": "Ustawienia połączenia *",
+      "wifi_ssid": "SSID WiFi",
+      "wifi_password": "Hasło WiFi",
+      "hostname": "Nazwa hosta",
+      "fahrenheit": "Temperatura w Fahrenheit",
+      "hour12": "Czas w formacie 12-godzinnym",
+      "auto_update": "Automatycznie sprawdzaj aktualizacje oprogramowania",
+      "restart_note": "* Zmiana ustawień połączenia uruchomi urządzenie ponownie."
+    },
+    "wifi": {
+      "available_networks": "Dostępne sieci WiFi",
+      "scanning": "Szukanie sieci...",
+      "scan_button": "Skanuj dostępne sieci"
+    }
+  },
+  "advanced": {
+    "display": {
+      "title": "Ustawienia wyświetlacza",
+      "x_offset": "Przesunięcie X",
+      "y_offset": "Przesunięcie Y",
+      "rotation": "Obrót wyświetlacza",
+      "show_scroll": "Pokaż przewijaną wiadomość informacyjną",
+      "show_weather": "Pokaż ikonę prognozy pogody i fazę księżyca",
+      "show_leading_zero": "Pokaż 0 dla jednocyfrowej godziny",
+      "disable_dots_breathe": "Wyłącz efekt oddychania kropek czasu",
+      "show_grid": "Pokaż siatkę",
+      "mirror": "Odbij wyświetlacz"
+    },
+    "day": {
+      "title": "Ustawienia dzienne",
+      "font": "Czcionka",
+      "color_filter": "Filtr kolorów",
+      "message_color": "Kolor przewijanej wiadomości"
+    },
+    "night": {
+      "title": "Ustawienia nocne",
+      "font": "Czcionka",
+      "color_filter": "Filtr kolorów",
+      "message_color": "Kolor przewijanej wiadomości"
+    },
+    "color_filter": {
+      "none": "Brak",
+      "red": "Czerwony",
+      "green": "Zielony",
+      "blue": "Niebieski",
+      "bw": "Czarno-biały"
+    },
+    "fonts": {
+      "title": "Przykłady czcionek"
+    },
+    "location": {
+      "title": "Ustawienia lokalizacji *",
+      "latitude": "Szerokość geograficzna",
+      "longitude": "Długość geograficzna",
+      "timezone": "Strefa czasowa",
+      "timezone_placeholder": "Automatycznie wykryta, pozostaw puste",
+      "help_text": "Listę stref czasowych POSIX znajdziesz <a href=\"https://leo.leung.xyz/wiki/Timezone\" target=\"_blank\">tutaj</a>.",
+      "restart_note": "* Zmiana ustawień lokalizacji uruchomi urządzenie ponownie."
+    },
+    "wifi_hours": {
+      "title": "Aktywne godziny WiFi",
+      "start": "Start",
+      "end": "Koniec"
+    },
+    "brightness": {
+      "title": "Ustawienia jasności projekcji",
+      "auto_dimming": "Ustawienia automatycznego przyciemniania",
+      "day_threshold": "Próg dzienny (lux)",
+      "light_sensitivity": "Czułość światła (lux)",
+      "sensitivity_help": "Czułość pomaga uniknąć niechcianych zmian jasności. Ciemny = Próg - Czułość, Jasny = Próg + Czułość",
+      "full_brightness": "Utrzymuj pełną jasność (skraca żywotność LED)",
+      "led_levels": "Poziomy jasności LED (%)",
+      "led_day": "Jasność (Dzień)",
+      "led_night": "Jasność (Noc)",
+      "pwm_frequency": "Częstotliwość PWM",
+      "max_power": "Maksymalna moc"
+    },
+    "message": {
+      "title": "Przewijana wiadomość",
+      "font_size": "Rozmiar czcionki",
+      "scroll_delay": "Opóźnienie przewijania",
+      "scroll_delay_help": "Opóźnienie animacji w milisekundach (30-500)",
+      "message": "Wiadomość",
+      "message_placeholder": "Wprowadź przewijaną wiadomość (użyj tokenów w nawiasach kwadratowych)",
+      "tokens_title": "Dostępne tokeny:",
+      "token_device": "Nazwa urządzenia",
+      "token_greeting": "Powitanie zależne od pory dnia (Dzień dobry/Dobry wieczór/Dobranoc)",
+      "token_day": "Aktualny dzień tygodnia",
+      "token_date": "Aktualna data",
+      "token_mon": "Aktualny miesiąc",
+      "token_temp": "Aktualna temperatura",
+      "token_hum": "Aktualna wilgotność",
+      "token_high": "Dzisiejsza najwyższa temperatura",
+      "token_low": "Dzisiejsza najniższa temperatura",
+      "token_rise": "Czas wschodu słońca",
+      "token_set": "Czas zachodu słońca",
+      "token_ha": "Pobierz ustawienia z Home Assistant (wymaga włączonej integracji)",
+      "token_stock": "Pobierz notowania giełdowe (wymaga włączonej integracji giełdowej)",
+      "token_cgm_glucose": "Najnowszy odczyt glukozy z urządzenia CGM, sformatowany, np. 157 mg/dl (+3 @ 12:01). (wymaga aktywnej integracji CGM)",
+      "token_cgm_reading": "Najnowszy odczyt glukozy, prosty, np. 157",
+      "tokens_note": "Uwaga: Tokeny rozróżniają wielkość liter i muszą być w nawiasach kwadratowych.",
+      "default_message": "Domyślna wiadomość: [device].local/ [greeting] [day], [date] [mon], teraz [temp] dziś [high]-[low], wilg. [hum], sol [rise]-[set]"
+    }
+  },
+  "status": {
+    "support": {
+      "title": "Udostępnij informacje dla wsparcia",
+      "send_email": "Wyślij e-mail",
+      "copy_clipboard": "Kopiuj do schowka",
+      "help_text": "Jeśli potrzebujesz wsparcia, udostępnij powyższe informacje. Kliknij \"wyślij e-mail\" aby wysłać nam wiadomość; jeśli to nie działa, skopiuj informacje do schowka i wyślij e-mailem na support@buyfrixos.com."
+    },
+    "sensor": {
+      "title": "Dane czujnika",
+      "light_level": "Aktualny poziom światła (lux)",
+      "last_time_update": "Ostatnia aktualizacja czasu",
+      "timezone": "Strefa czasowa",
+      "moon_phase": "Faza księżyca",
+      "last_weather_update": "Ostatnia aktualizacja pogody",
+      "latitude": "Szerokość geograficzna",
+      "longitude": "Długość geograficzna",
+      "uptime": "Czas pracy"
+    },
+    "system": {
+      "title": "Informacje systemowe",
+      "app_name": "Nazwa aplikacji",
+      "version": "Wersja",
+      "fw_version": "Wersja oprogramowania",
+      "power_on_hours": "Godziny pracy",
+      "mac_address": "Adres MAC",
+      "ip_address": "Adres IP",
+      "chip_revision": "Rewizja układu",
+      "flash_size": "Rozmiar pamięci Flash SPI",
+      "cpu_freq": "Częstotliwość CPU",
+      "compile_time": "Czas kompilacji",
+      "free_heap": "Wolna pamięć Heap",
+      "min_free_heap": "Min. wolna pamięć Heap"
+    },
+    "refresh_button": "Odśwież status"
+  },
+  "integrations": {
+    "ha": {
+      "title": "Home Assistant",
+      "server_url": "Adres URL serwera",
+      "token": "Token dostępu LL",
+      "token_placeholder": "Wprowadź swój token",
+      "refresh_interval": "Odświeżanie (min.)"
+    },
+    "stock": {
+      "title": "Serwis notowań giełdowych (przez Finnhub.io)",
+      "api_key": "Klucz API",
+      "api_key_placeholder": "Wprowadź swój klucz API Finnhub",
+      "refresh_interval": "Odświeżanie (min.)"
+    },
+    "dexcom": {
+      "title": "Dexcom G5/6",
+      "region": "Region",
+      "disabled": "Wyłączony",
+      "japan": "Japonia",
+      "rest_of_world": "Reszta świata"
+    },
+    "freestyle": {
+      "title": "FreeStyle Libre",
+      "region": "Region",
+      "disabled": "Disabled",
+      "enabled": "Włączony",
+      "japan": "Japonia",
+      "rest_of_world": "Reszta świata"
+    },
+    "glucose_monitors": {
+      "title": "Monitorowanie glukozy",
+      "high_threshold": "Wysoki (mg/dL)",
+      "low_threshold": "Niski (mg/dL)",
+      "refresh_interval": "Odświeżanie (min.)",
+      "display_unit": "Jednostka wyświetlania",
+      "validity_duration": "Ważność (min.)",
+      "username": "Nazwa użytkownika",
+      "username_placeholder": "Wprowadź swoją nazwę użytkownika",
+      "password": "Hasło",
+      "password_placeholder": "Wprowadź swoje hasło",
+      "cgm_device_title": "Urządzenie CGM",
+      "alternate_time_cgm": {
+        "title": "Przełączanie czasu/CGM",
+        "description": "Przełączanie wyświetlania projekcji między czasem a pomiarami CGM",
+        "time": "Czas (sek)",
+        "cgm": "CGM (sek)"
+      }
+    }
+  },
+  "update": {
+    "title": "Prześlij oprogramowanie / pliki",
+    "auto_check": "Twoje urządzenie automatycznie sprawdza i instaluje nowe oprogramowanie układowe.",
+    "manual_info": "Jeśli nasz support polecił Ci zainstalować określoną wersję oprogramowania ręcznie lub chcesz przesłać niestandardową czcionkę, możesz to zrobić tutaj.",
+    "select_file": "Wybierz plik oprogramowania (.bin) lub inny plik do przesłania do urządzenia.",
+    "upload_button": "Prześlij plik",
+    "firmware_instructions_title": "Instrukcje aktualizacji oprogramowania",
+    "firmware_step1": "Kliknij przycisk \"Wybierz plik\" i wybierz plik oprogramowania (.bin) z komputera.",
+    "firmware_step2": "Kliknij przycisk \"Prześlij plik\" aby rozpocząć proces aktualizacji.",
+    "firmware_step3": "Poczekaj na zakończenie aktualizacji. Nie wyłączaj ani nie odłączaj urządzenia podczas aktualizacji.",
+    "firmware_step4": "Urządzenie automatycznie uruchomi się ponownie po zakończeniu aktualizacji.",
+    "firmware_warning": "<strong>Ostrzeżenie:</strong> Przesłanie nieprawidłowego oprogramowania może spowodować nieprawidłowe działanie urządzenia. Upewnij się, że używasz prawidłowego oprogramowania dla swojego urządzenia.",
+    "file_instructions_title": "Instrukcje przesyłania plików użytkownika",
+    "file_step1": "Kliknij przycisk \"Wybierz plik\" i wybierz plik (np. user-font.jpg) z komputera.",
+    "file_step2": "Kliknij przycisk \"Prześlij plik\" aby rozpocząć proces przesyłania.",
+    "file_step3": "Poczekaj na zakończenie przesyłania. Nie wyłączaj ani nie odłączaj urządzenia podczas przesyłania.",
+    "file_step4": "Możesz teraz przesłać kolejny plik lub zamknąć to okno."
+  },
+  "restart": {
+    "title": "Reset urządzenia",
+    "description": "Użyj tej opcji aby zrestartować urządzenie Frixos.",
+    "button": "Restart urządzenia",
+    "confirm_title": "Potwierdź restart",
+    "confirm_message": "Czy na pewno chcesz zrestartować urządzenie?",
+    "unavailable_message": "Urządzenie będzie tymczasowo niedostępne podczas restartu.",
+    "confirm_button": "Restart"
+  },
+  "messages": {
+    "error_loading_settings": "Błąd wczytywania ustawień",
+    "sensor_data_refreshed": "Dane czujnika odświeżone",
+    "failed_refresh_sensor": "Nie udało się odświeżyć danych czujnika",
+    "correct_form_errors": "Proszę poprawić podświetlone pola przed wysłaniem",
+    "invalid_hostname": "Nieprawidłowa nazwa hosta: ",
+    "saving_settings": "Zapisywanie ustawień...",
+    "network_settings_changed": "Ustawienia sieciowe zmienione. Urządzenie się zrestartuje...",
+    "device_will_restart": "Urządzenie zrestartuje się za ",
+    "settings_saved": "Ustawienia zapisane pomyślnie",
+    "error_saving_settings": "Błąd zapisywania ustawień: ",
+    "error_saving_unknown": "Błąd zapisywania ustawień. Sprawdź konsolę aby uzyskać szczegóły.",
+    "failed_fetch_status": "Nie udało się pobrać danych statusu",
+    "select_firmware_file": "Proszę wybrać plik oprogramowania lub inny plik do przesłania",
+    "uploading_file": "Przesyłanie pliku... Nie wyłączaj urządzenia.",
+    "firmware_update_success": "Aktualizacja oprogramowania udana! Urządzenie się restartuje...",
+    "file_upload_success": "Plik przesłany pomyślnie!",
+    "update_failed": "Aktualizacja nie powiodła się: ",
+    "invalid_response": "Nieprawidłowa odpowiedź z serwera",
+    "upload_failed_status": "Przesyłanie nie powiodło się ze statusem: ",
+    "network_error_upload": "Błąd sieci podczas przesyłania",
+    "upload_aborted": "Przesyłanie przerwane",
+    "sending_reset": "Wysyłanie polecenia restartu...",
+    "device_restarting": "Urządzenie się restartuje. Ta strona odświeży się za ",
+    "device_restarting_seconds": " sekund.",
+    "failed_restart": "Nie udało się zrestartować urządzenia: ",
+    "error_reset_connection": "Błąd wysyłania polecenia restartu: Połączenie utracone",
+    "correct_form_before_save": "Proszę poprawić błędy w formularzu przed zapisaniem.",
+    "dexcom_credentials_required": "Nazwa użytkownika i hasło są wymagane gdy włączone",
+    "dexcom_refresh_range": "Interwał odświeżania musi wynosić między 1 a 60 minut",
+    "glucose_high_range": "Wysoki próg glukozy musi wynosić między 1 a 400 mg/dL",
+    "glucose_low_range": "Niski próg glukozy musi wynosić między 1 a 400 mg/dL",
+    "glucose_low_less_than_high": "Niski próg glukozy musi być niższy niż wysoki próg",
+    "freestyle_credentials_required": "Nazwa użytkownika i hasło Libre są wymagane gdy włączone",
+    "freestyle_refresh_range": "Interwał odświeżania Libre musi wynosić między 1 a 60 minut",
+    "error_preparing_info": "Błąd przygotowywania informacji systemowych: ",
+    "info_copied_clipboard": "Informacje systemowe skopiowane do schowka",
+    "failed_copy_clipboard": "Nie udało się skopiować do schowka"
+  }
+}

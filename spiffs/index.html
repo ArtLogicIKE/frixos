@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy"
+        content="default-src * 'unsafe-inline' 'unsafe-eval'; script-src * 'unsafe-inline' 'unsafe-eval'; connect-src * 'unsafe-inline'; img-src * data: blob: 'unsafe-inline'; frame-src *; style-src * 'unsafe-inline';">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Frixos</title>
+    <link rel="stylesheet" href="index.css">
+</head>
+
+<body>
+    <div class="container">
+        <!-- Header with logo and navigation -->
+        <div class="menu-container">
+            <div class="logo-title-container">
+                <img src="logo.jpg" alt="Frixos Logo" class="logo">
+                <h1 id="page-title">Frixos</h1>
+            </div>
+            <div class="menu">
+                <a href="#settings" class="menu-item" data-section="settings-section"
+                    data-i18n="menu.settings">Settings</a>
+                <a href="#advanced" class="menu-item" data-section="advanced-section"
+                    data-i18n="menu.advanced">Advanced</a>
+                <a href="#integrations" class="menu-item" data-section="integrations-section"
+                    data-i18n="menu.integrations">Integrations</a>
+                <a href="#status" class="menu-item" data-section="status-section" data-i18n="menu.status">Status</a>
+                <a href="#update" class="menu-item" data-section="update-section" data-i18n="menu.update">Update</a>
+                <a href="#restart" class="menu-item" data-section="restart-section" data-i18n="menu.restart">Restart</a>
+            </div>
+            <div class="header-controls">
+                <button id="language-toggle" class="language-toggle" aria-label="Change language">
+                    <span id="current-language-name">English</span>
+                </button>
+                <div id="language-dropdown" class="language-dropdown" style="display: none;">
+                    <div class="language-option" data-lang="en">
+                        <span class="lang-name">English</span>
+                    </div>
+                    <div class="language-option" data-lang="de">
+                        <span class="lang-name">Deutsch</span>
+                    </div>
+                    <div class="language-option" data-lang="fr">
+                        <span class="lang-name">Français</span>
+                    </div>
+                    <div class="language-option" data-lang="it">
+                        <span class="lang-name">Italiano</span>
+                    </div>
+                    <div class="language-option" data-lang="pt">
+                        <span class="lang-name">Português</span>
+                    </div>
+                    <div class="language-option" data-lang="sv">
+                        <span class="lang-name">Svenska</span>
+                    </div>
+                    <div class="language-option" data-lang="da">
+                        <span class="lang-name">Dansk</span>
+                    </div>
+                    <div class="language-option" data-lang="pl">
+                        <span class="lang-name">Polski</span>
+                    </div>
+                    <div class="language-option" data-lang="es">
+                        <span class="lang-name">Español</span>
+                    </div>
+                </div>
+                <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">
+                    <span class="sun-icon">☀️</span>
+                    <span class="moon-icon">🌙</span>
+                </button>
+            </div>
+        </div>
+
+        <div id="status-message" class="status" style="display: none;"></div>
+
+        <!-- Settings Section -->
+        <div id="settings-section" class="page-section">
+            <form id="settingsForm" class="settings-form">
+                <div class="section">
+                    <div class="section-header">
+                        <h2 data-i18n="settings.connection.title">Connection Settings *</h2>
+                    </div>
+                    <div class="section-content">
+                        <div class="form-group">
+                            <label for="wifi_ssid" data-i18n="settings.connection.wifi_ssid">WiFi SSID</label>
+                            <input type="text" id="wifi_ssid" name="wifi_ssid">
+                        </div>
+                        <div class="form-group">
+                            <label for="wifi_pass" data-i18n="settings.connection.wifi_password">WiFi Password</label>
+                            <input type="password" id="wifi_pass" name="wifi_pass">
+                        </div>
+                        <div class="form-group">
+                            <label for="hostname" data-i18n="settings.connection.hostname">Hostname</label>
+                            <input type="text" id="hostname" name="hostname" required>
+                            <span id="hostname-error" class="input-error"></span>
+                        </div>
+                        <div class="checkbox-container">
+                            <input type="checkbox" id="fahrenheit" name="fahrenheit">
+                            <label for="fahrenheit" data-i18n="settings.connection.fahrenheit">Temperature in
+                                Fahrenheit</label>
+                        </div>
+                        <div class="checkbox-container">
+                            <input type="checkbox" id="hour12" name="hour12">
+                            <label for="hour12" data-i18n="settings.connection.hour12">Time in 12-hour format</label>
+                        </div>
+                        <div class="checkbox-container">
+                            <input type="checkbox" id="update_firmware" name="update_firmware">
+                            <label for="update_firmware" data-i18n="settings.connection.auto_update">Automatically check
+                                for firmware updates</label>
+                        </div>
+                        <button type="submit" class="button" data-i18n="common.save_settings">Save Settings</button>
+                        <p data-i18n="settings.connection.restart_note">* Changing connection settings will restart the
+                            device.</p>
+
+                        <div class="network-section">
+                            <h3 data-i18n="settings.wifi.available_networks">Available WiFi Networks</h3>
+                            <div class="network-list" id="network-list">
+                                <div class="loading-spinner" id="loading-spinner" style="display: none;"></div>
+                                <div class="loading-text" id="loading-text" style="display: none;"
+                                    data-i18n="settings.wifi.scanning">Scanning for
+                                    networks...</div>
+                            </div>
+                            <button type="button" id="scan-btn" class="scan-btn"
+                                data-i18n="settings.wifi.scan_button">Scan available networks</button>
+                        </div>
+                    </div>
+                </div>
+
+            </form>
+        </div>
+
+        <!-- Advanced Settings Section -->
+        <div id="advanced-section" class="page-section" style="display: none;">
+            <form id="advancedForm" class="settings-form">
+                <div class="section">
+                    <div class="section-header">
+                        <h2 data-i18n="advanced.display.title">Display Settings</h2>
+                    </div>
+                    <div class="section-content">
+                        <div class="form-group">
+                            <label for="ofs_x" data-i18n="advanced.display.x_offset">X Offset</label>
+                            <input type="number" id="ofs_x" name="ofs_x" min="0" max="160">
+                            <span id="ofs_x-error" class="input-error"></span>
+                        </div>
+                        <div class="form-group">
+                            <label for="ofs_y" data-i18n="advanced.display.y_offset">Y Offset</label>
+                            <input type="number" id="ofs_y" name="ofs_y" min="0" max="160">
+                            <span id="ofs_y-error" class="input-error"></span>
+                        </div>
+                        <div class="form-group">
+                            <label for="rotation" data-i18n="advanced.display.rotation">Display Rotation</label>
+                            <select id="rotation" name="rotation">
+                                <option value="0">0°</option>
+                                <option value="1">90°</option>
+                                <option value="2">180°</option>
+                                <option value="3">270°</option>
+                            </select>
+                        </div>
+                        <h3 data-i18n="advanced.day.title">Day Settings</h3>
+                        <div class="form-group">
+                            <label for="dayfont" data-i18n="advanced.day.font">Font</label>
+                            <select id="dayfont" name="dayfont">
+                                <option value="bold">Bold</option>
+                                <option value="light">Light</option>
+                                <option value="lcd">LCD</option>
+                                <option value="nixie">Nixie</option>
+                                <option value="robrito">Robrito</option>
+                                <option value="ficasso">Ficasso</option>
+                                <option value="lichten">Lichten</option>
+                                <option value="kablame">Kablame</option>
+                                <option value="kablamo">Kablamo</option>
+                                <option value="kaboom">Kaboom</option>
+                                <option value="user1">User1</option>
+                                <option value="user2">User2</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="color_filter" data-i18n="advanced.day.color_filter">Color Filter</label>
+                            <select id="color_filter" name="color_filter">
+                                <option value="0" data-i18n="advanced.color_filter.none">None</option>
+                                <option value="1" data-i18n="advanced.color_filter.red">Red</option>
+                                <option value="2" data-i18n="advanced.color_filter.green">Green</option>
+                                <option value="3" data-i18n="advanced.color_filter.blue">Blue</option>
+                                <option value="4" data-i18n="advanced.color_filter.bw">Black & White</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="msg_color" data-i18n="advanced.day.message_color">Message Color</label>
+                            <input type="color" id="msg_color" name="msg_color" value="#FFFFFF">
+                        </div>
+
+                        <h3 data-i18n="advanced.night.title">Night Settings</h3>
+                        <div class="form-group">
+                            <label for="nightfont" data-i18n="advanced.night.font">Font</label>
+                            <select id="nightfont" name="nightfont">
+                                <option value="bold">Bold</option>
+                                <option value="light">Light</option>
+                                <option value="lcd">LCD</option>
+                                <option value="nixie">Nixie</option>
+                                <option value="robrito">Robrito</option>
+                                <option value="ficasso">Ficasso</option>
+                                <option value="lichten">Lichten</option>
+                                <option value="kablame">Kablame</option>
+                                <option value="kablamo">Kablamo</option>
+                                <option value="kaboom">Kabboom</option>
+                                <option value="user1">User1</option>
+                                <option value="user2">User2</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="night_color_filter" data-i18n="advanced.night.color_filter">Color Filter</label>
+                            <select id="night_color_filter" name="night_color_filter">
+                                <option value="0" data-i18n="advanced.color_filter.none">None</option>
+                                <option value="1" data-i18n="advanced.color_filter.red">Red</option>
+                                <option value="2" data-i18n="advanced.color_filter.green">Green</option>
+                                <option value="3" data-i18n="advanced.color_filter.blue">Blue</option>
+                                <option value="4" data-i18n="advanced.color_filter.bw">Black & White</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="night_msg_color" data-i18n="advanced.night.message_color">Message Color</label>
+                            <input type="color" id="night_msg_color" name="night_msg_color" value="#FFFFFF">
+                        </div>
+                        <div class="checkbox-container">
+                            <input type="checkbox" id="quiet_scroll" name="quiet_scroll">
+                            <label for="quiet_scroll" data-i18n="advanced.display.show_scroll">Show scrolling
+                                information message</label>
+                        </div>
+                        <div class="checkbox-container">
+                            <input type="checkbox" id="quiet_weather" name="quiet_weather">
+                            <label for="quiet_weather" data-i18n="advanced.display.show_weather">Show weather forecast
+                                icon and moon phase</label>
+                        </div>
+                        <div class="checkbox-container">
+                            <input type="checkbox" id="show_leading_zero" name="show_leading_zero">
+                            <label for="show_leading_zero" data-i18n="advanced.display.show_leading_zero">Show 0 for
+                                single digit hour</label>
+                        </div>
+                        <div class="checkbox-container">
+                            <input type="checkbox" id="dots_breathe" name="dots_breathe">
+                            <label for="dots_breathe" data-i18n="advanced.display.disable_dots_breathe">Disable breathing time dots</label>
+                        </div>
+                        <div class="checkbox-container">
+                            <input type="checkbox" id="show_grid" name="show_grid">
+                            <label for="show_grid" data-i18n="advanced.display.show_grid">Show grid</label>
+                        </div>
+                        <div class="checkbox-container">
+                            <input type="checkbox" id="mirroring" name="mirroring">
+                            <label for="mirroring" data-i18n="advanced.display.mirror">Mirror Display</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <div class="section-header">
+                        <h2 data-i18n="advanced.fonts.title">Font Samples</h2>
+                    </div>
+                    <div class="section-content">
+                        <div class="font-samples-container">
+                            <div class="font-samples-grid">
+                                <div class="font-sample-box">
+                                    <div class="font-sample-name">Bold</div>
+                                    <img src="bold.jpg" alt="Bold Font Sample" class="font-sample-img">
+                                </div>
+                                <div class="font-sample-box">
+                                    <div class="font-sample-name">Light</div>
+                                    <img src="light.jpg" alt="Light Font Sample" class="font-sample-img">
+                                </div>
+                                <div class="font-sample-box">
+                                    <div class="font-sample-name">LCD</div>
+                                    <img src="lcd.jpg" alt="LCD Font Sample" class="font-sample-img">
+                                </div>
+                                <div class="font-sample-box">
+                                    <div class="font-sample-name">Nixie</div>
+                                    <img src="nixie.jpg" alt="Nixie Font Sample" class="font-sample-img">
+                                </div>
+                                <div class="font-sample-box">
+                                    <div class="font-sample-name">Robrito</div>
+                                    <img src="robrito.jpg" alt="Robrito Font Sample" class="font-sample-img">
+                                </div>
+                                <div class="font-sample-box">
+                                    <div class="font-sample-name">Ficasso</div>
+                                    <img src="ficasso.jpg" alt="Ficasso Font Sample" class="font-sample-img">
+                                </div>
+                                <div class="font-sample-box">
+                                    <div class="font-sample-name">Lichten</div>
+                                    <img src="lichten.jpg" alt="Lichten Font Sample" class="font-sample-img">
+                                </div>
+                                <div class="font-sample-box">
+                                    <div class="font-sample-name">Kablame</div>
+                                    <img src="kablame.jpg" alt="Kablame Font Sample" class="font-sample-img">
+                                </div>
+                                <div class="font-sample-box">
+                                    <div class="font-sample-name">Kablamo</div>
+                                    <img src="kablamo.jpg" alt="Kablamo Font Sample" class="font-sample-img">
+                                </div>
+                                <div class="font-sample-box">
+                                    <div class="font-sample-name">Kaboom</div>
+                                    <img src="kaboom.jpg" alt="Kaboom Font Sample" class="font-sample-img">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <div class="section-header">
+                        <h2 data-i18n="advanced.location.title">Location Settings *</h2>
+                    </div>
+                    <div class="section-content">
+                        <div class="form-group">
+                            <label for="lat" data-i18n="advanced.location.latitude">Latitude</label>
+                            <input type="text" id="lat" name="lat" placeholder="e.g. 40.6892494">
+                            <span id="lat-error" class="input-error"></span>
+                        </div>
+                        <div class="form-group">
+                            <label for="lon" data-i18n="advanced.location.longitude">Longitude</label>
+                            <input type="text" id="lon" name="lon" placeholder="e.g. -74.0470807">
+                            <span id="lon-error" class="input-error"></span>
+                        </div>
+                        <div class="form-group">
+                            <label for="timezone" data-i18n="advanced.location.timezone">Timezone</label>
+                            <input type="text" id="timezone" name="timezone"
+                                data-i18n-placeholder="advanced.location.timezone_placeholder">
+                        </div>
+                        <p data-i18n="advanced.location.help_text">You can find a list of POSIX timezones <a
+                                href="https://leo.leung.xyz/wiki/Timezone" target="_blank">here</a>. Lat/Lon only affect
+                            weather data.</p>
+                        <p data-i18n="advanced.location.restart_note">* Changing location settings will restart the
+                            device.</p>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <div class="section-header">
+                        <h2 data-i18n="advanced.wifi_hours.title">WiFi Active Hours</h2>
+                    </div>
+                    <div class="section-content">
+                        <div class="form-group">
+                            <label for="wifi_start" data-i18n="advanced.wifi_hours.start">Start</label>
+                            <input type="number" id="wifi_start" name="wifi_start" min="0" max="23" value="0">
+                            <span id="wifi_start-error" class="input-error"></span>
+                        </div>
+                        <div class="form-group">
+                            <label for="wifi_end" data-i18n="advanced.wifi_hours.end">End</label>
+                            <input type="number" id="wifi_end" name="wifi_end" min="0" max="23" value="0">
+                            <span id="wifi_end-error" class="input-error"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <div class="section-header">
+                        <h2 data-i18n="advanced.brightness.title">Projection brightness settings</h2>
+                    </div>
+                    <div class="section-content">
+                        <h3 data-i18n="advanced.brightness.auto_dimming">Automatic dimming settings</h3>
+                        <div class="form-group">
+                            <label for="lux_threshold" data-i18n="advanced.brightness.day_threshold">Day Threshold
+                                (lux)</label>
+                            <input type="number" id="lux_threshold" name="lux_threshold" step="0.1" min="0" max="500">
+                            <span id="lux_threshold-error" class="input-error"></span>
+                        </div>
+                        <div class="form-group">
+                            <label for="lux_sensitivity" data-i18n="advanced.brightness.light_sensitivity">Light
+                                Sensitivity (lux)</label>
+                            <input type="number" id="lux_sensitivity" name="lux_sensitivity" step="0.1" min="0"
+                                max="50">
+                            <span id="lux_sensitivity-error" class="input-error"></span>
+                        </div>
+                        <p data-i18n="advanced.brightness.sensitivity_help">Sensitivity helps avoid unwanted brightness
+                            changes. Dark = Threshold - Sensitivity, Bright =
+                            Threshold + Sensitivity.</p>
+                        <div class="checkbox-container">
+                            <input type="checkbox" id="dim_disable" name="dim_disable">
+                            <label for="dim_disable" data-i18n="advanced.brightness.full_brightness">Maintain full
+                                brightness (reduces LED lifespan)</label>
+                        </div>
+                        <h3 data-i18n="advanced.brightness.led_levels">LED Brightness Levels (%)</h3>
+                        <div class="form-group">
+                            <label for="brightness_LED0" data-i18n="advanced.brightness.led_day">Brightness
+                                (Day)</label>
+                            <input type="number" id="brightness_LED0" name="brightness_LED[0]" min="1" max="100">
+                            <span id="brightness_LED0-error" class="input-error"></span>
+                        </div>
+                        <div class="form-group">
+                            <label for="brightness_LED1" data-i18n="advanced.brightness.led_night">Brightness
+                                (Night)</label>
+                            <input type="number" id="brightness_LED1" name="brightness_LED[1]" min="1" max="100">
+                            <span id="brightness_LED1-error" class="input-error"></span>
+                        </div>
+                        <div class="form-group">
+                            <label for="pwm_frequency" data-i18n="advanced.brightness.pwm_frequency">PWM
+                                Frequency</label>
+                            <input type="number" id="pwm_frequency" name="pwm_frequency" min="10" max="5000"
+                                value="133">
+                            <span id="pwm_frequency-error" class="input-error"></span>
+                        </div>
+                        <div class="form-group">
+                            <label for="max_power" data-i18n="advanced.brightness.max_power">Max Power</label>
+                            <input type="number" id="max_power" name="max_power" min="1" max="1023" value="1023">
+                            <span id="max_power-error" class="input-error"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <div class="section-header">
+                        <h2 data-i18n="advanced.message.title">Scrolling Message</h2>
+                    </div>
+                    <div class="section-content">
+                        <div class="form-group">
+                            <label for="msg_font" data-i18n="advanced.message.font_size">Font Size</label>
+                            <select id="msg_font" name="msg_font">
+                                <option value="0">8pt</option>
+                                <option value="1">10pt</option>
+                                <option value="2">12pt</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="scroll_delay" data-i18n="advanced.message.scroll_delay">Scroll Delay</label>
+                            <input type="number" id="scroll_delay" name="scroll_delay" min="30" max="500" value="65">
+                            <span class="help-text" data-i18n="advanced.message.scroll_delay_help">Animation delay in
+                                milliseconds (30-500)</span>
+                        </div>
+                        <div class="form-group">
+                            <label for="message" data-i18n="advanced.message.message">Message</label>
+                            <textarea id="message" name="message"
+                                data-i18n-placeholder="advanced.message.message_placeholder" maxlength="511"
+                                rows="2"></textarea>
+                        </div>
+                        <div class="message-tokens">
+                            <h4 data-i18n="advanced.message.tokens_title">Available Tokens:</h4>
+                            <ul>
+                                <li><code>[device]</code> - <span data-i18n="advanced.message.token_device">Device
+                                        name</span></li>
+                                <li><code>[greeting]</code> - <span
+                                        data-i18n="advanced.message.token_greeting">Time-based greeting (Good
+                                        Morning/Afternoon/Evening/Night)</span>
+                                </li>
+                                <li><code>[day]</code> - <span data-i18n="advanced.message.token_day">Current day of the
+                                        week</span></li>
+                                <li><code>[date]</code> - <span data-i18n="advanced.message.token_date">Current
+                                        date</span></li>
+                                <li><code>[mon]</code> - <span data-i18n="advanced.message.token_mon">Current
+                                        month</span></li>
+                                <li><code>[temp]</code> - <span data-i18n="advanced.message.token_temp">Current
+                                        temperature</span></li>
+                                <li><code>[hum]</code> - <span data-i18n="advanced.message.token_hum">Current
+                                        humidity</span></li>
+                                <li><code>[high]</code> - <span data-i18n="advanced.message.token_high">Today's high
+                                        temperature</span></li>
+                                <li><code>[low]</code> - <span data-i18n="advanced.message.token_low">Today's low
+                                        temperature</span></li>
+                                <li><code>[rise]</code> - <span data-i18n="advanced.message.token_rise">Sunrise
+                                        time</span></li>
+                                <li><code>[set]</code> - <span data-i18n="advanced.message.token_set">Sunset time</span>
+                                </li>
+                                <li><code>[HA:entity_id:path]</code> - <span data-i18n="advanced.message.token_ha">Fetch
+                                        settings from Home Assistant (needs enabled
+                                        integration)</span></li>
+                                <li><code>[$:symbol]</code> - <span data-i18n="advanced.message.token_stock">Fetch stock
+                                        price quote (needs enabled
+                                        stock integration with Finnhub.io)</span></li>
+                                <li><code>[CGM:glucose]</code> - <span data-i18n="advanced.message.token_cgm_glucose">Latest glucose reading from your CGM device, formatted, e.g. 157 mg/dl (+3 @ 12:01). (needs active CGM integration)</span></li>
+                                <li><code>[CGM:reading]</code> - <span data-i18n="advanced.message.token_cgm_reading">Latest glucose reading, plain, e.g. 157</span></li>
+                            </ul>
+                            <p data-i18n="advanced.message.tokens_note">Note: Tokens are case-sensitive and must be
+                                enclosed in square brackets.</p>
+                            <p data-i18n="advanced.message.default_message">Default message: [device].local/ [greeting]
+                                [day], [date] [mon], now [temp] today
+                                [high]-[low], hum. [hum], sun [rise]-[set]</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <button type="submit" class="button" data-i18n="common.save_settings">Save Settings</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Status Section -->
+        <div id="status-section" class="page-section" style="display: none;">
+            <div class="section">
+                <div class="button-container" style="margin-bottom: 20px;">
+                    <h2 data-i18n="status.support.title">Share information with support</h2>
+                    <button id="sendToSupportButton" class="button" data-i18n="status.support.send_email">Send
+                        email</button>
+                    <button id="copyToClipboardButton" class="button" style="margin-left: 10px;"
+                        data-i18n="status.support.copy_clipboard">Copy to clipboard</button>
+                    <p data-i18n="status.support.help_text">If you need any support, please share the information above
+                        with us. Click "send email" to send us a message; if that doesn't work,
+                        copy the information to your clipboard and send it via email to support@buyfrixos.com.</p>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2 data-i18n="status.sensor.title">Sensor Data</h2>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <div class="info-label" data-i18n="status.sensor.light_level">Current Light Level (lux)</div>
+                        <div class="info-value" id="lux">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label" data-i18n="status.sensor.last_time_update">Last Time Update</div>
+                        <div class="info-value" id="time_update_status">
+                            <span class="status-icon status-error"></span> No data
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label" data-i18n="status.sensor.timezone">Timezone</div>
+                        <div class="info-value" id="timezone_val">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label" data-i18n="status.sensor.moon_phase">Moon Phase</div>
+                        <div class="info-value" id="moon_status">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label" data-i18n="status.sensor.last_weather_update">Last Weather Update</div>
+                        <div class="info-value" id="weather_update_status">
+                            <span class="status-icon status-error"></span> No data
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label" data-i18n="status.sensor.latitude">Latitude</div>
+                        <div class="info-value" id="latitude">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label" data-i18n="status.sensor.longitude">Longitude</div>
+                        <div class="info-value" id="longitude">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label" data-i18n="status.sensor.uptime">Uptime</div>
+                        <div class="info-value" id="uptime">-</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2 data-i18n="status.system.title">System Information</h2>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <div class="info-label" data-i18n="status.system.app_name">Application Name</div>
+                        <div class="info-value" id="app">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label" data-i18n="status.system.version">Version</div>
+                        <div class="info-value" id="version">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label" data-i18n="status.system.fw_version">Firmware Version</div>
+                        <div class="info-value" id="fwversion">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label" data-i18n="status.system.power_on_hours">Power On Hours</div>
+                        <div class="info-value" id="poh">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label" data-i18n="status.system.mac_address">MAC Address</div>
+                        <div class="info-value" id="mac_address">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label" data-i18n="status.system.ip_address">IP Address</div>
+                        <div class="info-value" id="ip_address">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label" data-i18n="status.system.chip_revision">Chip Revision</div>
+                        <div class="info-value" id="chip_revision">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label" data-i18n="status.system.flash_size">SPI Flash Size</div>
+                        <div class="info-value" id="flash_size">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label" data-i18n="status.system.cpu_freq">CPU Frequency</div>
+                        <div class="info-value" id="cpu_freq">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label" data-i18n="status.system.compile_time">Compile Time</div>
+                        <div class="info-value" id="compile_time">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label" data-i18n="status.system.free_heap">Free Heap Memory</div>
+                        <div class="info-value" id="free_heap">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label" data-i18n="status.system.min_free_heap">Min Free Heap</div>
+                        <div class="info-value" id="min_free_heap">-</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>System Logs</h2>
+                <div class="info-grid">
+                    <div class="info-item" style="grid-column: 1 / span 2;">
+                        <textarea class="info-value" id="system_logs"
+                            style="width: 100%; height: 200px; resize: vertical; font-family: monospace;"
+                            readonly>-</textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- HA Status Section -->
+            <div class="section">
+                <h2>Integration Status</h2>
+                <div class="info-item">
+                    <textarea id="ha_status_textarea" rows="5"
+                        style="width: 100%; height: 200px; resize: vertical; font-family: monospace;"
+                        readonly>-</textarea>
+                </div>
+            </div>
+
+            <div class="section">
+                <button id="refreshButton" class="button" data-i18n="status.refresh_button">Refresh Status</button>
+            </div>
+
+
+        </div>
+
+        <!-- Integrations Section -->
+        <div id="integrations-section" class="page-section" style="display: none;">
+            <form id="integrationsForm" class="settings-form">
+                <div class="section">
+                    <div class="section-header">
+                        <h2 data-i18n="integrations.ha.title">Home Assistant</h2>
+                    </div>
+                    <div class="section-content">
+                        <div class="form-group">
+                            <label for="eeprom_ha_url" data-i18n="integrations.ha.server_url">Server URL</label>
+                            <input type="text" id="eeprom_ha_url" name="eeprom_ha_url" maxlength="200"
+                                placeholder="e.g. http://homeassistant.local:8123">
+                            <span id="eeprom_ha_url-error" class="input-error"></span>
+                        </div>
+                        <div class="form-group">
+                            <label for="eeprom_ha_token" data-i18n="integrations.ha.token">LL Access Token</label>
+                            <input type="password" id="eeprom_ha_token" name="eeprom_ha_token" maxlength="255"
+                                data-i18n-placeholder="integrations.ha.token_placeholder">
+                            <span id="eeprom_ha_token-error" class="input-error"></span>
+                            <span id="eeprom_ha_token-mask" class="token-mask"></span>
+                        </div>
+                        <div class="form-group">
+                            <label for="eeprom_ha_refresh_mins" data-i18n="integrations.ha.refresh_interval">Refresh
+                                (min.)</label>
+                            <input type="number" id="eeprom_ha_refresh_mins" name="eeprom_ha_refresh_mins" min="1"
+                                max="7200" value="1">
+                            <span id="eeprom_ha_refresh_mins-error" class="input-error"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <div class="section-header">
+                        <h2 data-i18n="integrations.stock.title">Stock Quote Service (via Finnhub.io)</h2>
+                    </div>
+                    <div class="section-content">
+                        <div class="form-group">
+                            <label for="eeprom_stock_key" data-i18n="integrations.stock.api_key">API Key</label>
+                            <input type="password" id="eeprom_stock_key" name="eeprom_stock_key" maxlength="64"
+                                data-i18n-placeholder="integrations.stock.api_key_placeholder">
+                            <span id="eeprom_stock_key-error" class="input-error"></span>
+                            <span id="eeprom_stock_key-mask" class="token-mask"></span>
+                        </div>
+                        <div class="form-group">
+                            <label for="eeprom_stock_refresh_mins"
+                                data-i18n="integrations.stock.refresh_interval">Refresh (min.)</label>
+                            <input type="number" id="eeprom_stock_refresh_mins" name="eeprom_stock_refresh_mins" min="1"
+                                max="1440" value="5">
+                            <span id="eeprom_stock_refresh_mins-error" class="input-error"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <div class="section-header">
+                        <h2 data-i18n="integrations.glucose_monitors.title">Glucose Monitoring</h2>
+                    </div>
+                    <div class="section-content">
+                        <!-- Shared Glucose Monitor Settings -->
+                        <div class="form-group">
+                            <label for="eeprom_glucose_refresh"
+                                data-i18n="integrations.glucose_monitors.refresh_interval">Refresh (min.)</label>
+                            <input type="number" id="eeprom_glucose_refresh" name="eeprom_glucose_refresh" min="1"
+                                max="60" value="5">
+                            <span id="eeprom_glucose_refresh-error" class="input-error"></span>
+                        </div>
+                        <div class="form-group">
+                            <label for="eeprom_glucose_unit" data-i18n="integrations.glucose_monitors.display_unit">Display Unit</label>
+                            <select id="eeprom_glucose_unit" name="eeprom_glucose_unit">
+                                <option value="0">mg/dL</option>
+                                <option value="1">mmol/L</option>
+                            </select>
+                            <span id="eeprom_glucose_unit-error" class="input-error"></span>
+                        </div>
+                        <div class="form-group">
+                            <label for="eeprom_glucose_high"
+                                data-i18n="integrations.glucose_monitors.high_threshold">High (mg/dL)</label>
+                            <input type="number" id="eeprom_glucose_high" name="eeprom_glucose_high" min="1" max="400"
+                                value="175">
+                            <span id="glucose_high_mmol" class="mmol-label"></span>
+                            <span id="eeprom_glucose_high-error" class="input-error"></span>
+                        </div>
+                        <div class="form-group">
+                            <label for="eeprom_glucose_low" data-i18n="integrations.glucose_monitors.low_threshold">Low
+                                (mg/dL)</label>
+                            <input type="number" id="eeprom_glucose_low" name="eeprom_glucose_low" min="1" max="400"
+                                value="70">
+                            <span id="glucose_low_mmol" class="mmol-label"></span>
+                            <span id="eeprom_glucose_low-error" class="input-error"></span>
+                        </div>
+                        <div class="form-group">
+                            <label for="glucose_validity_duration"
+                                data-i18n="integrations.glucose_monitors.validity_duration">Validity (min.)</label>
+                            <input type="number" id="glucose_validity_duration" name="glucose_validity_duration" min="10"
+                                max="360" value="30">
+                            <span id="glucose_validity_duration-error" class="input-error"></span>
+                        </div>
+
+                        <!-- Shared Credentials -->
+                        <div class="form-group">
+                            <label for="eeprom_glucose_username"
+                                data-i18n="integrations.glucose_monitors.username">Username</label>
+                            <input type="text" id="eeprom_glucose_username" name="eeprom_glucose_username"
+                                maxlength="64"
+                                data-i18n-placeholder="integrations.glucose_monitors.username_placeholder">
+                            <span id="eeprom_glucose_username-error" class="input-error"></span>
+                        </div>
+                        <div class="form-group">
+                            <label for="eeprom_glucose_password"
+                                data-i18n="integrations.glucose_monitors.password">Password</label>
+                            <input type="password" id="eeprom_glucose_password" name="eeprom_glucose_password"
+                                maxlength="64"
+                                data-i18n-placeholder="integrations.glucose_monitors.password_placeholder">
+                            <span id="eeprom_glucose_password-error" class="input-error"></span>
+                            <span id="eeprom_glucose_password-mask" class="token-mask"></span>
+                        </div>
+
+                        <div class="sub-section" style="margin-top: 20px;">
+                            <h3 data-i18n="integrations.glucose_monitors.alternate_time_cgm.title" style="margin-bottom: 15px;">
+                                Alternate time/CGM</h3>
+                            <p data-i18n="integrations.glucose_monitors.alternate_time_cgm.description"
+                                style="margin-bottom: 15px; color: #999; font-size: 0.9em;"></p>
+                            <div class="form-group">
+                                <label for="eeprom_sec_time"
+                                    data-i18n="integrations.glucose_monitors.alternate_time_cgm.time">Time (sec)</label>
+                                <input type="number" id="eeprom_sec_time" name="eeprom_sec_time" min="0" max="120"
+                                    value="0">
+                                <span id="eeprom_sec_time-error" class="input-error"></span>
+                            </div>
+                            <div class="form-group">
+                                <label for="eeprom_sec_cgm"
+                                    data-i18n="integrations.glucose_monitors.alternate_time_cgm.cgm">CGM (sec)</label>
+                                <input type="number" id="eeprom_sec_cgm" name="eeprom_sec_cgm" min="0" max="120"
+                                    value="0">
+                                <span id="eeprom_sec_cgm-error" class="input-error"></span>
+                            </div>
+                        </div>
+
+                        <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
+
+                        <div class="sub-section">
+                            <h3 data-i18n="integrations.glucose_monitors.cgm_device_title" style="margin-bottom: 15px;">
+                                CGM Device</h3>
+
+                            <!-- Dexcom Selection -->
+                            <div class="form-group">
+                                <label for="eeprom_dexcom_region" data-i18n="integrations.dexcom.title">Dexcom</label>
+                                <select id="eeprom_dexcom_region" name="eeprom_dexcom_region">
+                                    <option value="0" data-i18n="integrations.dexcom.disabled">Disabled</option>
+                                    <option value="1">US</option>
+                                    <option value="2" data-i18n="integrations.dexcom.japan">Japan</option>
+                                    <option value="3" data-i18n="integrations.dexcom.rest_of_world">Rest of World
+                                    </option>
+                                </select>
+                            </div>
+
+                            <!-- FreeStyle Libre Selection -->
+                            <div class="form-group">
+                                <label for="eeprom_libre_region" data-i18n="integrations.freestyle.title">FreeStyle
+                                    Libre</label>
+                                <select id="eeprom_libre_region" name="eeprom_libre_region">
+                                    <option value="0" data-i18n="integrations.disabled">Disabled</option>
+                                    <option value="1">United States</option>
+                                    <option value="2">Europe</option>
+                                    <option value="3">Germany</option>
+                                    <option value="4">France</option>
+                                    <option value="5">Japan</option>
+                                    <option value="6">Australia</option>
+                                    <option value="7">Global / Rest of World</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="eeprom_ns_url">Nightscout URL</label>
+                                <input type="text" id="eeprom_ns_url" name="eeprom_ns_url" maxlength="100"
+                                    placeholder="https://your-site.herokuapp.com">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <button type="submit" class="button" data-i18n="common.save_settings">Save Settings</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Update (OTA) Section -->
+        <div id="update-section" class="page-section" style="display: none;">
+            <div class="section">
+                <h2 data-i18n="update.title">Upload Firmware / Files</h2>
+                <p data-i18n="update.auto_check">Your device checks and installs new firmware automatically. </p>
+                <p data-i18n="update.manual_info">If you have been instructed by our support to manually install a
+                    specific firmware version,
+                    or if you are looking to upload e.g. a custom font, you can do this here.</p><br />
+                <p data-i18n="update.select_file">Select a firmware file (.bin) or other file to upload to the device.
+                </p>
+
+                <form id="uploadForm">
+                    <div class="file-input-container">
+                        <input type="file" id="firmwareFile" accept="*">
+                    </div>
+
+                    <button type="submit" id="uploadButton" class="button" disabled
+                        data-i18n="update.upload_button">Upload
+                        File</button>
+                </form>
+
+                <div id="progressContainer" class="progress-container" style="display: none;">
+                    <div class="progress-bar">
+                        <div id="progress" class="progress"></div>
+                    </div>
+                    <div id="progressText" class="progress-text">0%</div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2 data-i18n="update.firmware_instructions_title">Firmware Update Instructions</h2>
+                <ol>
+                    <li data-i18n="update.firmware_step1">Click the "Choose File" button and select the firmware file
+                        (.bin) from your computer.</li>
+                    <li data-i18n="update.firmware_step2">Click the "Upload Firmware" button to start the update
+                        process.</li>
+                    <li data-i18n="update.firmware_step3">Wait for the update to complete. Do not power off or
+                        disconnect the device during the update.
+                    </li>
+                    <li data-i18n="update.firmware_step4">The device will automatically restart after the update is
+                        complete.</li>
+                </ol>
+                <p data-i18n="update.firmware_warning"><strong>Warning:</strong> Uploading incorrect firmware may cause
+                    the device to malfunction. Make sure
+                    to use the correct firmware for your device.</p>
+            </div>
+            <div class="section">
+                <h2 data-i18n="update.file_instructions_title">User file upload instructions</h2>
+                <ol>
+                    <li data-i18n="update.file_step1">Click the "Choose File" button and select the file (e.g.
+                        user-font.jpg) from your computer.</li>
+                    <li data-i18n="update.file_step2">Click the "Upload Firmware" button to start the upload process.
+                    </li>
+                    <li data-i18n="update.file_step3">Wait for the upload to complete. Do not power off or disconnect
+                        the device during the upload.
+                    </li>
+                    <li data-i18n="update.file_step4">You can now upload another file or close this window.</li>
+                </ol>
+            </div>
+
+        </div>
+
+        <!-- Restart Section -->
+        <div id="restart-section" class="page-section" style="display: none;">
+            <div class="section">
+                <h2 data-i18n="restart.title">Device Reset</h2>
+                <p data-i18n="restart.description">Use this option to restart your Frixos device.</p><br />
+                <button id="resetButton" class="button" data-i18n="restart.button">Restart Device</button>
+            </div>
+        </div>
+
+        <!-- Reset Confirmation Modal -->
+        <div id="resetModal" class="modal">
+            <div class="modal-content">
+                <h2 data-i18n="restart.confirm_title">Confirm Restart</h2>
+                <p data-i18n="restart.confirm_message">Are you sure you want to restart the device?</p>
+                <p data-i18n="restart.unavailable_message">The device will become temporarily unavailable during
+                    restart.</p>
+                <div class="modal-buttons">
+                    <button id="cancelButton" class="button" data-i18n="common.cancel">Cancel</button>
+                    <button id="confirmButton" class="button danger" data-i18n="restart.confirm_button">Restart</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="index.js"></script>
+</body>
+
+</html>

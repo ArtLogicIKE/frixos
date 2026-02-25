@@ -1,0 +1,55 @@
+OPEN
+
+
+
+FIXED
+HA - look for tokens on message change
+message - update when integration changes
+
+projection video doesn't work on iphone
+
+FIXED
+Reduced LVGL allocated memory to 24k - seems to be working fine. With 10k, spiffs no longer open.
+If we ever need more memory, the better option is to use malloc instead of the LVGL functions.
+
+color change after multi saves
+device gets stuck on occasion
+America/New York
+scrolling message line save 
+full brightness setting doesn[t worek] 
+RGB filters are shot
+
+.. Update manifest
+
+1. mDNS Service Advertising (Recommended)
+Implement mDNS (Multicast DNS) service advertising on your ESP32:
+cppCopy#include <ESPmDNS.h>
+// In setup():
+MDNS.begin("esp32device");
+MDNS.addService("mydevice", "tcp", 80); // Service type and port
+Then in your app:
+
+On Android: Use NsdManager to discover services
+On iOS: Use NSNetServiceBrowser
+On desktop: Use libraries like Avahi, Bonjour, or jmDNS
+
+This approach:
+
+Works across networks
+Doesn't require knowing IP addresses
+Supports auto-discovery
+Is low-bandwidth and battery-efficient
+
+2. UDP Broadcast Beacons
+Have ESP32 periodically broadcast UDP packets:
+cppCopy// ESP32 code
+void sendUDPBeacon() {
+  WiFiUDP udp;
+  udp.beginPacket("255.255.255.255", 4210);
+  String deviceInfo = "{\"deviceID\":\"" + String(DEVICE_ID) + "\",\"type\":\"esp32\"}";
+  udp.write((uint8_t*)deviceInfo.c_str(), deviceInfo.length());
+  udp.endPacket();
+}
+In your app, listen for these UDP broadcasts on port 4210.
+
+Use Flutter to implement the app and provisioning

@@ -1,0 +1,7 @@
+managed_components/
+build/
+sdkconfig
+sdkconfig.old
+
+# Environment file with API keys (copy from env.example)
+.env

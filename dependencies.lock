@@ -1,0 +1,52 @@
+dependencies:
+  espressif/esp_lvgl_port:
+    component_hash: b6360960f47b6776462e7092861b3ea66477ffb762a01baa0aecbb3d74cd50f4
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.1'
+    - name: lvgl/lvgl
+      registry_url: https://components.espressif.com
+      require: public
+      version: '>=8,<10'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 2.7.2
+  espressif/mdns:
+    component_hash: 043f989435fd88f771c70507bfde854380c259a8fec8c0d60bcfd8714f16960e
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.0'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 1.10.0
+  idf:
+    source:
+      type: idf
+    version: 5.4.0
+  lvgl/lvgl:
+    component_hash: 184e532558c1c45fefed631f3e235423d22582aafb4630f3e8885c35281a49ae
+    dependencies: []
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 9.5.0
+  teriyakigod/esp_lcd_st7735:
+    component_hash: 5c61377ee7a5bbccb40a629c2db9c1918ce1645beb2732c007934c52bc1be2a1
+    dependencies: []
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 0.0.1
+direct_dependencies:
+- espressif/esp_lvgl_port
+- espressif/mdns
+- idf
+- lvgl/lvgl
+- teriyakigod/esp_lcd_st7735
+manifest_hash: 8394342b1cb93b2cf8168508d3669ec3bc8cc170ba62f7fb3e319220232b57ec
+target: esp32
+version: 2.0.0

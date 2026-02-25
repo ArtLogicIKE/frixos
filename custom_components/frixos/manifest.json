@@ -1,0 +1,14 @@
+{
+  "domain": "frixos",
+  "name": "Frixos",
+  "codeowners": ["@frixos"],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/yourusername/frixos-ha-integration",
+  "integration_type": "device",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/yourusername/frixos-ha-integration/issues",
+  "requirements": ["aiohttp>=3.8.0"],
+  "version": "1.0.0",
+  "icon": "icon.png"
+}
