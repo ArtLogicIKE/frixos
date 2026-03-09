@@ -20,7 +20,7 @@ Frixos firmware powers projection clocks that combine:
 
 The device uses an ST7735S LCD (128×128) as the projection source, an LTR303 ambient light sensor for automatic day/night dimming, and LVGL for the display engine. Settings are stored in NVS and served via a captive-portal web UI when the device is in provisioning mode.
 
-*Frixos projection clocks — [Obelisk](https://buyfrixos.com/product/obelisk-stylish-daylight-projection-clock/), [Monolith](https://buyfrixos.com/product/monolith-its-full-of-time/), [Square Mellon](https://buyfrixos.com/shop/), [Kiwi](https://buyfrixos.com/shop/) — available at [buyfrixos.com](https://buyfrixos.com)*
+*Frixos projection clocks — [Obelisk](https://buyfrixos.com/product/obelisk-stylish-daylight-projection-clock/), [Monolith](https://buyfrixos.com/product/monolith-its-full-of-time/), [HaloTime](https://buyfrixos.com/shop/) — available at [buyfrixos.com](https://buyfrixos.com)*
 
 > **Tip:** To add product images to this README, right-click images on [buyfrixos.com](https://buyfrixos.com) → "Copy image address" and use: `![Description](image-url)`
 
