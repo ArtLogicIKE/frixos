@@ -44,7 +44,7 @@ void startup_led_pwm()
 
     // set_led_pwm_brightness(eeprom_brightness_LED[0]); // Set initial brightness
 
-    ESP_LOG_WEB(ESP_LOG_INFO,TAG, "* PWM LED on GPIO 32, Frequency %u Hz, 10bit resolution, initial low brightness", eeprom_pwm_frequency);
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "PWM LED GPIO32 %lu Hz 10bit", (unsigned long)eeprom_pwm_frequency);
 }
 
 // Reconfigure PWM frequency (called when settings are updated)
@@ -54,9 +54,9 @@ void reconfigure_led_pwm_frequency(void)
     ledc_timer_t timer = LEDC_TIMER_0;
     
     // Validate frequency range
-    uint16_t freq = eeprom_pwm_frequency;
+    uint32_t freq = eeprom_pwm_frequency;
     if (freq < 10) freq = 10;
-    if (freq > 5000) freq = 5000;
+    if (freq > 1000000) freq = 1000000;
     if (freq == 133) freq = 200; // replace 133 with 200 for backwards compatibility
     
     // Configure the LEDC timer with new frequency
@@ -71,11 +71,11 @@ void reconfigure_led_pwm_frequency(void)
     esp_err_t err = ledc_timer_config(&ledc_timer);
     if (err != ESP_OK)
     {
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to reconfigure PWM frequency: %s", esp_err_to_name(err));
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "PWM freq reconfigure failed: %s", esp_err_to_name(err));
     }
     else
     {
-        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "PWM frequency reconfigured to %u Hz", freq);
+        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "PWM frequency reconfigured to %lu Hz", (unsigned long)freq);
     }
 }
 
@@ -92,7 +92,7 @@ void set_led_pwm_brightness(uint8_t duty)
     if (duty == 99) {
         pwm_duty = 1023;
     }
-    ESP_LOG_WEB(ESP_LOG_INFO,TAG, "Setting LED brightness to duty = %i%%, actual = %i", duty, pwm_duty);
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "LED brightness %i%% (actual %i)", duty, pwm_duty);
     ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, pwm_duty);
     ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
 }

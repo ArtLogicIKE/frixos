@@ -74,7 +74,7 @@
  * - p23 = brightness_LED (LED brightness array)
  * - p24 = show_leading_zero (Show leading zero)
  * - p50 = dots_breathe (Disable breathing time dots)
- * - p42 = pwm_frequency (PWM frequency in Hz, range 10-5000)
+ * - p42 = pwm_frequency (PWM frequency in Hz, range 10-1000000)
  * - p43 = max_power (Max power, range 1-1023)
  *
  * Integration Settings (shortened):
@@ -1036,6 +1036,12 @@ esp_err_t settings_post_handler(httpd_req_t *req)
     if (cJSON_IsString(timezone))
     {
         strncpy(eeprom_timezone, timezone->valuestring, sizeof(eeprom_timezone) - 1);
+        eeprom_timezone[sizeof(eeprom_timezone) - 1] = '\0';
+        if (!validate_timezone(eeprom_timezone))
+        {
+            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Invalid timezone received: '%s', rejecting (use POSIX format e.g. GMT-2 not GMT +2)", eeprom_timezone);
+            strcpy(eeprom_timezone, "");
+        }
     }
 
     // Process WiFi Active Hours settings
@@ -1235,16 +1241,16 @@ esp_err_t settings_post_handler(httpd_req_t *req)
     if (cJSON_IsNumber(pwm_frequency))
     {
         int freq_value = (int)pwm_frequency->valueint;
-        // Validate range 10-5000
-        if (freq_value >= 10 && freq_value <= 5000)
+        // Validate range 10-1000000
+        if (freq_value >= 10 && freq_value <= 1000000)
         {
-            eeprom_pwm_frequency = (uint16_t)freq_value;
+            eeprom_pwm_frequency = (uint32_t)freq_value;
             pwm_frequency_changed = true;
-            ESP_LOG_WEB(ESP_LOG_INFO, TAG, "PWM frequency set to: %u Hz", eeprom_pwm_frequency);
+            ESP_LOG_WEB(ESP_LOG_INFO, TAG, "PWM frequency set to: %lu Hz", (unsigned long)eeprom_pwm_frequency);
         }
         else
         {
-            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "PWM frequency out of range (10-5000): %d, keeping current value", freq_value);
+            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "PWM frequency out of range (10-1000000): %d, keeping current value", freq_value);
         }
     }
 

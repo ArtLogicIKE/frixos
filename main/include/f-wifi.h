@@ -40,6 +40,7 @@ void ota_update_timer_callback(void *arg);
 esp_err_t f_http_post(const char* url, const char* data);
 void url_encode_string(const char *input, char *output);
 bool validate_coordinate(const char *coord_str, bool is_latitude);
+bool validate_timezone(const char *tz_str);
 
 // External variables
 extern int response_len;

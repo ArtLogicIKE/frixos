@@ -46,14 +46,14 @@ static esp_err_t dexcom_http_event_handler(esp_http_client_event_t *evt)
     switch (evt->event_id)
     {
     case HTTP_EVENT_ERROR:
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Dexcom HTTP Error");
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Dexcom HTTP error");
         dexcom_response_len = 0;
         break;
     case HTTP_EVENT_ON_DATA:
         // Ensure we have a valid buffer and the data will fit
         if (dexcom_response_buffer == NULL)
         {
-            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Response buffer is NULL");
+            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Response buffer null");
             return ESP_FAIL;
         }
 
@@ -61,7 +61,7 @@ static esp_err_t dexcom_http_event_handler(esp_http_client_event_t *evt)
         if (evt->data_len <= 0 || dexcom_response_len < 0 ||
             (dexcom_response_len + evt->data_len) >= HTTP_BUFFER_SIZE)
         {
-            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Buffer overflow prevented: len=%d, data_len=%d, max=%d",
+            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Buffer overflow len=%d data=%d max=%d",
                         dexcom_response_len, evt->data_len, HTTP_BUFFER_SIZE);
             dexcom_response_len = 0;
             return ESP_FAIL;
@@ -107,7 +107,7 @@ bool init_dexcom_client(void)
     dexcom_client = esp_http_client_init(&config);
     if (!dexcom_client)
     {
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to initialize Dexcom client");
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Dexcom client init failed");
         return false;
     }
 
@@ -131,7 +131,7 @@ void cleanup_dexcom_client(void)
 
 bool authenticate_dexcom_account(void)
 {
-    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Authenticating Dexcom to get account ID");
+    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Dexcom auth");
     const char *base_url = DEXCOM_BASE_URLS[eeprom_dexcom_region];
     if (!base_url)
         return false;
@@ -191,7 +191,7 @@ bool authenticate_dexcom_account(void)
                 memmove(dexcom_account_id, dexcom_account_id + 1, strlen(dexcom_account_id));
                 dexcom_account_id[strlen(dexcom_account_id) - 1] = '\0';
             }
-            ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Dexcom account auth successful, ID: %s", dexcom_account_id);
+            ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Dexcom auth ok ID %s", dexcom_account_id);
             success = true;
         }
         else
@@ -201,7 +201,7 @@ bool authenticate_dexcom_account(void)
     }
     else
     {
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Dexcom account auth HTTP request failed");
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Dexcom auth HTTP failed");
     }
 
     release_shared_buffer(dexcom_response_buffer);
@@ -214,7 +214,7 @@ bool authenticate_dexcom_account(void)
 
 bool login_dexcom(void)
 {
-    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Logging into Dexcom to get session ID");
+    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Dexcom login");
     const char *base_url = DEXCOM_BASE_URLS[eeprom_dexcom_region];
     if (!base_url)
         return false;
@@ -225,7 +225,7 @@ bool login_dexcom(void)
     // Acquire SSL connection semaphore before making SSL connection
     if (!acquire_ssl_semaphore("login_dexcom"))
     {
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to acquire SSL semaphore for login_dexcom");
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "SSL lock failed (Dexcom login)");
         return false;
     }
 
@@ -263,17 +263,17 @@ bool login_dexcom(void)
                 memmove(dexcom_session_id, dexcom_session_id + 1, strlen(dexcom_session_id));
                 dexcom_session_id[strlen(dexcom_session_id) - 1] = '\0';
             }
-            ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Dexcom login successful, session ID: %s", dexcom_session_id);
+            ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Dexcom login ok %s", dexcom_session_id);
             success = true;
         }
         else
         {
-            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Dexcom login failed, status: %d, response: %s", esp_http_client_get_status_code(dexcom_client), dexcom_response_buffer);
+            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Dexcom login failed %d", esp_http_client_get_status_code(dexcom_client));
         }
     }
     else
     {
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Dexcom login HTTP request failed");
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Dexcom login HTTP failed");
     }
 
     release_shared_buffer(dexcom_response_buffer);
@@ -291,7 +291,7 @@ bool fetch_dexcom_glucose()
     {
         if (!init_dexcom_client())
         {
-            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to initialize Dexcom client");
+            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Dexcom client init failed");
             return false;
         }
         dexcom_client_initialized = true;
@@ -303,7 +303,7 @@ bool fetch_dexcom_glucose()
     // this shouldn't be needed, but just in case
     if (dexcom_account_id[0] == '\0') {
         if (!authenticate_dexcom_account()) {
-            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Aborting Dexcom fetch: Could not get Account ID.");
+            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Dexcom fetch: no account ID");
             return false;
         }
     }
@@ -316,7 +316,7 @@ bool fetch_dexcom_glucose()
         {
             if (!login_dexcom())
             {
-                ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Aborting Dexcom fetch: Could not log in.");
+                ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Dexcom fetch: login failed");
                 return false;
             }
         }
@@ -327,7 +327,7 @@ bool fetch_dexcom_glucose()
         snprintf(url, sizeof(url), "%s/ShareWebServices/Services/Publisher/ReadPublisherLatestGlucoseValues?sessionId=%s&minutes=1440&maxCount=2", base_url, dexcom_session_id);
         //snprintf(url, sizeof(url), "https://share2.dexcom.com/ShareWebServices/Services/Publisher/ReadPublisherLatestGlucoseValues?sessionId=e629db54-0854-48d6-8e96-2252fe66750a&minutes=1440&maxCount=4");
 
-        ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Dexcom glucose fetch URL: %s", url);
+        ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Dexcom fetch %s", url);
         
         // Acquire SSL connection semaphore before making SSL connection
         if (!acquire_ssl_semaphore("fetch_dexcom_glucose"))
@@ -354,7 +354,7 @@ bool fetch_dexcom_glucose()
         if (esp_http_client_perform(dexcom_client) == ESP_OK)
         {
             int status_code = esp_http_client_get_status_code(dexcom_client);
-            ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Dexcom glucose fetch code %d response: %s", status_code, dexcom_response_buffer);
+            ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Dexcom fetch %d", status_code);
             if (status_code == 200)
             {
                 cJSON *root = cJSON_Parse(dexcom_response_buffer);
@@ -430,7 +430,7 @@ bool fetch_dexcom_glucose()
             }
             else if (status_code == 500)
             { // could look for specific errors, like SessionIdNotFound, but what the heck, login again && strstr(dexcom_response_buffer, "SessionIdNotFound") != NULL) {
-                ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Dexcom session expired. Re-logging in...");
+                ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Dexcom session expired, re-login");
                 dexcom_session_id[0] = '\0'; // Invalidate session, loop will retry
             }
             else
@@ -445,7 +445,7 @@ bool fetch_dexcom_glucose()
         }
         else
         {
-            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Dexcom glucose fetch failed");
+            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Dexcom fetch failed");
         }
 
         release_shared_buffer(dexcom_response_buffer);
@@ -453,14 +453,14 @@ bool fetch_dexcom_glucose()
         release_ssl_semaphore();
     }
 
-    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Dexcom glucose fetch failed after retry.");
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Dexcom fetch failed (retry)");
     release_ssl_semaphore();
     return false;
 }
 
 time_t parse_dexcom_timestamp(const char *timestamp)
 {
-    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Parsing Dexcom timestamp: %s", timestamp);
+    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Dexcom timestamp %s", timestamp);
     // Dexcom timestamp format: "/Date(1234567890123-0700)/" 
     char *start = strstr(timestamp, "(");
     if (!start)

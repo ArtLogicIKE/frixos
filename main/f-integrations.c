@@ -31,7 +31,7 @@ bool init_integration_token(integration_token_t *token, const char *name, const 
 {
     if (token == NULL || name == NULL || entity == NULL)
     {
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "init_integration_token: token, name and entity must not be NULL");
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "init_token: token/name/entity required");
         return false;
     }
 
@@ -43,7 +43,7 @@ bool init_integration_token(integration_token_t *token, const char *name, const 
     token->name = (char *)malloc(name_len);
     if (token->name == NULL)
     {
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to allocate memory for token name");
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Token name alloc failed");
         return false;
     }
     strcpy(token->name, name);
@@ -53,7 +53,7 @@ bool init_integration_token(integration_token_t *token, const char *name, const 
     token->entity = (char *)malloc(entity_len);
     if (token->entity == NULL)
     {
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to allocate memory for token entity");
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Token entity alloc failed");
         free(token->name);
         token->name = NULL;
         return false;
@@ -66,7 +66,7 @@ bool init_integration_token(integration_token_t *token, const char *name, const 
     token->path = (char *)malloc(path_len);
     if (token->path == NULL)
     {
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to allocate memory for token path");
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Token path alloc failed");
         free(token->entity);
         free(token->name);
         token->entity = NULL;
@@ -177,12 +177,12 @@ bool acquire_ssl_semaphore(const char *function_name)
     if (xSemaphoreTake(ssl_connection_semaphore, timeout_ticks) == pdTRUE)
     {
         ssl_semaphore_holder = function_name;
-        ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "SSL semaphore acquired by %s", function_name ? function_name : "unknown");
+        ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "SSL lock %s", function_name ? function_name : "?");
         return true;
     }
     else
     {
-        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Failed to acquire SSL semaphore within %d seconds (currently held by: %s)",
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "SSL lock timeout %ds (held by %s)",
                     SSL_SEMAPHORE_TIMEOUT_MS / 1000, ssl_semaphore_holder ? ssl_semaphore_holder : "unknown");
         return false;
     }
@@ -212,7 +212,7 @@ esp_err_t custom_crt_bundle_attach(void *conf)
     esp_err_t ret = esp_crt_bundle_attach(conf);
     if (ret != ESP_OK)
     {
-        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Failed to attach certificate bundle: %s (continuing anyway)", esp_err_to_name(ret));
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Cert bundle attach failed: %s", esp_err_to_name(ret));
         // Continue anyway since we're not verifying certificates
         return ESP_OK;
     }
@@ -234,7 +234,7 @@ static void check_stack_usage(void)
 
     if (free_stack < STACK_WARNING_THRESHOLD)
     {
-        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Low stack space: %d bytes free", free_stack);
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Low stack: %d bytes", free_stack);
     }
 }
 
@@ -244,14 +244,14 @@ static esp_err_t ha_http_event_handler(esp_http_client_event_t *evt)
     switch (evt->event_id)
     {
     case HTTP_EVENT_ERROR:
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "HTTP Error");
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "HTTP error");
         ha_response_len = 0;
         break;
     case HTTP_EVENT_ON_DATA:
         // Ensure we have a valid buffer and the data will fit
         if (ha_response_buffer == NULL)
         {
-            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Response buffer is NULL");
+            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Response buffer null");
             return ESP_FAIL;
         }
 
@@ -271,7 +271,7 @@ static esp_err_t ha_http_event_handler(esp_http_client_event_t *evt)
         ha_response_buffer[ha_response_len] = '\0';
         break;
     case HTTP_EVENT_ON_FINISH:
-        ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "HA HTTP Event: FINISH");
+        ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "HA HTTP done");
         break;
     default:
         break;
@@ -297,7 +297,7 @@ static bool fetch_ha_entity(integration_token_t *token)
     // Acquire SSL connection semaphore before making SSL connection
     if (!acquire_ssl_semaphore("fetch_ha_entity"))
     {
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to acquire SSL semaphore for HA entity fetch");
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "SSL lock failed (HA fetch)");
         return false;
     }
 
@@ -305,7 +305,7 @@ static bool fetch_ha_entity(integration_token_t *token)
     ha_response_buffer = get_shared_buffer(HTTP_BUFFER_SIZE, "HA_HTTP");
     if (ha_response_buffer == NULL)
     {
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to get shared buffer for HA response");
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "HA response buffer failed");
         release_ssl_semaphore();
         return false;
     }
@@ -332,7 +332,7 @@ static bool fetch_ha_entity(integration_token_t *token)
         client = esp_http_client_init(&config);
         if (client == NULL)
         {
-            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to initialize HTTP client after memory cleanup");
+            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "HTTP client init failed (after cleanup)");
             release_shared_buffer(ha_response_buffer);
             ha_response_buffer = NULL;
             release_ssl_semaphore();
@@ -358,7 +358,7 @@ static bool fetch_ha_entity(integration_token_t *token)
     while (retry_count < max_retries && !success)
     {
         ha_response_len = 0; // Reset response buffer
-        ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "HTTP call to %s (attempt %d/%d)", urlstr, retry_count + 1, max_retries);
+        ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "HA HTTP %s (%d/%d)", urlstr, retry_count + 1, max_retries);
 
         esp_err_t err = esp_http_client_perform(client);
         if (err == ESP_OK)
@@ -377,7 +377,7 @@ static bool fetch_ha_entity(integration_token_t *token)
                     // Remove quotes from beginning/end if present
                     char *start = value;
                     size_t len = strlen(value);
-                    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "\nHA value: [%s], length %d", value, len);
+                    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "HA value [%s] len %d", value, len);
                     if (len > 0 && (value[0] == '"' || value[0] == '\''))
                     {
                         start++;
@@ -400,17 +400,17 @@ static bool fetch_ha_entity(integration_token_t *token)
                         strcpy(token->value, "-");
                     }
                     success = true;
-                    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "HA entity %s, path %s, value: %s",
+                    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "HA %s %s=%s",
                                 token->entity, token->path, token->value);
                 }
                 else
                 {
-                    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Invalid or missing value for path %s", token->path);
+                    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "HA invalid value path %s", token->path);
                 }
             }
             else
             {
-                ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "HA request failed with status %d (attempt %d/%d)",
+                ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "HA status %d (%d/%d)",
                             status_code, retry_count + 1, max_retries);
             }
         }
@@ -423,7 +423,7 @@ static bool fetch_ha_entity(integration_token_t *token)
         if (!success && retry_count < max_retries - 1)
         {
             retry_count++;
-            ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Retrying in %d ms...", backoff_ms);
+            ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Retry in %d ms", backoff_ms);
             vTaskDelay(pdMS_TO_TICKS(backoff_ms));
             // backoff_ms *= 2; // Exponential backoff cancelled; don't like it
         }
@@ -438,7 +438,7 @@ static bool fetch_ha_entity(integration_token_t *token)
     // Force garbage collection after each request
     if (heap_caps_get_free_size(MALLOC_CAP_8BIT) < 10000)
     {
-        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Low memory before cleanup: %d bytes", heap_caps_get_free_size(MALLOC_CAP_8BIT));
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Low mem before cleanup: %d", heap_caps_get_free_size(MALLOC_CAP_8BIT));
         vTaskDelay(pdMS_TO_TICKS(100)); // Give time for cleanup
     }
 
@@ -464,10 +464,10 @@ static void integration_update_task(void *pvParameters)
 
             // Check heap memory and log warning if low
             size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_8BIT);
-            ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Integration update cycle - free heap: %d bytes", free_heap);
+            ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Integration cycle heap %d", free_heap);
             if (free_heap < 5000) // Less than 5KB free
             {
-                ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Low heap memory: %d bytes free", free_heap);
+                ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Low heap: %d", free_heap);
             }
 
             // Monitor buffer pool usage
@@ -476,7 +476,7 @@ static void integration_update_task(void *pvParameters)
             ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Buffer pool: %d/%d buffers used (%d KB)", used_buffers, total_buffers, total_memory / 1024);
             if (used_buffers >= total_buffers)
             {
-                ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Buffer pool exhausted: all %d buffers in use", total_buffers);
+                ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Buffer pool exhausted %d", total_buffers);
             }
 
             update_ok[INTEGRATION_HA] = false;
@@ -499,7 +499,7 @@ static void integration_update_task(void *pvParameters)
                         size_t ha_heap = heap_caps_get_free_size(MALLOC_CAP_8BIT);
                         if (ha_heap < 15000)
                         {
-                            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Skipping HA update - insufficient memory: %d bytes free (need ~15KB)", ha_heap);
+                            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Skip HA: low mem %d (need ~15K)", ha_heap);
                         }
                         else
                         {
@@ -513,27 +513,24 @@ static void integration_update_task(void *pvParameters)
                                 {
                                     if (fetch_ha_entity(&integration_active_tokens[INTEGRATION_HA][i]))
                                     {
-                                        ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Update HA token %d: %s = %s @ %s = %s",
+                                        ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "HA token %d %s=%s",
                                                     i, integration_active_tokens[INTEGRATION_HA][i].name ? integration_active_tokens[INTEGRATION_HA][i].name : "(null)",
-                                                    integration_active_tokens[INTEGRATION_HA][i].entity ? integration_active_tokens[INTEGRATION_HA][i].entity : "(null)",
-                                                    integration_active_tokens[INTEGRATION_HA][i].path ? integration_active_tokens[INTEGRATION_HA][i].path : "(null)",
                                                     integration_active_tokens[INTEGRATION_HA][i].value);
                                         update_ok[INTEGRATION_HA] = true;
                                     }
                                     else
                                     {
-                                        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to update HA token %d: %s for path %s",
-                                                    i, integration_active_tokens[INTEGRATION_HA][i].entity ? integration_active_tokens[INTEGRATION_HA][i].entity : "(null)",
-                                                    integration_active_tokens[INTEGRATION_HA][i].path ? integration_active_tokens[INTEGRATION_HA][i].path : "(null)");
+                                        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "HA token %d failed %s",
+                                                    i, integration_active_tokens[INTEGRATION_HA][i].entity ? integration_active_tokens[INTEGRATION_HA][i].entity : "(null)");
                                     }
                                 }
                                 xSemaphoreGive(http_mutex);
                                 if (!update_ok[INTEGRATION_HA])
-                                    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Home Assistant integration update failed");
+                                    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "HA update failed");
                             }
                             else
                             {
-                                ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Failed to acquire http_mutex for HA integration update (timeout)");
+                                ESP_LOG_WEB(ESP_LOG_WARN, TAG, "http_mutex timeout (HA)");
                             }
                             // Small delay to allow memory cleanup before next integration
                             vTaskDelay(pdMS_TO_TICKS(100));
@@ -555,7 +552,7 @@ static void integration_update_task(void *pvParameters)
                         }
                         else
                         {
-                            ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Updating %d stock integrations",
+                            ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Stock update %d",
                                         integration_active_tokens_count[INTEGRATION_STOCK]);
                             // Use timeout for http_mutex to prevent indefinite blocking
                             if (xSemaphoreTake(http_mutex, pdMS_TO_TICKS(10000)) == pdTRUE) // 10 second timeout
@@ -566,24 +563,24 @@ static void integration_update_task(void *pvParameters)
                                 {
                                     if (fetch_stock_quote(&integration_active_tokens[INTEGRATION_STOCK][i]))
                                     {
-                                        ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Update stock token %d: %s = %s",
+                                        ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Stock token %d %s=%s",
                                                     i, integration_active_tokens[INTEGRATION_STOCK][i].entity ? integration_active_tokens[INTEGRATION_STOCK][i].entity : "(null)",
                                                     integration_active_tokens[INTEGRATION_STOCK][i].value);
                                         update_ok[INTEGRATION_STOCK] = true;
                                     }
                                     else
                                     {
-                                        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to update stock token %d: %s",
+                                        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Stock token %d failed %s",
                                                     i, integration_active_tokens[INTEGRATION_STOCK][i].entity);
                                     }
                                 }
                                 xSemaphoreGive(http_mutex);
                                 if (!update_ok[INTEGRATION_STOCK])
-                                    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Stock integration update failed");
+                                    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Stock update failed");
                             }
                             else
                             {
-                                ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Failed to acquire http_mutex for stock integration update (timeout)");
+                                ESP_LOG_WEB(ESP_LOG_WARN, TAG, "http_mutex timeout (Stock)");
                             }
                             // Small delay to allow memory cleanup before next integration
                             vTaskDelay(pdMS_TO_TICKS(100));
@@ -601,11 +598,11 @@ static void integration_update_task(void *pvParameters)
                         {
                             if (!init_dexcom_client())
                             {
-                                ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to initialize Dexcom client");
+                                ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Dexcom client init failed");
                                 dexcom_client_initialized = true;
                             }
                             if (!authenticate_dexcom_account())
-                                ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to authenticate Dexcom account");
+                                ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Dexcom auth failed");
                         }
 
                         if (fetch_dexcom_glucose())
@@ -657,7 +654,7 @@ static void integration_update_task(void *pvParameters)
         }
         else
         {
-            ESP_LOG_WEB(ESP_LOG_INFO, TAG, "OTA update in progress, skipping integration update");
+            ESP_LOG_WEB(ESP_LOG_INFO, TAG, "OTA in progress, skip integration");
         }
         // Wait for the next timer trigger
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
@@ -667,7 +664,7 @@ static void integration_update_task(void *pvParameters)
 // Timer callback function - now just notifies the task
 static void integration_timer_callback(void *arg)
 {
-    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Integration update timer triggered");
+    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Integration timer");
 
     if (integration_update_task_handle != NULL)
     {
@@ -702,7 +699,7 @@ void parse_HA_entities(const char *input)
     integration_active_tokens[INTEGRATION_HA] = (integration_token_t *)malloc(integration_active_tokens_count[INTEGRATION_HA] * sizeof(integration_token_t));
     if (integration_active_tokens[INTEGRATION_HA] == NULL)
     {
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to allocate memory for HA tokens");
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "HA tokens alloc failed");
         integration_active_tokens_count[INTEGRATION_HA] = 0;
         return;
     }
@@ -740,7 +737,7 @@ void parse_HA_entities(const char *input)
             entity_str = (char *)malloc(entity_len + 1);
             if (entity_str == NULL)
             {
-                ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to allocate memory for entity");
+                ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Entity alloc failed");
                 break;
             }
             strncpy(entity_str, p, entity_len);
@@ -754,7 +751,7 @@ void parse_HA_entities(const char *input)
             entity_str = (char *)malloc(entity_len + 1);
             if (entity_str == NULL)
             {
-                ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to allocate memory for entity");
+                ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Entity alloc failed");
                 break;
             }
             strncpy(entity_str, p, entity_len);
@@ -778,7 +775,7 @@ void parse_HA_entities(const char *input)
         char *name_str = (char *)malloc(name_len + 1);
         if (name_str == NULL)
         {
-            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to allocate memory for token name");
+            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Token name alloc failed");
             free(entity_str);
             if (path_allocated)
             {
@@ -792,7 +789,7 @@ void parse_HA_entities(const char *input)
         // Initialize token in array using helper function
         if (!init_integration_token(&integration_active_tokens[INTEGRATION_HA][token_index], name_str, entity_str, path_str))
         {
-            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to initialize integration token");
+            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Integration token init failed");
             free(name_str);
             free(entity_str);
             if (path_allocated)
@@ -823,7 +820,7 @@ void parse_HA_entities(const char *input)
 
 void parse_integrations(void)
 {
-    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Parsing integrations");
+    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Parse integrations");
 
     // determine active integrations
     integration_active[INTEGRATION_HA] = (eeprom_ha_url[0] != '\0' && eeprom_ha_token[0] != '\0');
@@ -843,15 +840,15 @@ void parse_integrations(void)
     {
         integration_active[INTEGRATION_NIGHTSCOUT] = 0;
         integration_active[INTEGRATION_DEXCOM] = 1;
-        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Dexcom active");
+        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Dexcom on");
     }
-    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Libre region: %d, username: %s, password: %s", eeprom_libre_region, eeprom_glucose_username, eeprom_glucose_password);
+    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Libre region %d user %s", eeprom_libre_region, eeprom_glucose_username);
     if (eeprom_libre_region > 0 && eeprom_glucose_username[0] != '\0' && eeprom_glucose_password[0] != '\0')
     {
         integration_active[INTEGRATION_NIGHTSCOUT] = 0;
         integration_active[INTEGRATION_DEXCOM] = 0;
         integration_active[INTEGRATION_FREESTYLE] = 1;
-        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Freestyle Libre active, Dexcom and Nightscout disabled (mutually exclusive)");
+        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Libre on, Dexcom/NS disabled");
     }
 
     // Parse HA entities if HA integration is active
@@ -893,12 +890,12 @@ void startup_integrations(void)
     ssl_connection_semaphore = xSemaphoreCreateBinary();
     if (ssl_connection_semaphore == NULL)
     {
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to create SSL connection semaphore");
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "SSL semaphore create failed");
         return;
     }
     // Give the semaphore initially so first connection can acquire it
     xSemaphoreGive(ssl_connection_semaphore);
-    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "SSL connection semaphore created");
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "SSL semaphore ready");
 
     // parse for any active integrations
     parse_integrations();
@@ -917,7 +914,7 @@ void startup_integrations(void)
 
     if (task_created != pdPASS)
     {
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to create integration update task");
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Integration task create failed");
         return;
     }
 
@@ -929,7 +926,7 @@ void startup_integrations(void)
     esp_err_t err = esp_timer_create(&timer_args, &integration_timer);
     if (err != ESP_OK)
     {
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to create integration timer: %s", esp_err_to_name(err));
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Integration timer create: %s", esp_err_to_name(err));
         vTaskDelete(integration_update_task_handle);
         integration_update_task_handle = NULL;
         return;
@@ -938,7 +935,7 @@ void startup_integrations(void)
     err = esp_timer_start_periodic(integration_timer, int_update_secs * 1000 * 1000); // Convert to microseconds
     if (err != ESP_OK)
     {
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to start integration timer: %s", esp_err_to_name(err));
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Integration timer start: %s", esp_err_to_name(err));
         esp_timer_delete(integration_timer);
         integration_timer = NULL;
         vTaskDelete(integration_update_task_handle);
@@ -952,7 +949,7 @@ void startup_integrations(void)
 // Cleanup function to free resources
 void force_integration_update(void)
 {
-    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Forcing integration update");
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Force integration update");
 
     // Reset last update times to force immediate update
     integration_last_update[INTEGRATION_HA] = 0;
@@ -980,7 +977,7 @@ void force_integration_update(void)
 
 void cleanup_integrations(void)
 {
-    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Cleaning up integrations");
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Integration cleanup");
     cleanup_dexcom_client();
     cleanup_freestyle_client();
     cleanup_nightscout_client();

@@ -31,7 +31,7 @@ static esp_err_t stock_http_event_handler(esp_http_client_event_t *evt)
     switch (evt->event_id)
     {
     case HTTP_EVENT_ERROR:
-        ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Stock HTTP Error");
+        ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Stock HTTP error");
         stock_response_len = 0;
         break;
     case HTTP_EVENT_ON_DATA:
@@ -46,7 +46,7 @@ static esp_err_t stock_http_event_handler(esp_http_client_event_t *evt)
         if (evt->data_len <= 0 || stock_response_len < 0 ||
             (stock_response_len + evt->data_len) >= HTTP_BUFFER_SIZE)
         {
-            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Buffer overflow prevented: len=%d, data_len=%d, max=%d",
+            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Buffer overflow len=%d data=%d max=%d",
                         stock_response_len, evt->data_len, HTTP_BUFFER_SIZE);
             stock_response_len = 0;
             return ESP_FAIL;
@@ -58,7 +58,7 @@ static esp_err_t stock_http_event_handler(esp_http_client_event_t *evt)
         stock_response_buffer[stock_response_len] = '\0';
         break;
     case HTTP_EVENT_ON_FINISH:
-        ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Stock HTTP Event: FINISH");
+        ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Stock HTTP done");
         break;
     default:
         break;
@@ -116,7 +116,7 @@ bool fetch_stock_quote(integration_token_t *token)
     // Check WiFi connection before proceeding
     if (!is_wifi_connected())
     {
-        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "WiFi not connected, skipping stock quote fetch");
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "WiFi down, skip stock");
         return false;
     }
 
@@ -136,7 +136,7 @@ bool fetch_stock_quote(integration_token_t *token)
     // Acquire SSL connection semaphore before making SSL connection
     if (!acquire_ssl_semaphore("fetch_stock_quote"))
     {
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to acquire SSL semaphore for fetch_stock_quote");
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "SSL lock failed (Stock)");
         return false;
     }
 
@@ -144,7 +144,7 @@ bool fetch_stock_quote(integration_token_t *token)
     stock_response_buffer = get_shared_buffer(HTTP_BUFFER_SIZE, "STOCK_HTTP");
     if (stock_response_buffer == NULL)
     {
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to get shared buffer for stock response");
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Stock buffer failed");
         release_ssl_semaphore();
         return false;
     }
@@ -154,7 +154,7 @@ bool fetch_stock_quote(integration_token_t *token)
     snprintf(urlstr, URL_BUFFER_SIZE, "/api/v1/quote?symbol=%s&token=%s",
              token->entity, eeprom_stock_key);
 
-    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Making HTTPS request to: %s", urlstr);
+    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Stock HTTPS %s", urlstr);
 
     // Update URL for this request
     esp_http_client_set_url(stock_client, urlstr);
@@ -203,7 +203,7 @@ bool fetch_stock_quote(integration_token_t *token)
         }
         else
         {
-            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Stock quote fetch failed, status: %d", status_code);
+            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Stock fetch %d", status_code);
             // If we get a 401 or 403, the connection might be stale
             if (status_code == 401 || status_code == 403) {
                 cleanup_stock_client();
@@ -213,7 +213,7 @@ bool fetch_stock_quote(integration_token_t *token)
     }
     else
     {
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Stock quote HTTP request failed: %s", esp_err_to_name(err));
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Stock HTTP %s", esp_err_to_name(err));
         // Clean up client on any other error
         cleanup_stock_client();
         stock_client_initialized = false;
@@ -234,7 +234,7 @@ bool fetch_stock_quote(integration_token_t *token)
 
 void parse_stock_entities(const char *input)
 {
-    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Parsing stocks");
+    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Parse stocks");
 
     // Free existing tokens if any
     if (integration_active_tokens[INTEGRATION_STOCK] != NULL)
@@ -260,7 +260,7 @@ void parse_stock_entities(const char *input)
     // Log memory status before allocation
     size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_8BIT);
     size_t required_memory = integration_active_tokens_count[INTEGRATION_STOCK] * sizeof(integration_token_t);
-    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Found %d stock tokens, token size: %d, required memory: %d, free heap: %d",
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Stock tokens %d size %d mem %d heap %d",
                 integration_active_tokens_count[INTEGRATION_STOCK],
                 sizeof(integration_token_t),
                 required_memory,
@@ -270,14 +270,14 @@ void parse_stock_entities(const char *input)
     integration_active_tokens[INTEGRATION_STOCK] = (integration_token_t *)malloc(required_memory);
     if (integration_active_tokens[INTEGRATION_STOCK] == NULL)
     {
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to allocate memory for stock tokens");
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Stock tokens alloc failed");
         integration_active_tokens_count[INTEGRATION_STOCK] = 0;
         return;
     }
-    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Mem ok");
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Stock mem ok");
     // Initialize the allocated memory to zero
     memset(integration_active_tokens[INTEGRATION_STOCK], 0, required_memory);
-    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Mem cleared");
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Stock mem cleared");
 
     // Second pass: parse tokens
     int token_index = 0;
@@ -304,7 +304,7 @@ void parse_stock_entities(const char *input)
         
         if (name_str == NULL || entity_str == NULL)
         {
-            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to allocate memory for stock token strings");
+            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Stock token strings alloc failed");
             if (name_str != NULL) free(name_str);
             if (entity_str != NULL) free(entity_str);
             break;
@@ -321,7 +321,7 @@ void parse_stock_entities(const char *input)
         // Initialize token in array using helper function (path is NULL for stocks)
         if (!init_integration_token(&integration_active_tokens[INTEGRATION_STOCK][token_index], name_str, entity_str, NULL))
         {
-            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to initialize stock token");
+            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Stock token init failed");
             free(name_str);
             free(entity_str);
             break;
@@ -342,7 +342,7 @@ void parse_stock_entities(const char *input)
     // Log the parsed tokens
     for (int i = 0; i < integration_active_tokens_count[INTEGRATION_STOCK]; i++)
     {
-        ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Parsed stock token %d: name='%s', symbol='%s'",
+        ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Stock token %d %s %s",
                     i, integration_active_tokens[INTEGRATION_STOCK][i].name ? integration_active_tokens[INTEGRATION_STOCK][i].name : "(null)",
                     integration_active_tokens[INTEGRATION_STOCK][i].entity ? integration_active_tokens[INTEGRATION_STOCK][i].entity : "(null)");
     }

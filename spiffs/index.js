@@ -919,11 +919,11 @@ function setupFieldValidations() {
             return null; // Valid
         },
         
-        // PWM Frequency: 10-5000 integer
+        // PWM Frequency: 10-1000000 integer
         pwmFrequencyValidator: function(value) {
             const num = parseInt(value);
             if (isNaN(num)) return "Must be a whole number";
-            if (num < 10 || num > 5000) return "Must be between 10 and 5000";
+            if (num < 10 || num > 1000000) return "Must be between 10 and 1000000";
             return null; // Valid
         },
         
@@ -1172,7 +1172,7 @@ function addIfChanged(formData, key, newValue, oldValue) {
  * - p22 = dim_disable (Maintain full brightness)
  * - p23 = brightness_LED (LED brightness array)
  * - p24 = show_leading_zero (Show leading zero)
- * - p42 = pwm_frequency (PWM frequency in Hz, range 10-5000)
+ * - p42 = pwm_frequency (PWM frequency in Hz, range 10-1000000)
  * - p43 = max_power (Max power, range 1-1023)
  * - p46 = wifi_start (WiFi Active Hours Start, 0-23)
  * - p47 = wifi_end (WiFi Active Hours End, 0-23)

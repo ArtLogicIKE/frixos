@@ -33,10 +33,19 @@
 // Add necessary NVS includes if they are missing
 #include "nvs_flash.h"
 #include "nvs.h"
+#include "esp_timer.h"
+
+// Boot fail count for auto-rescue mode (3 failed boots -> rescue once)
+#define BOOT_FAIL_THRESHOLD 3
+#define BOOT_SUCCESS_DELAY_SEC 10
+#define NVS_BOOT_NAMESPACE "frixos"
+#define NVS_BOOT_FAIL_KEY "boot_fail_count"
+
+static int rescue_mode_this_boot = 0; // Set by check_boot_fail_count() when 3 consecutive failed boots
 
 // versioning variables
 const char app[10] = "Frixos";
-const char version[10] = "2.12beta";
+const char version[10] = "2.14beta";
 static const char *TAG = "frixos main"; // in case we use ESP_LOGE -rror/W-arning/I-info (also D-ebug/V-erbose)
 const int fwversion = 63;
 const int rescuemode = 0; // 0 = normal, 1 = rescue mode
@@ -108,7 +117,7 @@ uint8_t eeprom_dexcom_region = 0;     // 0=disabled, 1=US, 2=Japan, 3=Rest of Wo
 uint16_t eeprom_glucose_high = 175;   // Default high threshold in mg/dL
 uint16_t eeprom_glucose_low = 70;     // Default low threshold in mg/dL
 uint8_t eeprom_glucose_unit = 0;      // Glucose display unit: 0=mg/dL, 1=mmol/L
-uint16_t eeprom_pwm_frequency = 200;  // Default PWM frequency in Hz (range 10-5000)
+uint32_t eeprom_pwm_frequency = 200;  // Default PWM frequency in Hz (range 10-1000000)
 uint16_t eeprom_max_power = MAX_DUTY; // Default max power (range 1-1023)
 
 // LibreLinkUp settings
@@ -338,12 +347,12 @@ void ESP_LOG_WEB(esp_log_level_t level, const char *tag, const char *format, ...
 
 void ESP_LOGI_STACK(const char *tag, const char *msg)
 {
-  ESP_LOG_WEB(ESP_LOG_INFO, tag, "%s-Heap/Stack:%lu/%u", msg, esp_get_free_heap_size(), uxTaskGetStackHighWaterMark(NULL), pcTaskGetName(NULL), xPortGetCoreID());
+  ESP_LOG_WEB(ESP_LOG_INFO, tag, "%s heap %lu stack %u", msg, esp_get_free_heap_size(), uxTaskGetStackHighWaterMark(NULL));
 }
 
 void startup_diags(void)
 {
-  ESP_LOG_WEB(ESP_LOG_INFO, TAG, "********************** %s -- %s (%d)", app, version, fwversion);
+  ESP_LOG_WEB(ESP_LOG_INFO, TAG, "%s %s (v%d)", app, version, fwversion);
 
   /* Print chip information */
   esp_chip_info_t chip_info;
@@ -362,14 +371,72 @@ void startup_diags(void)
   ESP_LOG_WEB(ESP_LOG_INFO, TAG, "silicon v%d.%d, ", major_rev, minor_rev);
   if (esp_flash_get_size(NULL, &flash_size) != ESP_OK)
   {
-    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Get flash size failed");
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Flash size failed");
     return;
   }
 
   ESP_LOG_WEB(ESP_LOG_INFO, TAG, "%" PRIu32 "MB %s flash\n", flash_size / (uint32_t)(1024 * 1024),
               (chip_info.features & CHIP_FEATURE_EMB_FLASH) ? "embedded" : "external");
 
-  ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Min free heap size: %" PRIu32 " bytes\n", esp_get_minimum_free_heap_size());
+  ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Min heap %" PRIu32, esp_get_minimum_free_heap_size());
+}
+
+/** Check boot fail count and set rescue_mode_this_boot if 3 consecutive failed boots.
+ *  Call early in app_main, after nvs_flash_init. */
+static void check_boot_fail_count(void)
+{
+  nvs_handle_t h;
+  esp_err_t err = nvs_open(NVS_BOOT_NAMESPACE, NVS_READWRITE, &h);
+  if (err != ESP_OK)
+  {
+    ESP_LOGW(TAG, "Cannot open NVS for boot count: %s", esp_err_to_name(err));
+    return;
+  }
+
+  uint8_t fail_count = 0;
+  nvs_get_u8(h, NVS_BOOT_FAIL_KEY, &fail_count); // ignore error, default 0
+
+  fail_count++;
+  nvs_set_u8(h, NVS_BOOT_FAIL_KEY, fail_count);
+  nvs_commit(h);
+
+  if (fail_count >= BOOT_FAIL_THRESHOLD)
+  {
+    rescue_mode_this_boot = 1;
+    ESP_LOGW(TAG, "Auto-rescue: %u failed boots, entering rescue mode (reset settings except WiFi)", (unsigned)fail_count);
+    nvs_set_u8(h, NVS_BOOT_FAIL_KEY, 0); // reset after entering rescue
+    nvs_commit(h);
+  }
+  else
+  {
+    ESP_LOGI(TAG, "Boot fail count: %u/%u", (unsigned)fail_count, (unsigned)BOOT_FAIL_THRESHOLD);
+  }
+  nvs_close(h);
+}
+
+/** Clear boot fail count on successful boot. Called by 120s success timer. */
+static void clear_boot_fail_count(void)
+{
+  nvs_handle_t h;
+  if (nvs_open(NVS_BOOT_NAMESPACE, NVS_READWRITE, &h) != ESP_OK)
+    return;
+  nvs_set_u8(h, NVS_BOOT_FAIL_KEY, 0);
+  nvs_commit(h);
+  nvs_close(h);
+  ESP_LOGI(TAG, "Boot success: cleared fail count");
+}
+
+static esp_timer_handle_t s_boot_success_timer = NULL;
+
+static void boot_success_timer_cb(void *arg)
+{
+  (void)arg;
+  clear_boot_fail_count();
+  if (s_boot_success_timer)
+  {
+    esp_timer_delete(s_boot_success_timer);
+    s_boot_success_timer = NULL;
+  }
 }
 
 void startup_read_eeprom(void)
@@ -380,7 +447,7 @@ void startup_read_eeprom(void)
   err = nvs_flash_init();
   if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND)
   {
-    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS partition was truncated or needs format update. Erasing and re-initializing.");
+    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS truncated, erasing");
     ESP_ERROR_CHECK(nvs_flash_erase());
     err = nvs_flash_init();
   }
@@ -391,7 +458,7 @@ void startup_read_eeprom(void)
 
   if (err != ESP_OK)
   {
-    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Error opening NEW NVS handle '%s' for reading: %s. Defaults may be used.", EEPROM_NAMESPACE, esp_err_to_name(err));
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS open %s: %s", EEPROM_NAMESPACE, esp_err_to_name(err));
     // Consider setting default values here if NVS isn't available
     // set_default_parameters(); // Example function call
   }
@@ -408,8 +475,8 @@ void startup_read_eeprom(void)
     if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
       ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error wifi_pass: %s", esp_err_to_name(err));
 
-    // if rescue mode, read only SSID and password
-    if (rescuemode == 1)
+    // if rescue mode (compile-time override or auto-rescue after 3 failed boots), read only SSID and password
+    if (rescuemode == 1 || rescue_mode_this_boot)
     {
       // save all default values back to eeprom
       nvs_close(nvs_handle);
@@ -672,7 +739,15 @@ void startup_read_eeprom(void)
     if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
       ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error cgm_unit: %s", esp_err_to_name(err));
 
-    err = nvs_get_u16(nvs_handle, "pwm_frequency", &eeprom_pwm_frequency);
+    err = nvs_get_u32(nvs_handle, "pwm_frequency", &eeprom_pwm_frequency);
+    if (err == ESP_ERR_NVS_INVALID_LENGTH)
+    {
+      /* Migrate from old u16 format */
+      uint16_t freq16 = 200;
+      err = nvs_get_u16(nvs_handle, "pwm_frequency", &freq16);
+      if (err == ESP_OK)
+        eeprom_pwm_frequency = freq16;
+    }
     if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
       ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error pwm_frequency: %s", esp_err_to_name(err));
 
@@ -698,37 +773,48 @@ void startup_read_eeprom(void)
     // Close NVS
     nvs_close(nvs_handle);
 
-    /*
-    // 5. Log final parameters (either migrated or read from new NVS) (unchanged format)
-    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Final params: hostname=%s, wifi_ssid=%s, lat=%s, lon=%s, tz=%s, "
-                                   "dayfont=%s, nightfont=%s, "
-                                   "dim=%u, F=%u, 12h=%u, q_scr=%u, q_wea=%u, filter=[%u,%u], "
-                                   "msg_rgb=([%u,%u,%u],[%u,%u,%u]), msg_font=%u, offset=(%u,%u), rot=%u, mirror=%u, grid=%u, "
-                                   "update=%u, dark=%u, lang=%u, scroll_dly=%u,"
-                                   "brightness=[%u,%u], lux_sens=%.1f, lux_thresh=%.1f, "
-                                   "ha_url=%s, ha_token=%.05s, ha_refresh=%u, stock_key=%s, stock_refresh=%u, "
-                                   "dexcom_region=%u, glucose_refresh=%u, glucose_high=%u, glucose_low=%u, "
-                                   "pwm_freq=%u, poh=%u, "
-                                   "libre_region=%u",
-                eeprom_hostname, eeprom_wifi_ssid, eeprom_lat, eeprom_lon, eeprom_timezone,
-                eeprom_font[0], eeprom_font[1],
-                eeprom_dim_disable, eeprom_fahrenheit, eeprom_12hour,
-                eeprom_quiet_scroll, eeprom_quiet_weather,
-                eeprom_color_filter[0], eeprom_color_filter[1],
-                eeprom_msg_red[0], eeprom_msg_green[0], eeprom_msg_blue[0],
-                eeprom_msg_red[1], eeprom_msg_green[1], eeprom_msg_blue[1],
-                eeprom_msg_font,
-                eeprom_ofs_x, eeprom_ofs_y, eeprom_rotation, eeprom_mirroring,
-                eeprom_show_grid, eeprom_update_firmware, eeprom_dark_theme, eeprom_language, eeprom_scroll_delay,
-                eeprom_brightness_LED[0], eeprom_brightness_LED[1],
-                eeprom_lux_sensitivity, eeprom_lux_threshold,
-                eeprom_ha_url, eeprom_ha_token, eeprom_ha_refresh_mins,
-                eeprom_stock_key,                 eeprom_stock_refresh_mins,
-                eeprom_dexcom_region, eeprom_glucose_refresh, eeprom_glucose_high, eeprom_glucose_low,
-                eeprom_pwm_frequency, eeprom_max_power, eeprom_poh,
-                eeprom_libre_region);
+    
+    // 5. Log final parameters (either migrated or read from new NVS)
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG,
+        "Final params:\n"
+        "  Network:     hostname=%s, wifi_ssid=%s, wifi_start=%u, wifi_end=%u\n"
+        "  Location:    lat=%s, lon=%s, tz=%s\n"
+        "  Fonts:       day=%s, night=%s\n"
+        "  Display:     dim=%u, F=%u, 12h=%u, q_scr=%u, q_wea=%u, lead_zero=%u, dots_breathe=%u, filter=[%u,%u]\n"
+        "  Message:     rgb=([%u,%u,%u],[%u,%u,%u]), font=%u, offset=(%u,%u), rot=%u, mirror=%u, grid=%u\n"
+        "  Message txt: %s\n"
+        "  UI:          update=%u, dark=%u, lang=%u, scroll_dly=%u, scroll_speed=%u\n"
+        "  Brightness:  led=[%u,%u], lux_sens=%.1f, lux_thresh=%.1f\n"
+        "  HomeAssist:  url=%s, ha_refresh=%u (token redacted)\n"
+        "  Stock:       stock_refresh=%u (key redacted)\n"
+        "  Dexcom:      region=%u, refresh=%u, high=%u, low=%u\n"
+        "  Libre:       region=%u, ns_url=%s\n"
+        "  CGM:         username=%s, validity=%u, sec_time=%u, sec_cgm=%u, unit=%u (password redacted)\n"
+        "  PWM:         freq=%u, max_power=%u, poh=%u",
+        eeprom_hostname, eeprom_wifi_ssid, eeprom_wifi_start, eeprom_wifi_end,
+        eeprom_lat, eeprom_lon, eeprom_timezone,
+        eeprom_font[0], eeprom_font[1],
+        eeprom_dim_disable, eeprom_fahrenheit, eeprom_12hour,
+        eeprom_quiet_scroll, eeprom_quiet_weather,
+        eeprom_show_leading_zero, eeprom_dots_breathe,
+        eeprom_color_filter[0], eeprom_color_filter[1],
+        eeprom_msg_red[0], eeprom_msg_green[0], eeprom_msg_blue[0],
+        eeprom_msg_red[1], eeprom_msg_green[1], eeprom_msg_blue[1],
+        eeprom_msg_font,
+        eeprom_ofs_x, eeprom_ofs_y, eeprom_rotation, eeprom_mirroring,
+        eeprom_show_grid,
+        eeprom_message,
+        eeprom_update_firmware, eeprom_dark_theme, eeprom_language, eeprom_scroll_delay, eeprom_scroll_speed,
+        eeprom_brightness_LED[0], eeprom_brightness_LED[1],
+        eeprom_lux_sensitivity, eeprom_lux_threshold,
+        eeprom_ha_url, eeprom_ha_refresh_mins,
+        eeprom_stock_refresh_mins,
+        eeprom_dexcom_region, eeprom_glucose_refresh, eeprom_glucose_high, eeprom_glucose_low,
+        eeprom_libre_region, eeprom_ns_url,
+        eeprom_glucose_username, glucose_validity_duration, eeprom_sec_time, eeprom_sec_cgm, eeprom_glucose_unit,
+        eeprom_pwm_frequency, eeprom_max_power, eeprom_poh);
 
-                */
+    
   }
 
 } // end startup_read_eeprom
@@ -878,7 +964,7 @@ esp_err_t write_nvs_parameters(void)
 
   if (eeprom_pwm_frequency == 133)
     eeprom_pwm_frequency = 200; // replace 133 with 200 for backwards compatibility
-  err = nvs_set_u16(nvs_handle, "pwm_frequency", eeprom_pwm_frequency);
+  err = nvs_set_u32(nvs_handle, "pwm_frequency", eeprom_pwm_frequency);
   if (err != ESP_OK)
     ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error pwm_frequency: %s", esp_err_to_name(err));
 
@@ -1206,6 +1292,18 @@ void app_main(void)
   ESP_LOGI(TAG, "Starting Frixos application...");
   ESP_LOGI(TAG, "Initial free heap: %lu bytes", esp_get_free_heap_size());
 
+  // Initialize NVS early for boot fail count (before anything that can crash)
+  esp_err_t err = nvs_flash_init();
+  if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND)
+  {
+    ESP_LOGW(TAG, "NVS partition needs format. Erasing and re-initializing.");
+    ESP_ERROR_CHECK(nvs_flash_erase());
+    err = nvs_flash_init();
+  }
+  ESP_ERROR_CHECK(err);
+
+  check_boot_fail_count();
+
   // warn level for the serial log; the web log is still going to show INFO and below.
   esp_log_level_set("*", ESP_LOG_INFO);
 
@@ -1254,4 +1352,15 @@ void app_main(void)
   vTaskDelay(pdMS_TO_TICKS(4000));                    // Wait 4 seconds for tasks to initialize
   startup_led_pwm();
   ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Startup complete");
+
+  // Start 120s success timer: clear boot fail count on successful run
+  esp_timer_handle_t success_timer = NULL;
+  esp_timer_create_args_t success_args = {
+      .callback = boot_success_timer_cb,
+      .name = "boot_success"};
+  if (esp_timer_create(&success_args, &success_timer) == ESP_OK)
+  {
+    s_boot_success_timer = success_timer;
+    esp_timer_start_once(success_timer, BOOT_SUCCESS_DELAY_SEC * 1000000ULL);
+  }
 }

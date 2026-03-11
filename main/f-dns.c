@@ -68,12 +68,12 @@ bool dns_server_start(dns_server_t* server, esp_ip4_addr_t gateway) {
         return false;
     }
     
-    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Starting DNS server");
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "DNS server start");
     server->gateway = gateway;
 
     server->socket_fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (server->socket_fd < 0) {
-        ESP_LOG_WEB(ESP_LOG_ERROR,TAG, "Failed to create socket");
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Socket create failed");
         return false;
     }
 
@@ -101,7 +101,7 @@ bool dns_server_start(dns_server_t* server, esp_ip4_addr_t gateway) {
     );
     
     if (task_created != pdPASS) {
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to create DNS server task");
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "DNS server task create failed");
         close(server->socket_fd);
         server->socket_fd = -1;
         return false;
@@ -116,7 +116,7 @@ void dns_server_stop(dns_server_t* server) {
         return;
     }
     
-    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Stopping DNS server");
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "DNS server stop");
     
     if (server->task_handle != NULL) {
         vTaskDelete(server->task_handle);
@@ -191,9 +191,9 @@ static void dns_server_task(void* arg) {
 
         // Extract and print the domain name
         if (extract_dns_name(buffer, len, domain_name, DNS_MAX_NAME_LENGTH) > 0) {
-            ESP_LOG_WEB(ESP_LOG_VERBOSE,TAG, "Received DNS query for: %s", domain_name);
+            ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "DNS query: %s", domain_name);
         } else {
-            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Failed to extract domain name from DNS query");
+            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "DNS: domain extract failed");
         }
 
         // Simple DNS response: point all queries to gateway IP
@@ -211,7 +211,7 @@ static void dns_server_task(void* arg) {
         
         char ip_str[16];
         inet_ntop(AF_INET, &server->gateway.addr, ip_str, sizeof(ip_str));
-        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Sending DNS response for %s to %s", domain_name, ip_str);
+        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "DNS response %s -> %s", domain_name, ip_str);
 
         sendto(server->socket_fd, buffer, len, 0, (struct sockaddr*)&client_addr, client_addr_len);
     }

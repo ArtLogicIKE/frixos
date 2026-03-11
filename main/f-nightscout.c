@@ -28,7 +28,7 @@ static esp_err_t nightscout_http_event_handler(esp_http_client_event_t *evt)
     switch (evt->event_id)
     {
     case HTTP_EVENT_ERROR:
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Nightscout HTTP Error");
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Nightscout HTTP error");
         nightscout_response_len = 0;
         break;
     case HTTP_EVENT_ON_DATA:
@@ -40,7 +40,7 @@ static esp_err_t nightscout_http_event_handler(esp_http_client_event_t *evt)
         if (evt->data_len <= 0 || nightscout_response_len < 0 ||
             (nightscout_response_len + evt->data_len) >= HTTP_BUFFER_SIZE)
         {
-            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Buffer overflow prevented: len=%d, data_len=%d, max=%d",
+            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Buffer overflow len=%d data=%d max=%d",
                         nightscout_response_len, evt->data_len, HTTP_BUFFER_SIZE);
             nightscout_response_len = 0;
             return ESP_FAIL;
@@ -50,7 +50,7 @@ static esp_err_t nightscout_http_event_handler(esp_http_client_event_t *evt)
         nightscout_response_buffer[nightscout_response_len] = '\0';
         break;
     case HTTP_EVENT_ON_FINISH:
-        ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Nightscout HTTP Event: FINISH");
+        ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Nightscout HTTP done");
         break;
     default:
         break;
@@ -127,7 +127,7 @@ bool init_nightscout_client(void)
     nightscout_client = esp_http_client_init(&config);
     if (!nightscout_client)
     {
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to initialize Nightscout client");
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Nightscout client init failed");
         return false;
     }
 
@@ -182,7 +182,7 @@ bool fetch_nightscout_glucose(void)
 
     if (!acquire_ssl_semaphore("fetch_nightscout_glucose"))
     {
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to acquire SSL semaphore for fetch_nightscout_glucose");
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "SSL lock failed (Nightscout)");
         return false;
     }
 
@@ -243,10 +243,10 @@ bool fetch_nightscout_glucose(void)
                     success = true;
 
                     if (eeprom_glucose_unit == 1)
-                        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "fetch_nightscout_glucose: ok, glucose: %.1f mmol/L, trend: %i",
+                        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Nightscout ok %.1f mmol/L trend %i",
                                     glucose_data.current_gl_mgdl / 18.0182f, glucose_data.trend_arrow);
                     else
-                        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "fetch_nightscout_glucose: ok, glucose: %.0f mg/dL, trend: %i",
+                        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Nightscout ok %.0f mg/dL trend %i",
                                     glucose_data.current_gl_mgdl, glucose_data.trend_arrow);
                 }
             }
@@ -255,7 +255,7 @@ bool fetch_nightscout_glucose(void)
         }
         else if (status_code == 401)
         {
-            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Nightscout unauthorized (check API secret)");
+            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Nightscout unauthorized");
         }
         else
         {
@@ -264,7 +264,7 @@ bool fetch_nightscout_glucose(void)
     }
     else
     {
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Nightscout glucose fetch failed: %s", esp_err_to_name(err));
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Nightscout fetch %s", esp_err_to_name(err));
     }
 
     release_shared_buffer(nightscout_response_buffer);

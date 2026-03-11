@@ -127,7 +127,7 @@ static time_t parse_freestyle_timestamp(const char *timestamp_str)
         time_t result = mktime(&tm);
         if (result == (time_t)-1)
         {
-            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Failed to parse timestamp: %s", timestamp_str);
+            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Timestamp parse failed %s", timestamp_str);
             return 0;
         }
         return result;
@@ -443,7 +443,7 @@ static esp_err_t freestyle_http_event_handler(esp_http_client_event_t *evt)
     switch (evt->event_id)
     {
     case HTTP_EVENT_ERROR:
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Freestyle HTTP Error");
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Freestyle HTTP error");
         freestyle_response_len = 0;
         if (is_glucose_chunk_mode)
         {
@@ -475,7 +475,7 @@ static esp_err_t freestyle_http_event_handler(esp_http_client_event_t *evt)
             if (evt->data_len <= 0 || freestyle_response_len < 0 ||
                 (freestyle_response_len + evt->data_len) >= HTTP_BUFFER_SIZE)
             {
-                ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Buffer overflow prevented: len=%d, data_len=%d, max=%d",
+                ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Buffer overflow len=%d data=%d max=%d",
                             freestyle_response_len, evt->data_len, HTTP_BUFFER_SIZE);
                 freestyle_response_len = 0;
                 return ESP_FAIL;
@@ -488,7 +488,7 @@ static esp_err_t freestyle_http_event_handler(esp_http_client_event_t *evt)
         }
         break;
     case HTTP_EVENT_ON_FINISH:
-        ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Freestyle HTTP Event: FINISH");
+        ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Freestyle HTTP done");
         break;
     default:
         break;
@@ -507,7 +507,7 @@ bool init_freestyle_client(void)
     const char *base_url = get_freestyle_base_url();
     if (!base_url || base_url[0] == '\0')
     {
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Invalid base URL for Freestyle");
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Freestyle invalid base URL");
         return false;
     }
 
@@ -563,7 +563,7 @@ bool login_freestyle(void)
     // Guard against recursive calls
     if (login_freestyle_in_progress)
     {
-        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "login_freestyle already in progress, skipping duplicate call");
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Freestyle login already in progress");
         return false;
     }
     login_freestyle_in_progress = true;
@@ -590,7 +590,7 @@ bool login_freestyle(void)
     size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_8BIT);
     if (free_heap < 20000) // Less than 20KB free - SSL needs significant memory
     {
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Insufficient heap memory for SSL connection: %d bytes free (need ~20KB)", free_heap);
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Low heap %d (need ~20K)", free_heap);
         login_freestyle_in_progress = false;
         return false;
     }
@@ -598,7 +598,7 @@ bool login_freestyle(void)
     // Acquire SSL connection semaphore before making SSL connection
     if (!acquire_ssl_semaphore("login_freestyle"))
     {
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to acquire SSL semaphore for Freestyle login");
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "SSL lock failed (Freestyle login)");
         login_freestyle_in_progress = false;
         return false;
     }
@@ -703,7 +703,7 @@ bool login_freestyle(void)
            }
             else
             {
-                ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "login_freestyle: Failed to extract token or account ID from response");
+                ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Freestyle login: no token/account ID");
             }
         }
         else
@@ -713,7 +713,7 @@ bool login_freestyle(void)
     }
     else
     {
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "login_freestyle: HTTP request failed: %s", esp_err_to_name(http_err));
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Freestyle login HTTP %s", esp_err_to_name(http_err));
         
         // If SSL handshake failed, the client might be in a bad state - recreate it
         // Check for connection failures (ESP_FAIL is returned for SSL handshake failures)
@@ -758,7 +758,7 @@ static bool fetch_patient_id(void)
     // Acquire SSL connection semaphore before making SSL connection
     if (!acquire_ssl_semaphore("fetch_patient_id"))
     {
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to acquire SSL semaphore for fetch_patient_id");
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "SSL lock failed (patient ID)");
         return false;
     }
 
@@ -911,11 +911,11 @@ bool fetch_freestyle_glucose(void)
                 if (eeprom_glucose_unit == 1)
                 {
                     float glucose_mmol = glucose_data.current_gl_mgdl / 18.0182f;
-                    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "fetch_freestyle_glucose: ok, glucose: %.1f mmol/L, trend: %i", glucose_mmol, glucose_data.trend_arrow);
+                    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Freestyle ok %.1f mmol/L trend %i", glucose_mmol, glucose_data.trend_arrow);
                 }
                 else
                 {
-                    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "fetch_freestyle_glucose: ok, glucose: %.0f mg/dL, trend: %i", glucose_data.current_gl_mgdl, glucose_data.trend_arrow);
+                    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Freestyle ok %.0f mg/dL trend %i", glucose_data.current_gl_mgdl, glucose_data.trend_arrow);
                 }
             }
             else
@@ -924,14 +924,14 @@ bool fetch_freestyle_glucose(void)
                 // Return true so timestamp gets updated to respect refresh interval
                 if (glucose_data.timestamp != latest_timestamp)
                 {
-                    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "fetch_freestyle_glucose: not newer; value: %.0f mg/dL, timestamp: %ld", glucose_data.current_gl_mgdl, (long)glucose_data.timestamp);
+                    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Freestyle not newer %.0f ts %ld", glucose_data.current_gl_mgdl, (long)glucose_data.timestamp);
                     success = true; // Data was updated
                 }                
             }
         }
         else if (status_code == 401)
         {
-            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "fetch_freestyle_glucose: unauthorized, retrying login");
+            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Freestyle unauthorized, retry login");
             eeprom_libre_token[0] = '\0'; // Trigger re-login next time
         }
     }

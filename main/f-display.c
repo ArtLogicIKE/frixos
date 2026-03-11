@@ -195,7 +195,7 @@ uint8_t madctl_value[8] =
 
 void set_display_color_filter(uint8_t curve)
 {
-  ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Setting display color filter to %d", curve);
+  ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Display color filter: %d", curve);
   /*
   uint16_t color_filters[4] = {0xFFFF, 0x07E0, 0x001F, 0xF800};
   uint16_t color_mask = color_filters[curve];
@@ -213,7 +213,7 @@ void st7735_set_rotation_and_mirror(uint8_t rotation, uint8_t mirror)
 
 esp_err_t startup_lcd(void)
 {
-  ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Startup LCD");
+  ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "LCD startup");
   esp_err_t ret = ESP_OK;
 
   /* LCD backlight */
@@ -223,7 +223,7 @@ esp_err_t startup_lcd(void)
   ESP_ERROR_CHECK(gpio_config(&bk_gpio_config));
 
   /* LCD initialization */
-  ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Initialize SPI bus");
+  ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "SPI bus init");
   const spi_bus_config_t buscfg = {
       .sclk_io_num = LCD_GPIO_SCLK,
       .mosi_io_num = LCD_GPIO_MOSI,
@@ -235,7 +235,7 @@ esp_err_t startup_lcd(void)
 
   ESP_RETURN_ON_ERROR(spi_bus_initialize(LCD_SPI_NUM, &buscfg, SPI_DMA_CH_AUTO), TAG, "SPI init failed");
 
-  ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Install panel IO");
+  ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Panel IO install");
   const esp_lcd_panel_io_spi_config_t io_config = {
       .dc_gpio_num = LCD_GPIO_DC,
       .cs_gpio_num = LCD_GPIO_CS,
@@ -247,7 +247,7 @@ esp_err_t startup_lcd(void)
   };
   ESP_GOTO_ON_ERROR(esp_lcd_new_panel_io_spi((esp_lcd_spi_bus_handle_t)LCD_SPI_NUM, &io_config, &lcd_io), err, TAG, "New panel IO failed");
 
-  ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Install LCD driver");
+  ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "LCD driver install");
   const esp_lcd_panel_dev_config_t panel_config = {
       .reset_gpio_num = LCD_GPIO_RST,
       .color_space = LCD_COLOR_SPACE,
@@ -283,7 +283,7 @@ err:
 
 esp_err_t startup_lvgl(void)
 {
-  ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Startup LVGL");
+  ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "LVGL startup");
 
   /* Initialize LVGL port - this will create the LVGL task and call lv_init() internally */
   const lvgl_port_cfg_t lvgl_cfg = {
@@ -296,7 +296,7 @@ esp_err_t startup_lvgl(void)
   ESP_RETURN_ON_ERROR(lvgl_port_init(&lvgl_cfg), TAG, "LVGL port initialization failed");
 
   /* Add LCD screen */
-  ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "-Add LCD screen");
+  ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Add LCD screen");
   const lvgl_port_display_cfg_t disp_cfg = {
       .io_handle = lcd_io,
       .panel_handle = lcd_panel,
@@ -347,7 +347,7 @@ void show_grid(uint8_t show)
 
 void create_grid(lv_obj_t *scr)
 {
-  ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Create GRID");
+  ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Create grid");
 
   static lv_point_precise_t v_points[][2] = {
       {{20, 0}, {20, 128}},
@@ -401,20 +401,20 @@ void set_scroll_message(const char *msg)
   // Add null pointer check
   if (msg == NULL || label_msg == NULL)
   {
-    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "set_scroll_message: NULL pointer detected");
+    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "set_scroll_message: null pointer");
     return;
   }
   // Validate font index bounds
   if (eeprom_msg_font > MAX_FONT_INDEX)
   {
-    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "set_scroll_message: Invalid font index %d, using default", eeprom_msg_font);
+    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "set_scroll_message: invalid font %d, using default", eeprom_msg_font);
     eeprom_msg_font = 0; // Reset to default
   }
   // Get the selected font and validate it
   const lv_font_t *font = get_selected_font(eeprom_msg_font);
   if (font == NULL)
   {
-    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "set_scroll_message: Invalid font, using default");
+    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "set_scroll_message: invalid font, using default");
     font = &frixos_8; // Use default font
   }
 
@@ -453,7 +453,7 @@ void set_scroll_message(const char *msg)
 // this is reboot only stuff
 void startup_display(void)
 {
-  ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Startup display");
+  ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Display startup");
   lv_obj_t *scr = lv_scr_act();
 
   lvgl_port_lock(0);
@@ -467,7 +467,7 @@ void startup_display(void)
   lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
 
   img_logo = lv_image_create(lv_scr_act());
-  lv_image_set_src(img_logo, "/logo.jpg");
+  lv_image_set_src(img_logo, "S:/logo.jpg");
   lv_image_set_inner_align(img_logo, LV_ALIGN_CENTER);
   lv_obj_align(img_logo, LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 20, eeprom_ofs_y + 10);
 
@@ -531,13 +531,13 @@ int check_file(char *filename)
   FILE *fp = fopen(filename, "r");
   if (fp != NULL)
   {
-    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "check_file %s found", filename);
+    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "check_file: %s found", filename);
     fclose(fp);
     return 1;
   }
   else
   {
-    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "check_file %s not found", filename);
+    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "check_file: %s not found", filename);
     return 0;
   }
 }
@@ -583,7 +583,7 @@ void find_file(char *filename, char len, char *theme, char *item)
   }
 
   // Fallback to logo
-  snprintf(filename, len, "/logo.jpg");
+  snprintf(filename, len, "S:/logo.jpg");
 }
 
 void show_object(lv_obj_t *obj, bool show)
@@ -677,10 +677,8 @@ void display_changed(void)
   lv_obj_align(img_digits_sprite, LV_ALIGN_TOP_LEFT, 0, 0);
   lvgl_port_unlock();
 
-  ESP_LOG_WEB(ESP_LOG_INFO, TAG,
-              "Display change - (lx %.1f,idx %i,%s,%s,flt %i,fnt %s, msg color %i,%i,%i",
-              lux, font_index, eeprom_font[0], eeprom_font[1], eeprom_color_filter[font_index], buf,
-              eeprom_msg_red[font_index], eeprom_msg_green[font_index], eeprom_msg_blue[font_index]);
+  ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Display change: lx %.1f idx %i flt %i fnt %s",
+              lux, font_index, eeprom_color_filter[font_index], buf);
 
   lvgl_port_lock(0);
 
@@ -773,7 +771,7 @@ void display_changed(void)
     show_object(img_glucose, false);
     show_object(img_glucose_trend, false); // Hide trend arrow when WiFi is disabled
     show_object(img_mgdl, false);          // Hide mgdl when WiFi is disabled
-    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Wifi off, Trend arrow hidden");
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "WiFi off, trend arrow hidden");
   }
   else
   {
@@ -787,7 +785,7 @@ void display_changed(void)
   // Apply gamma curve based on eeprom_color_filter, after we get on wifi
   if (wifi_connected)
   {
-    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Applying color filter: %u (font_index: %u, wifi_connected: %s)",
+    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Color filter: %u (font %u, wifi %s)",
                 eeprom_color_filter[font_index], font_index, wifi_connected ? "true" : "false");
     set_display_color_filter(eeprom_color_filter[font_index]);
   }
@@ -862,7 +860,7 @@ void update_weather_msg(void)
 void show_qr_code(void)
 {
   lvgl_port_lock(0);
-  lv_image_set_src(img_logo, "/wifi-qr.jpg");
+  lv_image_set_src(img_logo, "S:/wifi-qr.jpg");
   lv_obj_align(img_logo, LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 15, eeprom_ofs_y + 10);
   set_scroll_message(" Scan QR code to connect to your Frixos ");
   lvgl_port_unlock();
@@ -873,18 +871,18 @@ static volatile bool watchdog_triggered = false;
 
 static void watchdog_callback(void *arg)
 {
-  ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "WATCHDOG TIMEOUT: Display task appears to be hung!");
+  ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Watchdog: display task hung");
   watchdog_triggered = true;
   // Force a system restart after 5 seconds if the task is still hung
-  ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Scheduling system restart in 5 seconds due to display task hang");
+  ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Restart in 5s (display hang)");
   // Note: In a real implementation, you might want to call esp_restart() directly
   // or use a proper restart mechanism. For now, we'll just log the issue.
 }
 
 void display_task(void *pvParameters)
 {
-  ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "display_task started.");
-  ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Initial display state - font_index: %u, day_color_filter: %u, night_color_filter: %u",
+  ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "display_task started");
+  ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Display state: font %u, day_flt %u, night_flt %u",
               font_index, eeprom_color_filter[0], eeprom_color_filter[1]);
 
   // Create fade timer
@@ -923,10 +921,10 @@ void display_task(void *pvParameters)
     if (loop_counter % 1000 == 1)
     {
       UBaseType_t stack_high_water = uxTaskGetStackHighWaterMark(NULL);
-      ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Display task alive - loop %lu, stack free: %lu bytes", loop_counter, stack_high_water);
+      ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Display loop %lu, stack %lu", loop_counter, stack_high_water);
       if (stack_high_water < 1024)
       {
-        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "LOW STACK WARNING: Only %lu bytes free!", stack_high_water);
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Low stack: %lu bytes", stack_high_water);
       }
     }
 
@@ -935,7 +933,7 @@ void display_task(void *pvParameters)
 
     if (settings_updated)
     {
-      ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Settings updated, updating display");
+      ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Settings updated");
       // Reset alternate display state when settings change
       alternate_display_start = 0;
       showing_glucose = false;
@@ -955,14 +953,14 @@ void display_task(void *pvParameters)
         show_object(img_wifi, true);
         show_object(img_glucose, false);
         show_object(img_glucose_trend, false);
-        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "WiFi disabled by active hours - showing WiFi-off icon");
+        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "WiFi disabled (active hours)");
         lvgl_port_unlock();
       }
       else
       {
         lvgl_port_lock(0);
         show_object(img_wifi, false);
-        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "WiFi enabled - hiding WiFi-off icon");
+        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "WiFi enabled");
         lvgl_port_unlock();
       }
     }
@@ -1040,24 +1038,24 @@ void display_task(void *pvParameters)
         // Timeout after 5 minutes - restore normal message
         if (time(NULL) - ota_start_time > 300)
         { // 5 minutes timeout
-          ESP_LOG_WEB(ESP_LOG_WARN, TAG, "OTA update timeout, restoring normal message");
+          ESP_LOG_WEB(ESP_LOG_WARN, TAG, "OTA timeout, restoring message");
           ota_update_in_progress = false; // Force reset the flag
           ota_updating_message = false;
           ota_start_time = 0;
         }
       }
 
-      ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Scroll message updated: %s", msg_scrolling);
+      ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Scroll message: %s", msg_scrolling);
 
       lv_mem_monitor_t mon;
       lv_mem_monitor(&mon);
-      ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Mem: Total: %d bytes, Free: %d bytes, Used: %d%%, Fragmentation: %d%%, Largest free block: %d bytes",
+      ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Mem: total %d free %d used %d%% frag %d%% largest %d",
                   mon.total_size, mon.free_size, mon.used_pct, mon.frag_pct, mon.free_biggest_size);
 
       // Check for memory issues
       if (mon.free_size < 1024)
       {
-        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "LOW MEMORY WARNING: Only %d bytes free!", mon.free_size);
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Low memory: %d bytes", mon.free_size);
       }
 
       integration_tokens_updated = false;
@@ -1089,8 +1087,8 @@ void display_task(void *pvParameters)
       pwmpct = eeprom_brightness_LED[font_index];
       if (font_index != old_font_index)
       {
-        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Font: %u -> %u (lux=%.1f, thres=%.1f, sens=%.1f, dim_dis=%u, manufacturer_mode=%u)",
-                    old_font_index, font_index, lux, eeprom_lux_threshold, eeprom_lux_sensitivity, eeprom_dim_disable, manufacturer_mode);
+        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Font %u->%u (lux %.1f thres %.1f)",
+                    old_font_index, font_index, lux, eeprom_lux_threshold);
         set_led_pwm_brightness(pwmpct);
         display_changed();
       }
@@ -1392,11 +1390,11 @@ void display_task(void *pvParameters)
         lvgl_port_lock(0);
         if (img_logo)
         {
-          lv_obj_delete_async(img_logo);
+          lv_obj_delete(img_logo);
           img_logo = NULL;
         }
 
-        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "TJV: showing digits");
+        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Showing digits");
 
         for (int i = 0; i < 4; i++)
           lv_obj_remove_flag(digit_objs[i], LV_OBJ_FLAG_HIDDEN);
@@ -1450,7 +1448,7 @@ void display_task(void *pvParameters)
         show_ip_on_boot = false;
         ip_message_set = false;
         ip_display_start_time = 0;
-        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "IP address display complete (%lld seconds), returning to normal message", (long long)elapsed_sec);
+        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "IP display done (%lld s)", (long long)elapsed_sec);
         integration_tokens_updated = true; // Force message update
       }
     }
@@ -1468,13 +1466,15 @@ void display_task(void *pvParameters)
       lvgl_port_unlock();
     }
 
-    // Update the display
-    lv_task_handler();
+    // NOTE: Do NOT call lv_task_handler() here! The esp_lvgl_port creates its own
+    // task that runs lv_timer_handler. Calling it from display_task causes two tasks
+    // to run the LVGL timer handler, corrupting the event list and crashing in
+    // lv_event_mark_deleted when objects are deleted. See LVGL issue #6677.
 
     // Check if watchdog was triggered
     if (watchdog_triggered)
     {
-      ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Watchdog was triggered, attempting to recover display task");
+      ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Watchdog triggered, recovering");
       watchdog_triggered = false;
       // Try to recover by forcing a display refresh
       display_changed();
@@ -1488,7 +1488,7 @@ void display_task(void *pvParameters)
     xTaskDelayUntil(&lastrun_tick, pdMS_TO_TICKS(eeprom_scroll_delay)); // this is probably causing jumpy scrolling
   } // end of while (1) loop
 
-  ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Display task exiting unexpectedly");
+  ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Display task exit (unexpected)");
 
   // Cleanup timers (should never reach here)
   if (watchdog_timer)
@@ -1556,7 +1556,7 @@ void prepare_tokens(void)
     prepared_tokens_count = 0;
   }
 
-  ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Preparing tokens");
+  ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Prepare tokens");
 
   // Start with base tokens
   prepared_tokens = base_tokens;
@@ -1580,14 +1580,14 @@ void prepare_tokens(void)
   // Add safety check for reasonable token count
   if (tokencount > MAX_TOKEN_COUNT)
   {
-    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Token count too high (%d), limiting to %d", tokencount, MAX_TOKEN_COUNT);
+    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Token count %d, limit %d", tokencount, MAX_TOKEN_COUNT);
     tokencount = MAX_TOKEN_COUNT;
   }
 
   token_t *all_tokens = malloc((prepared_tokens_count + tokencount + 1) * sizeof(token_t));
   if (all_tokens == NULL)
   {
-    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to allocate memory for all tokens");
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Token alloc failed");
     return;
   }
 
@@ -1693,7 +1693,7 @@ void replace_placeholders(const char *input, char *output, size_t output_size)
   // Add null pointer and size checks
   if (input == NULL || output == NULL || output_size == 0)
   {
-    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "replace_placeholders: Invalid parameters");
+    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "replace_placeholders: invalid params");
     if (output != NULL && output_size > 0)
     {
       output[0] = '\0';
@@ -1750,13 +1750,13 @@ void replace_placeholders(const char *input, char *output, size_t output_size)
 
   strcpy(greeting, greetings[lang_index][greeting_index]);
 
-  ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Greeting calculated for hour %d: %s", current_timeinfo.tm_hour, greeting);
+  ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Greeting hour %d: %s", current_timeinfo.tm_hour, greeting);
 
   // Copy input to temp buffer with proper bounds checking
   size_t input_len = strlen(input);
   if (input_len >= sizeof(temp))
   {
-    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Input string too long, truncating");
+    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Input string truncated");
     input_len = sizeof(temp) - 1;
   }
   strncpy(temp, input, input_len);
@@ -1769,7 +1769,9 @@ void replace_placeholders(const char *input, char *output, size_t output_size)
   // debug: show all tokens
   for (int i = 0; i < prepared_tokens_count; i++)
   {
-    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Token %d: %s = %s", i, (prepared_tokens[i].token == NULL ? "NULL" : prepared_tokens[i].token), (prepared_tokens[i].value == NULL ? "NULL" : prepared_tokens[i].value));
+    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Token %d: %s=%s", i,
+                prepared_tokens[i].token ? prepared_tokens[i].token : "null",
+                prepared_tokens[i].value ? prepared_tokens[i].value : "null");
   }
 
   while (*src && dst < end)
@@ -1906,11 +1908,11 @@ void replace_placeholders(const char *input, char *output, size_t output_size)
               {
                 if (integration_active_tokens[INTEGRATION_HA][i].name != NULL && integration_active_tokens[INTEGRATION_HA][i].name[0] != '\0' && integration_active_tokens[INTEGRATION_HA][i].value[0] != '\0')
                 {
-                  ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Checking %s", integration_active_tokens[INTEGRATION_HA][i].name);
+                  ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Check HA %s", integration_active_tokens[INTEGRATION_HA][i].name);
                   if (integration_active_tokens[INTEGRATION_HA][i].name != NULL && strcmp(integration_active_tokens[INTEGRATION_HA][i].name, token->token) == 0)
                   {
                     snprintf(replacement, sizeof(replacement), "%s", integration_active_tokens[INTEGRATION_HA][i].value);
-                    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "HA token: %s = %s", token->token, integration_active_tokens[INTEGRATION_HA][i].value);
+                    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "HA %s=%s", token->token, integration_active_tokens[INTEGRATION_HA][i].value);
                     break;
                   }
                 }
@@ -1929,7 +1931,7 @@ void replace_placeholders(const char *input, char *output, size_t output_size)
                   if (integration_active_tokens[INTEGRATION_STOCK][i].name != NULL && strcmp(integration_active_tokens[INTEGRATION_STOCK][i].name, token->token) == 0)
                   {
                     snprintf(replacement, sizeof(replacement), "%s", integration_active_tokens[INTEGRATION_STOCK][i].value);
-                    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Stock token: %s = %s", token->token, integration_active_tokens[INTEGRATION_STOCK][i].value);
+                    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Stock %s=%s", token->token, integration_active_tokens[INTEGRATION_STOCK][i].value);
                     break;
                   }
                 }
@@ -2020,7 +2022,7 @@ void init_char_width_cache(const lv_font_t *font)
 {
   if (font == NULL)
   {
-    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "init_char_width_cache: NULL font");
+    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "init_char_width_cache: null font");
     return;
   }
 
@@ -2030,7 +2032,7 @@ void init_char_width_cache(const lv_font_t *font)
     return; // Cache is already valid
   }
 
-  ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Initializing character width cache for font");
+  ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Char width cache init");
 
   // Clear the cache
   memset(char_width_cache, 0, sizeof(char_width_cache));
@@ -2056,7 +2058,7 @@ void init_char_width_cache(const lv_font_t *font)
   cached_font = font;
   cache_valid = true;
 
-  ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Character width cache initialized");
+  ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Char width cache ready");
 }
 
 // Function to get cached character width for Unicode code points
@@ -2064,7 +2066,7 @@ static uint8_t get_cached_char_width(uint32_t code_point, const lv_font_t *font,
 {
   if (!cache_valid)
   {
-    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "get_cached_char_width: Cache not initialized");
+    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "get_cached_char_width: not init");
     return 0;
   }
 
@@ -2111,7 +2113,7 @@ static uint8_t get_cached_char_width(uint32_t code_point, const lv_font_t *font,
 
     if (cached_width != direct_width)
     {
-      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "get_cached_char_width: Width mismatch for code point 0x%04X: cached=%d, direct=%d",
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Char width mismatch 0x%04X: cached=%d direct=%d",
                   code_point, cached_width, direct_width);
       return direct_width; // Use the direct calculation
     }
@@ -2125,7 +2127,7 @@ void invalidate_char_width_cache(void)
 {
   cache_valid = false;
   cached_font = NULL;
-  ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Character width cache invalidated");
+  ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Char width cache invalidated");
 }
 
 // UTF-8 decoder function
@@ -2212,13 +2214,13 @@ void display_string_substring(const char *text, int32_t x, int32_t y,
 {
   if (text == NULL || label_obj == NULL || font == NULL)
   {
-    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "display_string_substring: NULL pointer detected");
+    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "display_string_substring: null ptr");
     return;
   }
 
   if (width_pixels <= 0)
   {
-    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "display_string_substring: Invalid width parameter");
+    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "display_string_substring: invalid width");
     return;
   }
 
@@ -2324,7 +2326,7 @@ void display_string_substring(const char *text, int32_t x, int32_t y,
   static char substring_buffer[128];
   if (substring_len >= sizeof(substring_buffer))
   {
-    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "display_string_substring: Substring too long, truncating");
+    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "display_string_substring: truncated");
     substring_len = sizeof(substring_buffer) - 1;
   }
 

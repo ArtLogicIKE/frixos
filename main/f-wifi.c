@@ -710,6 +710,46 @@ bool validate_coordinate(const char *coord_str, bool is_latitude)
 }
 
 /**
+ * Validate POSIX TZ string before passing to setenv/tzset/localtime.
+ * Invalid strings (e.g. "GMT +2" with space) can crash newlib on ESP-IDF.
+ * POSIX format: std offset[dst...] - no spaces, std 3+ chars, offset [+-]hh[:mm[:ss]]
+ * Returns true if string is safe to use.
+ */
+bool validate_timezone(const char *tz_str)
+{
+    if (tz_str == NULL)
+        return false;
+    /* Empty is valid - caller will use UTC fallback */
+    if (tz_str[0] == '\0')
+        return true;
+
+    for (size_t i = 0; tz_str[i] != '\0'; i++)
+    {
+        char c = tz_str[i];
+        /* Reject spaces - main cause of tzset/localtime crashes */
+        if (c == ' ' || c == '\t')
+        {
+            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Invalid timezone: spaces not allowed in POSIX TZ (e.g. use GMT+2 not GMT +2)");
+            return false;
+        }
+        /* Reject control chars */
+        if ((unsigned char)c < 0x20)
+        {
+            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Invalid timezone: control character 0x%02x", (unsigned char)c);
+            return false;
+        }
+        /* Valid POSIX TZ chars: letters, digits, + - : , . / < > */
+        if (!((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') ||
+              c == '+' || c == '-' || c == ':' || c == ',' || c == '.' || c == '/' || c == '<' || c == '>'))
+        {
+            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Invalid timezone: illegal character '%c' (0x%02x)", c, (unsigned char)c);
+            return false;
+        }
+    }
+    return true;
+}
+
+/**
  * Fetch Weather Data from OpenWeatherMap
  */
 bool wifi_get_weather(void)
@@ -872,8 +912,16 @@ bool wifi_get_location()
     // use eeprom defaults, if any
     if (strlen(eeprom_timezone))
     {
-        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Using EEPROM timezone: %s", eeprom_timezone);
-        strcpy(my_timezone, eeprom_timezone);
+        if (validate_timezone(eeprom_timezone))
+        {
+            ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Using EEPROM timezone: %s", eeprom_timezone);
+            strcpy(my_timezone, eeprom_timezone);
+        }
+        else
+        {
+            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Invalid timezone in EEPROM: '%s', clearing", eeprom_timezone);
+            strcpy(eeprom_timezone, "");
+        }
     }
 
     if (strlen(eeprom_lat))
@@ -1055,13 +1103,13 @@ bool wifi_get_location()
             esp_err_t err = esp_http_client_perform(client);
             if (err == ESP_OK && wifi_http_buffer != NULL)
             {
-                ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Timezone found: %s is %s", internet_location, wifi_http_buffer);
-                strncpy(my_timezone, wifi_http_buffer, TZ_LENGTH);
-                // add new entry to /spiffs/timezone.txt
-
-                // save it if we got a valid timezone
-                if (strlen(my_timezone) > 0)
+                /* Trim trailing newline from response */
+                char *nl = strchr(wifi_http_buffer, '\n');
+                if (nl) *nl = '\0';
+                if (validate_timezone(wifi_http_buffer))
                 {
+                    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Timezone found: %s is %s", internet_location, wifi_http_buffer);
+                    strncpy(my_timezone, wifi_http_buffer, TZ_LENGTH);
                     file = fopen("/spiffs/timezone.txt", "a");
                     if (file)
                     {
@@ -1070,6 +1118,8 @@ bool wifi_get_location()
                         fclose(file);
                     }
                 }
+                else
+                    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Invalid timezone from server: '%s', ignoring", wifi_http_buffer);
             }
             esp_http_client_cleanup(client);
         }

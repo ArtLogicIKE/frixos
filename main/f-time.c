@@ -1,8 +1,10 @@
 #include <time.h>
 #include <sys/time.h>
+#include <string.h>
 #include "esp_sntp.h"
 #include "frixos.h"
 #include "f-time.h"
+#include "f-wifi.h"
 #include "moon.h"
 
 static const char *TAG = "f-time";
@@ -12,7 +14,7 @@ time_t first_time_sync = 0;
 void time_sync_notification_cb(struct timeval *tv)
 {
   
-  ESP_LOG_WEB(ESP_LOG_INFO, TAG, "NTP Time sync");
+  ESP_LOG_WEB(ESP_LOG_INFO, TAG, "NTP sync");
   time_valid = 1; // set time as valid once we receive the first NTP event
   if (time_just_validated == -1)
     time_just_validated = 1;
@@ -23,7 +25,7 @@ void time_sync_notification_cb(struct timeval *tv)
   struct tm timeinfo;
   localtime_r(&now, &timeinfo);
   time(&last_time_update); // update timestamp
-  ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Moon phase after NTP: %d", moon_icon_index);
+  ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Moon phase: %d", moon_icon_index);
   if (first_time_sync == 0) {
     first_time_sync = now;
   }
@@ -31,7 +33,7 @@ void time_sync_notification_cb(struct timeval *tv)
 
 void sync_time_with_ntp(void)
 {
-  ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Initializing SNTP");
+  ESP_LOG_WEB(ESP_LOG_INFO, TAG, "SNTP init");
 
   // First stop any existing SNTP instance
   esp_sntp_stop();
@@ -45,10 +47,11 @@ void sync_time_with_ntp(void)
   esp_sntp_set_time_sync_notification_cb(time_sync_notification_cb);
   esp_sntp_init();
 
-    // ✅ Set timezone
-  setenv("TZ", my_timezone, 1); // Set environment variable for timezone
-  tzset();                      // Apply the timezone settings
-  ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Timezone set to: %s", my_timezone);
+  // Set timezone - validate first; invalid strings (e.g. "GMT +2") can crash tzset/localtime
+  const char *tz_to_use = (validate_timezone(my_timezone) && strlen(my_timezone) > 0) ? my_timezone : "UTC";
+  setenv("TZ", tz_to_use, 1);
+  tzset();
+  ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Timezone: %s", tz_to_use);
 }
 
 

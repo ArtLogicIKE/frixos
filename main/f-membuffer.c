@@ -56,7 +56,7 @@ char* get_shared_buffer(size_t required_size, const char* owner) {
     if (buffer_mutex == NULL) {
         buffer_mutex = xSemaphoreCreateMutex();
         if (buffer_mutex == NULL) {
-            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to create buffer mutex");
+            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Buffer mutex create failed");
             return NULL;
         }
     }
@@ -94,7 +94,7 @@ char* get_shared_buffer(size_t required_size, const char* owner) {
             heap_caps_free(global_buffer_pool[oldest_index].buffer);
             global_buffer_pool[oldest_index].buffer = heap_caps_malloc(required_size, MALLOC_CAP_8BIT);
             if (global_buffer_pool[oldest_index].buffer == NULL) {
-                ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to reallocate buffer");
+                ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Buffer realloc failed");
                 xSemaphoreGive(buffer_mutex);
                 return NULL;
             }
@@ -117,7 +117,7 @@ void release_shared_buffer(char* buffer) {
     if (buffer_mutex == NULL || buffer == NULL) return;
 
     if (xSemaphoreTake(buffer_mutex, pdMS_TO_TICKS(BUFFER_POOL_TIMEOUT_MS)) != pdTRUE) {
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to take buffer mutex for release");
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Buffer mutex release failed");
         return;
     }
 

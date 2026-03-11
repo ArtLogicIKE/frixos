@@ -118,7 +118,7 @@ extern uint16_t eeprom_stock_refresh_mins;  // Stock quote refresh interval in s
 // Dexcom settings
 extern uint8_t eeprom_dexcom_region;  // 0=disabled, 1=US, 2=Japan, 3=Rest of World
 extern uint16_t eeprom_glucose_high;   // High glucose threshold in mg/dL
-extern uint16_t eeprom_pwm_frequency;  // PWM frequency in Hz (range 10-5000)
+extern uint32_t eeprom_pwm_frequency;  // PWM frequency in Hz (range 10-1000000)
 extern uint16_t eeprom_max_power;      // Max power (range 1-1023)
 
 // LibreLinkUp settings

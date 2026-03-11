@@ -46,7 +46,7 @@ bool connect_to_wifi(void)
 
     if (strlen((char *)wifi_config.sta.ssid) > 0) // if we have stored credentials
     {
-        ESP_LOG_WEB(ESP_LOG_INFO,TAG, "Trying stored SSID %s", (char *)wifi_config.sta.ssid);
+        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Try stored SSID %s", (char *)wifi_config.sta.ssid);
         snprintf(msg_scrolling, SCROLL_MSG_LENGTH, "Connecting to %s", (char *)wifi_config.sta.ssid);
         lvgl_port_lock(0);
         set_scroll_message(msg_scrolling);
@@ -64,7 +64,7 @@ bool connect_to_wifi(void)
 
         if (wifi_connected)
         {
-            ESP_LOG_WEB(ESP_LOG_INFO,TAG, "Successfully connected using stored credentials");
+            ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Connected (stored creds)");
             return true;
         }
     }
@@ -73,7 +73,7 @@ bool connect_to_wifi(void)
     // ARTLOGIC_SSID and ARTLOGIC_PASSWORD are set from .env via CMake
     if (strlen(ARTLOGIC_SSID) > 0 && strlen(ARTLOGIC_PASSWORD) > 0)
     {
-        ESP_LOG_WEB(ESP_LOG_VERBOSE,TAG, "Preparing provisioning portal");
+        ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Prepare provisioning portal");
         wifi_config_t artlogic_config = {0};
         strncpy((char *)artlogic_config.sta.ssid, ARTLOGIC_SSID, sizeof(artlogic_config.sta.ssid));
         strncpy((char *)artlogic_config.sta.password, ARTLOGIC_PASSWORD, sizeof(artlogic_config.sta.password));
@@ -99,14 +99,14 @@ bool connect_to_wifi(void)
             return true;
     }
 
-    ESP_LOG_WEB(ESP_LOG_INFO,TAG, "All connection attempts failed, starting provisioning portal");
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "All connections failed, start provisioning");
     manufacturer_mode = false;
     return false; // This will trigger the provisioning portal
 }
 
 void start_softap_provisioning(void)
 {
-    ESP_LOG_WEB(ESP_LOG_INFO,TAG, "Starting softAP provisioning");
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Start softAP provisioning");
     esp_netif_init();
     esp_event_loop_create_default();
     esp_netif_t *ap_netif = esp_netif_create_default_wifi_ap();
@@ -154,7 +154,7 @@ void start_softap_provisioning(void)
     esp_err_t err = esp_wifi_set_channel(1, WIFI_SECOND_CHAN_NONE);
     if (err != ESP_OK)
     {
-        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Failed to set WiFi channel: %s", esp_err_to_name(err));
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "WiFi channel set failed: %s", esp_err_to_name(err));
     }
 }
 
@@ -173,14 +173,14 @@ void provision_init(void)
         extern bool mdns_initialized;
         if (mdns_initialized)
         {
-            ESP_LOG_WEB(ESP_LOG_INFO,TAG, "Stopping mDNS before switching to AP mode");
+            ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Stop mDNS for AP mode");
             mdns_free();
             mdns_initialized = false;
         }
 
         // Always stop WiFi before starting softAP provisioning
         esp_wifi_stop();
-        ESP_LOG_WEB(ESP_LOG_INFO,TAG, "Stopped any existing WiFi connection attempts");
+        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Stopped WiFi attempts");
 
         start_softap_provisioning();
 
@@ -193,28 +193,28 @@ void provision_init(void)
         {
             if (dns_server_start(dns_server, gateway))
             {
-                ESP_LOG_WEB(ESP_LOG_INFO,TAG, "DNS server started successfully");
+                ESP_LOG_WEB(ESP_LOG_INFO, TAG, "DNS server started");
             }
             else
             {
-                ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to start DNS server");
+                ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "DNS server start failed");
             }
         }
         else
         {
-            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to create DNS server");
+            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "DNS server create failed");
         }
 
-        ESP_LOG_WEB(ESP_LOG_VERBOSE,TAG, "Starting HTTP server...");
+        ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Start HTTP server");
         init_settings_server();
 
         // Start provisioning timeout timer
-        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Starting provisioning timeout timer (%d minutes)", PROVISIONING_TIMEOUT_MINUTES);
+        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Provisioning timeout %d min", PROVISIONING_TIMEOUT_MINUTES);
         vTaskDelay(pdMS_TO_TICKS(PROVISIONING_TIMEOUT_MS));
         
         // If we're still in provisioning mode after timeout, restart the device
         if (!wifi_connected) {
-            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Provisioning timeout reached (%d minutes), restarting device", PROVISIONING_TIMEOUT_MINUTES);
+            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Provisioning timeout %d min, restart", PROVISIONING_TIMEOUT_MINUTES);
             esp_restart();
         }
 
@@ -222,7 +222,7 @@ void provision_init(void)
     }
     else
     {
-        ESP_LOG_WEB(ESP_LOG_INFO,TAG, "Connected to WiFi successfully, settings_updated set");
+        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "WiFi connected, settings updated");
         init_settings_server();
         vTaskDelay(pdMS_TO_TICKS(3000));
         settings_updated = true; // trigger a screen update
