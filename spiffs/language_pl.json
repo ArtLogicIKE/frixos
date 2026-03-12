@@ -94,7 +94,7 @@
       "title": "Przewijana wiadomość",
       "font_size": "Rozmiar czcionki",
       "scroll_delay": "Opóźnienie przewijania",
-      "scroll_delay_help": "Opóźnienie animacji w milisekundach (30-500)",
+      "scroll_delay_help": "Opóźnienie animacji w milisekundach (30-255)",
       "message": "Wiadomość",
       "message_placeholder": "Wprowadź przewijaną wiadomość (użyj tokenów w nawiasach kwadratowych)",
       "tokens_title": "Dostępne tokeny:",

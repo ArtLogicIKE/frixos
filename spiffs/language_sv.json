@@ -94,7 +94,7 @@
       "title": "Rullande meddelande",
       "font_size": "Teckenstorlek",
       "scroll_delay": "Rullningsfördröjning",
-      "scroll_delay_help": "Animeringsfördröjning i millisekunder (30-500)",
+      "scroll_delay_help": "Animeringsfördröjning i millisekunder (30-255)",
       "message": "Meddelande",
       "message_placeholder": "Ange ditt meddelande",
       "tokens_title": "Tillgängliga tokens:",

@@ -94,7 +94,7 @@
       "title": "Mensagem deslizante",
       "font_size": "Tamanho da letra",
       "scroll_delay": "Atraso de deslocamento",
-      "scroll_delay_help": "Atraso de animação em milissegundos (30-500)",
+      "scroll_delay_help": "Atraso de animação em milissegundos (30-255)",
       "message": "Mensagem",
       "message_placeholder": "Insira a sua mensagem",
       "tokens_title": "Tokens disponíveis:",

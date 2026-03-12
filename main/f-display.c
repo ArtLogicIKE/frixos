@@ -551,7 +551,7 @@ void find_file(char *filename, char len, char *theme, char *item)
   if (check_file(filename))
   {
     // Theme-specific file exists, return without /spiffs/
-    snprintf(filename, len, "/%s-%s.bmp", theme, item);
+    snprintf(filename, len, "S:/%s-%s.bmp", theme, item);
     return;
   }
 
@@ -560,7 +560,7 @@ void find_file(char *filename, char len, char *theme, char *item)
   if (check_file(filename))
   {
     // Default file exists, return without /spiffs/
-    snprintf(filename, len, "/default-%s.bmp", item);
+    snprintf(filename, len, "S:/default-%s.bmp", item);
     return;
   }
 
@@ -569,7 +569,7 @@ void find_file(char *filename, char len, char *theme, char *item)
   if (check_file(filename))
   {
     // Theme-specific file exists, return without /spiffs/
-    snprintf(filename, len, "/%s-%s.jpg", theme, item);
+    snprintf(filename, len, "S:/%s-%s.jpg", theme, item);
     return;
   }
 
@@ -578,7 +578,7 @@ void find_file(char *filename, char len, char *theme, char *item)
   if (check_file(filename))
   {
     // Default file exists, return without /spiffs/
-    snprintf(filename, len, "/default-%s.jpg", item);
+    snprintf(filename, len, "S:/default-%s.jpg", item);
     return;
   }
 
@@ -1390,8 +1390,7 @@ void display_task(void *pvParameters)
         lvgl_port_lock(0);
         if (img_logo)
         {
-          lv_obj_delete(img_logo);
-          img_logo = NULL;
+          lv_obj_add_flag(img_logo, LV_OBJ_FLAG_HIDDEN);          
         }
 
         ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Showing digits");

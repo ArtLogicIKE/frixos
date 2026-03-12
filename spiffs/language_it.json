@@ -94,7 +94,7 @@
       "title": "Messaggio scorrevole",
       "font_size": "Dimensione font",
       "scroll_delay": "Ritardo scorrimento",
-      "scroll_delay_help": "Ritardo animazione in millisecondi (30-500)",
+      "scroll_delay_help": "Ritardo animazione in millisecondi (30-255)",
       "message": "Messaggio",
       "message_placeholder": "Inserisci il tuo messaggio",
       "tokens_title": "Token disponibili:",

@@ -94,7 +94,7 @@
       "title": "Message défilant",
       "font_size": "Taille de police",
       "scroll_delay": "Délai de défilement",
-      "scroll_delay_help": "Délai d'animation en millisecondes (30-500)",
+      "scroll_delay_help": "Délai d'animation en millisecondes (30-255)",
       "message": "Message",
       "message_placeholder": "Entrez votre message",
       "tokens_title": "Jetons disponibles:",

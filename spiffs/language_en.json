@@ -94,7 +94,7 @@
       "title": "Scrolling Message",
       "font_size": "Font Size",
       "scroll_delay": "Scroll Delay",
-      "scroll_delay_help": "Animation delay in milliseconds (30-500)",
+      "scroll_delay_help": "Animation delay in milliseconds (30-255)",
       "message": "Message",
       "message_placeholder": "Enter your message",
       "tokens_title": "Available Tokens:",

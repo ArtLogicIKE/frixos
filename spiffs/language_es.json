@@ -94,7 +94,7 @@
       "title": "Mensaje Desplazable",
       "font_size": "Tamaño de Fuente",
       "scroll_delay": "Retraso de Desplazamiento",
-      "scroll_delay_help": "Retraso de animación en milisegundos (30-500)",
+      "scroll_delay_help": "Retraso de animación en milisegundos (30-255)",
       "message": "Mensaje",
       "message_placeholder": "Ingrese su mensaje",
       "tokens_title": "Tokens Disponibles:",

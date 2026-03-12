@@ -94,7 +94,7 @@
       "title": "Rullende besked",
       "font_size": "Skriftstørrelse",
       "scroll_delay": "Rulleforsinkelse",
-      "scroll_delay_help": "Animeringsforsinkelse i millisekunder (30-500)",
+      "scroll_delay_help": "Animeringsforsinkelse i millisekunder (30-255)",
       "message": "Besked",
       "message_placeholder": "Indtast din besked",
       "tokens_title": "Tilgængelige tokens:",

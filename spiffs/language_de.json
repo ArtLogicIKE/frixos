@@ -94,7 +94,7 @@
       "title": "Laufende Nachricht",
       "font_size": "Schriftgröße",
       "scroll_delay": "Scroll-Verzögerung",
-      "scroll_delay_help": "Animationsverzögerung in Millisekunden (30-500)",
+      "scroll_delay_help": "Animationsverzögerung in Millisekunden (30-255)",
       "message": "Nachricht",
       "message_placeholder": "Geben Sie Ihre Nachricht ein",
       "tokens_title": "Verfügbare Token:",

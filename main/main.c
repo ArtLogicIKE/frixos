@@ -400,7 +400,7 @@ static void check_boot_fail_count(void)
   nvs_set_u8(h, NVS_BOOT_FAIL_KEY, fail_count);
   nvs_commit(h);
 
-  if (fail_count >= BOOT_FAIL_THRESHOLD)
+  if (fail_count > BOOT_FAIL_THRESHOLD) // at least BOOT_FAIL_THRESHOLD failed boots, next one resets settings
   {
     rescue_mode_this_boot = 1;
     ESP_LOGW(TAG, "Auto-rescue: %u failed boots, entering rescue mode (reset settings except WiFi)", (unsigned)fail_count);

@@ -827,6 +827,380 @@ static bool is_valid_hostname_char(char c)
     return isalnum((unsigned char)c) || c == '-';
 }
 
+// Valid font names (from UI select options)
+static const char *const VALID_FONTS[] = {
+    "bold", "light", "lcd", "nixie", "robrito", "ficasso", "lichten",
+    "kablame", "kablamo", "kaboom", "kabboom", "user1", "user2"
+};
+static const int NUM_VALID_FONTS = sizeof(VALID_FONTS) / sizeof(VALID_FONTS[0]);
+
+static bool is_valid_font_name(const char *name)
+{
+    if (!name || strlen(name) >= 12)
+        return false;
+    for (int i = 0; i < NUM_VALID_FONTS; i++)
+    {
+        if (strcmp(name, VALID_FONTS[i]) == 0)
+            return true;
+    }
+    return false;
+}
+
+// Validate all JSON parameters against UI limits. Returns true if all valid.
+// On failure, fills err_buf with error message (max err_size chars) and returns false.
+static bool validate_json_params(cJSON *root, char *err_buf, size_t err_size)
+{
+    cJSON *item;
+    const char *sval;
+    size_t len;
+
+#define CHECK_RANGE(param, val, min_val, max_val) do { \
+    if ((val) < (min_val) || (val) > (max_val)) { \
+        snprintf(err_buf, err_size, "Invalid %s: value %d out of range (%d-%d)", \
+                 (param), (int)(val), (min_val), (max_val)); \
+        return false; \
+    } \
+} while (0)
+
+#define CHECK_DOUBLE_RANGE(param, val, min_val, max_val) do { \
+    if ((val) < (min_val) || (val) > (max_val)) { \
+        snprintf(err_buf, err_size, "Invalid %s: value %.1f out of range (%.1f-%.1f)", \
+                 (param), (double)(val), (double)(min_val), (double)(max_val)); \
+        return false; \
+    } \
+} while (0)
+
+#define CHECK_STR_LEN(param, str, max_len) do { \
+    if ((str) && (len = strlen(str)) > (max_len)) { \
+        snprintf(err_buf, err_size, "Invalid %s: length %d exceeds max %d", \
+                 (param), (int)len, (int)(max_len)); \
+        return false; \
+    } \
+} while (0)
+
+    /* p00 hostname */
+    if ((item = cJSON_GetObjectItem(root, "p00")) && cJSON_IsString(item))
+    {
+        sval = item->valuestring;
+        len = strlen(sval);
+        if (len == 0 || len >= sizeof(eeprom_hostname))
+        {
+            snprintf(err_buf, err_size, "Invalid hostname: length must be 1-%d", (int)sizeof(eeprom_hostname) - 1);
+            return false;
+        }
+        if (sval[0] == '-' || sval[len - 1] == '-')
+        {
+            snprintf(err_buf, err_size, "Invalid hostname: cannot start or end with hyphen");
+            return false;
+        }
+        for (size_t i = 0; i < len; i++)
+        {
+            if (!is_valid_hostname_char(sval[i]))
+            {
+                snprintf(err_buf, err_size, "Invalid hostname: invalid character");
+                return false;
+            }
+        }
+    }
+
+    /* p34 wifi_ssid */
+    if ((item = cJSON_GetObjectItem(root, "p34")) && cJSON_IsString(item))
+        CHECK_STR_LEN("wifi_ssid", item->valuestring, sizeof(eeprom_wifi_ssid) - 1);
+
+    /* p35 wifi_pass */
+    if ((item = cJSON_GetObjectItem(root, "p35")) && cJSON_IsString(item))
+        CHECK_STR_LEN("wifi_pass", item->valuestring, sizeof(eeprom_wifi_pass) - 1);
+
+    /* p36 fahrenheit */
+    if ((item = cJSON_GetObjectItem(root, "p36")) && cJSON_IsNumber(item))
+        CHECK_RANGE("fahrenheit", item->valueint, 0, 1);
+
+    /* p37 hour12 */
+    if ((item = cJSON_GetObjectItem(root, "p37")) && cJSON_IsNumber(item))
+        CHECK_RANGE("hour12", item->valueint, 0, 1);
+
+    /* p24 show_leading_zero */
+    if ((item = cJSON_GetObjectItem(root, "p24")) && cJSON_IsNumber(item))
+        CHECK_RANGE("show_leading_zero", item->valueint, 0, 1);
+
+    /* p50 dots_breathe */
+    if ((item = cJSON_GetObjectItem(root, "p50")) && cJSON_IsNumber(item))
+        CHECK_RANGE("dots_breathe", item->valueint, 0, 1);
+
+    /* p39 update_firmware */
+    if ((item = cJSON_GetObjectItem(root, "p39")) && cJSON_IsNumber(item))
+        CHECK_RANGE("update_firmware", item->valueint, 0, 1);
+
+    /* p17 lat */
+    if ((item = cJSON_GetObjectItem(root, "p17")) && cJSON_IsString(item))
+    {
+        sval = item->valuestring;
+        len = strlen(sval);
+        if (len == 0)
+            ; /* empty is valid */
+        else if (len >= sizeof(eeprom_lat))
+        {
+            snprintf(err_buf, err_size, "Invalid lat: length exceeds max %d", (int)sizeof(eeprom_lat) - 1);
+            return false;
+        }
+        else
+        {
+            char tmp[12];
+            strncpy(tmp, sval, sizeof(tmp) - 1);
+            tmp[sizeof(tmp) - 1] = '\0';
+            if (!validate_coordinate(tmp, true))
+            {
+                snprintf(err_buf, err_size, "Invalid lat: invalid coordinate format");
+                return false;
+            }
+        }
+    }
+
+    /* p18 lon */
+    if ((item = cJSON_GetObjectItem(root, "p18")) && cJSON_IsString(item))
+    {
+        sval = item->valuestring;
+        len = strlen(sval);
+        if (len == 0)
+            ;
+        else if (len >= sizeof(eeprom_lon))
+        {
+            snprintf(err_buf, err_size, "Invalid lon: length exceeds max %d", (int)sizeof(eeprom_lon) - 1);
+            return false;
+        }
+        else
+        {
+            char tmp[12];
+            strncpy(tmp, sval, sizeof(tmp) - 1);
+            tmp[sizeof(tmp) - 1] = '\0';
+            if (!validate_coordinate(tmp, false))
+            {
+                snprintf(err_buf, err_size, "Invalid lon: invalid coordinate format");
+                return false;
+            }
+        }
+    }
+
+    /* p19 timezone */
+    if ((item = cJSON_GetObjectItem(root, "p19")) && cJSON_IsString(item))
+    {
+        sval = item->valuestring;
+        len = strlen(sval);
+        if (len >= TZ_LENGTH)
+        {
+            snprintf(err_buf, err_size, "Invalid timezone: length exceeds max %d", (int)TZ_LENGTH - 1);
+            return false;
+        }
+        if (len > 0 && !validate_timezone(sval))
+        {
+            snprintf(err_buf, err_size, "Invalid timezone: use POSIX format (e.g. GMT-2 not GMT +2)");
+            return false;
+        }
+    }
+
+    /* p46 wifi_start, p47 wifi_end */
+    if ((item = cJSON_GetObjectItem(root, "p46")) && cJSON_IsNumber(item))
+        CHECK_RANGE("wifi_start", item->valueint, 0, 23);
+    if ((item = cJSON_GetObjectItem(root, "p47")) && cJSON_IsNumber(item))
+        CHECK_RANGE("wifi_end", item->valueint, 0, 23);
+
+    /* p23 brightness_LED array */
+    if ((item = cJSON_GetObjectItem(root, "p23")) && cJSON_IsArray(item))
+    {
+        int arr_size = cJSON_GetArraySize(item);
+        if (arr_size > 3)
+        {
+            snprintf(err_buf, err_size, "Invalid brightness_LED: array size %d exceeds max 3", arr_size);
+            return false;
+        }
+        for (int i = 0; i < arr_size && i < 3; i++)
+        {
+            cJSON *elem = cJSON_GetArrayItem(item, i);
+            if (cJSON_IsNumber(elem))
+                CHECK_RANGE("brightness_LED", elem->valueint, 1, 100);
+        }
+    }
+
+    /* p20 lux_sensitivity */
+    if ((item = cJSON_GetObjectItem(root, "p20")) && cJSON_IsNumber(item))
+        CHECK_DOUBLE_RANGE("lux_sensitivity", item->valuedouble, 0, 50);
+
+    /* p21 lux_threshold */
+    if ((item = cJSON_GetObjectItem(root, "p21")) && cJSON_IsNumber(item))
+        CHECK_DOUBLE_RANGE("lux_threshold", item->valuedouble, 0, 500);
+
+    /* p04 dayfont, p05 nightfont */
+    if ((item = cJSON_GetObjectItem(root, "p04")) && cJSON_IsString(item))
+    {
+        if (!is_valid_font_name(item->valuestring))
+        {
+            snprintf(err_buf, err_size, "Invalid dayfont: unknown font name");
+            return false;
+        }
+    }
+    if ((item = cJSON_GetObjectItem(root, "p05")) && cJSON_IsString(item))
+    {
+        if (!is_valid_font_name(item->valuestring))
+        {
+            snprintf(err_buf, err_size, "Invalid nightfont: unknown font name");
+            return false;
+        }
+    }
+
+    /* p22 dim_disable */
+    if ((item = cJSON_GetObjectItem(root, "p22")) && cJSON_IsNumber(item))
+        CHECK_RANGE("dim_disable", item->valueint, 0, 1);
+
+    /* p16 message */
+    if ((item = cJSON_GetObjectItem(root, "p16")) && cJSON_IsString(item))
+        CHECK_STR_LEN("message", item->valuestring, SCROLL_MSG_LENGTH - 1);
+
+    /* p06 quiet_scroll, p07 quiet_weather */
+    if ((item = cJSON_GetObjectItem(root, "p06")) && cJSON_IsNumber(item))
+        CHECK_RANGE("quiet_scroll", item->valueint, 0, 1);
+    if ((item = cJSON_GetObjectItem(root, "p07")) && cJSON_IsNumber(item))
+        CHECK_RANGE("quiet_weather", item->valueint, 0, 1);
+
+    /* p10 color_filter, p11 night_color_filter */
+    if ((item = cJSON_GetObjectItem(root, "p10")) && cJSON_IsNumber(item))
+        CHECK_RANGE("color_filter", item->valueint, 0, 4);
+    if ((item = cJSON_GetObjectItem(root, "p11")) && cJSON_IsNumber(item))
+        CHECK_RANGE("night_color_filter", item->valueint, 0, 4);
+
+    /* p12 msg_color, p15 night_msg_color - hex #RRGGBB */
+    if ((item = cJSON_GetObjectItem(root, "p12")) && cJSON_IsString(item))
+    {
+        sval = item->valuestring;
+        if (strlen(sval) != 0 && (strlen(sval) != 7 || sval[0] != '#' ||
+            !isxdigit((unsigned char)sval[1]) || !isxdigit((unsigned char)sval[2]) ||
+            !isxdigit((unsigned char)sval[3]) || !isxdigit((unsigned char)sval[4]) ||
+            !isxdigit((unsigned char)sval[5]) || !isxdigit((unsigned char)sval[6])))
+        {
+            snprintf(err_buf, err_size, "Invalid msg_color: must be #RRGGBB hex format");
+            return false;
+        }
+    }
+    if ((item = cJSON_GetObjectItem(root, "p15")) && cJSON_IsString(item))
+    {
+        sval = item->valuestring;
+        if (strlen(sval) != 0 && (strlen(sval) != 7 || sval[0] != '#' ||
+            !isxdigit((unsigned char)sval[1]) || !isxdigit((unsigned char)sval[2]) ||
+            !isxdigit((unsigned char)sval[3]) || !isxdigit((unsigned char)sval[4]) ||
+            !isxdigit((unsigned char)sval[5]) || !isxdigit((unsigned char)sval[6])))
+        {
+            snprintf(err_buf, err_size, "Invalid night_msg_color: must be #RRGGBB hex format");
+            return false;
+        }
+    }
+
+    /* p01 ofs_x, p02 ofs_y */
+    if ((item = cJSON_GetObjectItem(root, "p01")) && cJSON_IsNumber(item))
+        CHECK_RANGE("ofs_x", item->valueint, 0, 160);
+    if ((item = cJSON_GetObjectItem(root, "p02")) && cJSON_IsNumber(item))
+        CHECK_RANGE("ofs_y", item->valueint, 0, 160);
+
+    /* p03 rotation */
+    if ((item = cJSON_GetObjectItem(root, "p03")) && cJSON_IsNumber(item))
+        CHECK_RANGE("rotation", item->valueint, 0, 3);
+
+    /* p09 mirroring, p08 show_grid */
+    if ((item = cJSON_GetObjectItem(root, "p09")) && cJSON_IsNumber(item))
+        CHECK_RANGE("mirroring", item->valueint, 0, 1);
+    if ((item = cJSON_GetObjectItem(root, "p08")) && cJSON_IsNumber(item))
+        CHECK_RANGE("show_grid", item->valueint, 0, 1);
+
+    /* p38 scroll_speed */
+    if ((item = cJSON_GetObjectItem(root, "p38")) && cJSON_IsNumber(item))
+        CHECK_RANGE("scroll_speed", item->valueint, 1, 255);
+
+    /* p14 scroll_delay (stored as uint8_t, max 255) */
+    if ((item = cJSON_GetObjectItem(root, "p14")) && cJSON_IsNumber(item))
+        CHECK_RANGE("scroll_delay", item->valueint, 30, 255);
+
+    /* p40 dark_theme, p41 language */
+    if ((item = cJSON_GetObjectItem(root, "p40")) && cJSON_IsNumber(item))
+        CHECK_RANGE("dark_theme", item->valueint, 0, 1);
+    if ((item = cJSON_GetObjectItem(root, "p41")) && cJSON_IsNumber(item))
+        CHECK_RANGE("language", item->valueint, 0, 8);
+
+    /* p42 pwm_frequency */
+    if ((item = cJSON_GetObjectItem(root, "p42")) && cJSON_IsNumber(item))
+        CHECK_RANGE("pwm_frequency", item->valueint, 10, 1000000);
+
+    /* p43 max_power */
+    if ((item = cJSON_GetObjectItem(root, "p43")) && cJSON_IsNumber(item))
+        CHECK_RANGE("max_power", item->valueint, 1, 1023);
+
+    /* p13 msg_font */
+    if ((item = cJSON_GetObjectItem(root, "p13")) && cJSON_IsNumber(item))
+        CHECK_RANGE("msg_font", item->valueint, 0, 2);
+
+    /* p25 ha_url, p26 ha_token */
+    if ((item = cJSON_GetObjectItem(root, "p25")) && cJSON_IsString(item))
+        CHECK_STR_LEN("ha_url", item->valuestring, sizeof(eeprom_ha_url) - 1);
+    if ((item = cJSON_GetObjectItem(root, "p26")) && cJSON_IsString(item))
+        CHECK_STR_LEN("ha_token", item->valuestring, sizeof(eeprom_ha_token) - 1);
+
+    /* p27 ha_refresh_mins */
+    if ((item = cJSON_GetObjectItem(root, "p27")) && cJSON_IsNumber(item))
+        CHECK_RANGE("ha_refresh_mins", item->valueint, 1, 7200);
+
+    /* p28 stock_key */
+    if ((item = cJSON_GetObjectItem(root, "p28")) && cJSON_IsString(item))
+        CHECK_STR_LEN("stock_key", item->valuestring, sizeof(eeprom_stock_key) - 1);
+
+    /* p29 stock_refresh_mins */
+    if ((item = cJSON_GetObjectItem(root, "p29")) && cJSON_IsNumber(item))
+        CHECK_RANGE("stock_refresh_mins", item->valueint, 1, 1440);
+
+    /* p30 dexcom_region */
+    if ((item = cJSON_GetObjectItem(root, "p30")) && cJSON_IsNumber(item))
+        CHECK_RANGE("dexcom_region", item->valueint, 0, 3);
+
+    /* p31 glucose_username, p32 glucose_password */
+    if ((item = cJSON_GetObjectItem(root, "p31")) && cJSON_IsString(item))
+        CHECK_STR_LEN("glucose_username", item->valuestring, sizeof(eeprom_glucose_username) - 1);
+    if ((item = cJSON_GetObjectItem(root, "p32")) && cJSON_IsString(item))
+        CHECK_STR_LEN("glucose_password", item->valuestring, sizeof(eeprom_glucose_password) - 1);
+
+    /* p33 glucose_refresh */
+    if ((item = cJSON_GetObjectItem(root, "p33")) && cJSON_IsNumber(item))
+        CHECK_RANGE("glucose_refresh", item->valueint, 1, 60);
+
+    /* p45 glucose_validity_duration */
+    if ((item = cJSON_GetObjectItem(root, "p45")) && cJSON_IsNumber(item))
+        CHECK_RANGE("glucose_validity_duration", item->valueint, 10, 360);
+
+    /* p48 sec_time, p49 sec_cgm */
+    if ((item = cJSON_GetObjectItem(root, "p48")) && cJSON_IsNumber(item))
+        CHECK_RANGE("sec_time", item->valueint, 0, 120);
+    if ((item = cJSON_GetObjectItem(root, "p49")) && cJSON_IsNumber(item))
+        CHECK_RANGE("sec_cgm", item->valueint, 0, 120);
+
+    /* p44 libre_region */
+    if ((item = cJSON_GetObjectItem(root, "p44")) && cJSON_IsNumber(item))
+        CHECK_RANGE("libre_region", item->valueint, 0, 7);
+
+    /* p54 ns_url */
+    if ((item = cJSON_GetObjectItem(root, "p54")) && cJSON_IsString(item))
+        CHECK_STR_LEN("ns_url", item->valuestring, 100);
+
+    /* p51 glucose_high, p52 glucose_low */
+    if ((item = cJSON_GetObjectItem(root, "p51")) && cJSON_IsNumber(item))
+        CHECK_RANGE("glucose_high", item->valueint, 1, 400);
+    if ((item = cJSON_GetObjectItem(root, "p52")) && cJSON_IsNumber(item))
+        CHECK_RANGE("glucose_low", item->valueint, 1, 400);
+
+    /* p53 glucose_unit */
+    if ((item = cJSON_GetObjectItem(root, "p53")) && cJSON_IsNumber(item))
+        CHECK_RANGE("glucose_unit", item->valueint, 0, 1);
+
+    return true;
+#undef CHECK_RANGE
+#undef CHECK_DOUBLE_RANGE
+#undef CHECK_STR_LEN
+}
+
 // Handler for settings form submission
 
 esp_err_t settings_post_handler(httpd_req_t *req)
@@ -889,6 +1263,22 @@ esp_err_t settings_post_handler(httpd_req_t *req)
         ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to parse JSON");
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Failed to parse JSON");
         goto cleanup;
+    }
+
+    // Validate all parameters against UI limits before applying any changes
+    {
+        char validation_err[128];
+        if (!validate_json_params(root, validation_err, sizeof(validation_err)))
+        {
+            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "JSON validation failed: %s", validation_err);
+            httpd_resp_set_status(req, "400 Bad Request");
+            httpd_resp_set_type(req, "application/json");
+            char err_json[192];
+            snprintf(err_json, sizeof(err_json), "{\"status\":\"error\",\"message\":\"%s\"}", validation_err);
+            httpd_resp_send(req, err_json, HTTPD_RESP_USE_STRLEN);
+            cJSON_Delete(root);
+            goto cleanup;
+        }
     }
 
     // Store original values of critical settings to check if they changed
@@ -1209,11 +1599,11 @@ esp_err_t settings_post_handler(httpd_req_t *req)
     {
         int delay_value = (int)scroll_delay->valueint;
         ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Received scroll_delay: %d", delay_value);
-        // Apply bounds checking: minimum 30, maximum 500
+        // Apply bounds checking: minimum 30, maximum 255 (uint8_t storage)
         if (delay_value < 30)
             delay_value = 30;
-        if (delay_value > 500)
-            delay_value = 500;
+        if (delay_value > 255)
+            delay_value = 255;
         eeprom_scroll_delay = (uint8_t)delay_value;
         ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Set eeprom_scroll_delay to: %u", eeprom_scroll_delay);
     }
