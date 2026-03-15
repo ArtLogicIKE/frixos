@@ -696,7 +696,7 @@ void parse_HA_entities(const char *input)
     }
 
     // Allocate memory for token pointers
-    integration_active_tokens[INTEGRATION_HA] = (integration_token_t *)malloc(integration_active_tokens_count[INTEGRATION_HA] * sizeof(integration_token_t));
+    integration_active_tokens[INTEGRATION_HA] = (integration_token_t *)calloc(integration_active_tokens_count[INTEGRATION_HA], sizeof(integration_token_t));
     if (integration_active_tokens[INTEGRATION_HA] == NULL)
     {
         ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "HA tokens alloc failed");

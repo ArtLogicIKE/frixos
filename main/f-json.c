@@ -12,23 +12,37 @@ char *get_value_from_JSON_string(const char *json_str, const char *key, char *ou
         return output;
     }
 
-    // Construct the search pattern: "key":
+    // Construct the search pattern: "key"
     char search_pattern[64];
-    snprintf(search_pattern, sizeof(search_pattern), "\"%s\":", key);
+    snprintf(search_pattern, sizeof(search_pattern), "\"%s\"", key);
     
     // Find the key in the JSON string
-    char *value_start = strstr(json_str, search_pattern);
-    if (!value_start)
+    char *key_pos = strstr(json_str, search_pattern);
+    if (!key_pos)
     {
         strcpy(output, "-");
         if (remaining_str) *remaining_str = NULL;
         return output;
     }
 
-    // Move past the key and colon
-    value_start += strlen(search_pattern);
+    // Move past the key
+    char *value_start = key_pos + strlen(search_pattern);
     
-    // Skip any whitespace
+    // Skip any whitespace and find the colon
+    while (*value_start && isspace((unsigned char)*value_start))
+    {
+        value_start++;
+    }
+
+    if (*value_start != ':')
+    {
+        strcpy(output, "-");
+        if (remaining_str) *remaining_str = NULL;
+        return output;
+    }
+    value_start++; // Skip colon
+
+    // Skip any whitespace after colon
     while (*value_start && isspace((unsigned char)*value_start))
     {
         value_start++;

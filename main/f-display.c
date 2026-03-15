@@ -156,6 +156,13 @@ LV_FONT_DECLARE(frixos_11);
 
 static void fade_timer_cb(void *arg);
 void create_grid(lv_obj_t *scr);
+
+// Helper functions for modular display_task
+static void handle_als_and_brightness(uint32_t loop_counter);
+static void handle_wifi_status_icon(void);
+static void handle_integration_and_messages(void);
+static void handle_alternate_mode_switching(time_t now, uint32_t loop_counter, bool *should_update_display);
+static void update_display_content(time_t now);
 void update_weather_msg(void);
 void display_string_substring(const char *text, int32_t x, int32_t y,
                               int32_t start_pixel, int32_t width_pixels,
@@ -879,536 +886,392 @@ static void watchdog_callback(void *arg)
   // or use a proper restart mechanism. For now, we'll just log the issue.
 }
 
+static int last_integration_update_hour = -1; // Track last hour we updated integration message
+static time_t lastrun = 0;
+
+static void handle_als_and_brightness(uint32_t loop_counter)
+{
+  // read ALS sensor every 5 seconds. each pass is 50ms, so 100 passes = 5 seconds
+  if (loop_counter % 100 == 1)
+  {
+    // Get the current lux value
+    lux = ltr303_get_frixos_lux();
+    int8_t pwmpct = -1;
+    uint8_t old_font_index = font_index;
+
+    if (lux > eeprom_lux_threshold + eeprom_lux_sensitivity)
+      font_index = 0;
+    else if (lux < eeprom_lux_threshold - eeprom_lux_sensitivity)
+      font_index = 1;
+
+    // if dim_disable is enabled or we are in manufacturer mode, force full brightness
+    if (eeprom_dim_disable || manufacturer_mode)
+      font_index = 0; // force full brightness
+
+    pwmpct = eeprom_brightness_LED[font_index];
+    if (font_index != old_font_index)
+    {
+      ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Font %u->%u (lux %.1f thres %.1f)",
+                  old_font_index, font_index, lux, eeprom_lux_threshold);
+      set_led_pwm_brightness(pwmpct);
+      display_changed();
+    }
+  }
+}
+
+static void handle_wifi_status_icon(void)
+{
+  static bool last_wifi_disabled_state = false;
+  if (wifi_disabled_by_active_hours != last_wifi_disabled_state)
+  {
+    last_wifi_disabled_state = wifi_disabled_by_active_hours;
+    lvgl_port_lock(0);
+    if (wifi_disabled_by_active_hours)
+    {
+      show_object(img_wifi, true);
+      show_object(img_glucose, false);
+      show_object(img_glucose_trend, false);
+      ESP_LOG_WEB(ESP_LOG_INFO, TAG, "WiFi disabled (active hours)");
+    }
+    else
+    {
+      show_object(img_wifi, false);
+      ESP_LOG_WEB(ESP_LOG_INFO, TAG, "WiFi enabled");
+    }
+    lvgl_port_unlock();
+  }
+}
+
+static void handle_integration_and_messages(void)
+{
+  if (integration_tokens_updated || (timeinfo.tm_min == 0 && timeinfo.tm_hour != last_integration_update_hour) || (!ota_update_in_progress && ota_updating_message) || (show_ip_on_boot && !ip_message_set))
+  {
+    // Glucose icon handling
+    if (is_glucose_on())
+    {
+      int glucose_index = 1; // green
+      if (glucose_data.current_gl_mgdl > eeprom_glucose_high)
+        glucose_index = 2; // yellow
+      else if (glucose_data.current_gl_mgdl < eeprom_glucose_low)
+        glucose_index = 0; // red
+      if (!is_glucose_fresh())
+        glucose_index = 3; // gray
+
+      lvgl_port_lock(0);
+      lv_image_set_offset_x(img_glucose, -glucose_index * 14);
+      lv_image_set_offset_x(img_glucose_trend, -glucose_data.trend_arrow * 12);
+      show_object(img_glucose, is_glucose_on());
+      show_object(img_glucose_trend, is_glucose_fresh());
+      lvgl_port_unlock();
+    }
+    else
+    {
+      lvgl_port_lock(0);
+      show_object(img_glucose, false);
+      show_object(img_glucose_trend, false);
+      lvgl_port_unlock();
+    }
+
+    // IP address and OTA "updating..." message display handling
+    if (show_ip_on_boot && !ip_message_set)
+    {
+      char ip_message[64];
+      snprintf(ip_message, sizeof(ip_message), "%s ", boot_ip_address);
+      lvgl_port_lock(0);
+      set_scroll_message(ip_message);
+      ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Displaying IP address: %s for %d seconds", ip_message, IP_DISPLAY_DURATION_SEC);
+      lvgl_port_unlock();
+      ip_message_set = true;
+      ip_display_start_time = esp_timer_get_time();
+    }
+    else if (!ota_update_in_progress && !show_ip_on_boot)
+    {
+      replace_placeholders(eeprom_message, msg_scrolling, sizeof(msg_scrolling));
+      lvgl_port_lock(0);
+      set_scroll_message(msg_scrolling);
+      lvgl_port_unlock();
+    }
+    else if (ota_update_in_progress)
+    {
+      if (!ota_updating_message)
+      {
+        set_scroll_message("Updating...");
+        ota_updating_message = true;
+      }
+      if (ota_start_time == 0)
+        ota_start_time = time(NULL);
+      if (time(NULL) - ota_start_time > 300)
+      {
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "OTA timeout, restoring message");
+        ota_update_in_progress = false;
+        ota_updating_message = false;
+        ota_start_time = 0;
+      }
+    }
+
+    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Scroll message: %s", msg_scrolling);
+
+    lv_mem_monitor_t mon;
+    lv_mem_monitor(&mon);
+    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Mem: total %d free %d used %d%% frag %d%% largest %d",
+                mon.total_size, mon.free_size, mon.used_pct, mon.frag_pct, mon.free_biggest_size);
+
+    if (mon.free_size < 1024)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Low memory: %d bytes", mon.free_size);
+
+    integration_tokens_updated = false;
+    if (timeinfo.tm_min == 0)
+      last_integration_update_hour = timeinfo.tm_hour;
+  }
+}
+
+static void handle_alternate_mode_switching(time_t now, uint32_t loop_counter, bool *should_update_display)
+{
+  if (loop_counter % 20 == 1)
+  {
+    bool mode_changed = false;
+    static bool last_showing_glucose = false;
+    static time_t last_minute_slot = 0;
+    time_t current_minute_slot = now / 60;
+    bool minute_changed = (current_minute_slot != last_minute_slot);
+
+    alternate_display_active = (eeprom_sec_time + eeprom_sec_cgm > 0);
+
+    static time_t last_alternate_display_start = 0;
+    if (alternate_display_start == 0 && last_alternate_display_start != 0)
+    {
+      mode_changed = true;
+      last_showing_glucose = false;
+    }
+    last_alternate_display_start = alternate_display_start;
+
+    if (alternate_display_active && time_valid)
+    {
+      if (alternate_display_start == 0)
+      {
+        showing_glucose = (eeprom_sec_time == 0) && is_glucose_fresh();
+        alternate_display_start = now;
+        mode_changed = true;
+      }
+      else
+      {
+        time_t elapsed = now - alternate_display_start;
+        bool should_switch = false;
+        if (showing_glucose)
+        {
+          if (eeprom_sec_cgm > 0 && elapsed >= eeprom_sec_cgm && eeprom_sec_time > 0)
+            should_switch = true;
+        }
+        else
+        {
+          if (eeprom_sec_time > 0 && elapsed >= eeprom_sec_time && is_glucose_fresh())
+            should_switch = true;
+        }
+        if (should_switch)
+        {
+          showing_glucose = !showing_glucose;
+          alternate_display_start = now;
+          mode_changed = true;
+        }
+      }
+    }
+    else
+    {
+      if (showing_glucose != false) mode_changed = true;
+      showing_glucose = false;
+      alternate_display_start = 0;
+    }
+
+    if (mode_changed || (showing_glucose != last_showing_glucose))
+    {
+      *should_update_display = true;
+      last_showing_glucose = showing_glucose;
+    }
+    else if (!showing_glucose)
+    {
+      *should_update_display = ((minute_changed || (now % 60 == 0) || (time_just_validated == 1) || weather_has_updated) && time_valid && (now - lastrun > 3));
+      last_minute_slot = current_minute_slot;
+    }
+  }
+}
+
+static void update_display_content(time_t now)
+{
+  localtime_r(&now, &timeinfo);
+
+  if (timeinfo.tm_min % 10 == 1)
+  {
+    char buf[128];
+    snprintf(buf, sizeof(buf), "Tck %li", (int32_t)(now - lastrun));
+    ESP_LOGI_STACK(TAG, buf);
+  }
+
+  if (weather_has_updated || (timeinfo.tm_min == 1))
+  {
+    update_weather_msg();
+    weather_has_updated = false;
+  }
+
+  int digit1, digit2, digit3, digit4;
+  bool show_dots = true;
+  bool show_ampm = false;
+
+  if (showing_glucose && alternate_display_active && is_glucose_on() && glucose_data.current_gl_mgdl > 0)
+  {
+    if (eeprom_glucose_unit == 1)
+    {
+      float glucose_mmol = glucose_data.current_gl_mgdl / 18.0182f;
+      if (glucose_mmol > 22.0f) glucose_mmol = 22.0f;
+      if (glucose_mmol < 0.0f) glucose_mmol = 0.0f;
+      int whole_part = (int)glucose_mmol;
+      int decimal_part = (int)((glucose_mmol - whole_part) * 10.0f + 0.5f);
+      if (decimal_part >= 10) { whole_part++; decimal_part = 0; }
+      digit1 = -1;
+      if (whole_part >= 10) { digit2 = whole_part / 10; digit3 = whole_part % 10; digit4 = decimal_part; }
+      else { digit2 = -1; digit3 = whole_part; digit4 = decimal_part; }
+      show_dots = true;
+      show_ampm = false;
+    }
+    else
+    {
+      int glucose_value = (int)glucose_data.current_gl_mgdl;
+      if (glucose_value > 999) glucose_value = 999;
+      if (glucose_value < 0) glucose_value = 0;
+      digit1 = -1;
+      if (glucose_value >= 100) { digit2 = glucose_value / 100; digit3 = (glucose_value / 10) % 10; digit4 = glucose_value % 10; }
+      else { digit2 = -1; digit3 = glucose_value / 10; digit4 = glucose_value % 10; }
+      show_dots = false;
+      show_ampm = false;
+    }
+  }
+  else
+  {
+    bool is_pm = false;
+    if (eeprom_12hour)
+    {
+      if (timeinfo.tm_hour == 0) timeinfo.tm_hour = 12;
+      else if (timeinfo.tm_hour > 12) { timeinfo.tm_hour -= 12; is_pm = true; }
+    }
+    digit1 = timeinfo.tm_hour / 10;
+    digit2 = timeinfo.tm_hour % 10;
+    digit3 = timeinfo.tm_min / 10;
+    digit4 = timeinfo.tm_min % 10;
+    if (!eeprom_show_leading_zero && digit1 == 0) digit1 = -1;
+    show_dots = true;
+    show_ampm = (eeprom_12hour && is_pm);
+  }
+
+  lvgl_port_lock(0);
+  display_digit(0, digit1);
+  display_digit(1, digit2);
+  display_digit(2, digit3);
+  display_digit(3, digit4);
+
+  if (showing_glucose && alternate_display_active)
+  {
+    lv_obj_align(digit_objs[1], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 1 * 18 + 6, eeprom_ofs_y + 25);
+    show_object(img_ampm, false);
+  }
+  else
+  {
+    lv_obj_align(digit_objs[1], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 1 * 18, eeprom_ofs_y + 25);
+    show_object(img_ampm, eeprom_12hour && time_valid);
+  }
+
+  lv_image_set_offset_x(img_weather, -weather_icon_index * 32);
+  lv_image_set_offset_x(img_moon, -moon_icon_index * 14);
+  lv_image_set_offset_x(img_ampm, show_ampm ? -10 : 0);
+
+  if (showing_glucose && alternate_display_active && eeprom_glucose_unit == 1)
+  {
+    show_object(dots[0], true);
+    show_object(dots[1], false);
+    int dot_x_pos = eeprom_ofs_x + 3 * 18 + 6 - 4;
+    lv_obj_align(dots[0], LV_ALIGN_TOP_LEFT, dot_x_pos, eeprom_ofs_y + 25 + 30);
+  }
+  else
+  {
+    show_object(dots[0], show_dots);
+    show_object(dots[1], show_dots);
+    if (!showing_glucose || !alternate_display_active)
+    {
+      lv_obj_align(dots[0], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 2 * 18 + 1, eeprom_ofs_y + 25 + 10);
+      lv_obj_align(dots[1], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 2 * 18 + 1, eeprom_ofs_y + 25 + 26);
+    }
+  }
+  show_object(img_mgdl, showing_glucose && alternate_display_active && is_glucose_on() && glucose_data.current_gl_mgdl > 0);
+  lv_image_set_offset_x(img_mgdl, -eeprom_glucose_unit * 12);
+  lvgl_port_unlock();
+
+  last_minute = timeinfo.tm_min;
+
+  if (time_just_validated == 1)
+  {
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Time validated, showing clock");
+    time_just_validated = 0;
+    lvgl_port_lock(0);
+    if (img_logo) lv_obj_add_flag(img_logo, LV_OBJ_FLAG_HIDDEN);
+    for (int i = 0; i < 4; i++) lv_obj_remove_flag(digit_objs[i], LV_OBJ_FLAG_HIDDEN);
+    lv_obj_remove_flag(img_moon, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_remove_flag(dots[0], LV_OBJ_FLAG_HIDDEN);
+    lv_obj_remove_flag(dots[1], LV_OBJ_FLAG_HIDDEN);
+    lvgl_port_unlock();
+    if (weather_valid) update_weather_msg();
+  }
+  lastrun = now;
+}
+
 void display_task(void *pvParameters)
 {
   ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "display_task started");
   ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Display state: font %u, day_flt %u, night_flt %u",
               font_index, eeprom_color_filter[0], eeprom_color_filter[1]);
 
-  // Create fade timer
-  esp_timer_create_args_t fade_args = {
-      .callback = fade_timer_cb,
-      .name = "fade_timer"};
-
+  esp_timer_create_args_t fade_args = {.callback = fade_timer_cb, .name = "fade_timer"};
   esp_timer_create(&fade_args, &fade_timer);
-  esp_timer_start_periodic(fade_timer, FADE_INTERVAL * 1000); // Convert ms to microseconds
-  ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Fade timer created");
+  esp_timer_start_periodic(fade_timer, FADE_INTERVAL * 1000);
 
-  time_t lastrun = 0;
-  TickType_t lastrun_tick;
-  time_t now;
-  static int last_integration_update_hour = -1; // Track last hour we updated integration message
-
-  // Add watchdog timer to detect task hanging
   esp_timer_handle_t watchdog_timer = NULL;
-
-  esp_timer_create_args_t watchdog_args = {
-      .callback = watchdog_callback,
-      .name = "display_watchdog"};
+  esp_timer_create_args_t watchdog_args = {.callback = watchdog_callback, .name = "display_watchdog"};
   esp_timer_create(&watchdog_args, &watchdog_timer);
-  esp_timer_start_periodic(watchdog_timer, 30000000); // 30 second timeout
+  esp_timer_start_periodic(watchdog_timer, 30000000);
 
-  lastrun_tick = xTaskGetTickCount(); // only needed for the first run, vTaskDelayUntil() will be used from then on
-
+  TickType_t lastrun_tick = xTaskGetTickCount();
+  time_t now;
   static uint32_t loop_counter = 0;
 
   while (1)
   {
-    // Monitor task state and log if we're running too long
     loop_counter++;
-
-    // Log every 500 loops (about 25 seconds) to show task is alive
     if (loop_counter % 1000 == 1)
     {
       UBaseType_t stack_high_water = uxTaskGetStackHighWaterMark(NULL);
       ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Display loop %lu, stack %lu", loop_counter, stack_high_water);
-      if (stack_high_water < 1024)
-      {
-        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Low stack: %lu bytes", stack_high_water);
-      }
+      if (stack_high_water < 1024) ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Low stack: %lu bytes", stack_high_water);
     }
 
-    // update time, if needed
     time(&now);
 
     if (settings_updated)
     {
       ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Settings updated");
-      // Reset alternate display state when settings change
       alternate_display_start = 0;
       showing_glucose = false;
       display_changed();
       settings_updated = false;
     }
 
-    // Check WiFi status every loop iteration (outside the conditional block above)
-    // This ensures the WiFi icon is updated immediately when WiFi is disabled by active hours
-    static bool last_wifi_disabled_state = false;
-    if (wifi_disabled_by_active_hours != last_wifi_disabled_state)
-    {
-      last_wifi_disabled_state = wifi_disabled_by_active_hours;
-      if (wifi_disabled_by_active_hours)
-      {
-        lvgl_port_lock(0);
-        show_object(img_wifi, true);
-        show_object(img_glucose, false);
-        show_object(img_glucose_trend, false);
-        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "WiFi disabled (active hours)");
-        lvgl_port_unlock();
-      }
-      else
-      {
-        lvgl_port_lock(0);
-        show_object(img_wifi, false);
-        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "WiFi enabled");
-        lvgl_port_unlock();
-      }
-    }
-
-    // scroll message
-    // any updated integration valued? update the message
-    if (integration_tokens_updated || (timeinfo.tm_min == 0 && timeinfo.tm_hour != last_integration_update_hour) || (!ota_update_in_progress && ota_updating_message) || (show_ip_on_boot && !ip_message_set))
-    {
-      // Glucose icon handling
-      if (is_glucose_on())
-      {
-        // Restore glucose icon source if WiFi is enabled
-        // ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Glucose on, current : %.0f mg/dL, previous : %.0f mg/dL, trend: %i, fresh: %u", glucose_data.current_gl_mgdl, glucose_data.previous_gl_mgdl, glucose_data.trend_arrow, is_glucose_fresh());
-        int glucose_index = 1; // green
-        if (glucose_data.current_gl_mgdl > eeprom_glucose_high)
-          glucose_index = 2; // yellow
-        else if (glucose_data.current_gl_mgdl < eeprom_glucose_low)
-          glucose_index = 0; // red
-        if (!is_glucose_fresh())
-          glucose_index = 3; // gray
-        lvgl_port_lock(0);
-        lv_image_set_offset_x(img_glucose, -glucose_index * 14);
-        lv_image_set_offset_x(img_glucose_trend, -glucose_data.trend_arrow * 12);
-        show_object(img_glucose, is_glucose_on());
-        show_object(img_glucose_trend, is_glucose_fresh());
-        lvgl_port_unlock(); // Unlock LVGL after display operations
-      }
-      else
-      {
-        // Not glucose on and WiFi not disabled - hide glucose icon
-        lvgl_port_lock(0);
-        show_object(img_glucose, false);
-        show_object(img_glucose_trend, false);
-        lvgl_port_unlock(); // Unlock LVGL after display operations
-      }
-
-      // IP address and OTA "updating..." message display handling
-      if (show_ip_on_boot && !ip_message_set)
-      {
-        // Display IP address on boot
-        char ip_message[64];
-        snprintf(ip_message, sizeof(ip_message), "%s ", boot_ip_address);
-        lvgl_port_lock(0);
-        set_scroll_message(ip_message);
-        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Displaying IP address: %s for %d seconds", ip_message, IP_DISPLAY_DURATION_SEC);
-        lvgl_port_unlock();
-        ip_message_set = true;
-        ip_display_start_time = esp_timer_get_time(); // Start the timer using monotonic time
-      }
-      else if (!ota_update_in_progress && !show_ip_on_boot)
-      {
-        // Normal integration update
-        replace_placeholders(eeprom_message, msg_scrolling, sizeof(msg_scrolling));
-        lvgl_port_lock(0);
-        set_scroll_message(msg_scrolling);
-        // ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Message updated: %s", msg_scrolling);
-        lvgl_port_unlock(); // Unlock LVGL after display operations
-      }
-      // If ota_update_in_progress is true, keep showing "Updating..." message
-      else if (ota_update_in_progress)
-      {
-        // sety the updating message
-        if (!ota_updating_message)
-        {
-          set_scroll_message("Updating...");
-          ota_updating_message = true;
-        }
-
-        // Track when OTA started for timeout detection
-        if (ota_start_time == 0)
-        {
-          ota_start_time = time(NULL);
-        }
-
-        // Timeout after 5 minutes - restore normal message
-        if (time(NULL) - ota_start_time > 300)
-        { // 5 minutes timeout
-          ESP_LOG_WEB(ESP_LOG_WARN, TAG, "OTA timeout, restoring message");
-          ota_update_in_progress = false; // Force reset the flag
-          ota_updating_message = false;
-          ota_start_time = 0;
-        }
-      }
-
-      ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Scroll message: %s", msg_scrolling);
-
-      lv_mem_monitor_t mon;
-      lv_mem_monitor(&mon);
-      ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Mem: total %d free %d used %d%% frag %d%% largest %d",
-                  mon.total_size, mon.free_size, mon.used_pct, mon.frag_pct, mon.free_biggest_size);
-
-      // Check for memory issues
-      if (mon.free_size < 1024)
-      {
-        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Low memory: %d bytes", mon.free_size);
-      }
-
-      integration_tokens_updated = false;
-
-      // Update the last hour we processed integration message
-      if (timeinfo.tm_min == 0)
-      {
-        last_integration_update_hour = timeinfo.tm_hour;
-      }
-    }
-
-    // read ALS sensor every 5 seconds. each pass is 50ms, so 100 passes = 5 seconds
-    if (loop_counter % 100 == 1)
-    {
-      // Get the current lux value
-      lux = ltr303_get_frixos_lux();
-      int8_t pwmpct = -1;
-      uint8_t old_font_index = font_index;
-
-      if (lux > eeprom_lux_threshold + eeprom_lux_sensitivity)
-        font_index = 0;
-      else if (lux < eeprom_lux_threshold - eeprom_lux_sensitivity)
-        font_index = 1;
-
-      // if dim_disable is enabled or we are in manufacturer mode, force full brightness
-      if (eeprom_dim_disable || manufacturer_mode)
-        font_index = 0; // force full brightness
-
-      pwmpct = eeprom_brightness_LED[font_index];
-      if (font_index != old_font_index)
-      {
-        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Font %u->%u (lux %.1f thres %.1f)",
-                    old_font_index, font_index, lux, eeprom_lux_threshold);
-        set_led_pwm_brightness(pwmpct);
-        display_changed();
-      }
-    } // end of ALS sensor
-
+    handle_wifi_status_icon();
+    handle_integration_and_messages();
+    handle_als_and_brightness(loop_counter);
 
     bool should_update_display = false;
-    // Check if alternate display is enabled and handle mode switching, every second or so
-    if (loop_counter % 20 == 1)
-    {
-      bool mode_changed = false;
-      static bool last_showing_glucose = false; // Track previous state to detect changes
-      
-      // Check if minute has changed using cheap integer division (minutes since epoch)
-      // This avoids expensive localtime_r() call
-      static time_t last_minute_slot = 0; // Track last minute slot (now / 60)
-      time_t current_minute_slot = now / 60;
-      bool minute_changed = (current_minute_slot != last_minute_slot);
-
-      alternate_display_active = (eeprom_sec_time + eeprom_sec_cgm > 0);
-
-      // Check if display_changed was called (indicated by alternate_display_start being reset)
-      static time_t last_alternate_display_start = 0;
-      if (alternate_display_start == 0 && last_alternate_display_start != 0)
-      {
-        // display_changed was called, force update
-        mode_changed = true;
-        last_showing_glucose = false; // Reset tracking
-      }
-      last_alternate_display_start = alternate_display_start;
-
-      // Handle alternate display mode switching (check every loop iteration for responsive switching)
-      if (alternate_display_active && time_valid)
-      {
-        // Initialize or check if we need to switch modes
-        if (alternate_display_start == 0)
-        {
-          // Start with time mode if sec_time > 0, otherwise start with glucose (only if valid)
-          showing_glucose = (eeprom_sec_time == 0) && is_glucose_fresh();
-          alternate_display_start = now;
-          mode_changed = true; // Initial state change
-        }
-        else
-        {
-          // Check if we need to switch modes
-          time_t elapsed = now - alternate_display_start;
-          bool should_switch = false;
-
-          if (showing_glucose)
-          {
-            // Currently showing glucose, switch to time after sec_cgm seconds
-            // But only if sec_time > 0 (if sec_time is 0, we want to show only glucose)
-            if (eeprom_sec_cgm > 0 && elapsed >= eeprom_sec_cgm && eeprom_sec_time > 0)
-              should_switch = true;
-          }
-          else
-          {
-            // Currently showing time, switch to glucose after sec_time seconds (only if valid)
-            // If sec_time is 0, we should have started with glucose, so this shouldn't happen
-            if (eeprom_sec_time > 0 && elapsed >= eeprom_sec_time && is_glucose_fresh())
-              should_switch = true;
-          }
-
-          if (should_switch)
-          {
-            showing_glucose = !showing_glucose;
-            alternate_display_start = now;
-            mode_changed = true;
-          }
-        }
-      }
-      else
-      {
-        // Alternate display disabled, always show time
-        if (showing_glucose != false)
-          mode_changed = true; // Switching back to time-only mode
-        showing_glucose = false;
-        alternate_display_start = 0;
-      }
-
-      // Update display only when there's a change: mode switch or time change      
-      if (mode_changed || (showing_glucose != last_showing_glucose))
-      {
-        // Mode changed, update display
-        should_update_display = true;
-        last_showing_glucose = showing_glucose;
-      }
-      else if (!showing_glucose)
-      {
-        // Showing time: update on minute boundaries or other conditions
-        // minute_changed is already calculated above using cheap integer division
-        should_update_display = ((minute_changed || (now % 60 == 0) || (time_just_validated == 1) || weather_has_updated) && time_valid && (now - lastrun > 3));
-        // Always update minute slot tracker (assignment is cheaper than conditional branch)
-        last_minute_slot = current_minute_slot;
-      }
-      // When showing glucose, only update when mode changes (already handled above)
-
-    } // alternate display check
+    handle_alternate_mode_switching(now, loop_counter, &should_update_display);
 
     if (should_update_display)
     {
-
-      // Update time and weather info first
-      localtime_r(&now, &timeinfo);
-
-      if (timeinfo.tm_min % 10 == 1)
-      {
-        char buf[128];
-        snprintf(buf, sizeof(buf), "Tck %li",
-                 (int32_t)(now - lastrun));
-        ESP_LOGI_STACK(TAG, buf);
-      }
-
-      // update scroll message when we get new weather OR at the top of the hour (ok, 1st minute of the hour)
-      if (weather_has_updated || (timeinfo.tm_min == 1))
-      {
-        update_weather_msg();
-        weather_has_updated = false;
-      }
-
-      int digit1, digit2, digit3, digit4;
-      bool show_dots = true;
-      bool show_ampm = false;
-
-      if (showing_glucose && alternate_display_active && is_glucose_on() && glucose_data.current_gl_mgdl > 0)
-      {
-        if (eeprom_glucose_unit == 1)
-        {
-          // Display in mmol/L with 1 decimal place
-          float glucose_mmol = glucose_data.current_gl_mgdl / 18.0182f;
-
-          // Clamp mmol/L values (typical range: 3.0-22.0)
-          if (glucose_mmol > 22.0f)
-            glucose_mmol = 22.0f;
-          if (glucose_mmol < 0.0f)
-            glucose_mmol = 0.0f;
-
-          // Round to 1 decimal place
-          int whole_part = (int)glucose_mmol;
-          int decimal_part = (int)((glucose_mmol - whole_part) * 10.0f + 0.5f); // Round to nearest
-
-          // Handle rounding up (e.g., 9.95 -> 10.0)
-          if (decimal_part >= 10)
-          {
-            whole_part++;
-            decimal_part = 0;
-          }
-
-          digit1 = -1; // Always hide first digit for glucose
-          if (whole_part >= 10)
-          {
-            // 2-digit whole part (e.g., 10.5)
-            digit2 = whole_part / 10; // Tens place (1)
-            digit3 = whole_part % 10; // Ones place (0)
-            digit4 = decimal_part;    // Decimal place (5)
-          }
-          else
-          {
-            // 1-digit whole part (e.g., 5.6)
-            digit2 = -1;           // Hide tens digit
-            digit3 = whole_part;   // Ones place (5)
-            digit4 = decimal_part; // Decimal place (6)
-          }
-
-          show_dots = true; // Show decimal point (one dot between whole and decimal)
-          show_ampm = false;
-        }
-        else
-        {
-          // Display in mg/dL (original logic)
-          int glucose_value = (int)glucose_data.current_gl_mgdl;
-
-          // Clamp to 3 digits (0-999)
-          if (glucose_value > 999)
-            glucose_value = 999;
-          if (glucose_value < 0)
-            glucose_value = 0;
-
-          digit1 = -1; // Always hide first digit for glucose
-
-          if (glucose_value >= 100)
-          {
-            // 3 digits (e.g., 123)
-            digit2 = glucose_value / 100;
-            digit3 = (glucose_value / 10) % 10;
-            digit4 = glucose_value % 10;
-          }
-          else
-          {
-            // 2 digits (e.g., 45) - hide leading zero
-            digit2 = -1; // Hide hundreds digit
-            digit3 = glucose_value / 10;
-            digit4 = glucose_value % 10;
-          }
-
-          show_dots = false; // Hide colon when showing glucose in mg/dL
-          show_ampm = false;
-        }
-      }
-      else
-      {
-        // Display time
-        bool is_pm = false;
-        if (eeprom_12hour)
-        {
-          // Convert to 12-hour format
-          if (timeinfo.tm_hour == 0)
-            timeinfo.tm_hour = 12; // Midnight case
-          else if (timeinfo.tm_hour > 12)
-          {
-            timeinfo.tm_hour -= 12;
-            is_pm = true;
-          }
-        }
-
-        digit1 = timeinfo.tm_hour / 10;
-        digit2 = timeinfo.tm_hour % 10;
-        digit3 = timeinfo.tm_min / 10;
-        digit4 = timeinfo.tm_min % 10;
-
-        if (!eeprom_show_leading_zero && digit1 == 0)
-          digit1 = -1; // don't display leading zero
-
-        show_dots = true;
-        show_ampm = (eeprom_12hour && is_pm);
-      }
-
-      // ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Time %d%d:%d%d", digit1, digit2, digit3, digit4);
-
-      // Update display elements in a single lock
-      lvgl_port_lock(0);
-      display_digit(0, digit1);
-      display_digit(1, digit2);
-      display_digit(2, digit3);
-      display_digit(3, digit4);
-
-      // Adjust digit positions for glucose display: bring 2nd digit closer to 3rd
-      // Normal positions: pos1=+18, pos2=+42, pos3=+60, pos4=+78
-      // For glucose: match spacing between 2-3 to spacing between 3-4 (18 pixels)
-      // Move pos2 from +18 to +24 (6 pixels right) to reduce gap and match visual spacing
-      if (showing_glucose && alternate_display_active)
-      {
-        // Reposition digit 2 (index 1) to be closer to digit 3
-        // Normal: eeprom_ofs_x + 1 * 18 + 0 = eeprom_ofs_x + 18
-        // Adjusted: eeprom_ofs_x + 1 * 18 + 6 = eeprom_ofs_x + 24 (moves it 6 pixels right, closer to pos3)
-        lv_obj_align(digit_objs[1], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 1 * 18 + 6, eeprom_ofs_y + 25);
-        show_object(img_ampm, false); // hide AM/PM indicator when showing glucose
-      }
-      else
-      {
-        // Normal time display: restore original position
-        lv_obj_align(digit_objs[1], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 1 * 18, eeprom_ofs_y + 25);
-        show_object(img_ampm, eeprom_12hour && time_valid); // show AM/PM indicator when showing time
-      }
-
-      lv_image_set_offset_x(img_weather, -weather_icon_index * 32);
-      lv_image_set_offset_x(img_moon, -moon_icon_index * 14);
-      lv_image_set_offset_x(img_ampm, show_ampm ? -10 : 0);
-      // Show/hide colon dots based on what we're displaying
-      if (showing_glucose && alternate_display_active && eeprom_glucose_unit == 1)
-      {
-        // For mmol/L, show one dot as decimal point between whole and decimal digits
-        // Position: whole number in digit3, decimal in digit4
-        show_object(dots[0], true);  // Use first dot as decimal point
-        show_object(dots[1], false); // Hide second dot
-        // Position decimal point between digit3 (whole) and digit4 (decimal)
-        // Digit positions: 2=+18+6, 3=+42+6, 4=+60+6 (when glucose display active)
-        // Place dot between position 3 and 4, centered
-        int dot_x_pos = eeprom_ofs_x + 3 * 18 + 6 - 4; // Between digit3 and digit4, slightly left of center
-        lv_obj_align(dots[0], LV_ALIGN_TOP_LEFT, dot_x_pos, eeprom_ofs_y + 25 + 30);
-      }
-      else
-      {
-        // Normal time display or mg/dL glucose
-        show_object(dots[0], show_dots);
-        show_object(dots[1], show_dots);
-        // Restore dots to normal position for time display
-        if (!showing_glucose || !alternate_display_active)
-        {
-          lv_obj_align(dots[0], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 2 * 18 + 1, eeprom_ofs_y + 25 + 10);
-          lv_obj_align(dots[1], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 2 * 18 + 1, eeprom_ofs_y + 25 + 26);
-        }
-      }
-      // Show mgdl image only when displaying glucose in mg/dL
-      show_object(img_mgdl, showing_glucose && alternate_display_active && is_glucose_on() && glucose_data.current_gl_mgdl > 0);
-      lv_image_set_offset_x(img_mgdl, -eeprom_glucose_unit * 12); // show the appropriate unit
-      lvgl_port_unlock();
-
-      last_minute = timeinfo.tm_min;
-      // Update minute slot tracker after successful display update
-      // Note: last_minute_slot is static, accessed in the loop_counter % 20 block
-
-      // Handle time validation separately to avoid long lock holds
-      if (time_just_validated == 1)
-      {
-        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Time validated, showing clock");
-        time_just_validated = 0;
-
-        lvgl_port_lock(0);
-        if (img_logo)
-        {
-          lv_obj_add_flag(img_logo, LV_OBJ_FLAG_HIDDEN);          
-        }
-
-        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Showing digits");
-
-        for (int i = 0; i < 4; i++)
-          lv_obj_remove_flag(digit_objs[i], LV_OBJ_FLAG_HIDDEN);
-        lv_obj_remove_flag(img_moon, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_remove_flag(dots[0], LV_OBJ_FLAG_HIDDEN);
-        lv_obj_remove_flag(dots[1], LV_OBJ_FLAG_HIDDEN);
-        lvgl_port_unlock();
-
-        if (weather_valid) // only if we have valid weather data
-          update_weather_msg();
-        // Remove the timer creation from here - it's now done at startup
-      } // end of time validated
-
-      lastrun = now;
-    } // end of now%60...
+      update_display_content(now);
+    }
 
     // Handle fade updates
     if (fade_update_needed)
@@ -1583,15 +1446,12 @@ void prepare_tokens(void)
     tokencount = MAX_TOKEN_COUNT;
   }
 
-  token_t *all_tokens = malloc((prepared_tokens_count + tokencount + 1) * sizeof(token_t));
+  token_t *all_tokens = calloc(prepared_tokens_count + tokencount + 1, sizeof(token_t));
   if (all_tokens == NULL)
   {
     ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Token alloc failed");
     return;
   }
-
-  // Initialize the allocated memory to zero
-  memset(all_tokens, 0, (prepared_tokens_count + tokencount + 1) * sizeof(token_t));
 
   // Copy existing base tokens
   memcpy(all_tokens, base_tokens, prepared_tokens_count * sizeof(token_t));
