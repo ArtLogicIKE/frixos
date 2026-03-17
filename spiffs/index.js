@@ -1,3 +1,4 @@
+const el = id => document.getElementById(id);
 // Language configuration
 const LANGUAGES = ['en', 'de', 'fr', 'it', 'pt', 'sv', 'da', 'pl', 'es'];
 
@@ -279,7 +280,7 @@ const translationsLoaded = { en: true }; // English is always loaded
 async function loadTranslations(lang) {
     // If already loaded or English (which is embedded), return immediately
     if (translationsLoaded[lang] || lang === 'en') {
-        return Promise.resolve();
+        return;
     }
 
     // If translation is already being loaded, wait for it
@@ -301,7 +302,7 @@ async function loadTranslations(lang) {
                 translations[lang] = translations.en;
                 translationsLoaded[lang] = true;
                 delete window._translationPromises[lang];
-                return Promise.resolve();
+                return;
             }
             return response.json();
         })
@@ -338,7 +339,6 @@ function getNestedTranslation(obj, path) {
 function getMessage(key, ...args) {
     const message = getNestedTranslation(translations[currentLanguage], `messages.${key}`);
     if (!message) {
-        console.warn(`Message key not found: ${key}`);
         return getNestedTranslation(translations.en, `messages.${key}`) || key;
     }
     
@@ -351,9 +351,9 @@ function getMessage(key, ...args) {
 
 // CGM mutual exclusivity: only one of Dexcom, FreeStyle Libre, or Nightscout URL can be enabled
 function updateCgmExclusivity() {
-    const dexcom = document.getElementById('eeprom_dexcom_region');
-    const libre = document.getElementById('eeprom_libre_region');
-    const nsUrl = document.getElementById('eeprom_ns_url');
+    const dexcom = el('eeprom_dexcom_region');
+    const libre = el('eeprom_libre_region');
+    const nsUrl = el('eeprom_ns_url');
     if (!dexcom || !libre || !nsUrl) return;
     const dexcomEnabled = dexcom.value !== '0';
     const libreEnabled = libre.value !== '0';
@@ -368,87 +368,37 @@ let currentLanguage = 'en';
 
 // Translation function - now async to support lazy-loading
 async function translate(lang) {
-    // Load translations if not already loaded
-    try {
-        await loadTranslations(lang);
-    } catch (error) {
-        // Silent fallback - loadTranslations should have already set fallback
-        // But ensure translations[lang] exists just in case
-        if (!translations[lang]) {
-            translations[lang] = translations.en;
-        }
-    }
+    await loadTranslations(lang);
+    currentLanguage = (lang !== 'en' && translations[lang] === translations.en) ? 'en' : lang;
 
-    // Always ensure translations exist - if not, fallback to English silently
-    if (!translations[lang]) {
-        translations[lang] = translations.en;
-    }
-    
-    // Determine effective language - use requested language if translations are loaded
-    // If file was not found, translations[lang] will be the same object as translations.en
-    // In that case, fallback to English silently (UI remains functional)
-    let effectiveLang = lang;
-    
-    // Check if translations for this language are actually loaded (not just a fallback to English)
-    if (lang !== 'en' && translations[lang] === translations.en) {
-        // File was not found - silently use English
-        effectiveLang = 'en';
-    }
-    
-    // Final safety check - ensure we always have valid translations
-    if (!translations[effectiveLang]) {
-        effectiveLang = 'en';
-        if (!translations[effectiveLang]) {
-            translations[effectiveLang] = translations.en;
-        }
-    }
-    
-    currentLanguage = effectiveLang;
-
-    // Update all elements with data-i18n attribute
     document.querySelectorAll('[data-i18n]').forEach(element => {
         const key = element.getAttribute('data-i18n');
-        const translation = getNestedTranslation(translations[effectiveLang], key);
-
-        if (translation) {
-            element.innerHTML = translation;
-        }
+        const translation = getNestedTranslation(translations[currentLanguage], key);
+        if (translation) element.innerHTML = translation;
     });
 
-    // Update placeholders
     document.querySelectorAll('[data-i18n-placeholder]').forEach(element => {
         const key = element.getAttribute('data-i18n-placeholder');
-        const translation = getNestedTranslation(translations[effectiveLang], key);
-
-        if (translation) {
-            element.placeholder = translation;
-        }
+        const translation = getNestedTranslation(translations[currentLanguage], key);
+        if (translation) element.placeholder = translation;
     });
 
-    // Update language button
-    const nameElement = document.getElementById('current-language-name');
+    const nameElement = el('current-language-name');
+    if (nameElement) nameElement.textContent = LANGUAGE_NAMES[currentLanguage] || LANGUAGE_NAMES['en'];
 
-    if (nameElement) {
-        nameElement.textContent = LANGUAGE_NAMES[effectiveLang] || LANGUAGE_NAMES['en'];
-    }
-
-    // Update page title if on a specific section
     const hash = window.location.hash.substring(1);
     if (hash && hash !== 'settings') {
-        const sectionName = hash.charAt(0).toUpperCase() + hash.slice(1);
         const menuKey = `menu.${hash}`;
-        const translatedSection = getNestedTranslation(translations[effectiveLang], menuKey) || sectionName;
-        const pageTitleElement = document.getElementById('page-title');
-        if (pageTitleElement) {
-            pageTitleElement.textContent = 'Frixos - ' + translatedSection;
-        }
+        const translatedSection = getNestedTranslation(translations[currentLanguage], menuKey) || (hash.charAt(0).toUpperCase() + hash.slice(1));
+        const pageTitleElement = el('page-title');
+        if (pageTitleElement) pageTitleElement.textContent = 'Frixos - ' + translatedSection;
     }
 }
 
 // Setup language selector
 function setupLanguageSelector() {
-    const languageToggle = document.getElementById('language-toggle');
-    const languageDropdown = document.getElementById('language-dropdown');
+    const languageToggle = el('language-toggle');
+    const languageDropdown = el('language-dropdown');
     
     // Toggle dropdown on button click
     languageToggle.addEventListener('click', function(e) {
@@ -526,10 +476,10 @@ window.settingsLoaded = {
 // Function to fetch minimal parameters for theme and language
 async function fetchThemeParams() {
     if (window.settingsLoaded.theme) {
-        return Promise.resolve(window.settings);
+        return window.settings;
     }
 
-    console.log('Fetching theme parameters (p40, p41)...');
+
     // Use query parameter to fetch only theme-related parameters
     try {
         const response = await fetch('/api/settings?group=theme');
@@ -547,7 +497,7 @@ async function fetchThemeParams() {
         // Load and apply language preference
         const languageIndex = data.p41 !== undefined ? data.p41 : 0;
         const selectedLang = LANGUAGES[languageIndex] || 'en';
-        console.log(`Loading language: ${selectedLang} (index: ${languageIndex})`);
+
         await translate(selectedLang);
 
         return data;
@@ -558,7 +508,7 @@ async function fetchThemeParams() {
     }
 }
 // Function to fetch parameters for a specific section
-function fetchSectionParams(sectionName) {
+async function fetchSectionParams(sectionName) {
     const sectionMap = {
         settings: 'settings',
         advanced: 'advanced',
@@ -567,16 +517,16 @@ function fetchSectionParams(sectionName) {
     
     const mappedSection = sectionMap[sectionName];
     if (!mappedSection) {
-        return Promise.resolve(window.settings);
+        return window.settings;
     }
     
     // Check if already loaded for this section
     if (window.settingsLoaded[mappedSection]) {
-        return Promise.resolve(window.settings);
+        return window.settings;
     }
     
     // Need to fetch parameters (first time a section is shown)
-    console.log(`Fetching parameters for ${sectionName} section...`);
+
     // Use query parameter to fetch only the parameters needed for this section
     return fetch(`/api/settings?group=${mappedSection}`)
         .then(response => response.json())
@@ -586,7 +536,7 @@ function fetchSectionParams(sectionName) {
                 window.settings[key] = data[key];
             });
             window.settingsLoaded[mappedSection] = true;
-            console.log(`Parameters for ${sectionName} section loaded`);
+
             return data;
         })
         .catch(error => {
@@ -635,19 +585,19 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
     // Add refresh sensor button handler
-    const refreshSensorButton = document.getElementById('refreshSensorButton');
+    const refreshSensorButton = el('refreshSensorButton');
     if (refreshSensorButton) {
         refreshSensorButton.addEventListener('click', function() {
             fetchStatus()
                 .then(data => {
                     // Update sensor data
-                    document.getElementById('lux').textContent = data.lux !== undefined ? data.lux.toFixed(1) : '-';
-                    document.getElementById('lux_sensitivity_val').textContent = data.lux_sensitivity !== undefined ? `${data.lux_sensitivity} lux` : '-';
-                    document.getElementById('lux_threshold_val').textContent = data.lux_threshold !== undefined ? `${data.lux_threshold} lux` : '-';
+                    el('lux').textContent = data.lux !== undefined ? data.lux.toFixed(1) : '-';
+                    el('lux_sensitivity_val').textContent = data.lux_sensitivity !== undefined ? `${data.lux_sensitivity} lux` : '-';
+                    el('lux_threshold_val').textContent = data.lux_threshold !== undefined ? `${data.lux_threshold} lux` : '-';
                     if (data.uptime !== undefined) {
-                        document.getElementById('uptime').textContent = formatUptime(data.uptime);
+                        el('uptime').textContent = formatUptime(data.uptime);
                     } else {
-                        document.getElementById('uptime').textContent = '-';
+                        el('uptime').textContent = '-';
                     }
                     showStatus(getMessage('sensor_data_refreshed'), 'success');
                 })
@@ -687,7 +637,7 @@ function initTheme(settings) {
     }
     
     // Add event listener to theme toggle button
-    const themeToggle = document.getElementById('theme-toggle');
+    const themeToggle = el('theme-toggle');
     if (themeToggle) {
         themeToggle.addEventListener('click', toggleTheme);
     }
@@ -760,15 +710,13 @@ function navigateToSection() {
     });
     
     // Show the selected section
-    const currentSection = document.getElementById(hash + '-section');
+    const currentSection = el(hash + '-section');
     if (currentSection) {
         currentSection.style.display = 'block';
         
-        // Update page title
-        document.getElementById('page-title').textContent = 'Frixos - ' + 
+        el('page-title').textContent = 'Frixos - ' +
             hash.charAt(0).toUpperCase() + hash.slice(1);
         
-        // Update active menu item
         document.querySelectorAll('.menu-item').forEach(item => {
             if (item.getAttribute('href') === '#' + hash) {
                 item.classList.add('active');
@@ -827,8 +775,8 @@ function navigateToSection() {
 
 // Function to show status messages
 function showStatus(message, type) {
-    console.log('Showing status message:', message, type);
-    const statusElem = document.getElementById('status-message');
+
+    const statusElem = el('status-message');
     if (!statusElem) {
         console.error('Status message element not found!');
         return;
@@ -952,8 +900,8 @@ function setupFieldValidations() {
     
     // Setup validation for each field
     fieldConfigs.forEach(config => {
-        const input = document.getElementById(config.id);
-        const error = document.getElementById(`${config.id}-error`);
+        const input = el(config.id);
+        const error = el(`${config.id}-error`);
         
         if (!input || !error) return;
         
@@ -986,7 +934,7 @@ function setupFieldValidations() {
     // Add form submission validation
     const forms = ['settingsForm', 'advancedForm'];
     forms.forEach(formId => {
-        const form = document.getElementById(formId);
+        const form = el(formId);
         if (!form) return;
         
         form.addEventListener('submit', function(e) {
@@ -994,8 +942,8 @@ function setupFieldValidations() {
             
             // Check each field
             fieldConfigs.forEach(config => {
-                const input = document.getElementById(config.id);
-                const error = document.getElementById(`${config.id}-error`);
+                const input = el(config.id);
+                const error = el(`${config.id}-error`);
                 
                 if (!input || !error) return;
                 
@@ -1023,8 +971,8 @@ function setupFieldValidations() {
 
 // Function to validate hostnames according to DNS rules
 function setupHostnameValidation() {
-    const hostnameInput = document.getElementById('hostname');
-    const hostnameError = document.getElementById('hostname-error');
+    const hostnameInput = el('hostname');
+    const hostnameError = el('hostname-error');
     
     if (!hostnameInput || !hostnameError) return;
     
@@ -1063,8 +1011,8 @@ function setupHostnameValidation() {
     });
     
     // For forms that contain hostname - prevent submission if invalid
-    const settingsForm = document.getElementById('settingsForm');
-    const advancedForm = document.getElementById('advancedForm');
+    const settingsForm = el('settingsForm');
+    const advancedForm = el('advancedForm');
     
     [settingsForm, advancedForm].forEach(form => {
         if (form) {
@@ -1199,13 +1147,13 @@ function addIfChanged(formData, key, newValue, oldValue) {
  */
 function handleFormSubmit(e, formId) {
     e.preventDefault();
-    console.log(`${formId} form submitted`);
+
 
     // Show "Saving..." message
     showStatus(getMessage('saving_settings'), 'info');
 
     // Get the actual form element to verify fields belong to it
-    const form = document.getElementById(formId);
+    const form = el(formId);
     if (!form) {
         console.error(`Form ${formId} not found`);
         showStatus(getMessage('error_saving_unknown'), 'error');
@@ -1214,7 +1162,7 @@ function handleFormSubmit(e, formId) {
 
     // Helper function to check if an element exists and belongs to this form
     function getFieldInForm(fieldId) {
-        const field = document.getElementById(fieldId);
+        const field = el(fieldId);
         // Check if field exists and is within this form
         if (field && (form.contains(field) || (field.form && field.form === form) || field.closest(`form#${formId}`))) {
             return field;
@@ -1481,7 +1429,7 @@ function handleFormSubmit(e, formId) {
         formData.p34 !== undefined ||
         formData.p35 !== undefined;
 
-    console.log(`Saving ${changedCount} changed field(s) out of all fields. Payload size: ${JSON.stringify(formData).length} bytes`);
+
 
     // Save settings using shared function
     // Only network settings require restart notification
@@ -1490,7 +1438,7 @@ function handleFormSubmit(e, formId) {
 
 // Shared function to save settings
 function saveSettings(formData, isNetworkSettings = false) {
-    console.log('Saving settings to server:', formData);
+
     
     return fetch('/api/settings', {
         method: 'POST',
@@ -1500,15 +1448,15 @@ function saveSettings(formData, isNetworkSettings = false) {
         body: JSON.stringify(formData)
     })
     .then(response => {
-        console.log('Response status:', response.status);
+
         return response.json();
     })
     .then(data => {
-        console.log('Response data:', data);
+
         if (data && data.status === 'ok') {
             // Update window.settings with new values
             window.settings = { ...window.settings, ...formData };
-            console.log('Updated window.settings:', window.settings);
+
             
             if (isNetworkSettings) {
                 showStatus(getMessage('network_settings_changed'), 'success');
@@ -1543,10 +1491,10 @@ function setupSettingsSection() {
         window.settingsEventListenersSet = true;
         
         // Setup WiFi scanning functionality
-        const networkList = document.getElementById('network-list');
-        const loadingSpinner = document.getElementById('loading-spinner');
-        const loadingText = document.getElementById('loading-text');
-        const scanButton = document.getElementById('scan-btn');
+        const networkList = el('network-list');
+        const loadingSpinner = el('loading-spinner');
+        const loadingText = el('loading-text');
+        const scanButton = el('scan-btn');
 
         if (networkList) {
             // Hide loading indicators by default
@@ -1567,7 +1515,7 @@ function setupSettingsSection() {
         }
 
         // Handle form submission
-        const settingsForm = document.getElementById('settingsForm');
+        const settingsForm = el('settingsForm');
         if (settingsForm) {
             settingsForm.addEventListener('submit', (e) => handleFormSubmit(e, 'settingsForm'));
         }
@@ -1575,12 +1523,12 @@ function setupSettingsSection() {
 
     // Populate fields if settings are loaded
     if (window.settings && window.settingsLoaded.settings) {
-        const hostnameEl = document.getElementById('hostname');
-        const wifiSsidEl = document.getElementById('wifi_ssid');
-        const wifiPassEl = document.getElementById('wifi_pass');
-        const fahrenheitEl = document.getElementById('fahrenheit');
-        const hour12El = document.getElementById('hour12');
-        const updateFirmwareEl = document.getElementById('update_firmware');
+        const hostnameEl = el('hostname');
+        const wifiSsidEl = el('wifi_ssid');
+        const wifiPassEl = el('wifi_pass');
+        const fahrenheitEl = el('fahrenheit');
+        const hour12El = el('hour12');
+        const updateFirmwareEl = el('update_firmware');
         
         if (hostnameEl && window.settings.p00 !== undefined) hostnameEl.value = window.settings.p00;
         if (wifiSsidEl && window.settings.p34 !== undefined) wifiSsidEl.value = window.settings.p34;
@@ -1593,7 +1541,7 @@ function setupSettingsSection() {
 
 // WiFi scanning functions
 function startScanningUI() {
-    const networkList = document.getElementById('network-list');
+    const networkList = el('network-list');
     
     // Safety check - if networkList doesn't exist, we can't proceed
     if (!networkList) {
@@ -1619,7 +1567,7 @@ function startScanningUI() {
 }
 
 function startWifiScan() {
-    console.log('Starting WiFi scan...');
+
     
     // Update UI to show scanning state
     startScanningUI();
@@ -1628,7 +1576,7 @@ function startWifiScan() {
     fetch('/api/wifi/scan')
         .then(response => response.json())
         .then(data => {
-            console.log('WiFi scan response:', data);
+
             if (data.status === 'ok') {
                 // Start polling for results
                 pollScanResults();
@@ -1643,12 +1591,12 @@ function startWifiScan() {
 }
 
 function pollScanResults() {
-    console.log('Polling for scan results...');
+
     const checkStatus = () => {
         fetch('/api/wifi/status')
             .then(response => response.json())
             .then(data => {
-                console.log('Scan status response:', data);
+
                 if (!data.scanning && data.scan_done) {
                     // Scan complete, display results
                     displayNetworks(data.networks || []);
@@ -1668,9 +1616,9 @@ function pollScanResults() {
 }
 
 function displayNetworks(networks) {
-    const networkList = document.getElementById('network-list');
-    const loadingSpinner = document.getElementById('loading-spinner');
-    const loadingText = document.getElementById('loading-text');
+    const networkList = el('network-list');
+    const loadingSpinner = el('loading-spinner');
+    const loadingText = el('loading-text');
     
     // Safety check - if networkList doesn't exist, we can't proceed
     if (!networkList) {
@@ -1738,14 +1686,14 @@ function displayNetworks(networks) {
 }
 
 function selectNetwork(ssid) {
-    document.getElementById('wifi_ssid').value = ssid;
-    document.getElementById('wifi_pass').focus();
+    el('wifi_ssid').value = ssid;
+    el('wifi_pass').focus();
 }
 
 function showNetworkError(message) {
-    const networkList = document.getElementById('network-list');
-    const loadingSpinner = document.getElementById('loading-spinner');
-    const loadingText = document.getElementById('loading-text');
+    const networkList = el('network-list');
+    const loadingSpinner = el('loading-spinner');
+    const loadingText = el('loading-text');
     
     // Safety check - if networkList doesn't exist, we can't proceed
     if (!networkList) {
@@ -1771,7 +1719,7 @@ function showNetworkError(message) {
 // Status section functionality
 function setupStatusSection() {
     // Add refresh button handler
-    const refreshButton = document.getElementById('refreshButton');
+    const refreshButton = el('refreshButton');
     if (refreshButton) {
         refreshButton.addEventListener('click', fetchStatus);
     }
@@ -1781,39 +1729,39 @@ function setupStatusSection() {
 
 // Setup support buttons (send email and copy to clipboard)
 function setupSupportButtons() {
-    const sendToSupportButton = document.getElementById('sendToSupportButton');
-    const copyToClipboardButton = document.getElementById('copyToClipboardButton');
+    const sendToSupportButton = el('sendToSupportButton');
+    const copyToClipboardButton = el('copyToClipboardButton');
     
     if (sendToSupportButton) {
-        console.log('Adding click handler to send to support button');
+
         // Remove any existing listeners by cloning the button
         const newButton = sendToSupportButton.cloneNode(true);
         sendToSupportButton.parentNode.replaceChild(newButton, sendToSupportButton);
         
         newButton.addEventListener('click', function(e) {
-            console.log('Send email button clicked');
+
             e.preventDefault();
             e.stopPropagation();
             sendSystemInfoToSupport();
         });
     } else {
-        console.warn('sendToSupportButton not found in DOM');
+
     }
     
     if (copyToClipboardButton) {
-        console.log('Adding click handler to copy to clipboard button');
+
         // Remove any existing listeners by cloning the button
         const newButton = copyToClipboardButton.cloneNode(true);
         copyToClipboardButton.parentNode.replaceChild(newButton, copyToClipboardButton);
         
         newButton.addEventListener('click', function(e) {
-            console.log('Copy to clipboard button clicked');
+
             e.preventDefault();
             e.stopPropagation();
             copySystemInfoToClipboard();
         });
     } else {
-        console.warn('copyToClipboardButton not found in DOM');
+
     }
 }
 
@@ -1822,8 +1770,8 @@ function fetchStatus() {
         .then(response => response.json())
         .then(data => {
             // Update time & weather status
-            const timeUpdateStatus = document.getElementById('time_update_status');
-            const weatherUpdateStatus = document.getElementById('weather_update_status');
+            const timeUpdateStatus = el('time_update_status');
+            const weatherUpdateStatus = el('weather_update_status');
 
             // Update time status
             if (data.time_status) {
@@ -1842,35 +1790,35 @@ function fetchStatus() {
             }
 
             // Update other weather-related info
-            document.getElementById('moon_status').textContent = data.moon_icon_index !== undefined ? getMoonPhaseName(data.moon_icon_index) : '-';
-            document.getElementById('latitude').textContent = data.latitude || '-';
-            document.getElementById('longitude').textContent = data.longitude || '-';
-            document.getElementById('timezone_val').textContent = data.timezone || '-';
+            el('moon_status').textContent = data.moon_icon_index !== undefined ? getMoonPhaseName(data.moon_icon_index) : '-';
+            el('latitude').textContent = data.latitude || '-';
+            el('longitude').textContent = data.longitude || '-';
+            el('timezone_val').textContent = data.timezone || '-';
 
             // Update system information
-            document.getElementById('app').textContent = data.app || '-';
-            document.getElementById('version').textContent = data.version || '-';
-            document.getElementById('fwversion').textContent = data.fwversion || '-';
-            document.getElementById('poh').textContent = data.poh !== undefined ? formatPOH(data.poh) : '-';
-            document.getElementById('mac_address').textContent = data.mac_address || '-';
-            document.getElementById('ip_address').textContent = data.ip_address || '-';
-            document.getElementById('chip_revision').textContent = data.chip_revision || '-';
-            document.getElementById('flash_size').textContent = data.flash_size ? formatBytes(data.flash_size) : '-';
-            document.getElementById('cpu_freq').textContent = data.cpu_freq ? `${(data.cpu_freq / 1000000)} MHz` : '-';
-            document.getElementById('compile_time').textContent = data.compile_time || '-';
-            document.getElementById('free_heap').textContent = data.free_heap ? formatBytes(data.free_heap) : '-';
-            document.getElementById('min_free_heap').textContent = data.min_free_heap ? formatBytes(data.min_free_heap) : '-';            
+            el('app').textContent = data.app || '-';
+            el('version').textContent = data.version || '-';
+            el('fwversion').textContent = data.fwversion || '-';
+            el('poh').textContent = data.poh !== undefined ? formatPOH(data.poh) : '-';
+            el('mac_address').textContent = data.mac_address || '-';
+            el('ip_address').textContent = data.ip_address || '-';
+            el('chip_revision').textContent = data.chip_revision || '-';
+            el('flash_size').textContent = data.flash_size ? formatBytes(data.flash_size) : '-';
+            el('cpu_freq').textContent = data.cpu_freq ? `${(data.cpu_freq / 1000000)} MHz` : '-';
+            el('compile_time').textContent = data.compile_time || '-';
+            el('free_heap').textContent = data.free_heap ? formatBytes(data.free_heap) : '-';
+            el('min_free_heap').textContent = data.min_free_heap ? formatBytes(data.min_free_heap) : '-';
 
             // Update sensor data
-            document.getElementById('lux').textContent = data.lux !== undefined ? data.lux.toFixed(1) : '-';
+            el('lux').textContent = data.lux !== undefined ? data.lux.toFixed(1) : '-';
             if (data.uptime !== undefined) {
-                document.getElementById('uptime').textContent = formatUptime(data.uptime);
+                el('uptime').textContent = formatUptime(data.uptime);
             } else {
-                document.getElementById('uptime').textContent = '-';
+                el('uptime').textContent = '-';
             }
 
             // Update system logs
-            const logsTextarea = document.getElementById('system_logs');
+            const logsTextarea = el('system_logs');
             if (data.system_logs && Array.isArray(data.system_logs)) {
                 logsTextarea.value = data.system_logs.join('\n');
             } else {
@@ -1879,9 +1827,9 @@ function fetchStatus() {
 
             // Update HA Status textarea
             if (data.ha_tokens && Array.isArray(data.ha_tokens)) {
-                document.getElementById('ha_status_textarea').value = data.ha_tokens.join('\n');
+                el('ha_status_textarea').value = data.ha_tokens.join('\n');
             } else {
-                document.getElementById('ha_status_textarea').value = 'No Integrations active';
+                el('ha_status_textarea').value = 'No Integrations active';
             }
 
             return data; // Return the data for other functions to use
@@ -1926,12 +1874,12 @@ function getMoonPhaseName(index) {
 
 // Update (OTA) section functionality
 function setupUpdateSection() {
-    const uploadForm = document.getElementById('uploadForm');
-    const firmwareFile = document.getElementById('firmwareFile');
-    const uploadButton = document.getElementById('uploadButton');
-    const progressContainer = document.getElementById('progressContainer');
-    const progressBar = document.getElementById('progress');
-    const progressText = document.getElementById('progressText');
+    const uploadForm = el('uploadForm');
+    const firmwareFile = el('firmwareFile');
+    const uploadButton = el('uploadButton');
+    const progressContainer = el('progressContainer');
+    const progressBar = el('progress');
+    const progressText = el('progressText');
     
     // Enable upload button when file is selected
     firmwareFile.addEventListener('change', function() {
@@ -2034,10 +1982,10 @@ function setupUpdateSection() {
 
 // Restart section functionality
 function setupRestartSection() {
-    const resetButton = document.getElementById('resetButton');
-    const resetModal = document.getElementById('resetModal');
-    const cancelButton = document.getElementById('cancelButton');
-    const confirmButton = document.getElementById('confirmButton');
+    const resetButton = el('resetButton');
+    const resetModal = el('resetModal');
+    const cancelButton = el('cancelButton');
+    const confirmButton = el('confirmButton');
     
     // Show modal when reset button is clicked
     resetButton.addEventListener('click', function() {
@@ -2103,7 +2051,7 @@ function setupAdvancedSection() {
         window.advancedEventListenersSet = true;
         
         // Handle form submission
-        const advancedForm = document.getElementById('advancedForm');
+        const advancedForm = el('advancedForm');
         if (advancedForm) {
             advancedForm.addEventListener('submit', (e) => handleFormSubmit(e, 'advancedForm'));
         }
@@ -2111,8 +2059,7 @@ function setupAdvancedSection() {
 
     // Populate fields if settings are loaded
     if (window.settings && window.settingsLoaded.advanced) {
-        const el = (id) => document.getElementById(id);
-        
+
         if (el('ofs_x') && window.settings.p01 !== undefined) el('ofs_x').value = window.settings.p01 || 0;
         if (el('ofs_y') && window.settings.p02 !== undefined) el('ofs_y').value = window.settings.p02 || 0;
         if (el('rotation') && window.settings.p03 !== undefined) el('rotation').value = window.settings.p03 || 0;
@@ -2125,7 +2072,7 @@ function setupAdvancedSection() {
         if (el('color_filter') && window.settings.p10 !== undefined) el('color_filter').value = window.settings.p10 || 0;
         if (el('night_color_filter') && window.settings.p11 !== undefined) {
             el('night_color_filter').value = window.settings.p11 || 0;
-            console.log('Setting night_color_filter in UI:', window.settings.p11, '->', el('night_color_filter').value);
+
         }
         if (el('msg_color') && window.settings.p12 !== undefined) el('msg_color').value = window.settings.p12 || '#FFFFFF';
         if (el('msg_font') && window.settings.p13 !== undefined) el('msg_font').value = window.settings.p13 || 0;
@@ -2151,10 +2098,10 @@ function setupAdvancedSection() {
 
 // Function to update mmol/l conversion labels
 function updateMmolLabels() {
-    const glucoseHigh = document.getElementById('eeprom_glucose_high');
-    const glucoseLow = document.getElementById('eeprom_glucose_low');
-    const highMmolLabel = document.getElementById('glucose_high_mmol');
-    const lowMmolLabel = document.getElementById('glucose_low_mmol');
+    const glucoseHigh = el('eeprom_glucose_high');
+    const glucoseLow = el('eeprom_glucose_low');
+    const highMmolLabel = el('glucose_high_mmol');
+    const lowMmolLabel = el('glucose_low_mmol');
     
     if (glucoseHigh && highMmolLabel) {
         const highValue = parseInt(glucoseHigh.value) || 0;
@@ -2178,12 +2125,12 @@ function updateMmolLabels() {
 }
 
 function setupIntegrationsSection() {
-    const form = document.getElementById('integrationsForm');
-    const haUrlInput = document.getElementById('eeprom_ha_url');
-    const haTokenInput = document.getElementById('eeprom_ha_token');
-    const haTokenMask = document.getElementById('eeprom_ha_token-mask');
-    const stockKeyInput = document.getElementById('eeprom_stock_key');
-    const stockKeyMask = document.getElementById('eeprom_stock_key-mask');
+    const form = el('integrationsForm');
+    const haUrlInput = el('eeprom_ha_url');
+    const haTokenInput = el('eeprom_ha_token');
+    const haTokenMask = el('eeprom_ha_token-mask');
+    const stockKeyInput = el('eeprom_stock_key');
+    const stockKeyMask = el('eeprom_stock_key-mask');
 
     // Function to update token mask
     function updateTokenMask(token, maskElement) {
@@ -2213,13 +2160,13 @@ function setupIntegrationsSection() {
         }
 
         // Add event listeners for shared glucose monitoring fields
-        const glucoseRefresh = document.getElementById('eeprom_glucose_refresh');
-        const glucosePassword = document.getElementById('eeprom_glucose_password');
-        const glucosePasswordMask = document.getElementById('eeprom_glucose_password-mask');
-        const dexcomRegion = document.getElementById('eeprom_dexcom_region');
-        const libreRegion = document.getElementById('eeprom_libre_region');
-        const glucoseHigh = document.getElementById('eeprom_glucose_high');
-        const glucoseLow = document.getElementById('eeprom_glucose_low');
+        const glucoseRefresh = el('eeprom_glucose_refresh');
+        const glucosePassword = el('eeprom_glucose_password');
+        const glucosePasswordMask = el('eeprom_glucose_password-mask');
+        const dexcomRegion = el('eeprom_dexcom_region');
+        const libreRegion = el('eeprom_libre_region');
+        const glucoseHigh = el('eeprom_glucose_high');
+        const glucoseLow = el('eeprom_glucose_low');
         
         // Add event listeners to update mmol/l labels when values change
         if (glucoseHigh) {
@@ -2248,9 +2195,9 @@ function setupIntegrationsSection() {
                 if (haTokenInput) haTokenInput.dispatchEvent(new Event('input', { bubbles: true }));
                 if (stockKeyInput) stockKeyInput.dispatchEvent(new Event('input', { bubbles: true }));
 
-                const urlError = document.getElementById('eeprom_ha_url-error');
-                const tokenError = document.getElementById('eeprom_ha_token-error');
-                const stockKeyError = document.getElementById('eeprom_stock_key-error');
+                const urlError = el('eeprom_ha_url-error');
+                const tokenError = el('eeprom_ha_token-error');
+                const stockKeyError = el('eeprom_stock_key-error');
 
                 const urlErrorText = urlError ? urlError.textContent : '';
                 const tokenErrorText = tokenError ? tokenError.textContent : '';
@@ -2277,7 +2224,7 @@ function setupIntegrationsSection() {
             haTokenInput.value = window.settings.p26;
             updateTokenMask(window.settings.p26, haTokenMask);
         }
-        const haRefreshMins = document.getElementById('eeprom_ha_refresh_mins');
+        const haRefreshMins = el('eeprom_ha_refresh_mins');
         if (haRefreshMins && typeof window.settings.p27 !== 'undefined') {
             haRefreshMins.value = window.settings.p27 || 5;
         }
@@ -2285,42 +2232,42 @@ function setupIntegrationsSection() {
             stockKeyInput.value = window.settings.p28;
             updateTokenMask(window.settings.p28, stockKeyMask);
         }
-        const stockRefreshMins = document.getElementById('eeprom_stock_refresh_mins');
+        const stockRefreshMins = el('eeprom_stock_refresh_mins');
         if (stockRefreshMins && typeof window.settings.p29 !== 'undefined') {
             stockRefreshMins.value = window.settings.p29 || 5;
         }
 
         // Load Dexcom region
-        const dexcomRegion = document.getElementById('eeprom_dexcom_region');
+        const dexcomRegion = el('eeprom_dexcom_region');
         if (dexcomRegion && typeof window.settings.p30 !== 'undefined') {
             dexcomRegion.value = window.settings.p30;
         }
 
         // Load Libre/Freestyle region
-        const libreRegion = document.getElementById('eeprom_libre_region');
+        const libreRegion = el('eeprom_libre_region');
         if (libreRegion && typeof window.settings.p44 !== 'undefined') {
             libreRegion.value = window.settings.p44;
         }
 
-        const nsUrlInput = document.getElementById('eeprom_ns_url');
+        const nsUrlInput = el('eeprom_ns_url');
         if (nsUrlInput && typeof window.settings.p54 !== 'undefined') {
             nsUrlInput.value = window.settings.p54 || '';
         }
         updateCgmExclusivity();
 
         // Load shared Glucose Monitoring thresholds
-        const glucoseHigh = document.getElementById('eeprom_glucose_high');
+        const glucoseHigh = el('eeprom_glucose_high');
         if (glucoseHigh && typeof window.settings.p51 !== 'undefined') {
             glucoseHigh.value = window.settings.p51;
         }
 
-        const glucoseLow = document.getElementById('eeprom_glucose_low');
+        const glucoseLow = el('eeprom_glucose_low');
         if (glucoseLow && typeof window.settings.p52 !== 'undefined') {
             glucoseLow.value = window.settings.p52;
         }
 
         // Load glucose unit
-        const glucoseUnit = document.getElementById('eeprom_glucose_unit');
+        const glucoseUnit = el('eeprom_glucose_unit');
         if (glucoseUnit && typeof window.settings.p53 !== 'undefined') {
             glucoseUnit.value = window.settings.p53 || 0;
         }
@@ -2329,27 +2276,27 @@ function setupIntegrationsSection() {
         updateMmolLabels();
 
         // Load shared refresh, username, and password - always from p31, p32, p33
-        const glucoseRefresh = document.getElementById('eeprom_glucose_refresh');
-        const glucoseUsername = document.getElementById('eeprom_glucose_username');
-        const glucosePassword = document.getElementById('eeprom_glucose_password');
-        const glucosePasswordMask = document.getElementById('eeprom_glucose_password-mask');
+        const glucoseRefresh = el('eeprom_glucose_refresh');
+        const glucoseUsername = el('eeprom_glucose_username');
+        const glucosePassword = el('eeprom_glucose_password');
+        const glucosePasswordMask = el('eeprom_glucose_password-mask');
 
         // Load shared refresh (p33)
         if (glucoseRefresh && typeof window.settings.p33 !== 'undefined') {
             glucoseRefresh.value = window.settings.p33 || 5;
         }
 
-        const glucoseValidity = document.getElementById('glucose_validity_duration');
+        const glucoseValidity = el('glucose_validity_duration');
         if (glucoseValidity && typeof window.settings.p45 !== 'undefined') {
             glucoseValidity.value = window.settings.p45 || 30;
         }
 
-        const secTime = document.getElementById('eeprom_sec_time');
+        const secTime = el('eeprom_sec_time');
         if (secTime && typeof window.settings.p48 !== 'undefined') {
             secTime.value = window.settings.p48 || 0;
         }
 
-        const secCgm = document.getElementById('eeprom_sec_cgm');
+        const secCgm = el('eeprom_sec_cgm');
         if (secCgm && typeof window.settings.p49 !== 'undefined') {
             secCgm.value = window.settings.p49 || 0;
         }
@@ -2369,25 +2316,25 @@ function setupIntegrationsSection() {
 
 // Function to handle Home Assistant Integration settings
 function setupIntegrationsValidation() {
-    const integrationsForm = document.getElementById('integrationsForm');
+    const integrationsForm = el('integrationsForm');
     if (!integrationsForm) return;
 
     // Home Assistant validation
-    const haUrl = document.getElementById('eeprom_ha_url');
-    const haToken = document.getElementById('eeprom_ha_token');
-    const haRefresh = document.getElementById('eeprom_ha_refresh_mins');
+    const haUrl = el('eeprom_ha_url');
+    const haToken = el('eeprom_ha_token');
+    const haRefresh = el('eeprom_ha_refresh_mins');
 
     // Stock validation
-    const stockKey = document.getElementById('eeprom_stock_key');
-    const stockRefresh = document.getElementById('eeprom_stock_refresh_mins');
+    const stockKey = el('eeprom_stock_key');
+    const stockRefresh = el('eeprom_stock_refresh_mins');
 
     // Glucose monitor validation (Dexcom, FreeStyle Libre, Nightscout URL - only one at a time)
-    const dexcomRegion = document.getElementById('eeprom_dexcom_region');
-    const libreRegion = document.getElementById('eeprom_libre_region');
-    const nsUrlInput = document.getElementById('eeprom_ns_url');
-    const glucoseUsername = document.getElementById('eeprom_glucose_username');
-    const glucosePassword = document.getElementById('eeprom_glucose_password');
-    const glucoseRefresh = document.getElementById('eeprom_glucose_refresh');
+    const dexcomRegion = el('eeprom_dexcom_region');
+    const libreRegion = el('eeprom_libre_region');
+    const nsUrlInput = el('eeprom_ns_url');
+    const glucoseUsername = el('eeprom_glucose_username');
+    const glucosePassword = el('eeprom_glucose_password');
+    const glucoseRefresh = el('eeprom_glucose_refresh');
 
     if (dexcomRegion && libreRegion && nsUrlInput && glucoseUsername && glucosePassword && glucoseRefresh) {
         dexcomRegion.addEventListener('change', function() {
@@ -2420,14 +2367,14 @@ function setupIntegrationsValidation() {
     }
 
     function validateGlucoseMonitors() {
-        const dexcomRegionVal = document.getElementById('eeprom_dexcom_region').value;
-        const libreRegionVal = document.getElementById('eeprom_libre_region').value;
-        const nsUrlVal = (document.getElementById('eeprom_ns_url') && document.getElementById('eeprom_ns_url').value) ? document.getElementById('eeprom_ns_url').value.trim() : '';
-        const username = document.getElementById('eeprom_glucose_username').value;
-        const password = document.getElementById('eeprom_glucose_password').value;
-        const refresh = document.getElementById('eeprom_glucose_refresh').value;
-        const glucoseHigh = document.getElementById('eeprom_glucose_high').value;
-        const glucoseLow = document.getElementById('eeprom_glucose_low').value;
+        const dexcomRegionVal = el('eeprom_dexcom_region').value;
+        const libreRegionVal = el('eeprom_libre_region').value;
+        const nsUrlVal = (el('eeprom_ns_url') && el('eeprom_ns_url').value) ? el('eeprom_ns_url').value.trim() : '';
+        const username = el('eeprom_glucose_username').value;
+        const password = el('eeprom_glucose_password').value;
+        const refresh = el('eeprom_glucose_refresh').value;
+        const glucoseHigh = el('eeprom_glucose_high').value;
+        const glucoseLow = el('eeprom_glucose_low').value;
 
         const dexcomEnabled = dexcomRegionVal !== '0';
         const libreEnabled = libreRegionVal !== '0';
@@ -2526,13 +2473,13 @@ function formatPOH(hours) {
 
 // Helper function to safely get text content
 function safeGetTextContent(elementId) {
-    const element = document.getElementById(elementId);
+    const element = el(elementId);
     return element ? (element.textContent || element.innerText || '') : 'N/A';
 }
 
 // Helper function to safely get input/textarea value
 function safeGetValue(elementId) {
-    const element = document.getElementById(elementId);
+    const element = el(elementId);
     return element ? (element.value || '') : 'N/A';
 }
 
@@ -2575,48 +2522,48 @@ function collectSystemInfo() {
 
         // Settings Information - Use window.settings for checkbox values to ensure accuracy
         settings: {
-                    hostname: window.settings ? window.settings.p00 : (document.getElementById('hostname') ? document.getElementById('hostname').value : ''),
-        wifi_ssid: window.settings ? window.settings.p34 : (document.getElementById('wifi_ssid') ? document.getElementById('wifi_ssid').value : ''),
-        fahrenheit: window.settings ? (window.settings.p36 ? 'Yes' : 'No') : 'Unknown',
-        hour12: window.settings ? (window.settings.p37 ? 'Yes' : 'No') : 'Unknown',
-        update_firmware: window.settings ? (window.settings.p39 ? 'Yes' : 'No') : 'Unknown',
-        ofs_x: window.settings ? window.settings.p01 : (document.getElementById('ofs_x') ? document.getElementById('ofs_x').value : ''),
-        ofs_y: window.settings ? window.settings.p02 : (document.getElementById('ofs_y') ? document.getElementById('ofs_y').value : ''),
-        rotation: window.settings ? window.settings.p03 : (document.getElementById('rotation') ? document.getElementById('rotation').value : ''),
-        dayfont: window.settings ? window.settings.p04 : (document.getElementById('dayfont') ? document.getElementById('dayfont').value : ''),
-        nightfont: window.settings ? window.settings.p05 : (document.getElementById('nightfont') ? document.getElementById('nightfont').value : ''),
-        quiet_scroll: window.settings ? (window.settings.p06 ? 'Yes' : 'No') : 'Unknown',
-        quiet_weather: window.settings ? (window.settings.p07 ? 'Yes' : 'No') : 'Unknown',
-        show_grid: window.settings ? (window.settings.p08 ? 'Yes' : 'No') : 'Unknown',
+            hostname: window.settings ? window.settings.p00 : (el('hostname') ? el('hostname').value : ''),
+            wifi_ssid: window.settings ? window.settings.p34 : (el('wifi_ssid') ? el('wifi_ssid').value : ''),
+            fahrenheit: window.settings ? (window.settings.p36 ? 'Yes' : 'No') : 'Unknown',
+            hour12: window.settings ? (window.settings.p37 ? 'Yes' : 'No') : 'Unknown',
+            update_firmware: window.settings ? (window.settings.p39 ? 'Yes' : 'No') : 'Unknown',
+            ofs_x: window.settings ? window.settings.p01 : (el('ofs_x') ? el('ofs_x').value : ''),
+            ofs_y: window.settings ? window.settings.p02 : (el('ofs_y') ? el('ofs_y').value : ''),
+            rotation: window.settings ? window.settings.p03 : (el('rotation') ? el('rotation').value : ''),
+            dayfont: window.settings ? window.settings.p04 : (el('dayfont') ? el('dayfont').value : ''),
+            nightfont: window.settings ? window.settings.p05 : (el('nightfont') ? el('nightfont').value : ''),
+            quiet_scroll: window.settings ? (window.settings.p06 ? 'Yes' : 'No') : 'Unknown',
+            quiet_weather: window.settings ? (window.settings.p07 ? 'Yes' : 'No') : 'Unknown',
+            show_grid: window.settings ? (window.settings.p08 ? 'Yes' : 'No') : 'Unknown',
         mirroring: window.settings ? (window.settings.p09 ? 'Yes' : 'No') : 'Unknown',
-        color_filter: window.settings ? window.settings.p10 : (document.getElementById('color_filter') ? document.getElementById('color_filter').value : ''),
-        night_color_filter: window.settings ? window.settings.p11 : (document.getElementById('night_color_filter') ? document.getElementById('night_color_filter').value : ''),
-        msg_color: window.settings ? window.settings.p12 : (document.getElementById('msg_color') ? document.getElementById('msg_color').value : ''),
-        msg_font: window.settings ? window.settings.p13 : (document.getElementById('msg_font') ? document.getElementById('msg_font').value : ''),
-        night_msg_color: window.settings ? window.settings.p15 : (document.getElementById('night_msg_color') ? document.getElementById('night_msg_color').value : ''),
-        message: window.settings ? window.settings.p16 : (document.getElementById('message') ? document.getElementById('message').value : ''),
-        lat: window.settings ? window.settings.p17 : (document.getElementById('lat') ? document.getElementById('lat').value : ''),
-        lon: window.settings ? window.settings.p18 : (document.getElementById('lon') ? document.getElementById('lon').value : ''),
-        timezone: window.settings ? window.settings.p19 : (document.getElementById('timezone') ? document.getElementById('timezone').value : ''),
-        lux_sensitivity: window.settings ? window.settings.p20 : (document.getElementById('lux_sensitivity') ? document.getElementById('lux_sensitivity').value : ''),
-        lux_threshold: window.settings ? window.settings.p21 : (document.getElementById('lux_threshold') ? document.getElementById('lux_threshold').value : ''),
+        color_filter: window.settings ? window.settings.p10 : (el('color_filter') ? el('color_filter').value : ''),
+        night_color_filter: window.settings ? window.settings.p11 : (el('night_color_filter') ? el('night_color_filter').value : ''),
+        msg_color: window.settings ? window.settings.p12 : (el('msg_color') ? el('msg_color').value : ''),
+        msg_font: window.settings ? window.settings.p13 : (el('msg_font') ? el('msg_font').value : ''),
+        night_msg_color: window.settings ? window.settings.p15 : (el('night_msg_color') ? el('night_msg_color').value : ''),
+        message: window.settings ? window.settings.p16 : (el('message') ? el('message').value : ''),
+        lat: window.settings ? window.settings.p17 : (el('lat') ? el('lat').value : ''),
+        lon: window.settings ? window.settings.p18 : (el('lon') ? el('lon').value : ''),
+        timezone: window.settings ? window.settings.p19 : (el('timezone') ? el('timezone').value : ''),
+        lux_sensitivity: window.settings ? window.settings.p20 : (el('lux_sensitivity') ? el('lux_sensitivity').value : ''),
+        lux_threshold: window.settings ? window.settings.p21 : (el('lux_threshold') ? el('lux_threshold').value : ''),
         dim_disable: window.settings ? (window.settings.p22 ? 'Yes' : 'No') : 'Unknown',
-        brightness_LED0: window.settings && window.settings.p23 ? window.settings.p23[0] : (document.getElementById('brightness_LED0') ? document.getElementById('brightness_LED0').value : ''),
-        brightness_LED1: window.settings && window.settings.p23 ? window.settings.p23[1] : (document.getElementById('brightness_LED1') ? document.getElementById('brightness_LED1').value : ''),
+        brightness_LED0: window.settings && window.settings.p23 ? window.settings.p23[0] : (el('brightness_LED0') ? el('brightness_LED0').value : ''),
+        brightness_LED1: window.settings && window.settings.p23 ? window.settings.p23[1] : (el('brightness_LED1') ? el('brightness_LED1').value : ''),
         show_leading_zero: window.settings ? (window.settings.p24 ? 'Yes' : 'No') : 'Unknown',
-        eeprom_ha_url: window.settings ? window.settings.p25 : (document.getElementById('eeprom_ha_url') ? document.getElementById('eeprom_ha_url').value : ''),
+        eeprom_ha_url: window.settings ? window.settings.p25 : (el('eeprom_ha_url') ? el('eeprom_ha_url').value : ''),
         eeprom_ha_token: window.settings ? (window.settings.p26 ? 'Configured' : 'Not configured') : 'Unknown',
-        eeprom_ha_refresh_mins: window.settings ? window.settings.p27 : (document.getElementById('eeprom_ha_refresh_mins') ? document.getElementById('eeprom_ha_refresh_mins').value : ''),
+        eeprom_ha_refresh_mins: window.settings ? window.settings.p27 : (el('eeprom_ha_refresh_mins') ? el('eeprom_ha_refresh_mins').value : ''),
         eeprom_stock_key: window.settings ? (window.settings.p28 ? 'Configured' : 'Not configured') : 'Unknown',
-        eeprom_stock_refresh_mins: window.settings ? window.settings.p29 : (document.getElementById('eeprom_stock_refresh_mins') ? document.getElementById('eeprom_stock_refresh_mins').value : ''),
-        eeprom_dexcom_region: window.settings ? window.settings.p30 : (document.getElementById('eeprom_dexcom_region') ? document.getElementById('eeprom_dexcom_region').value : ''),
-        eeprom_libre_region: window.settings ? window.settings.p44 : (document.getElementById('eeprom_libre_region') ? document.getElementById('eeprom_libre_region').value : ''),
-        eeprom_ns_url: window.settings ? (window.settings.p54 || '') : (document.getElementById('eeprom_ns_url') ? document.getElementById('eeprom_ns_url').value : ''),
-        eeprom_glucose_username: window.settings ? (window.settings.p31 || (document.getElementById('eeprom_glucose_username') ? document.getElementById('eeprom_glucose_username').value : '')) : (document.getElementById('eeprom_glucose_username') ? document.getElementById('eeprom_glucose_username').value : ''),
+        eeprom_stock_refresh_mins: window.settings ? window.settings.p29 : (el('eeprom_stock_refresh_mins') ? el('eeprom_stock_refresh_mins').value : ''),
+        eeprom_dexcom_region: window.settings ? window.settings.p30 : (el('eeprom_dexcom_region') ? el('eeprom_dexcom_region').value : ''),
+        eeprom_libre_region: window.settings ? window.settings.p44 : (el('eeprom_libre_region') ? el('eeprom_libre_region').value : ''),
+        eeprom_ns_url: window.settings ? (window.settings.p54 || '') : (el('eeprom_ns_url') ? el('eeprom_ns_url').value : ''),
+        eeprom_glucose_username: window.settings ? (window.settings.p31 || (el('eeprom_glucose_username') ? el('eeprom_glucose_username').value : '')) : (el('eeprom_glucose_username') ? el('eeprom_glucose_username').value : ''),
         eeprom_glucose_password: window.settings ? (window.settings.p32 ? 'Configured' : 'Not configured') : 'Unknown',
-        eeprom_glucose_refresh: window.settings ? (window.settings.p33 || (document.getElementById('eeprom_glucose_refresh') ? document.getElementById('eeprom_glucose_refresh').value : '')) : (document.getElementById('eeprom_glucose_refresh') ? document.getElementById('eeprom_glucose_refresh').value : ''),
-        eeprom_glucose_high: window.settings ? window.settings.p51 : (document.getElementById('eeprom_glucose_high') ? document.getElementById('eeprom_glucose_high').value : ''),
-        eeprom_glucose_low: window.settings ? window.settings.p52 : (document.getElementById('eeprom_glucose_low') ? document.getElementById('eeprom_glucose_low').value : '')
+        eeprom_glucose_refresh: window.settings ? (window.settings.p33 || (el('eeprom_glucose_refresh') ? el('eeprom_glucose_refresh').value : '')) : (el('eeprom_glucose_refresh') ? el('eeprom_glucose_refresh').value : ''),
+        eeprom_glucose_high: window.settings ? window.settings.p51 : (el('eeprom_glucose_high') ? el('eeprom_glucose_high').value : ''),
+        eeprom_glucose_low: window.settings ? window.settings.p52 : (el('eeprom_glucose_low') ? el('eeprom_glucose_low').value : '')
         }
     };
 
@@ -2713,40 +2660,40 @@ function formatSystemInfoForEmail(info) {
 
 // Function to load all data from all sections before collecting system info
 async function loadAllSystemData() {
-    console.log('Loading all system data...');
+
     const promises = [];
     
     // Always fetch status data (populates DOM elements)
     promises.push(fetchStatus().catch(err => {
-        console.warn('Error fetching status:', err);
+
         return null; // Continue even if status fails
     }));
     
     // Load all section parameters if not already loaded
     if (!window.settingsLoaded.settings) {
         promises.push(fetchSectionParams('settings').catch(err => {
-            console.warn('Error fetching settings params:', err);
+
             return null;
         }));
     }
     
     if (!window.settingsLoaded.advanced) {
         promises.push(fetchSectionParams('advanced').catch(err => {
-            console.warn('Error fetching advanced params:', err);
+
             return null;
         }));
     }
     
     if (!window.settingsLoaded.integrations) {
         promises.push(fetchSectionParams('integrations').catch(err => {
-            console.warn('Error fetching integrations params:', err);
+
             return null;
         }));
     }
     
     // Wait for all data to load
     await Promise.all(promises);
-    console.log('All system data loaded');
+
 }
 
 // Function to send system information to support
@@ -2770,7 +2717,7 @@ async function sendSystemInfoToSupport() {
         // Check if mailto link is too long (most browsers limit to ~2000-8000 chars)
         // If too long, fall back to clipboard method
         if (mailtoLink.length > 2000) {
-            console.log('Mailto link too long (' + mailtoLink.length + ' chars), using clipboard fallback');
+
             // Copy to clipboard and show instructions (skip data load since we already loaded it)
             await copySystemInfoToClipboard(true);
             showStatus('Email content copied to clipboard. Please paste it into your email client and send to support@buyfrixos.com', 'success');
