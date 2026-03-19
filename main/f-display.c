@@ -2093,13 +2093,16 @@ void display_string_substring(const char *text, int32_t x, int32_t y,
   }
 
   // Calculate which characters to display based on pixel positions
+  // Optimized: Single pass to find both start and end character indices,
+  // reducing redundant UTF-8 decoding and character width lookups.
   int32_t current_pixel = 0;
   int32_t start_char_index = 0;
   int32_t end_char_index = text_len;
   int32_t char_offset = 0;
+  int32_t end_pixel = effective_start_pixel + width_pixels;
+  bool start_found = false;
 
-  // Find the starting character (first character that contains effective_start_pixel)
-  for (int i = 0; i < text_len; i++)
+  for (int i = 0; i < text_len; )
   {
     int bytes_consumed;
     uint32_t code_point = decode_utf8(text, text_len, i, &bytes_consumed);
@@ -2111,39 +2114,23 @@ void display_string_substring(const char *text, int32_t x, int32_t y,
 
     uint8_t char_width = get_cached_char_width(code_point, font, text, i);
 
-    if (current_pixel + char_width > effective_start_pixel)
+    // Find the starting character (first character that contains effective_start_pixel)
+    if (!start_found && current_pixel + char_width > effective_start_pixel)
     {
       start_char_index = i;
       char_offset = effective_start_pixel - current_pixel;
-      break;
-    }
-    current_pixel += char_width;
-    i += bytes_consumed - 1; // -1 because the loop will increment i
-  }
-
-  // Find the ending character (last character that contains effective_start_pixel + width_pixels)
-  int32_t end_pixel = effective_start_pixel + width_pixels;
-  current_pixel = 0;
-
-  for (int i = 0; i < text_len; i++)
-  {
-    int bytes_consumed;
-    uint32_t code_point = decode_utf8(text, text_len, i, &bytes_consumed);
-
-    if (bytes_consumed == 0)
-    {
-      break; // End of string
+      start_found = true;
     }
 
-    uint8_t char_width = get_cached_char_width(code_point, font, text, i);
-
+    // Find the ending character (last character that contains effective_start_pixel + width_pixels)
     if (current_pixel + char_width > end_pixel)
     {
       end_char_index = i;
-      break;
+      break; // Found both indices, can stop scanning
     }
+
     current_pixel += char_width;
-    i += bytes_consumed - 1; // -1 because the loop will increment i
+    i += bytes_consumed;
   }
 
   // Create substring with only the characters that will be visible
