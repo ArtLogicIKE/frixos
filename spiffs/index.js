@@ -278,6 +278,9 @@ const translations = {
 // Translation loading cache - tracks which translations have been loaded
 const translationsLoaded = { en: true }; // English is always loaded
 
+// Path cache for nested translations - using a Map for better performance and to avoid prototype collisions
+const pathCache = new Map();
+
 // Async function to load translations for a specific language from JSON file
 async function loadTranslations(lang) {
     if (translationsLoaded[lang] || lang === 'en') return;
@@ -294,9 +297,17 @@ async function loadTranslations(lang) {
         });
 }
 
-// Helper function to get nested translation
+// Helper function to get nested translation with path caching for performance
 function getNestedTranslation(obj, path) {
-    return path.split('.').reduce((current, key) => current && current[key], obj);
+    if (!path) return null;
+
+    let parts = pathCache.get(path);
+    if (!parts) {
+        parts = path.split('.');
+        pathCache.set(path, parts);
+    }
+
+    return parts.reduce((current, key) => current && current[key], obj);
 }
 
 // Helper function to get translated message
@@ -339,14 +350,20 @@ async function translate(lang) {
     currentLanguage = effectiveLang;
     const trans = translations[effectiveLang];
 
-    document.querySelectorAll('[data-i18n]').forEach(element => {
-        const translation = getNestedTranslation(trans, element.getAttribute('data-i18n'));
-        if (translation) element.innerHTML = translation;
-    });
+    // Consolidate DOM traversal for better performance
+    document.querySelectorAll('[data-i18n], [data-i18n-placeholder]').forEach(element => {
+        const i18nKey = element.dataset.i18n;
+        const placeholderKey = element.dataset.i18nPlaceholder;
 
-    document.querySelectorAll('[data-i18n-placeholder]').forEach(element => {
-        const translation = getNestedTranslation(trans, element.getAttribute('data-i18n-placeholder'));
-        if (translation) element.placeholder = translation;
+        if (i18nKey) {
+            const translation = getNestedTranslation(trans, i18nKey);
+            if (translation) element.innerHTML = translation;
+        }
+
+        if (placeholderKey) {
+            const translation = getNestedTranslation(trans, placeholderKey);
+            if (translation) element.placeholder = translation;
+        }
     });
 
     const nameElement = el('current-language-name');
@@ -382,7 +399,7 @@ function setupLanguageSelector() {
     // Handle language selection
     document.querySelectorAll('.language-option').forEach(option => {
         option.addEventListener('click', function() {
-            const selectedLang = this.getAttribute('data-lang');
+            const selectedLang = this.dataset.lang;
             changeLanguage(selectedLang);
             languageDropdown.style.display = 'none';
         });
@@ -442,7 +459,7 @@ window.settingsLoaded = {
 // Function to fetch minimal parameters for theme and language
 async function fetchThemeParams() {
     if (window.settingsLoaded.theme) {
-        return Promise.resolve(window.settings);
+        return window.settings;
     }
 
     // Use query parameter to fetch only theme-related parameters
@@ -472,7 +489,7 @@ async function fetchThemeParams() {
     }
 }
 // Function to fetch parameters for a specific section
-function fetchSectionParams(sectionName) {
+async function fetchSectionParams(sectionName) {
     const sectionMap = {
         settings: 'settings',
         advanced: 'advanced',
@@ -481,31 +498,31 @@ function fetchSectionParams(sectionName) {
     
     const mappedSection = sectionMap[sectionName];
     if (!mappedSection) {
-        return Promise.resolve(window.settings);
+        return window.settings;
     }
     
     // Check if already loaded for this section
     if (window.settingsLoaded[mappedSection]) {
-        return Promise.resolve(window.settings);
+        return window.settings;
     }
     
     // Need to fetch parameters (first time a section is shown)
     // Use query parameter to fetch only the parameters needed for this section
-    return fetch(`/api/settings?group=${mappedSection}`)
-        .then(response => response.json())
-        .then(data => {
-            // Merge fetched parameters into window.settings
-            Object.keys(data).forEach(key => {
-                window.settings[key] = data[key];
-            });
-            window.settingsLoaded[mappedSection] = true;
-            return data;
-        })
-        .catch(error => {
-            console.error(`Error loading parameters for ${sectionName} section:`, error);
-            showStatus(getMessage('error_loading_settings'), 'error');
-            throw error;
+    try {
+        const response = await fetch(`/api/settings?group=${mappedSection}`);
+        const data = await response.json();
+
+        // Merge fetched parameters into window.settings
+        Object.keys(data).forEach(key => {
+            window.settings[key] = data[key];
         });
+        window.settingsLoaded[mappedSection] = true;
+        return data;
+    } catch (error) {
+        console.error(`Error loading parameters for ${sectionName} section:`, error);
+        showStatus(getMessage('error_loading_settings'), 'error');
+        throw error;
+    }
 }
 
 document.addEventListener('DOMContentLoaded', function() {
