@@ -295,8 +295,20 @@ async function loadTranslations(lang) {
 }
 
 // Helper function to get nested translation
+// Optimization: Cache split paths to avoid redundant string operations for 180+ translatable elements
+const pathCache = new Map();
 function getNestedTranslation(obj, path) {
-    return path.split('.').reduce((current, key) => current && current[key], obj);
+    let parts = pathCache.get(path);
+    if (!parts) {
+        parts = path.split('.');
+        pathCache.set(path, parts);
+    }
+    let current = obj;
+    for (let i = 0; i < parts.length; i++) {
+        current = current && current[parts[i]];
+        if (!current) break;
+    }
+    return current;
 }
 
 // Helper function to get translated message
@@ -332,6 +344,7 @@ function updateCgmExclusivity() {
 let currentLanguage = 'en';
 
 // Translation function - now async to support lazy-loading
+// Optimization: Consolidated DOM traversal into a single pass using querySelectorAll and dataset
 async function translate(lang) {
     await loadTranslations(lang);
     
@@ -339,14 +352,19 @@ async function translate(lang) {
     currentLanguage = effectiveLang;
     const trans = translations[effectiveLang];
 
-    document.querySelectorAll('[data-i18n]').forEach(element => {
-        const translation = getNestedTranslation(trans, element.getAttribute('data-i18n'));
-        if (translation) element.innerHTML = translation;
-    });
+    document.querySelectorAll('[data-i18n], [data-i18n-placeholder]').forEach(element => {
+        const i18nKey = element.dataset.i18n;
+        const i18nPlaceholderKey = element.dataset.i18nPlaceholder;
 
-    document.querySelectorAll('[data-i18n-placeholder]').forEach(element => {
-        const translation = getNestedTranslation(trans, element.getAttribute('data-i18n-placeholder'));
-        if (translation) element.placeholder = translation;
+        if (i18nKey) {
+            const translation = getNestedTranslation(trans, i18nKey);
+            if (translation) element.innerHTML = translation;
+        }
+
+        if (i18nPlaceholderKey) {
+            const translation = getNestedTranslation(trans, i18nPlaceholderKey);
+            if (translation) element.placeholder = translation;
+        }
     });
 
     const nameElement = el('current-language-name');
@@ -442,7 +460,7 @@ window.settingsLoaded = {
 // Function to fetch minimal parameters for theme and language
 async function fetchThemeParams() {
     if (window.settingsLoaded.theme) {
-        return Promise.resolve(window.settings);
+        return window.settings;
     }
 
     // Use query parameter to fetch only theme-related parameters
@@ -481,12 +499,12 @@ function fetchSectionParams(sectionName) {
     
     const mappedSection = sectionMap[sectionName];
     if (!mappedSection) {
-        return Promise.resolve(window.settings);
+        return window.settings;
     }
     
     // Check if already loaded for this section
     if (window.settingsLoaded[mappedSection]) {
-        return Promise.resolve(window.settings);
+        return window.settings;
     }
     
     // Need to fetch parameters (first time a section is shown)
