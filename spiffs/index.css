@@ -318,6 +318,51 @@ h1 {
 }
 
 /* Password fields should match or exceed text field width to accommodate tokens/passwords */
+.password-input-wrapper {
+    position: relative;
+    flex: 1;
+    max-width: 300px;
+    width: 100%;
+}
+
+.password-input-wrapper {
+    position: relative;
+    flex: 1;
+    max-width: 300px;
+    width: 100%;
+}
+
+.form-group .password-input-wrapper input[type="password"],
+.form-group .password-input-wrapper input[type="text"] {
+    width: 100%;
+    max-width: 100%;
+    padding: 6px 35px 6px 8px;
+    display: block;
+}
+
+.password-toggle {
+    position: absolute;
+    right: 8px;
+    top: 0;
+    bottom: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.1rem;
+    padding: 0;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+}
+
+.password-toggle:hover {
+    opacity: 1;
+}
+
 .form-group input[type="password"] {
     flex: 1;
     min-width: 150px;
