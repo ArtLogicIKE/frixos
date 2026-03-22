@@ -1,0 +1,50 @@
+import os
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
+import uvicorn
+
+app = FastAPI()
+
+# Settings storage (mock)
+settings = {
+    "p00": "frixos",
+    "p34": "MockSSID",
+    "p35": "MockPass",
+    "p36": 1,
+    "p37": 1,
+    "p39": 1,
+    "p40": 1,
+    "p41": 0,
+    "p01": 22,
+    "p02": 22,
+    "p03": 3,
+    "p04": "bold",
+    "p05": "light",
+}
+
+@app.get("/")
+async def read_index():
+    with open("spiffs/index.html", "r") as f:
+        return HTMLResponse(content=f.read())
+
+@app.get("/api/settings")
+async def get_settings(group: str = None):
+    return JSONResponse(content=settings)
+
+@app.get("/language_{lang}.json")
+async def get_language(lang: str):
+    path = f"spiffs/language_{lang}.json"
+    if os.path.exists(path):
+        return FileResponse(path)
+    return JSONResponse(status_code=404, content={"message": "Not found"})
+
+@app.get("/{filename}")
+async def get_static(filename: str):
+    path = f"spiffs/{filename}"
+    if os.path.exists(path):
+        return FileResponse(path)
+    return JSONResponse(status_code=404, content={"message": "Not found"})
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="127.0.0.1", port=8080)
