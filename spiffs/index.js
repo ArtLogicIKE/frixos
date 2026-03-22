@@ -379,6 +379,22 @@ async function translate(lang) {
     }
 }
 
+// Setup password visibility toggles
+function setupPasswordToggles() {
+    document.querySelectorAll('.password-toggle').forEach(button => {
+        button.addEventListener('click', function() {
+            const input = this.previousElementSibling;
+            if (!input) return;
+            const isPassword = input.type === 'password';
+            input.type = isPassword ? 'text' : 'password';
+            this.textContent = isPassword ? '🙈' : '👁️';
+            const action = isPassword ? 'Hide password' : 'Show password';
+            this.setAttribute('aria-label', action);
+            input.focus();
+        });
+    });
+}
+
 // Setup language selector
 function setupLanguageSelector() {
     const languageToggle = el('language-toggle');
@@ -531,6 +547,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Other sections (advanced, integrations) load on demand when navigated to
     Promise.all([fetchThemeParams(), fetchSectionParams('settings')])
         .then(() => {
+            setupPasswordToggles();
+
             // Setup language selector
             setupLanguageSelector();
             
