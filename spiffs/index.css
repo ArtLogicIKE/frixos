@@ -330,6 +330,53 @@ h1 {
     font-size: 0.9rem;
 }
 
+.password-input-wrapper input {
+    flex: 1;
+    min-width: 0;
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid var(--input-border);
+    border-radius: 4px;
+    background-color: var(--input-bg);
+    color: var(--text-color);
+    font-size: 0.9rem;
+}
+
+.password-input-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    flex: 1;
+    min-width: 150px;
+    max-width: 350px;
+    position: relative;
+}
+
+.password-toggle {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 4px 8px;
+    font-size: 1.1rem;
+    color: var(--text-secondary);
+    position: absolute;
+    right: 0;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s;
+    z-index: 10;
+}
+
+.password-toggle:hover {
+    color: var(--primary-color);
+}
+
+.password-input-wrapper input {
+    padding-right: 35px;
+}
+
 /* Special handling for textareas */
 .form-group textarea {
     width: 100%;

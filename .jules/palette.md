@@ -1,0 +1,3 @@
+## 2025-05-15 - Password Visibility Toggles
+**Learning:** In a multi-lingual UI using a text-overwriting translation engine (like `data-i18n`), icon-only buttons (using emojis or SVGs) should NOT use the standard translation attribute if it replaces the `textContent`. This will overwrite the visual icon with a text label, breaking the layout.
+**Action:** Use `aria-label` for accessibility on icon-only buttons and update it programmatically in JavaScript by fetching the translated string, rather than letting the translation engine handle the button's content directly. Ensure the input wrapper has `position: relative` and the toggle has `position: absolute` to avoid shifting the input's width.

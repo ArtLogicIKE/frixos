@@ -9,7 +9,9 @@
   },
   "common": {
     "save_settings": "Gem indstillinger",
-    "cancel": "Annuller"
+    "cancel": "Annuller",
+    "show_password": "Vis adgangskode",
+    "hide_password": "Skjul adgangskode"
   },
   "settings": {
     "connection": {
