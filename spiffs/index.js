@@ -344,26 +344,37 @@ function updateCgmExclusivity() {
 let currentLanguage = 'en';
 
 // Translation function - now async to support lazy-loading
-// Optimization: Consolidated DOM traversal into a single pass using querySelectorAll and dataset
+// Optimization: Persistent early return and DOM mutation diffing to minimize overhead
 async function translate(lang) {
     await loadTranslations(lang);
     
     const effectiveLang = (lang !== 'en' && translations[lang] === translations.en) ? 'en' : lang;
+
+    // Early return if same language already applied
+    if (currentLanguage === effectiveLang) return;
+
     currentLanguage = effectiveLang;
     const trans = translations[effectiveLang];
 
+    // Querying on every call to support dynamic elements while using dataset for readability
     document.querySelectorAll('[data-i18n], [data-i18n-placeholder]').forEach(element => {
         const i18nKey = element.dataset.i18n;
         const i18nPlaceholderKey = element.dataset.i18nPlaceholder;
 
         if (i18nKey) {
             const translation = getNestedTranslation(trans, i18nKey);
-            if (translation) element.innerHTML = translation;
+            // Optimization: Only update DOM if content actually changed to avoid layout thrashing
+            if (translation && element.innerHTML !== translation) {
+                element.innerHTML = translation;
+            }
         }
 
         if (i18nPlaceholderKey) {
             const translation = getNestedTranslation(trans, i18nPlaceholderKey);
-            if (translation) element.placeholder = translation;
+            // Optimization: Only update DOM if placeholder actually changed
+            if (translation && element.placeholder !== translation) {
+                element.placeholder = translation;
+            }
         }
     });
 
