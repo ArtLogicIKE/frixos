@@ -380,6 +380,32 @@ async function translate(lang) {
 }
 
 // Setup language selector
+// Setup password visibility toggles
+function setupPasswordToggles() {
+    document.querySelectorAll('.password-toggle').forEach(toggle => {
+        toggle.addEventListener('click', function() {
+            const input = this.previousElementSibling;
+            const isPassword = input.type === 'password';
+
+            // Toggle type
+            input.type = isPassword ? 'text' : 'password';
+
+            // Toggle icon
+            this.textContent = isPassword ? '🙈' : '👁️';
+
+            // Toggle aria-label for accessibility
+            const labelKey = isPassword ? 'common.hide_password' : 'common.show_password';
+
+            // Get current translation
+            const translatedLabel = getNestedTranslation(translations[currentLanguage], labelKey);
+            this.setAttribute('aria-label', translatedLabel || (isPassword ? 'Hide password' : 'Show password'));
+
+            // Restore focus to input
+            input.focus();
+        });
+    });
+}
+
 function setupLanguageSelector() {
     const languageToggle = el('language-toggle');
     const languageDropdown = el('language-dropdown');
@@ -534,6 +560,9 @@ document.addEventListener('DOMContentLoaded', function() {
             // Setup language selector
             setupLanguageSelector();
             
+            // Setup password toggles
+            setupPasswordToggles();
+
             // Setup navigation
             setupNavigation();
             
