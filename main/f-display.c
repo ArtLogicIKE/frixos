@@ -18,6 +18,7 @@
 #include "f-integrations.h"
 #include "f-dexcom.h"
 
+#include <string.h>
 #include "time.h"
 #include "math.h"
 #include "esp_timer.h"
@@ -2064,8 +2065,26 @@ void display_string_substring(const char *text, int32_t x, int32_t y,
 
   lvgl_port_lock(0);
 
-  // Only set font if it changed (avoid unnecessary style updates)
+  // Cache to avoid redundant LVGL calls. Skip if label_obj changes to ensure safety.
+  static lv_obj_t *last_label = NULL;
   static const lv_font_t *last_font = NULL;
+  static int32_t last_x = -2000, last_y = -2000, last_width = -1;
+  static char last_substring[128] = {0};
+  static bool cache_initialized = false;
+
+  // If label changes, invalidate all caches
+  if (last_label != label_obj)
+  {
+    last_label = label_obj;
+    last_font = NULL;
+    last_x = -2000;
+    last_y = -2000;
+    last_width = -1;
+    last_substring[0] = '\0';
+    cache_initialized = false;
+  }
+
+  // Only set font if it changed (avoid unnecessary style updates)
   if (last_font != font)
   {
     lv_obj_set_style_text_font(label_obj, font, 0);
@@ -2074,11 +2093,18 @@ void display_string_substring(const char *text, int32_t x, int32_t y,
 
   int32_t text_len = strlen(text);
 
-  // Early exit if text is empty
+  // Early exit if text is empty - also optimized
   if (text_len == 0)
   {
-    lv_label_set_text(label_obj, "");
-    lv_obj_set_pos(label_obj, x, y);
+    if (!cache_initialized || last_substring[0] != '\0' || last_x != x || last_y != y)
+    {
+      lv_label_set_text(label_obj, "");
+      lv_obj_set_pos(label_obj, x, y);
+      last_substring[0] = '\0';
+      last_x = x;
+      last_y = y;
+      cache_initialized = true;
+    }
     lvgl_port_unlock();
     return;
   }
@@ -2159,14 +2185,18 @@ void display_string_substring(const char *text, int32_t x, int32_t y,
     substring_buffer[substring_len] = '\0';
   }
 
-  // Set only the substring text (this is the key optimization!)
-  lv_label_set_text(label_obj, substring_buffer);
+  // Set only if the substring has actually changed (this is a key Bolt optimization!)
+  if (!cache_initialized || strcmp(last_substring, substring_buffer) != 0)
+  {
+    lv_label_set_text(label_obj, substring_buffer);
+    strncpy(last_substring, substring_buffer, sizeof(last_substring) - 1);
+    last_substring[sizeof(last_substring) - 1] = '\0';
+  }
 
   // Cache position to avoid unnecessary LVGL calls
-  static int32_t last_x = -1, last_y = -1, last_width = -1;
   int32_t new_x = x - char_offset + padding_offset;
 
-  if (last_x != new_x || last_y != y)
+  if (!cache_initialized || last_x != new_x || last_y != y)
   {
     lv_obj_set_pos(label_obj, new_x, y);
     last_x = new_x;
@@ -2174,11 +2204,13 @@ void display_string_substring(const char *text, int32_t x, int32_t y,
   }
 
   // Set the width to limit what's visible
-  if (last_width != width_pixels)
+  if (!cache_initialized || last_width != width_pixels)
   {
     lv_obj_set_width(label_obj, width_pixels);
     last_width = width_pixels;
   }
+
+  cache_initialized = true;
 
   lvgl_port_unlock();
 }
