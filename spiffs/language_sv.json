@@ -9,7 +9,9 @@
   },
   "common": {
     "save_settings": "Spara inställningar",
-    "cancel": "Avbryt"
+    "cancel": "Avbryt",
+    "show_password": "Visa lösenord",
+    "hide_password": "Dölj lösenord"
   },
   "settings": {
     "connection": {
