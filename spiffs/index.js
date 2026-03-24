@@ -326,6 +326,32 @@ function getMessage(key, ...args) {
     return message;
 }
 
+// Setup password visibility toggles
+function setupPasswordToggles() {
+    document.querySelectorAll('.password-toggle').forEach(button => {
+        button.addEventListener('click', function() {
+            const input = this.previousElementSibling;
+            if (!input) return;
+
+            const isPassword = input.type === 'password';
+            input.type = isPassword ? 'text' : 'password';
+
+            // Toggle icon
+            this.textContent = isPassword ? '🙈' : '👁️';
+
+            // Update aria-label programmatically to avoid overwriting the icon with translation text
+            const labelKey = isPassword ? 'common.hide_password' : 'common.show_password';
+            const translation = getNestedTranslation(translations[currentLanguage] || translations.en, labelKey);
+            if (translation) {
+                this.setAttribute('aria-label', translation);
+            }
+
+            // Restore focus to input
+            input.focus();
+        });
+    });
+}
+
 // CGM mutual exclusivity: only one of Dexcom, FreeStyle Libre, or Nightscout URL can be enabled
 function updateCgmExclusivity() {
     const dexcom = el('eeprom_dexcom_region');
@@ -364,6 +390,19 @@ async function translate(lang) {
         if (i18nPlaceholderKey) {
             const translation = getNestedTranslation(trans, i18nPlaceholderKey);
             if (translation) element.placeholder = translation;
+        }
+    });
+
+    // Update password toggles ARIA labels
+    document.querySelectorAll('.password-toggle').forEach(button => {
+        const input = button.previousElementSibling;
+        if (input) {
+            const isPassword = input.type === 'password';
+            const labelKey = isPassword ? 'common.show_password' : 'common.hide_password';
+            const translation = getNestedTranslation(trans, labelKey);
+            if (translation) {
+                button.setAttribute('aria-label', translation);
+            }
         }
     });
 
@@ -559,6 +598,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Setup send to support and copy buttons
             setupSupportButtons();
+
+            // Setup password visibility toggles
+            setupPasswordToggles();
         })
         .catch(error => {
             console.error('Error during initialization:', error);
