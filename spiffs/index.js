@@ -29,7 +29,9 @@ const translations = {
         },
         common: {
             save_settings: 'Save Settings',
-            cancel: 'Cancel'
+            cancel: 'Cancel',
+            show_password: 'Show password',
+            hide_password: 'Hide password'
         },
         settings: {
             connection: {
@@ -370,6 +372,15 @@ async function translate(lang) {
     const nameElement = el('current-language-name');
     if (nameElement) nameElement.textContent = LANGUAGE_NAMES[effectiveLang] || LANGUAGE_NAMES['en'];
 
+    // Update password toggle labels
+    document.querySelectorAll('.password-toggle').forEach(button => {
+        const input = button.parentElement.querySelector('input');
+        const isVisible = input.type === 'text';
+        const labelKey = isVisible ? 'common.hide_password' : 'common.show_password';
+        const translation = getNestedTranslation(trans, labelKey);
+        if (translation) button.setAttribute('aria-label', translation);
+    });
+
     const hash = window.location.hash.substring(1);
     if (hash && hash !== 'settings') {
         const sectionName = hash.charAt(0).toUpperCase() + hash.slice(1);
@@ -377,6 +388,31 @@ async function translate(lang) {
         const pageTitleElement = el('page-title');
         if (pageTitleElement) pageTitleElement.textContent = 'Frixos - ' + translatedSection;
     }
+}
+
+// Setup password visibility toggles
+function setupPasswordToggles() {
+    document.querySelectorAll('.password-toggle').forEach(button => {
+        button.addEventListener('click', function() {
+            const input = this.parentElement.querySelector('input');
+            const isVisible = input.type === 'text';
+
+            // Toggle type
+            input.type = isVisible ? 'password' : 'text';
+
+            // Toggle icon
+            this.textContent = isVisible ? '👁️' : '🙈';
+
+            // Update ARIA label
+            const trans = translations[currentLanguage] || translations.en;
+            const labelKey = isVisible ? 'common.show_password' : 'common.hide_password';
+            const translation = getNestedTranslation(trans, labelKey);
+            if (translation) this.setAttribute('aria-label', translation);
+
+            // Restore focus to input
+            input.focus();
+        });
+    });
 }
 
 // Setup language selector
@@ -533,6 +569,9 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(() => {
             // Setup language selector
             setupLanguageSelector();
+
+            // Setup password toggles
+            setupPasswordToggles();
             
             // Setup navigation
             setupNavigation();
