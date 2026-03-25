@@ -1903,7 +1903,7 @@ void init_char_width_cache(const lv_font_t *font)
   // Pre-calculate width for ASCII characters (0-127)
   for (int i = 0; i < 128; i++)
   {
-    int cache_index = i % CACHE_SIZE;
+    int cache_index = i & (CACHE_SIZE - 1);
     char_width_cache[cache_index].code_point = i;
     // We ignore kerning (letter_next) to keep cache hits consistent.
     // Frixos fonts currently don't use kerning tables.
@@ -1914,7 +1914,7 @@ void init_char_width_cache(const lv_font_t *font)
   uint32_t common_chars[] = {0xB0, 0x00A0, 0x00A1, 0x00A2, 0x00A3, 0x00A4, 0x00A5, 0x00A6, 0x00A7, 0x00A8, 0x00A9, 0x00AA, 0x00AB, 0x00AC, 0x00AD, 0x00AE, 0x00AF};
   for (int i = 0; i < sizeof(common_chars) / sizeof(common_chars[0]); i++)
   {
-    int cache_index = common_chars[i] % CACHE_SIZE;
+    int cache_index = common_chars[i] & (CACHE_SIZE - 1);
     char_width_cache[cache_index].code_point = common_chars[i];
     char_width_cache[cache_index].width = (uint8_t)lv_font_get_glyph_width(font, common_chars[i], '\0');
   }
@@ -1938,8 +1938,9 @@ static uint8_t get_cached_char_width(uint32_t code_point, const lv_font_t *font,
     return 0;
   }
 
-  // O(1) Lookup: Use modulo for direct indexing. Handle collisions by simple replacement.
-  int cache_index = code_point % CACHE_SIZE;
+  // O(1) Lookup: Use bitwise AND for direct indexing (as CACHE_SIZE is a power of 2).
+  // Handle collisions by simple replacement.
+  int cache_index = code_point & (CACHE_SIZE - 1);
 
   if (char_width_cache[cache_index].code_point == code_point)
   {
@@ -2159,12 +2160,29 @@ void display_string_substring(const char *text, int32_t x, int32_t y,
     substring_buffer[substring_len] = '\0';
   }
 
-  // Set only the substring text (this is the key optimization!)
-  lv_label_set_text(label_obj, substring_buffer);
+  // Only update label text if the substring or font has changed.
+  // This avoids expensive LVGL string copying and layout recalculations on every frame.
+  // Note: We don't cache per label_obj here because this specific label_obj is
+  // currently only used for the primary scrolling message.
+  const char *current_text = lv_label_get_text(label_obj);
+  if (current_text == NULL || strcmp(current_text, substring_buffer) != 0)
+  {
+    lv_label_set_text(label_obj, substring_buffer);
+  }
 
-  // Cache position to avoid unnecessary LVGL calls
+  // Cache position and width to avoid unnecessary LVGL calls
   static int32_t last_x = -1, last_y = -1, last_width = -1;
   int32_t new_x = x - char_offset + padding_offset;
+
+  // Invalidate position/width cache if label object changes
+  static lv_obj_t *last_pos_label_obj = NULL;
+  if (last_pos_label_obj != label_obj)
+  {
+    last_x = -1;
+    last_y = -1;
+    last_width = -1;
+    last_pos_label_obj = label_obj;
+  }
 
   if (last_x != new_x || last_y != y)
   {
