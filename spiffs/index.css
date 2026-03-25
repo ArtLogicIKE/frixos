@@ -289,7 +289,7 @@ h1 {
     display: flex;
     align-items: center;
     gap: 8px;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
 }
 
 .form-group label {
@@ -304,6 +304,7 @@ h1 {
 }
 
 .form-group input[type="text"],
+.form-group input[type="password"],
 .form-group input[type="number"],
 .form-group select {
     flex: 1;
@@ -317,17 +318,49 @@ h1 {
     font-size: 0.9rem;
 }
 
-/* Password fields should match or exceed text field width to accommodate tokens/passwords */
-.form-group input[type="password"] {
+/* Password input layout with toggle */
+.password-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
     flex: 1;
     min-width: 150px;
     max-width: 350px;
-    padding: 6px 8px;
-    border: 1px solid var(--input-border);
-    border-radius: 4px;
-    background-color: var(--input-bg);
-    color: var(--text-color);
-    font-size: 0.9rem;
+}
+
+.password-input-wrapper input[type="password"],
+.password-input-wrapper input[type="text"] {
+    width: 100%;
+    min-width: 0;
+    padding-right: 35px; /* Space for the toggle button */
+}
+
+.password-toggle {
+    position: absolute;
+    right: 0;
+    top: 0;
+    height: 100%;
+    width: 35px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    color: var(--text-secondary);
+    border-radius: 0 4px 4px 0;
+    transition: background-color 0.2s;
+    z-index: 2;
+}
+
+.password-toggle:hover {
+    background-color: rgba(128, 128, 128, 0.1);
+}
+
+.password-toggle:focus {
+    outline: none;
+    background-color: rgba(128, 128, 128, 0.2);
 }
 
 /* Special handling for textareas */
