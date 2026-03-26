@@ -289,7 +289,7 @@ h1 {
     display: flex;
     align-items: center;
     gap: 8px;
-    flex-wrap: nowrap;
+    flex-wrap: wrap; /* Changed to wrap to accommodate errors and masks */
 }
 
 .form-group label {
@@ -317,17 +317,51 @@ h1 {
     font-size: 0.9rem;
 }
 
-/* Password fields should match or exceed text field width to accommodate tokens/passwords */
-.form-group input[type="password"] {
+/* Password input wrapper for visibility toggle */
+.password-input-wrapper {
+    position: relative;
+    display: flex;
     flex: 1;
     min-width: 150px;
     max-width: 350px;
-    padding: 6px 8px;
+    align-items: center;
+}
+
+/* Password fields should match or exceed text field width to accommodate tokens/passwords */
+.form-group input[type="password"],
+.password-input-wrapper input[type="text"] {
+    flex: 1;
+    width: 100%;
+    min-width: 0;
+    padding: 6px 35px 6px 8px; /* Extra right padding for toggle button */
     border: 1px solid var(--input-border);
     border-radius: 4px;
     background-color: var(--input-bg);
     color: var(--text-color);
     font-size: 0.9rem;
+}
+
+.password-toggle {
+    position: absolute;
+    right: 5px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 1.2rem;
+    color: var(--text-secondary);
+    padding: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: color 0.2s;
+    user-select: none;
+}
+
+.password-toggle:hover {
+    color: var(--primary-color);
 }
 
 /* Special handling for textareas */
