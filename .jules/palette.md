@@ -1,0 +1,3 @@
+## 2025-03-24 - Password Visibility Toggle Implementation
+**Learning:** For accessibility in a multi-language environment, password visibility toggles should have dynamic ARIA labels updated via the translation engine. To avoid the translation engine overwriting visual icons (like emojis) with text, the `data-i18n` attribute should be omitted from the toggle button, and the label should be updated programmatically.
+**Action:** Implement `setupPasswordToggles` to handle icons and state, and update the `translate` function to handle ARIA label updates for these specific buttons across all languages.

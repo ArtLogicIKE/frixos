@@ -87,7 +87,10 @@
                         </div>
                         <div class="form-group">
                             <label for="wifi_pass" data-i18n="settings.connection.wifi_password">WiFi Password</label>
-                            <input type="password" id="wifi_pass" name="wifi_pass">
+                            <div class="password-input-wrapper">
+                                <input type="password" id="wifi_pass" name="wifi_pass">
+                                <button type="button" class="password-toggle" aria-label="Show password">👁️</button>
+                            </div>
                         </div>
                         <div class="form-group">
                             <label for="hostname" data-i18n="settings.connection.hostname">Hostname</label>
@@ -635,8 +638,11 @@
                         </div>
                         <div class="form-group">
                             <label for="eeprom_ha_token" data-i18n="integrations.ha.token">LL Access Token</label>
-                            <input type="password" id="eeprom_ha_token" name="eeprom_ha_token" maxlength="255"
-                                data-i18n-placeholder="integrations.ha.token_placeholder">
+                            <div class="password-input-wrapper">
+                                <input type="password" id="eeprom_ha_token" name="eeprom_ha_token" maxlength="255"
+                                    data-i18n-placeholder="integrations.ha.token_placeholder">
+                                <button type="button" class="password-toggle" aria-label="Show password">👁️</button>
+                            </div>
                             <span id="eeprom_ha_token-error" class="input-error"></span>
                             <span id="eeprom_ha_token-mask" class="token-mask"></span>
                         </div>
@@ -657,8 +663,11 @@
                     <div class="section-content">
                         <div class="form-group">
                             <label for="eeprom_stock_key" data-i18n="integrations.stock.api_key">API Key</label>
-                            <input type="password" id="eeprom_stock_key" name="eeprom_stock_key" maxlength="64"
-                                data-i18n-placeholder="integrations.stock.api_key_placeholder">
+                            <div class="password-input-wrapper">
+                                <input type="password" id="eeprom_stock_key" name="eeprom_stock_key" maxlength="64"
+                                    data-i18n-placeholder="integrations.stock.api_key_placeholder">
+                                <button type="button" class="password-toggle" aria-label="Show password">👁️</button>
+                            </div>
                             <span id="eeprom_stock_key-error" class="input-error"></span>
                             <span id="eeprom_stock_key-mask" class="token-mask"></span>
                         </div>
@@ -729,9 +738,12 @@
                         <div class="form-group">
                             <label for="eeprom_glucose_password"
                                 data-i18n="integrations.glucose_monitors.password">Password</label>
-                            <input type="password" id="eeprom_glucose_password" name="eeprom_glucose_password"
-                                maxlength="64"
-                                data-i18n-placeholder="integrations.glucose_monitors.password_placeholder">
+                            <div class="password-input-wrapper">
+                                <input type="password" id="eeprom_glucose_password" name="eeprom_glucose_password"
+                                    maxlength="64"
+                                    data-i18n-placeholder="integrations.glucose_monitors.password_placeholder">
+                                <button type="button" class="password-toggle" aria-label="Show password">👁️</button>
+                            </div>
                             <span id="eeprom_glucose_password-error" class="input-error"></span>
                             <span id="eeprom_glucose_password-mask" class="token-mask"></span>
                         </div>
