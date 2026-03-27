@@ -1,3 +1,7 @@
 ## 2025-03-24 - Optimized Character Width Caching in Firmware
 **Learning:** The previous character width cache implementation used a linear search ((N)$) and performed redundant string scans ((L)$) inside the character measurement loop, resulting in (L^2)$ complexity for string measurement. This is a significant bottleneck for real-time scrolling text on embedded systems.
 **Action:** Use direct-mapped hash lookups ((1)$) for Unicode code points and eliminate inner-loop string operations. Avoid "double-check" logic that bypasses the cache for non-ASCII characters. Mark unused legacy parameters with `(void)` to maintain API compatibility without warnings.
+
+## 2026-03-27 - Optimized Rendering Hot Path in display_string_substring
+**Learning:** Even with an efficient character measurement loop, calling `lv_label_set_text` in every frame of a scrolling animation is expensive because it triggers string parsing and layout invalidation within LVGL. When scrolling pixel-by-pixel, the visible substring often remains identical for several frames.
+**Action:** Use `strcmp(lv_label_get_text(label_obj), substring_buffer)` to detect when the visible content has actually changed before invoking `lv_label_set_text`. This significantly reduces CPU overhead during text scrolling. Trust the compiler to optimize modulo for power-of-two constants rather than manual bitwise AND to maintain code readability and robustness.
