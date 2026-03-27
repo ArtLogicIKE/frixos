@@ -9,7 +9,9 @@
   },
   "common": {
     "save_settings": "Zapisz ustawienia",
-    "cancel": "Anuluj"
+    "cancel": "Anuluj",
+    "show_password": "Pokaż hasło",
+    "hide_password": "Ukryj hasło"
   },
   "settings": {
     "connection": {

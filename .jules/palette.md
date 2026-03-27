@@ -1,0 +1,3 @@
+## 2025-05-15 - Password Visibility Toggle and Accessibility
+**Learning:** Password visibility toggles significantly improve user experience for complex configuration fields like API tokens and long passwords. For accessibility, toggles must avoid the `data-i18n` attribute to prevent overwriting visual icons (emojis) with text, while programmatically updating `aria-label` ensures screen readers receive the correct state (e.g., 'Show password' vs 'Hide password'). Restoring focus to the input field after interaction is crucial for keyboard users.
+**Action:** Always implement a programmatic `aria-label` update and focus restoration when adding interactive state toggles that involve non-textual UI elements.
