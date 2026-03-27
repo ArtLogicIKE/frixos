@@ -9,7 +9,9 @@
   },
   "common": {
     "save_settings": "Guardar definições",
-    "cancel": "Cancelar"
+    "cancel": "Cancelar",
+    "show_password": "Mostrar senha",
+    "hide_password": "Ocultar senha"
   },
   "settings": {
     "connection": {

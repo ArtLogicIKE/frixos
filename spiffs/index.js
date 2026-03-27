@@ -29,7 +29,9 @@ const translations = {
         },
         common: {
             save_settings: 'Save Settings',
-            cancel: 'Cancel'
+            cancel: 'Cancel',
+            show_password: 'Show password',
+            hide_password: 'Hide password'
         },
         settings: {
             connection: {
@@ -367,6 +369,15 @@ async function translate(lang) {
         }
     });
 
+    // Update ARIA labels for password toggles (they don't use data-i18n to preserve icons)
+    document.querySelectorAll('.password-toggle').forEach(button => {
+        const input = button.previousElementSibling;
+        const isVisible = input.type === 'text';
+        const labelKey = isVisible ? 'common.hide_password' : 'common.show_password';
+        const translation = getNestedTranslation(trans, labelKey);
+        if (translation) button.setAttribute('aria-label', translation);
+    });
+
     const nameElement = el('current-language-name');
     if (nameElement) nameElement.textContent = LANGUAGE_NAMES[effectiveLang] || LANGUAGE_NAMES['en'];
 
@@ -377,6 +388,30 @@ async function translate(lang) {
         const pageTitleElement = el('page-title');
         if (pageTitleElement) pageTitleElement.textContent = 'Frixos - ' + translatedSection;
     }
+}
+
+// Setup password toggles
+function setupPasswordToggles() {
+    document.querySelectorAll('.password-toggle').forEach(button => {
+        button.addEventListener('click', function() {
+            const input = this.previousElementSibling;
+            const isVisible = input.type === 'text';
+
+            // Toggle input type
+            input.type = isVisible ? 'password' : 'text';
+
+            // Toggle icon (optional, could be done with CSS but emoji is simple here)
+            this.textContent = isVisible ? '👁️' : '🙈';
+
+            // Update ARIA label
+            const labelKey = isVisible ? 'common.show_password' : 'common.hide_password';
+            const translation = getNestedTranslation(translations[currentLanguage], labelKey);
+            if (translation) this.setAttribute('aria-label', translation);
+
+            // Restore focus to the input field for better UX
+            input.focus();
+        });
+    });
 }
 
 // Setup language selector
@@ -551,6 +586,9 @@ document.addEventListener('DOMContentLoaded', function() {
             // Setup additional field validations
             setupFieldValidations();
             
+            // Setup password toggles
+            setupPasswordToggles();
+
             setupAdvancedSection();
             setupStatusSection();
             setupUpdateSection();

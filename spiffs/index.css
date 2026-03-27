@@ -289,7 +289,7 @@ h1 {
     display: flex;
     align-items: center;
     gap: 8px;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
 }
 
 .form-group label {
@@ -308,7 +308,7 @@ h1 {
 .form-group select {
     flex: 1;
     min-width: 150px;
-    max-width: 300px;
+    max-width: 500px;
     padding: 6px 8px;
     border: 1px solid var(--input-border);
     border-radius: 4px;
@@ -317,11 +317,48 @@ h1 {
     font-size: 0.9rem;
 }
 
+.password-input-wrapper {
+    position: relative;
+    display: flex;
+    flex: 1;
+    min-width: 150px;
+    max-width: 500px;
+}
+
+.password-input-wrapper input {
+    width: 100% !important;
+    min-width: 0 !important;
+    padding-right: 35px !important;
+}
+
+.password-toggle {
+    position: absolute;
+    right: 5px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    z-index: 5;
+    border-radius: 4px;
+}
+
+.password-toggle:hover {
+    color: var(--primary-color);
+    background-color: rgba(128, 128, 128, 0.1);
+}
+
 /* Password fields should match or exceed text field width to accommodate tokens/passwords */
 .form-group input[type="password"] {
     flex: 1;
     min-width: 150px;
-    max-width: 350px;
+    max-width: 500px;
     padding: 6px 8px;
     border: 1px solid var(--input-border);
     border-radius: 4px;
