@@ -4,4 +4,4 @@ sdkconfig
 sdkconfig.old
 
 # Environment file with API keys (copy from env.example)
-.env
+.envmain/include/config.h
