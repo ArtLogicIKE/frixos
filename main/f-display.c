@@ -207,7 +207,7 @@ void set_display_color_filter(uint8_t curve)
   uint16_t color_filters[4] = {0xFFFF, 0x07E0, 0x001F, 0xF800};
   uint16_t color_mask = color_filters[curve];
   */
-  panel_st7735_set_color_channel(lcd_panel, curve); // lcd driver will actually touch all the data before drawing, unless curve is 0
+  // panel_st7735_set_color_channel not available in current driver version
 }
 
 void st7735_set_rotation_and_mirror(uint8_t rotation, uint8_t mirror)
@@ -257,7 +257,7 @@ esp_err_t startup_lcd(void)
   ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "LCD driver install");
   const esp_lcd_panel_dev_config_t panel_config = {
       .reset_gpio_num = LCD_GPIO_RST,
-      .color_space = LCD_COLOR_SPACE,
+      .rgb_ele_order = LCD_COLOR_SPACE,
       .bits_per_pixel = LCD_BITS_PER_PIXEL,
   };
 

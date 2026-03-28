@@ -34,8 +34,9 @@ idf_component_register(SRCS
     REQUIRES nvs_flash
     REQUIRES esp_https_server
     REQUIRES esp_http_client
-    REQUIRES wifi_provisioning
-    REQUIRES json
+    REQUIRES network_provisioning
+    REQUIRES esp_driver_ledc
+    REQUIRES cjson
     REQUIRES app_update
     REQUIRES spi_flash)
 

@@ -196,7 +196,7 @@ extern char boot_ip_address[18];
 #define LCD_PIXEL_CLK_HZ    (40 * 1000 * 1000)
 #define LCD_CMD_BITS        (8)
 #define LCD_PARAM_BITS      (8)
-#define LCD_COLOR_SPACE     (ESP_LCD_COLOR_SPACE_BGR)
+#define LCD_COLOR_SPACE     (LCD_RGB_ELEMENT_ORDER_BGR)
 #define LCD_BITS_PER_PIXEL  (16)
 #define LCD_BL_ON_LEVEL     (1)
 

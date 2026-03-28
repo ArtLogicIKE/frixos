@@ -127,7 +127,7 @@ void start_softap_provisioning(void)
     esp_wifi_set_config(WIFI_IF_AP, &wifi_config);
 
     // Set optimal channel and bandwidth BEFORE wifi_start
-    esp_wifi_set_bandwidth(WIFI_IF_AP, WIFI_BW_HT20);
+    esp_wifi_set_bandwidth(WIFI_IF_AP, WIFI_BW20);
 
     // Configure IP info for AP mode
     esp_netif_ip_info_t ip_info;

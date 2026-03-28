@@ -18,3 +18,4 @@ dependencies:
   espressif/esp_lvgl_port: ^2.4.4
   teriyakigod/esp_lcd_st7735: ^0.0.1
   espressif/mdns: ^1.8.0
+  espressif/network_provisioning: '*'

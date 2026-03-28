@@ -1,4 +1,14 @@
 dependencies:
+  espressif/cjson:
+    component_hash: 002c6d1872ee4c97d333938ebe107a29841cc847f9de89e676714bd2844057ea
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.0'
+    source:
+      registry_url: https://components.espressif.com
+      type: service
+    version: 1.7.19~1
   espressif/esp_lvgl_port:
     component_hash: b6360960f47b6776462e7092861b3ea66477ffb762a01baa0aecbb3d74cd50f4
     dependencies:
@@ -14,7 +24,7 @@ dependencies:
       type: service
     version: 2.7.2
   espressif/mdns:
-    component_hash: 043f989435fd88f771c70507bfde854380c259a8fec8c0d60bcfd8714f16960e
+    component_hash: 1ebe3bd675bb9d1c58f52bc0b609b32f74e572b01c328f9e61282040c775495c
     dependencies:
     - name: idf
       require: private
@@ -22,18 +32,34 @@ dependencies:
     source:
       registry_url: https://components.espressif.com/
       type: service
-    version: 1.10.0
+    version: 1.11.0
+  espressif/network_provisioning:
+    component_hash: 555eb2a32ed8db0e9996dfc781efc15e637bfc14335006b9be68e6fd3b1ca06c
+    dependencies:
+    - name: espressif/cjson
+      registry_url: https://components.espressif.com
+      require: private
+      rules:
+      - if: idf_version >= 6.0
+      version: ^1.7.19
+    - name: idf
+      require: private
+      version: '>=5.1'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 1.2.2
   idf:
     source:
       type: idf
-    version: 5.4.0
+    version: 6.0.0
   lvgl/lvgl:
-    component_hash: 184e532558c1c45fefed631f3e235423d22582aafb4630f3e8885c35281a49ae
+    component_hash: b702d642e03e95928046d5c6726558e6444e112420c77efa5fdb6650b0a13c5d
     dependencies: []
     source:
       registry_url: https://components.espressif.com/
       type: service
-    version: 9.5.0
+    version: 9.3.0
   teriyakigod/esp_lcd_st7735:
     component_hash: 5c61377ee7a5bbccb40a629c2db9c1918ce1645beb2732c007934c52bc1be2a1
     dependencies: []
@@ -44,9 +70,10 @@ dependencies:
 direct_dependencies:
 - espressif/esp_lvgl_port
 - espressif/mdns
+- espressif/network_provisioning
 - idf
 - lvgl/lvgl
 - teriyakigod/esp_lcd_st7735
-manifest_hash: 8394342b1cb93b2cf8168508d3669ec3bc8cc170ba62f7fb3e319220232b57ec
+manifest_hash: a8e79107025b529e97f05e694a1d33fc7282d8faeda422e7dd6d209236fd9bed
 target: esp32
-version: 2.0.0
+version: 3.0.0
