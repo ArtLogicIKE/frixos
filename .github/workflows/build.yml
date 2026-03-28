@@ -2,6 +2,8 @@ name: Build
 
 on:
   push:
+    branches:
+      - '**'
   pull_request:
 
 jobs:
@@ -33,22 +35,3 @@ jobs:
             build/bootloader/bootloader.bin
             build/partition_table/partition-table.bin
             build/spiffs.bin
-
-  release:
-    if: startsWith(github.ref, 'refs/tags/')
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Download firmware artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: firmware
-          path: firmware
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          generate_release_notes: true
-          files: firmware/**/*.bin
