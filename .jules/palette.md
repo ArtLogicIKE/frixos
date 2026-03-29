@@ -1,0 +1,3 @@
+## 2025-05-14 - Accessible Password Visibility Toggles
+**Learning:** For password visibility toggles in a multi-lingual app using emojis as icons, the `data-i18n` attribute should be avoided on the button itself because the translation engine would overwrite the emoji icon with text. Instead, accessibility should be maintained by programmatically updating the `aria-label` within the translation loop, ensuring it stays synchronized with the current language and visibility state while preserving the visual delight of the emoji.
+**Action:** Use a combination of a CSS wrapper, programmatic `aria-label` updates in the `translate()` function, and explicit focus restoration to the input field to provide a seamless and accessible micro-UX for sensitive fields.

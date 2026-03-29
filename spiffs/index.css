@@ -289,7 +289,7 @@ h1 {
     display: flex;
     align-items: center;
     gap: 8px;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
 }
 
 .form-group label {
@@ -798,6 +798,45 @@ h1 {
     padding: 10px;
     width: 100%;
     cursor: pointer;
+}
+
+.password-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex: 1;
+    min-width: 150px;
+    max-width: 350px;
+}
+
+.password-input-wrapper input {
+    width: 100%;
+    padding-right: 35px !important; /* Make room for the toggle button */
+}
+
+.password-toggle {
+    position: absolute;
+    right: 5px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.1rem;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-color);
+    z-index: 2;
+    border-radius: 4px;
+}
+
+.password-toggle:hover {
+    background-color: rgba(128, 128, 128, 0.1);
+}
+
+.password-toggle:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: -2px;
 }
 
 /* Mobile optimizations - only apply to touch devices */
