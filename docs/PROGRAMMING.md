@@ -57,20 +57,20 @@ The ESP32-WROOM uses UART0 for flashing. The relevant signals are:
 
 > **Note:** The firmware forces GPIO0 HIGH at startup (`f-pwm.c`) to prevent unintended download-mode entry during normal operation. When flashing, GPIO0 must be held LOW before EN is released.
 
-## P1 Connector Pinout (Estimated)
+## P1 Connector Pinout
 
-P1 is a 6-pin 2.54 mm pitch header. The pinout below is based on the standard FTDI TTL-232R-3V3 cable convention — **verify against the PCB silkscreen or schematic before connecting**.
+P1 is a 6-pin 2.54 mm pitch header (pins 7 and 8 on the footprint are PCB mounting pads). The pinout below is confirmed from the schematic.
 
 | Pin | Signal | Notes                                          |
 |-----|--------|------------------------------------------------|
-| 1   | GND    | Common ground                                  |
-| 2   | CTS    | Clear to send (may be NC on some adapters)     |
-| 3   | VCC    | 3.3 V (from adapter or board — check jumper)   |
-| 4   | TXD    | Adapter TX → ESP32 RXD0 (GPIO3)                |
-| 5   | RXD    | Adapter RX ← ESP32 TXD0 (GPIO1)               |
-| 6   | DTR    | Auto-reset signal → EN (via RC circuit)        |
+| 1   | TXD    | ESP32 TXD0 (GPIO1) → adapter RX               |
+| 2   | IO0    | Boot mode select (GPIO0) — hold LOW to enter download mode |
+| 3   | RXD    | ESP32 RXD0 (GPIO3) ← adapter TX               |
+| 4   | GND    | Common ground                                  |
+| 5   | +3V3   | 3.3 V power                                   |
+| 6   | EN     | Chip enable / reset — pulse LOW to reset       |
 
-Adapters that implement the standard DTR/RTS auto-reset circuit (used by esptool) will automatically toggle EN and GPIO0 to enter download mode without manual intervention.
+Adapters that implement the standard DTR/RTS auto-reset circuit (used by esptool) will automatically toggle EN and GPIO0 to enter download mode without manual intervention — connect DTR to EN (pin 6) and RTS to IO0 (pin 2).
 
 ## Flashing
 
