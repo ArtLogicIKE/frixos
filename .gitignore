@@ -5,3 +5,6 @@ sdkconfig.old
 
 # Environment file with API keys (copy from env.example)
 .env
+
+# Generated from .env — contains credentials, do not commit
+main/include/config.h
