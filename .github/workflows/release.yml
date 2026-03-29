@@ -49,11 +49,11 @@ jobs:
         run: |
           TAG=${{ github.ref_name }}
           mkdir -p staging
-          cp firmware/build/frixos.bin                        staging/
-          cp firmware/build/bootloader/bootloader.bin         staging/
-          cp firmware/build/partition_table/partition-table.bin staging/
-          cp firmware/build/spiffs.bin                        staging/
-          cp firmware/build/flasher_args.json                 staging/
+          cp firmware/frixos.bin                        staging/
+          cp firmware/bootloader/bootloader.bin         staging/
+          cp firmware/partition_table/partition-table.bin staging/
+          cp firmware/spiffs.bin                        staging/
+          cp firmware/flasher_args.json                 staging/
           cp docs/FLASH.md                                    staging/
           cd staging && zip -j "../frixos-firmware-${TAG}.zip" ./*
 
