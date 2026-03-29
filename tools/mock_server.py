@@ -32,6 +32,46 @@ async def read_index():
 async def get_settings(group: str = None):
     return JSONResponse(content=settings)
 
+@app.get("/api/status")
+async def get_status(logs: str = "0"):
+    status_data = {
+        "wifi_connected": True,
+        "connected_ssid": "MockSSID",
+        "app": "Frixos",
+        "version": "2.15b",
+        "fwversion": 63,
+        "poh": 1234,
+        "mac_address": "AA:BB:CC:DD:EE:FF",
+        "ip_address": "192.168.1.100",
+        "chip_revision": 1,
+        "flash_size": 4 * 1024 * 1024,
+        "cpu_freq": 240000000,
+        "compile_time": "Mar 29 2024 12:00:00",
+        "free_heap": 100000,
+        "min_free_heap": 80000,
+        "current_memory_usage": 5000,
+        "peak_memory_usage": 6000,
+        "time_valid": 1,
+        "time_just_validated": 0,
+        "weather_icon_index": 1,
+        "moon_icon_index": 2,
+        "weather_status": True,
+        "time_status": True,
+        "last_weather_update": 1711713600,
+        "last_time_update": 1711713600,
+        "uptime": 3600,
+        "lux": 150.5,
+        "latitude": "48.123456",
+        "longitude": "16.123456",
+        "timezone": "CET-1CEST,M3.5.0,M10.5.0/3"
+    }
+
+    if logs == "1":
+        status_data["system_logs"] = ["Mock log line 1", "Mock log line 2"]
+        status_data["ha_tokens"] = ["Home Assistant tokens: 1, Last update: Fri Mar 29 12:00:00 2024", "0: Entity entity.name value 123"]
+
+    return JSONResponse(content=status_data)
+
 @app.get("/language_{lang}.json")
 async def get_language(lang: str):
     path = f"spiffs/language_{lang}.json"
