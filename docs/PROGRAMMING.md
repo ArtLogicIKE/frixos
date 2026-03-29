@@ -89,6 +89,29 @@ To flash without monitoring:
 idf.py -p /dev/tty.usbserial-* flash
 ```
 
+## Build Artifacts
+
+The ESP-IDF build produces four binary files, each destined for a specific flash offset defined in `partitions.csv`:
+
+| File | Flash Offset | Description |
+|------|-------------|-------------|
+| `build/bootloader/bootloader.bin` | `0x1000` | Second-stage bootloader. Initializes flash, reads the partition table, and selects which app slot to boot. |
+| `build/partition_table/partition-table.bin` | `0x8000` | Binary form of `partitions.csv`. Tells the bootloader where every partition lives on flash. |
+| `build/frixos.bin` | `0x10000` | Main application firmware (ota_0 slot). |
+| `build/spiffs.bin` | `0x670000` | SPIFFS filesystem image built from the `./spiffs` directory (web UI files). Included because `FLASH_IN_PROJECT` is set in `CMakeLists.txt`. |
+
+`idf.py flash` reads `build/flasher_args.json` — a manifest generated during build that lists every binary with its offset and flash parameters — and calls `esptool.py` to write them all in one shot.
+
+Individual components can also be flashed separately:
+
+```bash
+idf.py bootloader-flash       # just the bootloader
+idf.py partition-table-flash   # just the partition table
+idf.py app-flash               # just frixos.bin
+```
+
+**For OTA updates**, only `frixos.bin` is needed — the OTA process writes it to the alternate app slot and switches the boot partition. The bootloader, partition table, and SPIFFS are not touched during OTA.
+
 ## Manual Boot Mode (if auto-reset is not working)
 
 1. Hold GPIO0 LOW (press BOOT button if present, or bridge pin to GND)
