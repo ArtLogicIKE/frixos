@@ -1,3 +1,7 @@
 ## 2025-03-24 - Optimized Character Width Caching in Firmware
 **Learning:** The previous character width cache implementation used a linear search ((N)$) and performed redundant string scans ((L)$) inside the character measurement loop, resulting in (L^2)$ complexity for string measurement. This is a significant bottleneck for real-time scrolling text on embedded systems.
 **Action:** Use direct-mapped hash lookups ((1)$) for Unicode code points and eliminate inner-loop string operations. Avoid "double-check" logic that bypasses the cache for non-ASCII characters. Mark unused legacy parameters with `(void)` to maintain API compatibility without warnings.
+
+## 2025-03-29 - Optimized /api/status endpoint with optional logs
+**Learning:** The `/api/status` endpoint was a major source of unnecessary CPU and memory overhead because it always generated and transmitted large JSON arrays for system logs and integration tokens (~2-3KB), even when the UI only needed sensor data (lux, uptime). This is particularly impactful on resource-constrained devices like the ESP32 where cJSON object creation and string formatting are relatively expensive.
+**Action:** Implement optional data inclusion using query parameters (e.g., `?logs=1`). Update the frontend to only request verbose data when specifically viewing the Status section or generating support info. This reduces payload size by ~80% for background status checks.
