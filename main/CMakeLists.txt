@@ -37,7 +37,8 @@ idf_component_register(SRCS
     REQUIRES wifi_provisioning
     REQUIRES json
     REQUIRES app_update
-    REQUIRES spi_flash)
+    REQUIRES spi_flash
+    REQUIRES teriyakigod__esp_lcd_st7735)
 
     target_compile_options(${COMPONENT_LIB} PRIVATE "-fno-jump-tables" "-fno-tree-switch-conversion")
 

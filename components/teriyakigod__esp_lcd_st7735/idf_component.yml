@@ -1,0 +1,4 @@
+description: ESP-LCD ST7735 component for ESP-IDF
+license: MIT
+url: https://github.com/appsou/esp_lcd_st7735
+version: 0.0.1

@@ -18,6 +18,7 @@
 #include "esp_log.h"
 #include "esp_wifi.h"
 #include "esp_spiffs.h"
+#include "esp_http_server.h"
 
 #include "frixos.h"
 #include "f-display.h"
@@ -646,6 +647,9 @@ void startup_read_eeprom(void)
 
     // Close NVS
     nvs_close(nvs_handle);
+
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "HTTPD_MAX_REQ_HDR_LEN=%u",
+                (unsigned)HTTPD_MAX_REQ_HDR_LEN);
 
     // 5. Log final parameters
     ESP_LOG_WEB(ESP_LOG_INFO, TAG,
