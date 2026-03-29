@@ -35,3 +35,4 @@ jobs:
             build/bootloader/bootloader.bin
             build/partition_table/partition-table.bin
             build/spiffs.bin
+            build/flasher_args.json
