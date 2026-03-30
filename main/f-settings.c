@@ -2075,6 +2075,10 @@ esp_err_t status_api_handler(httpd_req_t *req)
 
     ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Status API request received");
 
+    // Check if we should include logs and integration details
+    const char *logs_param = get_query_param(req->uri, "logs");
+    bool include_logs = (logs_param != NULL && strcmp(logs_param, "1") == 0);
+
     // Set response headers first to ensure proper HTTP response
     httpd_resp_set_type(req, "application/json");
     httpd_resp_set_hdr(req, "Connection", "close");
@@ -2168,34 +2172,45 @@ esp_err_t status_api_handler(httpd_req_t *req)
     cJSON_AddStringToObject(root, "longitude", my_lon);
     cJSON_AddStringToObject(root, "timezone", my_timezone);
 
-    // Add system logs
-    cJSON *logs_array = cJSON_CreateArray();
-    if (logs_array)
+    // Add system logs and integration tokens only if requested via logs=1
+    if (include_logs)
     {
-        if (weblog.capacity > 0 && weblog.buffer != NULL)
+        // Add system logs
+        cJSON *logs_array = cJSON_CreateArray();
+        if (logs_array)
         {
-            int start_index = weblog.full ? weblog.head : 0;
-            int current_buf_idx;
-            int line_idx = 0;
-            char line_buffer[MAX_LOG_LINE_LENGTH];
-
-            for (int i = 0; i < weblog.size; i++)
+            if (weblog.capacity > 0 && weblog.buffer != NULL)
             {
-                current_buf_idx = (start_index + i) % weblog.capacity;
-                char c = weblog.buffer[current_buf_idx];
+                int start_index = weblog.full ? weblog.head : 0;
+                int current_buf_idx;
+                int line_idx = 0;
+                char line_buffer[MAX_LOG_LINE_LENGTH];
 
-                bool end_of_line = (c == '\n');
-                bool buffer_full = (line_idx >= MAX_LOG_LINE_LENGTH - 1);
-
-                if (end_of_line || buffer_full)
+                for (int i = 0; i < weblog.size; i++)
                 {
-                    if (line_idx > 0)
+                    current_buf_idx = (start_index + i) % weblog.capacity;
+                    char c = weblog.buffer[current_buf_idx];
+
+                    bool end_of_line = (c == '\n');
+                    bool buffer_full = (line_idx >= MAX_LOG_LINE_LENGTH - 1);
+
+                    if (end_of_line || buffer_full)
                     {
-                        line_buffer[line_idx] = '\0';
-                        cJSON_AddItemToArray(logs_array, cJSON_CreateString(line_buffer));
+                        if (line_idx > 0)
+                        {
+                            line_buffer[line_idx] = '\0';
+                            cJSON_AddItemToArray(logs_array, cJSON_CreateString(line_buffer));
+                        }
+                        line_idx = 0;
+                        if (buffer_full && !end_of_line && c != '\r')
+                        {
+                            if (line_idx < MAX_LOG_LINE_LENGTH - 1)
+                            {
+                                line_buffer[line_idx++] = c;
+                            }
+                        }
                     }
-                    line_idx = 0;
-                    if (buffer_full && !end_of_line && c != '\r')
+                    else if (c != '\r')
                     {
                         if (line_idx < MAX_LOG_LINE_LENGTH - 1)
                         {
@@ -2203,155 +2218,148 @@ esp_err_t status_api_handler(httpd_req_t *req)
                         }
                     }
                 }
-                else if (c != '\r')
+
+                // Add any remaining characters
+                if (line_idx > 0)
                 {
-                    if (line_idx < MAX_LOG_LINE_LENGTH - 1)
-                    {
-                        line_buffer[line_idx++] = c;
-                    }
+                    line_buffer[line_idx] = '\0';
+                    cJSON_AddItemToArray(logs_array, cJSON_CreateString(line_buffer));
                 }
             }
+            cJSON_AddItemToObject(root, "system_logs", logs_array);
+        }
 
-            // Add any remaining characters
-            if (line_idx > 0)
+        // Create JSON array for HA tokens
+        cJSON *integration_log = cJSON_CreateArray();
+        // Add HA tokens if available
+
+        if (integration_log == NULL)
+        {
+            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to create HA tokens array");
+            return ESP_FAIL;
+        }
+
+        // Add combined info for all tokens
+        char info[512];
+        snprintf(info, sizeof(info), "Home Assistant tokens: %d, Last update: %s",
+                 integration_active_tokens_count[INTEGRATION_HA],
+                 ctime(&integration_last_update[INTEGRATION_HA]));
+        cJSON_AddStringToObject(integration_log, "info", info);
+
+        if (integration_active_tokens_count[INTEGRATION_HA] > 0)
+        {
+
+            // Add each HA token
+            for (int i = 0; i < integration_active_tokens_count[INTEGRATION_HA]; i++)
             {
-                line_buffer[line_idx] = '\0';
-                cJSON_AddItemToArray(logs_array, cJSON_CreateString(line_buffer));
+                snprintf(info, sizeof(info), "%d: %s entity %s path %s value %s", i,
+                         integration_active_tokens[INTEGRATION_HA][i].name ? integration_active_tokens[INTEGRATION_HA][i].name : "(null)",
+                         integration_active_tokens[INTEGRATION_HA][i].entity ? integration_active_tokens[INTEGRATION_HA][i].entity : "(null)",
+                         integration_active_tokens[INTEGRATION_HA][i].path ? integration_active_tokens[INTEGRATION_HA][i].path : "(null)",
+                         integration_active_tokens[INTEGRATION_HA][i].value);
+                cJSON_AddStringToObject(integration_log, "info", info);
             }
         }
-        cJSON_AddItemToObject(root, "system_logs", logs_array);
-    }
 
-    // Create JSON array for HA tokens
-    cJSON *integration_log = cJSON_CreateArray();
-    // Add HA tokens if available
+        snprintf(info, sizeof(info), "\nStock (finnhub.io) tokens: %d, Last update: %s",
+                 integration_active_tokens_count[INTEGRATION_STOCK],
+                 ctime(&integration_last_update[INTEGRATION_STOCK]));
+        cJSON_AddStringToObject(integration_log, "info", info);
 
-    if (integration_log == NULL)
-    {
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to create HA tokens array");
-        return ESP_FAIL;
-    }
-
-    // Add combined info for all tokens
-    char info[512];
-    snprintf(info, sizeof(info), "Home Assistant tokens: %d, Last update: %s",
-             integration_active_tokens_count[INTEGRATION_HA],
-             ctime(&integration_last_update[INTEGRATION_HA]));
-    cJSON_AddStringToObject(integration_log, "info", info);
-
-    if (integration_active_tokens_count[INTEGRATION_HA] > 0)
-    {
-
-        // Add each HA token
-        for (int i = 0; i < integration_active_tokens_count[INTEGRATION_HA]; i++)
+        // Add stock tokens if available
+        if (integration_active_tokens[INTEGRATION_STOCK] != NULL && integration_active_tokens_count[INTEGRATION_STOCK] > 0)
         {
-            snprintf(info, sizeof(info), "%d: %s entity %s path %s value %s", i, 
-                     integration_active_tokens[INTEGRATION_HA][i].name ? integration_active_tokens[INTEGRATION_HA][i].name : "(null)",
-                     integration_active_tokens[INTEGRATION_HA][i].entity ? integration_active_tokens[INTEGRATION_HA][i].entity : "(null)",
-                     integration_active_tokens[INTEGRATION_HA][i].path ? integration_active_tokens[INTEGRATION_HA][i].path : "(null)",
-                     integration_active_tokens[INTEGRATION_HA][i].value);
+            // Add each stock token
+            for (int i = 0; i < integration_active_tokens_count[INTEGRATION_STOCK]; i++)
+            {
+                snprintf(info, sizeof(info), "%d: %s symbol %s value %s", i,
+                         integration_active_tokens[INTEGRATION_STOCK][i].name ? integration_active_tokens[INTEGRATION_STOCK][i].name : "(null)",
+                         integration_active_tokens[INTEGRATION_STOCK][i].entity ? integration_active_tokens[INTEGRATION_STOCK][i].entity : "(null)",
+                         integration_active_tokens[INTEGRATION_STOCK][i].value);
+                cJSON_AddStringToObject(integration_log, "info", info);
+            }
+        }
+        cJSON_AddItemToObject(root, "ha_tokens", integration_log);
+
+        // Add dexcom tokens
+        if (integration_active[INTEGRATION_DEXCOM])
+        {
+            snprintf(info, sizeof(info), "\nDexcom active: %d tokens, last update %s",
+                     integration_active_tokens_count[INTEGRATION_DEXCOM],
+                     ctime(&integration_last_update[INTEGRATION_DEXCOM]));
+            cJSON_AddStringToObject(integration_log, "info", info);
+
+            // Format glucose value directly from glucose_data
+            char glucose_value[64];
+            if (glucose_data.current_gl_mgdl > 0)
+            {
+                format_glucose_token(glucose_value, sizeof(glucose_value));
+                snprintf(info, sizeof(info), "[CGM:glucose] value %s", glucose_value);
+            }
+            else
+            {
+                snprintf(info, sizeof(info), "[CGM:glucose] value N/A");
+            }
             cJSON_AddStringToObject(integration_log, "info", info);
         }
-    }
-
-    snprintf(info, sizeof(info), "\nStock (finnhub.io) tokens: %d, Last update: %s",
-             integration_active_tokens_count[INTEGRATION_STOCK],
-             ctime(&integration_last_update[INTEGRATION_STOCK]));
-    cJSON_AddStringToObject(integration_log, "info", info);
-
-    // Add stock tokens if available
-    if (integration_active_tokens[INTEGRATION_STOCK] != NULL && integration_active_tokens_count[INTEGRATION_STOCK] > 0)
-    {
-        // Add each stock token
-        for (int i = 0; i < integration_active_tokens_count[INTEGRATION_STOCK]; i++)
+        else
         {
-            snprintf(info, sizeof(info), "%d: %s symbol %s value %s", i,
-                     integration_active_tokens[INTEGRATION_STOCK][i].name ? integration_active_tokens[INTEGRATION_STOCK][i].name : "(null)",
-                     integration_active_tokens[INTEGRATION_STOCK][i].entity ? integration_active_tokens[INTEGRATION_STOCK][i].entity : "(null)",
-                     integration_active_tokens[INTEGRATION_STOCK][i].value);
+            snprintf(info, sizeof(info), "\nDexcom not active");
             cJSON_AddStringToObject(integration_log, "info", info);
         }
-    }
-    cJSON_AddItemToObject(root, "ha_tokens", integration_log);
 
-    // Add dexcom tokens
-    if (integration_active[INTEGRATION_DEXCOM])
-    {
-        snprintf(info, sizeof(info), "\nDexcom active: %d tokens, last update %s",
-                 integration_active_tokens_count[INTEGRATION_DEXCOM],
-                 ctime(&integration_last_update[INTEGRATION_DEXCOM]));
-        cJSON_AddStringToObject(integration_log, "info", info);
-    
-        // Format glucose value directly from glucose_data
-        char glucose_value[64];
-        if (glucose_data.current_gl_mgdl > 0)
+        // Add freestyle libre tokens
+        if (integration_active[INTEGRATION_FREESTYLE])
         {
-            format_glucose_token(glucose_value, sizeof(glucose_value));
-            snprintf(info, sizeof(info), "[CGM:glucose] value %s", glucose_value);
+            snprintf(info, sizeof(info), "\nFreeStyle Libre active: %d tokens, last update %s",
+                     integration_active_tokens_count[INTEGRATION_FREESTYLE],
+                     ctime(&integration_last_update[INTEGRATION_FREESTYLE]));
+            cJSON_AddStringToObject(integration_log, "info", info);
+
+            // Format glucose value directly from glucose_data
+            char glucose_value[64];
+            if (glucose_data.current_gl_mgdl > 0)
+            {
+                format_glucose_token(glucose_value, sizeof(glucose_value));
+                snprintf(info, sizeof(info), "[CGM:glucose] value %s", glucose_value);
+            }
+            else
+            {
+                snprintf(info, sizeof(info), "[CGM:glucose] value N/A");
+            }
+            cJSON_AddStringToObject(integration_log, "info", info);
         }
         else
         {
-            snprintf(info, sizeof(info), "[CGM:glucose] value N/A");
+            snprintf(info, sizeof(info), "\nFreeStyle Libre not active");
+            cJSON_AddStringToObject(integration_log, "info", info);
         }
-        cJSON_AddStringToObject(integration_log, "info", info);
-    }
-    else
-    {
-        snprintf(info, sizeof(info), "\nDexcom not active");
-        cJSON_AddStringToObject(integration_log, "info", info);
-    }
 
-    // Add freestyle libre tokens
-    if (integration_active[INTEGRATION_FREESTYLE])
-    {
-        snprintf(info, sizeof(info), "\nFreeStyle Libre active: %d tokens, last update %s",
-                 integration_active_tokens_count[INTEGRATION_FREESTYLE],
-                 ctime(&integration_last_update[INTEGRATION_FREESTYLE]));
-        cJSON_AddStringToObject(integration_log, "info", info);
-        
-        // Format glucose value directly from glucose_data
-        char glucose_value[64];
-        if (glucose_data.current_gl_mgdl > 0)
+        // Add Nightscout tokens
+        if (integration_active[INTEGRATION_NIGHTSCOUT])
         {
-            format_glucose_token(glucose_value, sizeof(glucose_value));
-            snprintf(info, sizeof(info), "[CGM:glucose] value %s", glucose_value);
+            snprintf(info, sizeof(info), "\nNightscout active: %d tokens, last update %s",
+                     integration_active_tokens_count[INTEGRATION_NIGHTSCOUT],
+                     ctime(&integration_last_update[INTEGRATION_NIGHTSCOUT]));
+            cJSON_AddStringToObject(integration_log, "info", info);
+
+            char glucose_value[64];
+            if (glucose_data.current_gl_mgdl > 0)
+            {
+                format_glucose_token(glucose_value, sizeof(glucose_value));
+                snprintf(info, sizeof(info), "[CGM:glucose] value %s", glucose_value);
+            }
+            else
+            {
+                snprintf(info, sizeof(info), "[CGM:glucose] value N/A");
+            }
+            cJSON_AddStringToObject(integration_log, "info", info);
         }
         else
         {
-            snprintf(info, sizeof(info), "[CGM:glucose] value N/A");
+            snprintf(info, sizeof(info), "\nNightscout not active");
+            cJSON_AddStringToObject(integration_log, "info", info);
         }
-        cJSON_AddStringToObject(integration_log, "info", info);
-    }
-    else
-    {
-        snprintf(info, sizeof(info), "\nFreeStyle Libre not active");
-        cJSON_AddStringToObject(integration_log, "info", info);
-    }
-
-    // Add Nightscout tokens
-    if (integration_active[INTEGRATION_NIGHTSCOUT])
-    {
-        snprintf(info, sizeof(info), "\nNightscout active: %d tokens, last update %s",
-                 integration_active_tokens_count[INTEGRATION_NIGHTSCOUT],
-                 ctime(&integration_last_update[INTEGRATION_NIGHTSCOUT]));
-        cJSON_AddStringToObject(integration_log, "info", info);
-
-        char glucose_value[64];
-        if (glucose_data.current_gl_mgdl > 0)
-        {
-            format_glucose_token(glucose_value, sizeof(glucose_value));
-            snprintf(info, sizeof(info), "[CGM:glucose] value %s", glucose_value);
-        }
-        else
-        {
-            snprintf(info, sizeof(info), "[CGM:glucose] value N/A");
-        }
-        cJSON_AddStringToObject(integration_log, "info", info);
-    }
-    else
-    {
-        snprintf(info, sizeof(info), "\nNightscout not active");
-        cJSON_AddStringToObject(integration_log, "info", info);
     }
 
     // Send the response

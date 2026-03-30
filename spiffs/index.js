@@ -568,7 +568,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const refreshSensorButton = el('refreshSensorButton');
     if (refreshSensorButton) {
         refreshSensorButton.addEventListener('click', function() {
-            fetchStatus()
+            fetchStatus(false)
                 .then(data => {
                     // Update sensor data
                     el('lux').textContent = data.lux !== undefined ? data.lux.toFixed(1) : '-';
@@ -737,7 +737,7 @@ function navigateToSection() {
                 });
         } else if (hash === 'status' && !window.sectionsInitialized.status) {
             // Status section uses /api/status, not /api/settings
-            fetchStatus();
+            fetchStatus(true);
             window.sectionsInitialized.status = true;
         } else if (hash === 'settings' && window.sectionsInitialized.settings) {
             // Re-initialize with already loaded data
@@ -750,7 +750,7 @@ function navigateToSection() {
             setupIntegrationsSection();
         } else if (hash === 'status' && window.sectionsInitialized.status) {
             // Re-fetch status data when returning to status page
-            fetchStatus();
+            fetchStatus(true);
         }
     }
 }
@@ -1693,7 +1693,7 @@ function setupStatusSection() {
     // Add refresh button handler
     const refreshButton = el('refreshButton');
     if (refreshButton) {
-        refreshButton.addEventListener('click', fetchStatus);
+        refreshButton.addEventListener('click', () => fetchStatus(true));
     }
     
     // Status data will be fetched when the section is shown (in navigateToSection)
@@ -1733,8 +1733,9 @@ function setupSupportButtons() {
     }
 }
 
-function fetchStatus() {
-    return fetch('/api/status')
+function fetchStatus(includeLogs = false) {
+    const url = includeLogs ? '/api/status?logs=1' : '/api/status';
+    return fetch(url)
         .then(response => response.json())
         .then(data => {
             // Update time & weather status
@@ -2630,7 +2631,7 @@ async function loadAllSystemData() {
     const promises = [];
     
     // Always fetch status data (populates DOM elements)
-    promises.push(fetchStatus().catch(err => {
+    promises.push(fetchStatus(true).catch(err => {
         console.warn('Error fetching status:', err);
         return null; // Continue even if status fails
     }));
