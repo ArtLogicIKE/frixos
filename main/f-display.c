@@ -132,33 +132,6 @@ static esp_lcd_panel_io_handle_t lcd_io = NULL;
 static esp_lcd_panel_handle_t lcd_panel = NULL;
 
 /* Color channel filter — wraps draw_bitmap to mask pixels per-channel */
-static uint16_t color_channel_mask = 0xFFFF; // RGB565: no filter
-static esp_err_t (*original_draw_bitmap)(esp_lcd_panel_t *, int, int, int, int, const void *) = NULL;
-
-static esp_err_t filtered_draw_bitmap(esp_lcd_panel_t *panel, int x_start, int y_start, int x_end, int y_end, const void *color_data)
-{
-    if (color_channel_mask == 0xFFFF) {
-        return original_draw_bitmap(panel, x_start, y_start, x_end, y_end, color_data);
-    }
-    size_t pixel_count = (x_end - x_start) * (y_end - y_start);
-    uint16_t *src = (uint16_t *)color_data;
-    for (size_t i = 0; i < pixel_count; i++) {
-        src[i] &= color_channel_mask;
-    }
-    return original_draw_bitmap(panel, x_start, y_start, x_end, y_end, color_data);
-}
-
-static void panel_st7735_set_color_channel(esp_lcd_panel_handle_t panel, uint8_t curve)
-{
-    static const uint16_t masks[] = {0xFFFF, 0x07E0, 0x001F, 0xF800}; // all, green, blue, red
-    if (curve > 3) curve = 0;
-    color_channel_mask = masks[curve];
-
-    if (original_draw_bitmap == NULL) {
-        original_draw_bitmap = panel->draw_bitmap;
-        panel->draw_bitmap = filtered_draw_bitmap;
-    }
-}
 
 /* LVGL display and touch */
 static lv_display_t *lvgl_disp = NULL;

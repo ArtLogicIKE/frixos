@@ -59,7 +59,15 @@ The ESP32-WROOM uses UART0 for flashing. The relevant signals are:
 
 ## P1 Connector Pinout
 
-P1 is a 6-pin 2.54 mm pitch header (pins 7 and 8 on the footprint are PCB mounting pads). The pinout below is confirmed from the schematic.
+P1 is a 6-pin JST 1 mm pitch connector ([LCSC C495540](https://www.lcsc.com/product-detail/C495540.html)). Pins 7 and 8 on the footprint are PCB mounting pads. The pinout below is confirmed from the schematic.
+
+| Role | Part | Description |
+|------|------|-------------|
+| Board header | BM06B-SRSS-TBT(LF)(SN) | JST SH series, SMD, top-entry, 6-pin, 1.0 mm pitch |
+| Mating housing | [SHR-06V-S-B](https://www.digikey.com/en/products/detail/jst-sales-america-inc/SHR-06V-S-B/759870) | JST SH cable housing, 6-pin, 1.0 mm pitch |
+| Crimp contacts | SSH-003T-P0.2 | For 28–32 AWG wire, crimped into SHR-06V-S-B |
+| Pre-made cable | [Pololu 6-pin JST SH cables](https://www.pololu.com/category/351/6-pin-jst-sh-style-cables) | 28 AWG, various lengths, single- and double-ended |
+| Pre-made cable (Amazon) | [20-pair 6-pin JST SH 1.0mm (B0BKSNMCV4)](https://www.amazon.com/dp/B0BKSNMCV4) | 26 AWG, 150 mm, male+female pairs |
 
 | Pin | Signal | Notes                                          |
 |-----|--------|------------------------------------------------|
