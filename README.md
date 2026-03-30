@@ -179,6 +179,12 @@ The integration uses the device's `/api/settings` and `/api/status` endpoints. F
 
 ## Build & Flash
 
+See **[docs/BUILD.md](docs/BUILD.md)** for local, Docker, and Podman build instructions.
+
+See **[docs/FLASH.md](docs/FLASH.md)** for flashing instructions and a description of build artifacts.
+
+See **[docs/PROGRAMMING.md](docs/PROGRAMMING.md)** for the P1 UART programming header pinout, connector parts, and board photo.
+
 **Before building:** Copy `env.example` to `.env` and configure. The `.env` file is gitignored and will not be published.
 
 | Variable | Required | Description |
@@ -186,29 +192,6 @@ The integration uses the device's `/api/settings` and `/api/status` endpoints. F
 | `WEATHER_API_KEY` | Yes (for weather) | OpenWeatherMap API key from [openweathermap.org/api](https://openweathermap.org/api) |
 | `ARTLOGIC_SSID` | No | Manufacturer fallback WiFi SSID (leave empty to skip) |
 | `ARTLOGIC_PASSWORD` | No | Manufacturer fallback WiFi password |
-
-```bash
-# Clone and enter project
-cd frixos
-
-# Set up .env (required for weather, optional for manufacturer fallback)
-cp env.example .env
-# Edit .env: add WEATHER_API_KEY; optionally add ARTLOGIC_SSID/ARTLOGIC_PASSWORD
-
-# Set ESP-IDF environment
-. $IDF_PATH/export.sh   # Linux/macOS
-# or
-%IDF_PATH%\export.bat   # Windows
-
-# Configure (optional)
-idf.py menuconfig
-
-# Build
-idf.py build
-
-# Flash (adjust port as needed)
-idf.py -p COM3 flash monitor
-```
 
 ### Key Configuration (menuconfig)
 
@@ -241,6 +224,10 @@ frixos/
 │   ├── index.js          # UI logic, i18n
 │   ├── language_*.json   # Translations
 │   └── *.jpg             # Themes, logos, icons
+├── docs/
+│   ├── BUILD.md          # Local, Docker, and Podman build instructions
+│   ├── FLASH.md          # Flashing instructions and build artifact reference
+│   └── PROGRAMMING.md    # P1 UART header pinout and board programming guide
 └── README.md
 ```
 

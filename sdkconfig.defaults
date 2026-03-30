@@ -1,0 +1,24 @@
+# Frixos sdkconfig.defaults — only non-default settings required for CI builds
+
+# Flash size
+CONFIG_ESPTOOLPY_FLASHSIZE_8MB=y
+CONFIG_ESPTOOLPY_FLASHSIZE="8MB"
+
+# Custom partition table (OTA dual-slot + SPIFFS + coredump)
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+CONFIG_PARTITION_TABLE_FILENAME="partitions.csv"
+
+# Bluetooth — NimBLE host only, no controller
+CONFIG_BT_ENABLED=y
+CONFIG_BT_NIMBLE_ENABLED=y
+CONFIG_BT_CONTROLLER_DISABLED=y
+CONFIG_BT_NIMBLE_MEM_ALLOC_MODE_INTERNAL=y
+
+# WiFi — software coexistence disabled
+# CONFIG_ESP_COEX_SW_COEXIST_ENABLE is not set
+
+# LVGL filesystem — POSIX driver, drive letter S (83), mount /spiffs
+CONFIG_LV_USE_FS_POSIX=y
+CONFIG_LV_FS_POSIX_LETTER=83
+CONFIG_LV_FS_POSIX_PATH=""
