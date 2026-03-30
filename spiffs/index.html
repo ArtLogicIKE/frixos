@@ -87,7 +87,10 @@
                         </div>
                         <div class="form-group">
                             <label for="wifi_pass" data-i18n="settings.connection.wifi_password">WiFi Password</label>
-                            <input type="password" id="wifi_pass" name="wifi_pass">
+                            <div class="password-input-wrapper">
+                                <input type="password" id="wifi_pass" name="wifi_pass">
+                                <button type="button" class="password-toggle" aria-label="Toggle password visibility">👁️</button>
+                            </div>
                         </div>
                         <div class="form-group">
                             <label for="hostname" data-i18n="settings.connection.hostname">Hostname</label>
