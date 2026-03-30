@@ -87,7 +87,10 @@
                         </div>
                         <div class="form-group">
                             <label for="wifi_pass" data-i18n="settings.connection.wifi_password">WiFi Password</label>
-                            <input type="password" id="wifi_pass" name="wifi_pass">
+                            <div class="password-input-wrapper">
+                                <input type="password" id="wifi_pass" name="wifi_pass">
+                                <button type="button" class="password-toggle" aria-label="Toggle password visibility">👁️</button>
+                            </div>
                         </div>
                         <div class="form-group">
                             <label for="hostname" data-i18n="settings.connection.hostname">Hostname</label>
@@ -627,6 +630,11 @@
                         <h2 data-i18n="integrations.ha.title">Home Assistant</h2>
                     </div>
                     <div class="section-content">
+                        <p class="integration-kb-help"
+                            style="margin-bottom: 15px; color: #999; font-size: 0.9em;"
+                            data-i18n="integrations.ha.kb_help">For setup instructions, visit <a
+                                href="https://buyfrixos.com/knowledge-base/%f0%9f%93%a1-new-integration-home-assistant-frixos-smart-projections/"
+                                target="_blank" rel="noopener noreferrer">this KB article</a>.</p>
                         <div class="form-group">
                             <label for="eeprom_ha_url" data-i18n="integrations.ha.server_url">Server URL</label>
                             <input type="text" id="eeprom_ha_url" name="eeprom_ha_url" maxlength="200"
@@ -655,6 +663,11 @@
                         <h2 data-i18n="integrations.stock.title">Stock Quote Service (via Finnhub.io)</h2>
                     </div>
                     <div class="section-content">
+                        <p class="integration-kb-help"
+                            style="margin-bottom: 15px; color: #999; font-size: 0.9em;"
+                            data-i18n="integrations.stock.kb_help">For setup instructions, visit <a
+                                href="https://buyfrixos.com/knowledge-base/get-stock-crypto-etf-fx-quotes-on-your-ceiling/"
+                                target="_blank" rel="noopener noreferrer">this KB article</a>.</p>
                         <div class="form-group">
                             <label for="eeprom_stock_key" data-i18n="integrations.stock.api_key">API Key</label>
                             <input type="password" id="eeprom_stock_key" name="eeprom_stock_key" maxlength="64"
@@ -677,6 +690,11 @@
                         <h2 data-i18n="integrations.glucose_monitors.title">Glucose Monitoring</h2>
                     </div>
                     <div class="section-content">
+                        <p class="integration-kb-help"
+                            style="margin-bottom: 15px; color: #999; font-size: 0.9em;"
+                            data-i18n="integrations.glucose_monitors.kb_help">For setup instructions, visit <a
+                                href="https://buyfrixos.com/knowledge-base/blood-sugar-cgm-integration-and-projection/"
+                                target="_blank" rel="noopener noreferrer">this KB article</a>.</p>
                         <!-- Shared Glucose Monitor Settings -->
                         <div class="form-group">
                             <label for="eeprom_glucose_refresh"

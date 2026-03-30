@@ -344,26 +344,37 @@ function updateCgmExclusivity() {
 let currentLanguage = 'en';
 
 // Translation function - now async to support lazy-loading
-// Optimization: Consolidated DOM traversal into a single pass using querySelectorAll and dataset
+// Optimization: Persistent early return and DOM mutation diffing to minimize overhead
 async function translate(lang) {
     await loadTranslations(lang);
     
     const effectiveLang = (lang !== 'en' && translations[lang] === translations.en) ? 'en' : lang;
+
+    // Early return if same language already applied
+    if (currentLanguage === effectiveLang) return;
+
     currentLanguage = effectiveLang;
     const trans = translations[effectiveLang];
 
+    // Querying on every call to support dynamic elements while using dataset for readability
     document.querySelectorAll('[data-i18n], [data-i18n-placeholder]').forEach(element => {
         const i18nKey = element.dataset.i18n;
         const i18nPlaceholderKey = element.dataset.i18nPlaceholder;
 
         if (i18nKey) {
             const translation = getNestedTranslation(trans, i18nKey);
-            if (translation) element.innerHTML = translation;
+            // Optimization: Only update DOM if content actually changed to avoid layout thrashing
+            if (translation && element.innerHTML !== translation) {
+                element.innerHTML = translation;
+            }
         }
 
         if (i18nPlaceholderKey) {
             const translation = getNestedTranslation(trans, i18nPlaceholderKey);
-            if (translation) element.placeholder = translation;
+            // Optimization: Only update DOM if placeholder actually changed
+            if (translation && element.placeholder !== translation) {
+                element.placeholder = translation;
+            }
         }
     });
 
@@ -377,6 +388,22 @@ async function translate(lang) {
         const pageTitleElement = el('page-title');
         if (pageTitleElement) pageTitleElement.textContent = 'Frixos - ' + translatedSection;
     }
+}
+
+// Setup password visibility toggles
+function setupPasswordToggles() {
+    document.querySelectorAll('.password-toggle').forEach(button => {
+        button.addEventListener('click', function() {
+            const input = this.previousElementSibling;
+            if (!input) return;
+            const isPassword = input.type === 'password';
+            input.type = isPassword ? 'text' : 'password';
+            this.textContent = isPassword ? '🙈' : '👁️';
+            const action = isPassword ? 'Hide password' : 'Show password';
+            this.setAttribute('aria-label', action);
+            input.focus();
+        });
+    });
 }
 
 // Setup language selector
@@ -531,6 +558,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Other sections (advanced, integrations) load on demand when navigated to
     Promise.all([fetchThemeParams(), fetchSectionParams('settings')])
         .then(() => {
+            setupPasswordToggles();
+
             // Setup language selector
             setupLanguageSelector();
             

@@ -155,6 +155,7 @@
   "integrations": {
     "ha": {
       "title": "Home Assistant",
+      "kb_help": "Instrukcje konfiguracji znajdziesz w <a href=\"https://buyfrixos.com/knowledge-base/%f0%9f%93%a1-new-integration-home-assistant-frixos-smart-projections/\" target=\"_blank\" rel=\"noopener noreferrer\">tym artykule bazy wiedzy</a>.",
       "server_url": "Adres URL serwera",
       "token": "Token dostępu LL",
       "token_placeholder": "Wprowadź swój token",
@@ -162,6 +163,7 @@
     },
     "stock": {
       "title": "Serwis notowań giełdowych (przez Finnhub.io)",
+      "kb_help": "Instrukcje konfiguracji znajdziesz w <a href=\"https://buyfrixos.com/knowledge-base/get-stock-crypto-etf-fx-quotes-on-your-ceiling/\" target=\"_blank\" rel=\"noopener noreferrer\">tym artykule bazy wiedzy</a>.",
       "api_key": "Klucz API",
       "api_key_placeholder": "Wprowadź swój klucz API Finnhub",
       "refresh_interval": "Odświeżanie (min.)"
@@ -183,6 +185,7 @@
     },
     "glucose_monitors": {
       "title": "Monitorowanie glukozy",
+      "kb_help": "Instrukcje konfiguracji znajdziesz w <a href=\"https://buyfrixos.com/knowledge-base/blood-sugar-cgm-integration-and-projection/\" target=\"_blank\" rel=\"noopener noreferrer\">tym artykule bazy wiedzy</a>.",
       "high_threshold": "Wysoki (mg/dL)",
       "low_threshold": "Niski (mg/dL)",
       "refresh_interval": "Odświeżanie (min.)",
