@@ -1904,6 +1904,7 @@ void init_char_width_cache(const lv_font_t *font)
   // Pre-calculate width for ASCII characters (0-127)
   for (int i = 0; i < 128; i++)
   {
+    // O(1) optimization: Compilers optimize modulo for power-of-two constants
     int cache_index = i % CACHE_SIZE;
     char_width_cache[cache_index].code_point = i;
     // We ignore kerning (letter_next) to keep cache hits consistent.
@@ -1915,6 +1916,7 @@ void init_char_width_cache(const lv_font_t *font)
   uint32_t common_chars[] = {0xB0, 0x00A0, 0x00A1, 0x00A2, 0x00A3, 0x00A4, 0x00A5, 0x00A6, 0x00A7, 0x00A8, 0x00A9, 0x00AA, 0x00AB, 0x00AC, 0x00AD, 0x00AE, 0x00AF};
   for (int i = 0; i < sizeof(common_chars) / sizeof(common_chars[0]); i++)
   {
+    // O(1) optimization: Compilers optimize modulo for power-of-two constants
     int cache_index = common_chars[i] % CACHE_SIZE;
     char_width_cache[cache_index].code_point = common_chars[i];
     char_width_cache[cache_index].width = (uint8_t)lv_font_get_glyph_width(font, common_chars[i], '\0');
@@ -1939,7 +1941,8 @@ static uint8_t get_cached_char_width(uint32_t code_point, const lv_font_t *font,
     return 0;
   }
 
-  // O(1) Lookup: Use modulo for direct indexing. Handle collisions by simple replacement.
+  // O(1) Lookup: Use modulo for direct indexing (compilers optimize for power-of-two).
+  // Handle collisions by simple replacement.
   int cache_index = code_point % CACHE_SIZE;
 
   if (char_width_cache[cache_index].code_point == code_point)
@@ -2160,8 +2163,12 @@ void display_string_substring(const char *text, int32_t x, int32_t y,
     substring_buffer[substring_len] = '\0';
   }
 
-  // Set only the substring text (this is the key optimization!)
-  lv_label_set_text(label_obj, substring_buffer);
+  // Set only the substring text if it has changed.
+  // Optimization: Skip expensive LVGL updates when visible content is unchanged.
+  if (strcmp(lv_label_get_text(label_obj), substring_buffer) != 0)
+  {
+    lv_label_set_text(label_obj, substring_buffer);
+  }
 
   // Cache position to avoid unnecessary LVGL calls
   static int32_t last_x = -1, last_y = -1, last_width = -1;
