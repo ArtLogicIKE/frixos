@@ -22,6 +22,7 @@
 #include "math.h"
 #include "esp_timer.h"
 #include "esp_lcd_st7735.h"
+#include "esp_lcd_panel_interface.h"
 #include <unistd.h>
 #include "lvgl.h"
 #include "draw/lv_image_decoder.h"
@@ -129,6 +130,8 @@ lv_obj_t *dots[2] = {NULL, NULL};                            // Colon dots betwe
 /* LCD IO and panel */
 static esp_lcd_panel_io_handle_t lcd_io = NULL;
 static esp_lcd_panel_handle_t lcd_panel = NULL;
+
+/* Color channel filter — wraps draw_bitmap to mask pixels per-channel */
 
 /* LVGL display and touch */
 static lv_display_t *lvgl_disp = NULL;
