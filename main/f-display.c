@@ -1035,7 +1035,8 @@ static void handle_alternate_mode_switching(time_t now, uint32_t loop_counter, b
     time_t current_minute_slot = now / 60;
     bool minute_changed = (current_minute_slot != last_minute_slot);
 
-    alternate_display_active = (eeprom_sec_time + eeprom_sec_cgm > 0);
+    /* Alternate only when both phases have a non-zero duration; otherwise keep the clock on the digits. */
+    alternate_display_active = (eeprom_sec_time > 0 && eeprom_sec_cgm > 0);
 
     static time_t last_alternate_display_start = 0;
     if (alternate_display_start == 0 && last_alternate_display_start != 0)
@@ -1049,7 +1050,7 @@ static void handle_alternate_mode_switching(time_t now, uint32_t loop_counter, b
     {
       if (alternate_display_start == 0)
       {
-        showing_glucose = (eeprom_sec_time == 0) && is_glucose_fresh();
+        showing_glucose = false; /* always start with time, then switch to CGM after sec_time */
         alternate_display_start = now;
         mode_changed = true;
       }
