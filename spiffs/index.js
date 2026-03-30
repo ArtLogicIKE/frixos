@@ -29,7 +29,11 @@ const translations = {
         },
         common: {
             save_settings: 'Save Settings',
-            cancel: 'Cancel'
+            cancel: 'Cancel',
+            show_password: 'Show password',
+            hide_password: 'Hide password',
+            change_language: 'Change language',
+            toggle_theme: 'Toggle theme'
         },
         settings: {
             connection: {
@@ -357,9 +361,10 @@ async function translate(lang) {
     const trans = translations[effectiveLang];
 
     // Querying on every call to support dynamic elements while using dataset for readability
-    document.querySelectorAll('[data-i18n], [data-i18n-placeholder]').forEach(element => {
+    document.querySelectorAll('[data-i18n], [data-i18n-placeholder], [data-i18n-aria-label]').forEach(element => {
         const i18nKey = element.dataset.i18n;
         const i18nPlaceholderKey = element.dataset.i18nPlaceholder;
+        const i18nAriaLabelKey = element.dataset.i18nAriaLabel;
 
         if (i18nKey) {
             const translation = getNestedTranslation(trans, i18nKey);
@@ -374,6 +379,26 @@ async function translate(lang) {
             // Optimization: Only update DOM if placeholder actually changed
             if (translation && element.placeholder !== translation) {
                 element.placeholder = translation;
+            }
+        }
+
+        if (i18nAriaLabelKey) {
+            const translation = getNestedTranslation(trans, i18nAriaLabelKey);
+            if (translation && element.getAttribute('aria-label') !== translation) {
+                element.setAttribute('aria-label', translation);
+            }
+        }
+    });
+
+    // Update password toggle ARIA labels for accessibility after language change
+    document.querySelectorAll('.password-toggle').forEach(button => {
+        const input = button.previousElementSibling;
+        if (input) {
+            const isPassword = input.type === 'password';
+            const actionKey = isPassword ? 'common.show_password' : 'common.hide_password';
+            const translation = getNestedTranslation(trans, actionKey);
+            if (translation) {
+                button.setAttribute('aria-label', translation);
             }
         }
     });
@@ -399,8 +424,15 @@ function setupPasswordToggles() {
             const isPassword = input.type === 'password';
             input.type = isPassword ? 'text' : 'password';
             this.textContent = isPassword ? '🙈' : '👁️';
-            const action = isPassword ? 'Hide password' : 'Show password';
-            this.setAttribute('aria-label', action);
+
+            // Localized ARIA label
+            const trans = translations[currentLanguage] || translations.en;
+            const actionKey = isPassword ? 'common.hide_password' : 'common.show_password';
+            const translation = getNestedTranslation(trans, actionKey);
+            if (translation) {
+                this.setAttribute('aria-label', translation);
+            }
+
             input.focus();
         });
     });
@@ -2053,10 +2085,25 @@ function setupAdvancedSection() {
         if (advancedForm) {
             advancedForm.addEventListener('submit', (e) => handleFormSubmit(e, 'advancedForm'));
         }
+
+        // Setup message character counter
+        const messageInput = el('message');
+        const messageCounter = el('message-counter');
+        if (messageInput && messageCounter) {
+            messageInput.addEventListener('input', function() {
+                messageCounter.textContent = `${this.value.length} / 511`;
+            });
+        }
     }
 
     // Populate fields if settings are loaded
     if (window.settings && window.settingsLoaded.advanced) {
+        const messageInput = el('message');
+        const messageCounter = el('message-counter');
+        if (messageInput && messageCounter && window.settings.p16 !== undefined) {
+            messageInput.value = window.settings.p16 || '';
+            messageCounter.textContent = `${messageInput.value.length} / 511`;
+        }
         
         if (el('ofs_x') && window.settings.p01 !== undefined) el('ofs_x').value = window.settings.p01 || 0;
         if (el('ofs_y') && window.settings.p02 !== undefined) el('ofs_y').value = window.settings.p02 || 0;
@@ -2075,7 +2122,6 @@ function setupAdvancedSection() {
         if (el('msg_font') && window.settings.p13 !== undefined) el('msg_font').value = window.settings.p13 || 0;
         if (el('scroll_delay') && window.settings.p14 !== undefined) el('scroll_delay').value = window.settings.p14 || 65;
         if (el('night_msg_color') && window.settings.p15 !== undefined) el('night_msg_color').value = window.settings.p15 || '#FFFFFF';
-        if (el('message') && window.settings.p16 !== undefined) el('message').value = window.settings.p16 || '';
         if (el('lat') && window.settings.p17 !== undefined) el('lat').value = window.settings.p17 || '';
         if (el('lon') && window.settings.p18 !== undefined) el('lon').value = window.settings.p18 || '';
         if (el('timezone') && window.settings.p19 !== undefined) el('timezone').value = window.settings.p19 || '';

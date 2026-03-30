@@ -22,6 +22,18 @@ def verify_translations(page: Page):
     page.screenshot(path="/home/jules/verification/german.png")
     print("Screenshot of German taken.")
 
+    # Navigate to Advanced section
+    page.click('a[href="#advanced"]')
+    page.wait_for_timeout(500)
+
+    # Enter some text to verify counter
+    page.fill("#message", "Hello Frixos!")
+    page.wait_for_timeout(500)
+
+    # Take screenshot of Advanced section with counter
+    page.screenshot(path="/home/jules/verification/advanced_counter.png")
+    print("Screenshot of Advanced counter taken.")
+
     # Final screenshot for verification function
     page.screenshot(path="/home/jules/verification/verification.png")
 
