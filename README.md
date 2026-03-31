@@ -210,6 +210,14 @@ idf.py build
 idf.py -p COM3 flash monitor
 ```
 
+### Serial flashing (recovery)
+
+The USB port is only used for power (there is no serial-to-usb converted on board).
+
+If the device no longer responds to updates over the web UI, you can still flash firmware over UART using a **USB-to-serial adapter** wired to the **P1** programming connector on the board. The pinout is shown in [`artwork/P1 PGM pinout.png`](<artwork/P1 PGM pinout.png>). P1 is a **6-pin JST connector at 1.0 mm pitch** (use the matching JST cable or adapter, or carefully probe the pads with duPont leads).
+
+After wiring TX/RX, ground, EN and IO0 at **3.3 V logic levels** (do not use 5 V TTL on the ESP32), use the same `idf.py -p <serial-port> flash` flow as above with the correct COM/tty port for your adapter.
+
 ### Key Configuration (menuconfig)
 
 - **Flash size** — 8 MB

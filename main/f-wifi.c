@@ -74,11 +74,10 @@ esp_timer_handle_t weather_timer = NULL;
 double weather_high, weather_low;
 char greeting[64] = "Hello";
 
-uint64_t weather_delay_ms = 5 * 60 * 60 * 1000; // Start with 5 hours
+uint64_t weather_delay_ms = 2 * 60 * 60 * 1000; // Start with 2 hours - weather update interval
 esp_timer_handle_t location_timer;
 uint64_t location_delay_ms = 100; // Start with 0.1 seconds
 
-#define WEATHER_UPDATE_MS (3 * 60 * 60 * 1000 * 1000ULL) // time in us (microseconds), not milliseconds. 3 hours
 #define UPDATE_SERVER_BASE "http://update.artlogic.gr:8080"
 
 // Add these global variables at the top with other globals
