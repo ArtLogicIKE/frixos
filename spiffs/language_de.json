@@ -9,7 +9,11 @@
   },
   "common": {
     "save_settings": "Einstellungen speichern",
-    "cancel": "Abbrechen"
+    "cancel": "Abbrechen",
+    "show_password": "Passwort anzeigen",
+    "hide_password": "Passwort verbergen",
+    "change_language": "Sprache ändern",
+    "toggle_theme": "Thema wechseln"
   },
   "settings": {
     "connection": {

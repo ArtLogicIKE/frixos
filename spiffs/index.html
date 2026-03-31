@@ -32,7 +32,7 @@
                 <a href="#restart" class="menu-item" data-section="restart-section" data-i18n="menu.restart">Restart</a>
             </div>
             <div class="header-controls">
-                <button id="language-toggle" class="language-toggle" aria-label="Change language">
+                <button id="language-toggle" class="language-toggle" aria-label="Change language" data-i18n-aria-label="common.change_language">
                     <span id="current-language-name">English</span>
                 </button>
                 <div id="language-dropdown" class="language-dropdown" style="display: none;">
@@ -64,7 +64,7 @@
                         <span class="lang-name">Español</span>
                     </div>
                 </div>
-                <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">
+                <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-i18n-aria-label="common.toggle_theme">
                     <span class="sun-icon">☀️</span>
                     <span class="moon-icon">🌙</span>
                 </button>
@@ -431,6 +431,7 @@
                             <textarea id="message" name="message"
                                 data-i18n-placeholder="advanced.message.message_placeholder" maxlength="511"
                                 rows="2"></textarea>
+                            <span id="message-counter" class="message-counter">0 / 511</span>
                         </div>
                         <div class="message-tokens">
                             <h4 data-i18n="advanced.message.tokens_title">Available Tokens:</h4>
