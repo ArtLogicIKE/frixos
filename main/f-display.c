@@ -20,6 +20,7 @@
 
 #include "time.h"
 #include "math.h"
+#include <string.h>
 #include "esp_timer.h"
 #include "esp_lcd_st7735.h"
 #include <unistd.h>
@@ -113,7 +114,7 @@ lv_obj_t *label_msg = NULL;
 #define SPRITE_SHEET_COLUMNS 10 // Number of digits in the sprite sheet
 
 #define NUM_DIGITS 4                 // the 4 time digits
-#define label_msg_ofs_y 25 + 25 + 14 // y offset for the message label
+#define label_msg_ofs_y (25 + 25 + 14) // y offset for the message label
 #define MSG_WIDTH 105                // width of the message area
 #define MSG_EXTRA_WIDTH 7            // extra width for the message area, useful for scolling but bad for centering
 #define FADE_STEPS 14
@@ -375,7 +376,8 @@ void create_grid(lv_obj_t *scr)
   };
 
   // 1) Vertical lines (red)
-  for (int i = 0; i <= sizeof(v_points) / sizeof(v_points[0]); i++)
+  // Optimization: Fix out-of-bounds loop condition by using < instead of <=
+  for (int i = 0; i < sizeof(v_points) / sizeof(v_points[0]); i++)
   {
 
     lv_obj_t *line_v = lv_line_create(scr);
@@ -389,7 +391,8 @@ void create_grid(lv_obj_t *scr)
   }
 
   // 2) Horizontal lines (green)
-  for (int i = 0; i <= sizeof(h_points) / sizeof(h_points[0]); i++)
+  // Optimization: Fix out-of-bounds loop condition by using < instead of <=
+  for (int i = 0; i < sizeof(h_points) / sizeof(h_points[0]); i++)
   {
     lv_obj_t *line_h = lv_line_create(scr);
     lv_line_set_points(line_h, h_points[i], 2);
@@ -817,7 +820,8 @@ float ease_in_quad(float t)
 
 float ease_in_out_quad(float t)
 {
-  return t < 0.5 ? 2 * t * t : 1 - pow(-2 * t + 2, 2) / 2;
+  // Optimization: replace pow(..., 2) with direct multiplication for better performance on ESP32
+  return t < 0.5 ? 2 * t * t : 1 - ((-2 * t + 2) * (-2 * t + 2)) / 2;
 }
 
 // Fade effect callback
@@ -2160,8 +2164,12 @@ void display_string_substring(const char *text, int32_t x, int32_t y,
     substring_buffer[substring_len] = '\0';
   }
 
-  // Set only the substring text (this is the key optimization!)
-  lv_label_set_text(label_obj, substring_buffer);
+  // Set only the substring text if it has changed
+  // Optimization: use strcmp to avoid redundant LVGL updates during scrolling
+  if (strcmp(lv_label_get_text(label_obj), substring_buffer) != 0)
+  {
+    lv_label_set_text(label_obj, substring_buffer);
+  }
 
   // Cache position to avoid unnecessary LVGL calls
   static int32_t last_x = -1, last_y = -1, last_width = -1;

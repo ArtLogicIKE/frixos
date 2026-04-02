@@ -5,3 +5,7 @@
 ## 2026-03-30 - Conditional Data Fetching for Status API
 **Learning:** Large JSON payloads containing system logs and integration tokens were being generated on every status refresh, causing significant CPU and memory pressure on the ESP32. Even when the UI only needed minimal sensor data (e.g., lux levels for auto-dimming), the backend was performing expensive string formatting and JSON array construction.
 **Action:** Implement conditional data fetching via query parameters (e.g., `?logs=1`). Wrap resource-intensive JSON construction blocks in conditional checks on the backend and update the frontend to request heavy data only when necessary (e.g., viewing the full Status page or generating support reports).
+
+## 2024-04-27 - Optimized display rendering and fixed out-of-bounds loops
+**Learning:** Generic math functions like `pow(..., 2)` can introduce unnecessary overhead on microcontrollers compared to direct multiplication. Additionally, using `lv_label_set_text` without checking if the content changed causes redundant UI layout calculations. Off-by-one errors in loop boundaries (`i <= length`) can lead to out-of-bounds memory access in grid rendering logic.
+**Action:** Replace `pow` with direct multiplication in performance-critical paths. Implement string comparison guards before updating UI labels. Use strict inequality (`<`) for array boundary checks in loops.
