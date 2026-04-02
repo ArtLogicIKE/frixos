@@ -71,7 +71,7 @@
             </div>
         </div>
 
-        <div id="status-message" class="status" style="display: none;"></div>
+        <div id="status-message" class="status" role="status" aria-live="polite" style="display: none;"></div>
 
         <!-- Settings Section -->
         <div id="settings-section" class="page-section">
@@ -644,8 +644,11 @@
                         </div>
                         <div class="form-group">
                             <label for="eeprom_ha_token" data-i18n="integrations.ha.token">LL Access Token</label>
-                            <input type="password" id="eeprom_ha_token" name="eeprom_ha_token" maxlength="255"
-                                data-i18n-placeholder="integrations.ha.token_placeholder">
+                            <div class="password-input-wrapper">
+                                <input type="password" id="eeprom_ha_token" name="eeprom_ha_token" maxlength="255"
+                                    data-i18n-placeholder="integrations.ha.token_placeholder">
+                                <button type="button" class="password-toggle" aria-label="Toggle password visibility" data-i18n-aria-label="common.show_password">👁️</button>
+                            </div>
                             <span id="eeprom_ha_token-error" class="input-error"></span>
                             <span id="eeprom_ha_token-mask" class="token-mask"></span>
                         </div>
@@ -671,8 +674,11 @@
                                 target="_blank" rel="noopener noreferrer">this KB article</a>.</p>
                         <div class="form-group">
                             <label for="eeprom_stock_key" data-i18n="integrations.stock.api_key">API Key</label>
-                            <input type="password" id="eeprom_stock_key" name="eeprom_stock_key" maxlength="64"
-                                data-i18n-placeholder="integrations.stock.api_key_placeholder">
+                            <div class="password-input-wrapper">
+                                <input type="password" id="eeprom_stock_key" name="eeprom_stock_key" maxlength="64"
+                                    data-i18n-placeholder="integrations.stock.api_key_placeholder">
+                                <button type="button" class="password-toggle" aria-label="Toggle password visibility" data-i18n-aria-label="common.show_password">👁️</button>
+                            </div>
                             <span id="eeprom_stock_key-error" class="input-error"></span>
                             <span id="eeprom_stock_key-mask" class="token-mask"></span>
                         </div>
@@ -748,9 +754,12 @@
                         <div class="form-group">
                             <label for="eeprom_glucose_password"
                                 data-i18n="integrations.glucose_monitors.password">Password</label>
-                            <input type="password" id="eeprom_glucose_password" name="eeprom_glucose_password"
-                                maxlength="64"
-                                data-i18n-placeholder="integrations.glucose_monitors.password_placeholder">
+                            <div class="password-input-wrapper">
+                                <input type="password" id="eeprom_glucose_password" name="eeprom_glucose_password"
+                                    maxlength="64"
+                                    data-i18n-placeholder="integrations.glucose_monitors.password_placeholder">
+                                <button type="button" class="password-toggle" aria-label="Toggle password visibility" data-i18n-aria-label="common.show_password">👁️</button>
+                            </div>
                             <span id="eeprom_glucose_password-error" class="input-error"></span>
                             <span id="eeprom_glucose_password-mask" class="token-mask"></span>
                         </div>
