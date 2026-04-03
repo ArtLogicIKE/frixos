@@ -2362,8 +2362,8 @@ esp_err_t status_api_handler(httpd_req_t *req)
         }
     }
 
-    // Send the response
-    char *response = cJSON_Print(root);
+    // Send the response (using unformatted to minimize heap overhead and response size on ESP32)
+    char *response = cJSON_PrintUnformatted(root);
     if (response)
     {
         httpd_resp_sendstr(req, response);
