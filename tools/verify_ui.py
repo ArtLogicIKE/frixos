@@ -34,6 +34,14 @@ def verify_translations(page: Page):
     page.screenshot(path="/home/jules/verification/advanced_counter.png")
     print("Screenshot of Advanced counter taken.")
 
+    # Navigate to Integrations section
+    page.click('a[href="#integrations"]')
+    page.wait_for_timeout(1000)
+
+    # Take screenshot of Integrations section with toggles
+    page.screenshot(path="/home/jules/verification/integrations_toggles.png", full_page=True)
+    print("Screenshot of Integrations toggles taken.")
+
     # Final screenshot for verification function
     page.screenshot(path="/home/jules/verification/verification.png")
 
