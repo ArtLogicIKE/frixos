@@ -2016,21 +2016,54 @@ function setupRestartSection() {
     const resetModal = el('resetModal');
     const cancelButton = el('cancelButton');
     const confirmButton = el('confirmButton');
+    let lastFocusedElement;
+
+    const openModal = () => {
+        lastFocusedElement = document.activeElement;
+        resetModal.style.display = 'flex';
+        cancelButton.focus();
+    };
+
+    const closeModal = () => {
+        resetModal.style.display = 'none';
+        if (lastFocusedElement) {
+            lastFocusedElement.focus();
+        }
+    };
     
     // Show modal when reset button is clicked
-    resetButton.addEventListener('click', function() {
-        resetModal.style.display = 'flex';
-    });
+    resetButton.addEventListener('click', openModal);
     
     // Hide modal when cancel button is clicked
-    cancelButton.addEventListener('click', function() {
-        resetModal.style.display = 'none';
-    });
+    cancelButton.addEventListener('click', closeModal);
     
     // Handle device reset when confirm button is clicked
-    confirmButton.addEventListener('click', function() {
+    confirmButton.addEventListener('click', () => {
         resetModal.style.display = 'none';
         resetDevice();
+        if (lastFocusedElement) {
+            lastFocusedElement.focus();
+        }
+    });
+
+    // Keyboard navigation for modal
+    resetModal.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeModal();
+        } else if (e.key === 'Tab') {
+            // Basic focus trap between Cancel and Restart buttons
+            if (e.shiftKey) { // Shift + Tab
+                if (document.activeElement === cancelButton) {
+                    e.preventDefault();
+                    confirmButton.focus();
+                }
+            } else { // Tab
+                if (document.activeElement === confirmButton) {
+                    e.preventDefault();
+                    cancelButton.focus();
+                }
+            }
+        }
     });
 }
 
