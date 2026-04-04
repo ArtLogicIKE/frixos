@@ -319,6 +319,7 @@ function getNestedTranslation(obj, path) {
 function getMessage(key, ...args) {
     const message = getNestedTranslation(translations[currentLanguage], `messages.${key}`);
     if (!message) {
+        if (currentLanguage === 'en') return key;
         console.warn(`Message key not found: ${key}`);
         return getNestedTranslation(translations.en, `messages.${key}`) || key;
     }
@@ -360,11 +361,13 @@ async function translate(lang) {
     currentLanguage = effectiveLang;
     const trans = translations[effectiveLang];
 
-    // Querying on every call to support dynamic elements while using dataset for readability
-    document.querySelectorAll('[data-i18n], [data-i18n-placeholder], [data-i18n-aria-label]').forEach(element => {
-        const i18nKey = element.dataset.i18n;
-        const i18nPlaceholderKey = element.dataset.i18nPlaceholder;
-        const i18nAriaLabelKey = element.dataset.i18nAriaLabel;
+    // Querying on every call to support dynamic elements while avoiding dataset overhead
+    const elements = document.querySelectorAll('[data-i18n], [data-i18n-placeholder], [data-i18n-aria-label]');
+    for (let i = 0; i < elements.length; i++) {
+        const element = elements[i];
+        const i18nKey = element.getAttribute('data-i18n');
+        const i18nPlaceholderKey = element.getAttribute('data-i18n-placeholder');
+        const i18nAriaLabelKey = element.getAttribute('data-i18n-aria-label');
 
         if (i18nKey) {
             const translation = getNestedTranslation(trans, i18nKey);
@@ -388,7 +391,7 @@ async function translate(lang) {
                 element.setAttribute('aria-label', translation);
             }
         }
-    });
+    }
 
     // Update password toggle ARIA labels for accessibility after language change
     document.querySelectorAll('.password-toggle').forEach(button => {
@@ -528,9 +531,7 @@ async function fetchThemeParams() {
         const data = await response.json();
         
         // Store theme-related parameters
-        Object.keys(data).forEach(key => {
-            window.settings[key] = data[key];
-        });
+        Object.assign(window.settings, data);
         window.settingsLoaded.theme = true;
 
         // Initialize theme using the settings data
@@ -572,9 +573,7 @@ function fetchSectionParams(sectionName) {
         .then(response => response.json())
         .then(data => {
             // Merge fetched parameters into window.settings
-            Object.keys(data).forEach(key => {
-                window.settings[key] = data[key];
-            });
+            Object.assign(window.settings, data);
             window.settingsLoaded[mappedSection] = true;
             return data;
         })
