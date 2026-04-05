@@ -25,7 +25,9 @@
     "wifi": {
       "available_networks": "Réseaux WiFi disponibles",
       "scanning": "Recherche de réseaux...",
-      "scan_button": "Scanner les réseaux disponibles"
+      "scan_button": "Scanner les réseaux disponibles",
+      "no_scan_message": "Cliquez sur \"Rechercher les réseaux disponibles\" pour voir les réseaux WiFi",
+      "no_networks": "Aucun réseau trouvé"
     }
   },
   "advanced": {
@@ -149,6 +151,12 @@
       "compile_time": "Heure de compilation",
       "free_heap": "Mémoire heap libre",
       "min_free_heap": "Heap libre min"
+    },
+    "logs": {
+      "title": "Journaux système"
+    },
+    "integration_status": {
+      "title": "Statut des intégrations"
     },
     "refresh_button": "Actualiser le statut"
   },

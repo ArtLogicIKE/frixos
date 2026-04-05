@@ -25,7 +25,9 @@
     "wifi": {
       "available_networks": "Tillgängliga WiFi-nätverk",
       "scanning": "Söker efter nätverk...",
-      "scan_button": "Skanna tillgängliga nätverk"
+      "scan_button": "Skanna tillgängliga nätverk",
+      "no_scan_message": "Klicka på \"Sök tillgängliga nätverk\" för att se WiFi-nätverk",
+      "no_networks": "Inga nätverk hittades"
     }
   },
   "advanced": {
@@ -149,6 +151,12 @@
       "compile_time": "Kompileringstid",
       "free_heap": "Ledigt heap-minne",
       "min_free_heap": "Min ledigt heap"
+    },
+    "logs": {
+      "title": "Systemloggar"
+    },
+    "integration_status": {
+      "title": "Integrationsstatus"
     },
     "refresh_button": "Uppdatera status"
   },

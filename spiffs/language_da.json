@@ -25,7 +25,9 @@
     "wifi": {
       "available_networks": "Tilgængelige WiFi-netværk",
       "scanning": "Søger efter netværk...",
-      "scan_button": "Scan tilgængelige netværk"
+      "scan_button": "Scan tilgængelige netværk",
+      "no_scan_message": "Klik på \"Scan tilgængelige netværk\" for at se WiFi-netværk",
+      "no_networks": "Ingen netværk fundet"
     }
   },
   "advanced": {
@@ -149,6 +151,12 @@
       "compile_time": "Kompileringstid",
       "free_heap": "Ledig heap-hukommelse",
       "min_free_heap": "Min. ledig heap"
+    },
+    "logs": {
+      "title": "Systemlogfiler"
+    },
+    "integration_status": {
+      "title": "Integrationsstatus"
     },
     "refresh_button": "Opdater status"
   },

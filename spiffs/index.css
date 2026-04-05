@@ -325,13 +325,6 @@ h1 {
     width: 100%;
 }
 
-.password-input-wrapper {
-    position: relative;
-    flex: 1;
-    max-width: 300px;
-    width: 100%;
-}
-
 .form-group .password-input-wrapper input[type="password"],
 .form-group .password-input-wrapper input[type="text"] {
     width: 100%;

@@ -25,7 +25,9 @@
     "wifi": {
       "available_networks": "Reti WiFi disponibili",
       "scanning": "Scansione reti in corso...",
-      "scan_button": "Scansiona reti disponibili"
+      "scan_button": "Scansiona reti disponibili",
+      "no_scan_message": "Clicca su \"Scansiona reti disponibili\" per vedere le reti WiFi",
+      "no_networks": "Nessuna rete trovata"
     }
   },
   "advanced": {
@@ -149,6 +151,12 @@
       "compile_time": "Tempo di compilazione",
       "free_heap": "Memoria heap libera",
       "min_free_heap": "Heap libero min"
+    },
+    "logs": {
+      "title": "Log di sistema"
+    },
+    "integration_status": {
+      "title": "Stato integrazioni"
     },
     "refresh_button": "Aggiorna stato"
   },

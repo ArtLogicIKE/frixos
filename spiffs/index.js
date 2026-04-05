@@ -49,7 +49,9 @@ const translations = {
             wifi: {
                 available_networks: 'Available WiFi Networks',
                 scanning: 'Scanning for networks...',
-                scan_button: 'Scan available networks'
+                scan_button: 'Scan available networks',
+                no_scan_message: 'Click "Scan available networks" to see WiFi networks',
+                no_networks: 'No networks found'
             }
         },
         advanced: {
@@ -167,6 +169,12 @@ const translations = {
                 compile_time: 'Compile Time',
                 free_heap: 'Free Heap Memory',
                 min_free_heap: 'Min Free Heap'
+            },
+            logs: {
+                title: 'System Logs'
+            },
+            integration_status: {
+                title: 'Integration Status'
             },
             refresh_button: 'Refresh Status'
         },
@@ -1053,11 +1061,10 @@ function setupHostnameValidation() {
         }
     });
     
-    // For forms that contain hostname - prevent submission if invalid
+    // Prevent submission if hostname is invalid
     const settingsForm = el('settingsForm');
-    const advancedForm = el('advancedForm');
-    
-    [settingsForm, advancedForm].forEach(form => {
+
+    [settingsForm].forEach(form => {
         if (form) {
             form.addEventListener('submit', function(e) {
                 const hostname = hostnameInput.value;
@@ -1542,7 +1549,8 @@ function setupSettingsSection() {
             const noScanMessage = document.createElement('div');
             noScanMessage.id = 'no-scan-message';
             noScanMessage.className = 'info-text';
-            noScanMessage.textContent = 'Click "Scan available networks" to see WiFi networks';
+            const trans = translations[currentLanguage] || translations.en;
+            noScanMessage.textContent = getNestedTranslation(trans, 'settings.wifi.no_scan_message') || 'Click "Scan available networks" to see WiFi networks';
             networkList.appendChild(noScanMessage);
         }
 
@@ -1599,7 +1607,8 @@ function startScanningUI() {
     const loadingText = document.createElement('div');
     loadingText.id = 'loading-text';
     loadingText.className = 'loading-text';
-    loadingText.textContent = 'Scanning for networks...';
+    const trans = translations[currentLanguage] || translations.en;
+    loadingText.textContent = getNestedTranslation(trans, 'settings.wifi.scanning') || 'Scanning for networks...';
     networkList.appendChild(loadingText);
 }
 
@@ -1673,7 +1682,8 @@ function displayNetworks(networks) {
     if (!networks || networks.length === 0) {
         const noNetworks = document.createElement('div');
         noNetworks.className = 'info-text';
-        noNetworks.textContent = 'No networks found';
+        const trans = translations[currentLanguage] || translations.en;
+        noNetworks.textContent = getNestedTranslation(trans, 'settings.wifi.no_networks') || 'No networks found';
         networkList.appendChild(noNetworks);
         return;
     }
@@ -2264,30 +2274,6 @@ function setupIntegrationsSection() {
         // Region changes should NOT modify username/password fields
         // These fields are shared between Dexcom and Libre and should only be changed by user input
 
-        if (form) {
-            form.addEventListener('submit', function(e) {
-                // Trigger validation explicitly before submitting
-                if (haUrlInput) haUrlInput.dispatchEvent(new Event('input', { bubbles: true }));
-                if (haTokenInput) haTokenInput.dispatchEvent(new Event('input', { bubbles: true }));
-                if (stockKeyInput) stockKeyInput.dispatchEvent(new Event('input', { bubbles: true }));
-
-                const urlError = el('eeprom_ha_url-error');
-                const tokenError = el('eeprom_ha_token-error');
-                const stockKeyError = el('eeprom_stock_key-error');
-
-                const urlErrorText = urlError ? urlError.textContent : '';
-                const tokenErrorText = tokenError ? tokenError.textContent : '';
-                const stockKeyErrorText = stockKeyError ? stockKeyError.textContent : '';
-
-                if (urlErrorText || tokenErrorText || stockKeyErrorText) {
-                    e.preventDefault(); // Prevent submission if there are validation errors
-                    showStatus(getMessage('correct_form_before_save'), 'error');
-                } else {
-                    // If no client-side errors, proceed with generic form submission
-                    handleFormSubmit(e, 'integrationsForm');
-                }
-            });
-        }
         setupIntegrationsValidation();
     }
 
@@ -2496,16 +2482,67 @@ function setupIntegrationsValidation() {
         return true;
     }
 
+    function validateHomeAssistant() {
+        const url = haUrl.value.trim();
+        const token = haToken.value.trim();
+        const refresh = haRefresh ? parseInt(haRefresh.value) : 1;
+
+        // If URL is provided, validate format
+        if (url && !/^https?:\/\/.+/.test(url)) {
+            showStatus('Home Assistant URL must start with http:// or https://', 'error');
+            return false;
+        }
+
+        // If URL is set but no token, or token set but no URL
+        if (url && !token) {
+            showStatus('Home Assistant requires both URL and token', 'error');
+            return false;
+        }
+
+        if (haRefresh && (isNaN(refresh) || refresh < 1 || refresh > 7200)) {
+            showStatus('Home Assistant refresh interval must be between 1 and 7200 minutes', 'error');
+            return false;
+        }
+
+        return true;
+    }
+
+    function validateStock() {
+        const refresh = stockRefresh ? parseInt(stockRefresh.value) : 5;
+
+        if (stockRefresh && (isNaN(refresh) || refresh < 1 || refresh > 1440)) {
+            showStatus('Stock refresh interval must be between 1 and 1440 minutes', 'error');
+            return false;
+        }
+
+        return true;
+    }
+
     integrationsForm.addEventListener('submit', function(e) {
         e.preventDefault();
-        
+
+        // Trigger field-level validation before checking
+        if (haUrl) haUrl.dispatchEvent(new Event('input', { bubbles: true }));
+        if (haToken) haToken.dispatchEvent(new Event('input', { bubbles: true }));
+        if (stockKey) stockKey.dispatchEvent(new Event('input', { bubbles: true }));
+
+        // Check for existing field-level validation errors
+        const urlError = el('eeprom_ha_url-error');
+        const tokenError = el('eeprom_ha_token-error');
+        const stockKeyError = el('eeprom_stock_key-error');
+
+        if ((urlError && urlError.textContent) || (tokenError && tokenError.textContent) || (stockKeyError && stockKeyError.textContent)) {
+            showStatus(getMessage('correct_form_before_save'), 'error');
+            return;
+        }
+
         let isValid = true;
-        
+
         // Validate Home Assistant if enabled
         if (haUrl.value.trim() || haToken.value.trim()) {
             isValid = validateHomeAssistant() && isValid;
         }
-        
+
         // Validate Stock if enabled
         if (stockKey.value.trim()) {
             isValid = validateStock() && isValid;
@@ -2513,7 +2550,7 @@ function setupIntegrationsValidation() {
 
         // Validate CGM (only one of Dexcom, FreeStyle Libre, or Nightscout URL can be enabled)
         isValid = validateGlucoseMonitors() && isValid;
-        
+
         if (isValid) {
             handleFormSubmit(e, 'integrationsForm');
         }
