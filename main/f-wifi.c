@@ -63,7 +63,7 @@ esp_timer_handle_t wifi_active_hours_timer = NULL;
 volatile bool wifi_disabled_by_active_hours = false; // Track if WiFi is disabled due to active hours
 
 // Global Variables
-char my_ip[18], city[64], country[64], internal_ip[18];
+char my_ip[46], city[64], country[64], internal_ip[46];
 double dlat = 0.0, dlon = 0.0;
 
 // Weather Variables

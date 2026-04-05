@@ -21,10 +21,14 @@ from datetime import datetime, timedelta
 MAC_HISTORY = {}
 logger = logging.getLogger(__name__)
 
+# MAC lists for version pinning — edit these lists or move to a JSON config file
+SAFE_MACS = ['D48AFCB086E0']       # Don't update these devices
+TEST_MACS = ['D48AFCB100B8']       # Selective firmware testing devices
+
 class UpdateHttpServer:
     def __init__(self, port, bind, catalog_dir):
         self.start_time = time.time()
-        self.duration_limit = 5 * 3600  # 3 hours in seconds
+        self.duration_limit = 5 * 3600  # 5 hours in seconds
 
         def handler(*args):
             UpdateHTTPRequestHandler(catalog_dir, *args)
@@ -96,12 +100,11 @@ class UpdateHTTPRequestHandler(RobustHTTPRequestHandler):
                                 content = 44 # get the NEWEST version
 
                             # 'safe' list, don't update these ones.
-                            if 'mac' in args and args.get('mac')[0] in ['D48AFCB086E0']: #, '94E686C5CB70', '4C752558A370','94E686C5BACC','1097BD2A20C0']:
+                            if 'mac' in args and args.get('mac')[0] in SAFE_MACS:
                                 content = 40;
 
-                            # USE THIS IF YOU WANT SELECTIVE TESTING OF FIRMWARE
-                            if 'mac' in args and args.get('mac')[0] in ['D48AFCB100B8']: #, '94E686C5CB70', '4C752558A370','94E686C5BACC','1097BD2A20C0']:
-                                # logger.info('Test MAC detected: {0} {1}'.format(myfw[0], mymac))
+                            # Selective firmware testing
+                            if 'mac' in args and args.get('mac')[0] in TEST_MACS:
                                 content = 49; # no new version for 2.x
                     logger.info('response content: %s', content)
 

@@ -7,6 +7,7 @@ from datetime import timedelta
 from typing import Any
 
 import aiohttp
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
@@ -29,7 +30,7 @@ class FrixosDataUpdateCoordinator(DataUpdateCoordinator):
         self.host = host
         self.port = port
         self.base_url = f"http://{host}:{port}"
-        self._session: aiohttp.ClientSession | None = None
+        self._session: aiohttp.ClientSession = async_get_clientsession(hass)
 
         super().__init__(
             hass,
@@ -38,15 +39,8 @@ class FrixosDataUpdateCoordinator(DataUpdateCoordinator):
             update_interval=timedelta(seconds=DEFAULT_SCAN_INTERVAL),
         )
 
-    async def _async_create_session(self) -> None:
-        """Create aiohttp session if it doesn't exist."""
-        if self._session is None:
-            self._session = aiohttp.ClientSession()
-
     async def _async_update_data(self) -> dict:
         """Fetch data from Frixos device."""
-        await self._async_create_session()
-        
         try:
             # Fetch both settings and status
             settings_data, status_data = await asyncio.gather(
@@ -86,9 +80,6 @@ class FrixosDataUpdateCoordinator(DataUpdateCoordinator):
 
     async def _fetch_settings(self) -> dict:
         """Fetch settings from device."""
-        if self._session is None:
-            await self._async_create_session()
-            
         url = f"{self.base_url}{ENDPOINT_SETTINGS}"
         try:
             async with self._session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as response:
@@ -105,9 +96,6 @@ class FrixosDataUpdateCoordinator(DataUpdateCoordinator):
 
     async def _fetch_status(self) -> dict:
         """Fetch status from device."""
-        if self._session is None:
-            await self._async_create_session()
-            
         url = f"{self.base_url}{ENDPOINT_STATUS}"
         try:
             async with self._session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as response:
@@ -124,8 +112,6 @@ class FrixosDataUpdateCoordinator(DataUpdateCoordinator):
 
     async def async_set_setting(self, param: str, value: Any) -> bool:
         """Update a setting on the device."""
-        await self._async_create_session()
-        
         url = f"{self.base_url}{ENDPOINT_SETTINGS}"
         payload = {param: value}
         
@@ -150,7 +136,4 @@ class FrixosDataUpdateCoordinator(DataUpdateCoordinator):
             return False
 
     async def async_close(self) -> None:
-        """Close the aiohttp session."""
-        if self._session:
-            await self._session.close()
-            self._session = None
+        """No-op: session is managed by Home Assistant."""

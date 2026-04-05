@@ -13,7 +13,7 @@ char *get_value_from_JSON_string(const char *json_str, const char *key, char *ou
     }
 
     // Construct the search pattern: "key"
-    char search_pattern[64];
+    char search_pattern[128];
     snprintf(search_pattern, sizeof(search_pattern), "\"%s\"", key);
     
     // Find the key in the JSON string
@@ -72,14 +72,18 @@ char *get_value_from_JSON_string(const char *json_str, const char *key, char *ou
     else if (*value_start == '{' || *value_start == '[')
     {
         // Object or array - return the entire structure
+        // Track braces and brackets separately to avoid mismatched delimiters
         char *value_end = value_start + 1;
-        int brace_count = 1;
-        while (*value_end && brace_count > 0)
+        int brace_count = 0;
+        int bracket_count = 0;
+        if (*value_start == '{') brace_count = 1;
+        else bracket_count = 1;
+        while (*value_end && (brace_count > 0 || bracket_count > 0))
         {
-            if (*value_end == '{' || *value_end == '[')
-                brace_count++;
-            if (*value_end == '}' || *value_end == ']')
-                brace_count--;
+            if (*value_end == '{') brace_count++;
+            else if (*value_end == '}') brace_count--;
+            else if (*value_end == '[') bracket_count++;
+            else if (*value_end == ']') bracket_count--;
             value_end++;
         }
         size_t len = value_end - value_start;

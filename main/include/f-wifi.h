@@ -45,7 +45,7 @@ bool validate_timezone(const char *tz_str);
 // External variables
 extern int response_len;
 extern esp_err_t http_event_handler(esp_http_client_event_t *evt);
-extern char my_ip[18], internal_ip[18];
+extern char my_ip[46], internal_ip[46];
 extern char *wifi_http_buffer;  // Add this to track the current buffer
 
 #endif
