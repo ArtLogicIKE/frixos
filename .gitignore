@@ -2,7 +2,7 @@ managed_components/
 build/
 sdkconfig
 sdkconfig.old
-/include/config.h
+main/include/config.h
 
 # Environment file with API keys (copy from env.example)
 .env

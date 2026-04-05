@@ -39,7 +39,15 @@ static void cleanup_buffer_pool(void) {
 
 // Initialize buffer management system
 bool init_buffer_management(void) {
-    return init_buffer_pool();
+    if (!init_buffer_pool()) {
+        return false;
+    }
+    buffer_mutex = xSemaphoreCreateMutex();
+    if (buffer_mutex == NULL) {
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Buffer mutex create failed during init");
+        return false;
+    }
+    return true;
 }
 
 // Cleanup buffer management system
@@ -54,11 +62,8 @@ void cleanup_buffer_management(void) {
 // Get a buffer from the pool
 char* get_shared_buffer(size_t required_size, const char* owner) {
     if (buffer_mutex == NULL) {
-        buffer_mutex = xSemaphoreCreateMutex();
-        if (buffer_mutex == NULL) {
-            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Buffer mutex create failed");
-            return NULL;
-        }
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Buffer mutex not initialized - call init_buffer_management() first");
+        return NULL;
     }
 
     if (xSemaphoreTake(buffer_mutex, pdMS_TO_TICKS(BUFFER_POOL_TIMEOUT_MS)) != pdTRUE) {
@@ -78,11 +83,11 @@ char* get_shared_buffer(size_t required_size, const char* owner) {
         }
     }
 
-    // If no unused buffer found, try to reuse the oldest buffer
+    // If no unused buffer found, try to reuse the oldest NOT-in-use buffer
     int64_t oldest_time = INT64_MAX;
     int oldest_index = -1;
     for (int i = 0; i < MAX_BUFFER_POOL_SIZE; i++) {
-        if (global_buffer_pool[i].last_used < oldest_time) {
+        if (!global_buffer_pool[i].in_use && global_buffer_pool[i].last_used < oldest_time) {
             oldest_time = global_buffer_pool[i].last_used;
             oldest_index = i;
         }
