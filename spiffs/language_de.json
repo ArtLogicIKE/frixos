@@ -13,7 +13,8 @@
     "show_password": "Passwort anzeigen",
     "hide_password": "Passwort verbergen",
     "change_language": "Sprache ändern",
-    "toggle_theme": "Thema wechseln"
+    "toggle_theme": "Thema wechseln",
+    "unsaved_changes": "Sie haben ungespeicherte Änderungen."
   },
   "settings": {
     "connection": {
@@ -67,7 +68,8 @@
       "bw": "Schwarz-Weiß"
     },
     "fonts": {
-      "title": "Schriftmuster"
+      "title": "Schriftmuster",
+      "view_samples": "Beispiele ansehen"
     },
     "location": {
       "title": "Standorteinstellungen *",
@@ -79,9 +81,10 @@
       "restart_note": "* Änderungen der Standorteinstellungen starten das Gerät neu."
     },
     "wifi_hours": {
-      "title": "WiFi-Aktive Stunden",
+      "title": "WLAN aktive Stunden",
       "start": "Start",
-      "end": "Ende"
+      "end": "Ende",
+      "help_text": "Beide auf 0 setzen für dauerhaft aktives WLAN. WLAN ist von Startstunde bis Endstunde aktiv. Unterstützt Übernacht (z.B. 22 bis 6). Wird alle 10 Minuten geprüft."
     },
     "brightness": {
       "title": "Projektionshelligkeitseinstellungen",

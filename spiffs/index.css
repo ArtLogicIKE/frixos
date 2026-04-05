@@ -850,6 +850,24 @@ h1 {
         padding: 5px;
     }
 
+    .logo-title-container {
+        padding-right: 100px;
+    }
+
+    .header-controls {
+        top: 10px;
+        right: 10px;
+        gap: 6px;
+    }
+
+    #current-language-name {
+        font-size: 0.8rem;
+    }
+
+    .language-toggle {
+        padding: 3px 6px;
+    }
+
     .menu-item {
         padding: 6px 10px;
         font-size: 0.85rem;
@@ -1052,4 +1070,67 @@ h1 {
     height: auto;
     display: block;
     margin: 0 auto;
+}
+
+/* View samples link next to font dropdowns */
+.view-samples-link {
+    color: var(--primary-color);
+    font-size: 0.85rem;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.view-samples-link:hover {
+    text-decoration: underline;
+}
+
+/* Color hex label next to color picker */
+.color-hex-label {
+    font-family: monospace;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    min-width: 65px;
+}
+
+/* Unsaved changes banner */
+.unsaved-banner {
+    background-color: rgba(255, 193, 7, 0.15);
+    color: var(--warning-color);
+    border: 1px solid var(--warning-color);
+    border-radius: 4px;
+    padding: 8px 15px;
+    margin-bottom: 10px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    text-align: center;
+    animation: fadeIn 0.3s ease;
+}
+
+/* Restart-required field warning */
+.restart-warning {
+    background-color: rgba(255, 193, 7, 0.1);
+    border-left: 3px solid var(--warning-color);
+    padding-left: 8px;
+}
+
+/* Save button loading state */
+.button.loading {
+    position: relative;
+    color: transparent;
+    pointer-events: none;
+}
+
+.button.loading::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 16px;
+    height: 16px;
+    margin-left: -8px;
+    margin-top: -8px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
 }

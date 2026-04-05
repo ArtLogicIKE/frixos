@@ -9,7 +9,8 @@
   },
   "common": {
     "save_settings": "Gem indstillinger",
-    "cancel": "Annuller"
+    "cancel": "Annuller",
+    "unsaved_changes": "Du har ikke-gemte ændringer."
   },
   "settings": {
     "connection": {
@@ -63,7 +64,8 @@
       "bw": "Sort-hvid"
     },
     "fonts": {
-      "title": "Skrifttypeprøver"
+      "title": "Skrifttypeprøver",
+      "view_samples": "Se eksempler"
     },
     "location": {
       "title": "Placeringsindstillinger *",
@@ -77,7 +79,8 @@
     "wifi_hours": {
       "title": "WiFi-aktive timer",
       "start": "Start",
-      "end": "Slut"
+      "end": "Slut",
+      "help_text": "Sæt begge til 0 for WiFi altid aktiv. WiFi er aktiv fra starttime til sluttime. Understøtter nat-overgang (f.eks. 22 til 6). Kontrolleres hvert 10. minut."
     },
     "brightness": {
       "title": "Projektionslysstyrkeindstillinger",

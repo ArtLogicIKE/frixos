@@ -13,7 +13,8 @@
     "show_password": "Mostrar contraseña",
     "hide_password": "Ocultar contraseña",
     "change_language": "Cambiar idioma",
-    "toggle_theme": "Alternar tema"
+    "toggle_theme": "Alternar tema",
+    "unsaved_changes": "Tiene cambios sin guardar."
   },
   "settings": {
     "connection": {
@@ -67,7 +68,8 @@
       "bw": "Blanco y Negro"
     },
     "fonts": {
-      "title": "Muestras de Fuentes"
+      "title": "Muestras de Fuentes",
+      "view_samples": "Ver muestras"
     },
     "location": {
       "title": "Configuración de Ubicación *",
@@ -79,9 +81,10 @@
       "restart_note": "* Cambiar la configuración de ubicación reiniciará el dispositivo."
     },
     "wifi_hours": {
-      "title": "Horas Activas WiFi",
+      "title": "Horas activas de WiFi",
       "start": "Inicio",
-      "end": "Fin"
+      "end": "Fin",
+      "help_text": "Ambos en 0 para WiFi siempre activo. WiFi activo desde la hora de inicio hasta la hora de fin. Soporta horario nocturno (ej. 22 a 6). Se comprueba cada 10 minutos."
     },
     "brightness": {
       "title": "Configuración de brillo de proyección",

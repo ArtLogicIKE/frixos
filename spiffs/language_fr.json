@@ -9,7 +9,8 @@
   },
   "common": {
     "save_settings": "Enregistrer les paramètres",
-    "cancel": "Annuler"
+    "cancel": "Annuler",
+    "unsaved_changes": "Vous avez des modifications non enregistrées."
   },
   "settings": {
     "connection": {
@@ -63,7 +64,8 @@
       "bw": "Noir et blanc"
     },
     "fonts": {
-      "title": "Échantillons de polices"
+      "title": "Échantillons de polices",
+      "view_samples": "Voir les exemples"
     },
     "location": {
       "title": "Paramètres de localisation *",
@@ -75,9 +77,10 @@
       "restart_note": "* La modification des paramètres de localisation redémarrera l'appareil."
     },
     "wifi_hours": {
-      "title": "Heures d'activation WiFi",
+      "title": "Heures actives du WiFi",
       "start": "Début",
-      "end": "Fin"
+      "end": "Fin",
+      "help_text": "Mettre les deux à 0 pour un WiFi toujours actif. Le WiFi est actif de l'heure de début à l'heure de fin. Supporte le passage à minuit (ex. 22 à 6). Vérifié toutes les 10 minutes."
     },
     "brightness": {
       "title": "Paramètres de luminosité de projection",

@@ -33,7 +33,8 @@ const translations = {
             show_password: 'Show password',
             hide_password: 'Hide password',
             change_language: 'Change language',
-            toggle_theme: 'Toggle theme'
+            toggle_theme: 'Toggle theme',
+            unsaved_changes: 'You have unsaved changes.'
         },
         settings: {
             connection: {
@@ -86,7 +87,14 @@ const translations = {
                 bw: 'Black & White'
             },
             fonts: {
-                title: 'Font Samples'
+                title: 'Font Samples',
+                view_samples: 'View samples'
+            },
+            wifi_hours: {
+                title: 'WiFi Active Hours',
+                start: 'Start',
+                end: 'End',
+                help_text: 'Set both to 0 for WiFi always on. WiFi is active from Start hour to End hour. Supports wrap-around (e.g. 22 to 6 = overnight). Checked every 10 minutes.'
             },
             location: {
                 title: 'Location Settings *',
@@ -628,6 +636,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Setup send to support and copy buttons
             setupSupportButtons();
+
+            // Setup new UI features
+            setupUnsavedTracking();
+            setupColorHexDisplay();
+            setupFontSampleLinks();
+            setupRestartWarnings();
         })
         .catch(error => {
             console.error('Error during initialization:', error);
@@ -744,9 +758,12 @@ function setupNavigation() {
 function navigateToSection() {
     let hash = window.location.hash.substring(1);
     
-    // Default to settings if no hash
+    // Default to settings if no hash; redirect old restart hash to status
     if (!hash) {
         hash = 'settings';
+        window.location.hash = hash;
+    } else if (hash === 'restart') {
+        hash = 'status';
         window.location.hash = hash;
     }
     
@@ -1486,7 +1503,12 @@ function handleFormSubmit(e, formId) {
 
 // Shared function to save settings
 function saveSettings(formData, isNetworkSettings = false) {
-    
+    // Add loading state to all save buttons
+    document.querySelectorAll('.settings-form .button[type="submit"]').forEach(btn => {
+        btn.classList.add('loading');
+        btn.disabled = true;
+    });
+
     return fetch('/api/settings', {
         method: 'POST',
         headers: {
@@ -1502,6 +1524,9 @@ function saveSettings(formData, isNetworkSettings = false) {
             // Update window.settings with new values
             window.settings = { ...window.settings, ...formData };
             
+            // Clear unsaved state on successful save
+            clearUnsavedState();
+
             if (isNetworkSettings) {
                 showStatus(getMessage('network_settings_changed'), 'success');
                 let countdown = 5;
@@ -1525,6 +1550,13 @@ function saveSettings(formData, isNetworkSettings = false) {
     .catch(error => {
         console.error('Error:', error);
         showStatus(getMessage('error_saving_unknown'), 'error');
+    })
+    .finally(() => {
+        // Remove loading state from all save buttons
+        document.querySelectorAll('.settings-form .button[type="submit"]').forEach(btn => {
+            btn.classList.remove('loading');
+            btn.disabled = false;
+        });
     });
 }
 
@@ -2161,10 +2193,18 @@ function setupAdvancedSection() {
         if (el('night_color_filter') && window.settings.p11 !== undefined) {
             el('night_color_filter').value = window.settings.p11 || 0;
         }
-        if (el('msg_color') && window.settings.p12 !== undefined) el('msg_color').value = window.settings.p12 || '#FFFFFF';
+        if (el('msg_color') && window.settings.p12 !== undefined) {
+            el('msg_color').value = window.settings.p12 || '#FFFFFF';
+            const hexLabel = el('msg_color_hex');
+            if (hexLabel) hexLabel.textContent = (window.settings.p12 || '#FFFFFF').toUpperCase();
+        }
         if (el('msg_font') && window.settings.p13 !== undefined) el('msg_font').value = window.settings.p13 || 0;
         if (el('scroll_delay') && window.settings.p14 !== undefined) el('scroll_delay').value = window.settings.p14 || 65;
-        if (el('night_msg_color') && window.settings.p15 !== undefined) el('night_msg_color').value = window.settings.p15 || '#FFFFFF';
+        if (el('night_msg_color') && window.settings.p15 !== undefined) {
+            el('night_msg_color').value = window.settings.p15 || '#FFFFFF';
+            const hexLabel = el('night_msg_color_hex');
+            if (hexLabel) hexLabel.textContent = (window.settings.p15 || '#FFFFFF').toUpperCase();
+        }
         if (el('lat') && window.settings.p17 !== undefined) el('lat').value = window.settings.p17 || '';
         if (el('lon') && window.settings.p18 !== undefined) el('lon').value = window.settings.p18 || '';
         if (el('timezone') && window.settings.p19 !== undefined) el('timezone').value = window.settings.p19 || '';
@@ -2921,4 +2961,102 @@ function copyToClipboardFallback(text) {
         console.error('Error in copyToClipboardFallback:', error);
         showStatus('Error copying to clipboard: ' + error.message, 'error');
     }
-} 
+}
+
+// --- Unsaved changes tracking ---
+window._hasUnsavedChanges = false;
+
+function markUnsaved() {
+    if (!window._hasUnsavedChanges) {
+        window._hasUnsavedChanges = true;
+        const banner = el('unsaved-banner');
+        if (banner) banner.style.display = 'block';
+    }
+}
+
+function clearUnsavedState() {
+    window._hasUnsavedChanges = false;
+    const banner = el('unsaved-banner');
+    if (banner) banner.style.display = 'none';
+}
+
+function setupUnsavedTracking() {
+    // Track changes on all form inputs
+    document.querySelectorAll('.settings-form input, .settings-form select, .settings-form textarea').forEach(input => {
+        const eventType = (input.type === 'checkbox' || input.tagName === 'SELECT') ? 'change' : 'input';
+        input.addEventListener(eventType, markUnsaved);
+    });
+
+    // Warn on page unload
+    window.addEventListener('beforeunload', function(e) {
+        if (window._hasUnsavedChanges) {
+            e.preventDefault();
+            e.returnValue = '';
+        }
+    });
+}
+
+// --- Color hex display ---
+function setupColorHexDisplay() {
+    const colorFields = [
+        { input: 'msg_color', label: 'msg_color_hex' },
+        { input: 'night_msg_color', label: 'night_msg_color_hex' }
+    ];
+
+    colorFields.forEach(({ input, label }) => {
+        const colorInput = el(input);
+        const hexLabel = el(label);
+        if (!colorInput || !hexLabel) return;
+
+        colorInput.addEventListener('input', function() {
+            hexLabel.textContent = this.value.toUpperCase();
+        });
+
+        // Set initial value
+        hexLabel.textContent = colorInput.value.toUpperCase();
+    });
+}
+
+// --- Font sample scroll links ---
+function setupFontSampleLinks() {
+    document.querySelectorAll('.view-samples-link').forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            const target = el('font-samples-section');
+            if (target) {
+                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        });
+    });
+}
+
+// --- Restart-required field warnings ---
+function setupRestartWarnings() {
+    const restartFields = ['wifi_ssid', 'wifi_pass', 'hostname', 'lat', 'lon', 'timezone'];
+
+    restartFields.forEach(fieldId => {
+        const input = el(fieldId);
+        if (!input) return;
+
+        const formGroup = input.closest('.form-group') || input.closest('.checkbox-container');
+        if (!formGroup) return;
+
+        const eventType = input.type === 'checkbox' ? 'change' : 'input';
+        input.addEventListener(eventType, function() {
+            // Determine the original value key
+            const keyMap = {
+                wifi_ssid: 'p34', wifi_pass: 'p35', hostname: 'p00',
+                lat: 'p17', lon: 'p18', timezone: 'p19'
+            };
+            const origKey = keyMap[fieldId];
+            const origVal = window.settings ? String(window.settings[origKey] || '') : '';
+            const curVal = String(this.value || '');
+
+            if (curVal !== origVal) {
+                formGroup.classList.add('restart-warning');
+            } else {
+                formGroup.classList.remove('restart-warning');
+            }
+        });
+    });
+}

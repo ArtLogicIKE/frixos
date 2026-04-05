@@ -9,7 +9,8 @@
   },
   "common": {
     "save_settings": "Guardar definições",
-    "cancel": "Cancelar"
+    "cancel": "Cancelar",
+    "unsaved_changes": "Tem alterações não guardadas."
   },
   "settings": {
     "connection": {
@@ -63,7 +64,8 @@
       "bw": "Preto e branco"
     },
     "fonts": {
-      "title": "Amostras de tipos de letra"
+      "title": "Amostras de tipos de letra",
+      "view_samples": "Ver amostras"
     },
     "location": {
       "title": "Definições de localização *",
@@ -75,9 +77,10 @@
       "restart_note": "* Alterar as definições de localização irá reiniciar o dispositivo."
     },
     "wifi_hours": {
-      "title": "Horas Ativas WiFi",
+      "title": "Horas ativas do WiFi",
       "start": "Início",
-      "end": "Fim"
+      "end": "Fim",
+      "help_text": "Defina ambos como 0 para WiFi sempre ativo. WiFi ativo da hora de início à hora de fim. Suporta horário noturno (ex. 22 a 6). Verificado a cada 10 minutos."
     },
     "brightness": {
       "title": "Definições de brilho de projeção",

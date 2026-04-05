@@ -9,7 +9,8 @@
   },
   "common": {
     "save_settings": "Spara inställningar",
-    "cancel": "Avbryt"
+    "cancel": "Avbryt",
+    "unsaved_changes": "Du har osparade ändringar."
   },
   "settings": {
     "connection": {
@@ -63,7 +64,8 @@
       "bw": "Svartvit"
     },
     "fonts": {
-      "title": "Typsnittsprover"
+      "title": "Typsnittsprover",
+      "view_samples": "Visa exempel"
     },
     "location": {
       "title": "Platsinställningar *",
@@ -75,9 +77,10 @@
       "restart_note": "* Ändring av platsinställningar kommer att starta om enheten."
     },
     "wifi_hours": {
-      "title": "WiFi-aktiva timmar",
+      "title": "WiFi aktiva timmar",
       "start": "Start",
-      "end": "Slut"
+      "end": "Slut",
+      "help_text": "Sätt båda till 0 för WiFi alltid aktivt. WiFi är aktivt från starttimme till sluttimme. Stödjer nattövergång (t.ex. 22 till 6). Kontrolleras var 10:e minut."
     },
     "brightness": {
       "title": "Projektionsljushetsinställningar",

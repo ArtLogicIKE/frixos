@@ -13,7 +13,8 @@
     "show_password": "Show password",
     "hide_password": "Hide password",
     "change_language": "Change language",
-    "toggle_theme": "Toggle theme"
+    "toggle_theme": "Toggle theme",
+    "unsaved_changes": "You have unsaved changes."
   },
   "settings": {
     "connection": {
@@ -67,7 +68,8 @@
       "bw": "Black & White"
     },
     "fonts": {
-      "title": "Font Samples"
+      "title": "Font Samples",
+      "view_samples": "View samples"
     },
     "location": {
       "title": "Location Settings *",
@@ -81,7 +83,8 @@
     "wifi_hours": {
       "title": "WiFi Active Hours",
       "start": "Start",
-      "end": "End"
+      "end": "End",
+      "help_text": "Set both to 0 for WiFi always on. WiFi is active from Start hour to End hour. Supports wrap-around (e.g. 22 to 6 = overnight). Checked every 10 minutes."
     },
     "brightness": {
       "title": "Projection brightness settings",

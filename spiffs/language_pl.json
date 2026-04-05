@@ -9,7 +9,8 @@
   },
   "common": {
     "save_settings": "Zapisz ustawienia",
-    "cancel": "Anuluj"
+    "cancel": "Anuluj",
+    "unsaved_changes": "Masz niezapisane zmiany."
   },
   "settings": {
     "connection": {
@@ -63,7 +64,8 @@
       "bw": "Czarno-biały"
     },
     "fonts": {
-      "title": "Przykłady czcionek"
+      "title": "Przykłady czcionek",
+      "view_samples": "Zobacz przykłady"
     },
     "location": {
       "title": "Ustawienia lokalizacji *",
@@ -76,8 +78,9 @@
     },
     "wifi_hours": {
       "title": "Aktywne godziny WiFi",
-      "start": "Start",
-      "end": "Koniec"
+      "start": "Początek",
+      "end": "Koniec",
+      "help_text": "Ustaw oba na 0, aby WiFi było zawsze aktywne. WiFi jest aktywne od godziny początkowej do godziny końcowej. Obsługuje przejście nocne (np. 22 do 6). Sprawdzane co 10 minut."
     },
     "brightness": {
       "title": "Ustawienia jasności projekcji",

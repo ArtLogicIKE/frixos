@@ -29,7 +29,6 @@
                     data-i18n="menu.integrations">Integrations</a>
                 <a href="#status" class="menu-item" data-section="status-section" data-i18n="menu.status">Status</a>
                 <a href="#update" class="menu-item" data-section="update-section" data-i18n="menu.update">Update</a>
-                <a href="#restart" class="menu-item" data-section="restart-section" data-i18n="menu.restart">Restart</a>
             </div>
             <div class="header-controls">
                 <button id="language-toggle" class="language-toggle" aria-label="Change language" data-i18n-aria-label="common.change_language">
@@ -72,6 +71,10 @@
         </div>
 
         <div id="status-message" class="status" role="status" aria-live="polite" style="display: none;"></div>
+
+        <div id="unsaved-banner" class="unsaved-banner" style="display: none;" role="alert">
+            <span data-i18n="common.unsaved_changes">You have unsaved changes.</span>
+        </div>
 
         <!-- Settings Section -->
         <div id="settings-section" class="page-section">
@@ -176,6 +179,7 @@
                                 <option value="user1">User1</option>
                                 <option value="user2">User2</option>
                             </select>
+                            <a href="#font-samples-section" class="view-samples-link" data-i18n="advanced.fonts.view_samples">View samples</a>
                         </div>
                         <div class="form-group">
                             <label for="color_filter" data-i18n="advanced.day.color_filter">Color Filter</label>
@@ -190,6 +194,7 @@
                         <div class="form-group">
                             <label for="msg_color" data-i18n="advanced.day.message_color">Message Color</label>
                             <input type="color" id="msg_color" name="msg_color" value="#FFFFFF">
+                            <span id="msg_color_hex" class="color-hex-label">#FFFFFF</span>
                         </div>
 
                         <h3 data-i18n="advanced.night.title">Night Settings</h3>
@@ -209,6 +214,7 @@
                                 <option value="user1">User1</option>
                                 <option value="user2">User2</option>
                             </select>
+                            <a href="#font-samples-section" class="view-samples-link" data-i18n="advanced.fonts.view_samples">View samples</a>
                         </div>
                         <div class="form-group">
                             <label for="night_color_filter" data-i18n="advanced.night.color_filter">Color Filter</label>
@@ -223,6 +229,7 @@
                         <div class="form-group">
                             <label for="night_msg_color" data-i18n="advanced.night.message_color">Message Color</label>
                             <input type="color" id="night_msg_color" name="night_msg_color" value="#FFFFFF">
+                            <span id="night_msg_color_hex" class="color-hex-label">#FFFFFF</span>
                         </div>
                         <div class="checkbox-container">
                             <input type="checkbox" id="quiet_scroll" name="quiet_scroll">
@@ -254,7 +261,7 @@
                     </div>
                 </div>
 
-                <div class="section">
+                <div id="font-samples-section" class="section">
                     <div class="section-header">
                         <h2 data-i18n="advanced.fonts.title">Font Samples</h2>
                     </div>
@@ -349,6 +356,7 @@
                             <input type="number" id="wifi_end" name="wifi_end" min="0" max="23" value="0">
                             <span id="wifi_end-error" class="input-error"></span>
                         </div>
+                        <p data-i18n="advanced.wifi_hours.help_text">Set both to 0 for WiFi always on. WiFi is active from Start hour to End hour. Supports wrap-around (e.g. 22 to 6 = overnight). Checked every 10 minutes.</p>
                     </div>
                 </div>
 
@@ -487,19 +495,6 @@
         <!-- Status Section -->
         <div id="status-section" class="page-section" style="display: none;">
             <div class="section">
-                <div class="button-container" style="margin-bottom: 20px;">
-                    <h2 data-i18n="status.support.title">Share information with support</h2>
-                    <button id="sendToSupportButton" class="button" data-i18n="status.support.send_email">Send
-                        email</button>
-                    <button id="copyToClipboardButton" class="button" style="margin-left: 10px;"
-                        data-i18n="status.support.copy_clipboard">Copy to clipboard</button>
-                    <p data-i18n="status.support.help_text">If you need any support, please share the information above
-                        with us. Click "send email" to send us a message; if that doesn't work,
-                        copy the information to your clipboard and send it via email to support@buyfrixos.com.</p>
-                </div>
-            </div>
-
-            <div class="section">
                 <h2 data-i18n="status.sensor.title">Sensor Data</h2>
                 <div class="info-grid">
                     <div class="info-item">
@@ -620,6 +615,24 @@
                 <button id="refreshButton" class="button" data-i18n="status.refresh_button">Refresh Status</button>
             </div>
 
+            <div class="section">
+                <div class="button-container" style="margin-bottom: 20px;">
+                    <h2 data-i18n="status.support.title">Share information with support</h2>
+                    <button id="sendToSupportButton" class="button" data-i18n="status.support.send_email">Send
+                        email</button>
+                    <button id="copyToClipboardButton" class="button" style="margin-left: 10px;"
+                        data-i18n="status.support.copy_clipboard">Copy to clipboard</button>
+                    <p data-i18n="status.support.help_text">If you need any support, please share the information above
+                        with us. Click "send email" to send us a message; if that doesn't work,
+                        copy the information to your clipboard and send it via email to support@buyfrixos.com.</p>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2 data-i18n="restart.title">Device Reset</h2>
+                <p data-i18n="restart.description">Use this option to restart your Frixos device.</p><br />
+                <button id="resetButton" class="button danger" data-i18n="restart.button">Restart Device</button>
+            </div>
 
         </div>
 
@@ -893,15 +906,6 @@
                 </ol>
             </div>
 
-        </div>
-
-        <!-- Restart Section -->
-        <div id="restart-section" class="page-section" style="display: none;">
-            <div class="section">
-                <h2 data-i18n="restart.title">Device Reset</h2>
-                <p data-i18n="restart.description">Use this option to restart your Frixos device.</p><br />
-                <button id="resetButton" class="button" data-i18n="restart.button">Restart Device</button>
-            </div>
         </div>
 
         <!-- Reset Confirmation Modal -->

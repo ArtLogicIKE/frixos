@@ -9,7 +9,8 @@
   },
   "common": {
     "save_settings": "Salva impostazioni",
-    "cancel": "Annulla"
+    "cancel": "Annulla",
+    "unsaved_changes": "Hai modifiche non salvate."
   },
   "settings": {
     "connection": {
@@ -63,7 +64,8 @@
       "bw": "Bianco e nero"
     },
     "fonts": {
-      "title": "Esempi di font"
+      "title": "Esempi di font",
+      "view_samples": "Vedi esempi"
     },
     "location": {
       "title": "Impostazioni posizione *",
@@ -77,7 +79,8 @@
     "wifi_hours": {
       "title": "Ore attive WiFi",
       "start": "Inizio",
-      "end": "Fine"
+      "end": "Fine",
+      "help_text": "Imposta entrambi a 0 per WiFi sempre attivo. WiFi attivo dall'ora di inizio all'ora di fine. Supporta orario notturno (es. 22 a 6). Controllato ogni 10 minuti."
     },
     "brightness": {
       "title": "Impostazioni luminosità proiezione",
