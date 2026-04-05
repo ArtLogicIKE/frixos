@@ -977,7 +977,7 @@ void format_glucose_token(char *buffer, size_t buffer_size)
         float glucose_mmol = glucose_data.current_gl_mgdl / 18.0182f;
         float diff_mmol = glucose_data.gl_diff / 18.0182f;
         // Format with arrow (Freestyle style) in mmol/L
-        snprintf(buffer, buffer_size, "%.1f mmol/l (%+.2f @ %s)",
+        snprintf(buffer, buffer_size, "%.1f mmol/l %+.2f@%s",
                  glucose_mmol,
                  diff_mmol,
                  time_str);
@@ -985,7 +985,7 @@ void format_glucose_token(char *buffer, size_t buffer_size)
     else
     {
         // Format with arrow (Freestyle style) in mg/dL
-        snprintf(buffer, buffer_size, "%.0f mg/dl (%+.0f @ %s)",
+        snprintf(buffer, buffer_size, "%.0f mg/dl %+.0f@%s",
                  glucose_data.current_gl_mgdl,
                  glucose_data.gl_diff,
                  time_str);

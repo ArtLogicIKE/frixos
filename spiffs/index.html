@@ -431,7 +431,7 @@
                             <textarea id="message" name="message"
                                 data-i18n-placeholder="advanced.message.message_placeholder" maxlength="511"
                                 rows="2"></textarea>
-                            <span id="message-counter" class="message-counter">0 / 511</span>
+                            <span id="message-counter" class="message-counter" role="status" aria-live="polite">0 / 511</span>
                         </div>
                         <div class="message-tokens">
                             <h4 data-i18n="advanced.message.tokens_title">Available Tokens:</h4>
@@ -905,12 +905,14 @@
         </div>
 
         <!-- Reset Confirmation Modal -->
-        <div id="resetModal" class="modal">
+        <div id="resetModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="reset-modal-title" aria-describedby="reset-modal-desc">
             <div class="modal-content">
-                <h2 data-i18n="restart.confirm_title">Confirm Restart</h2>
-                <p data-i18n="restart.confirm_message">Are you sure you want to restart the device?</p>
-                <p data-i18n="restart.unavailable_message">The device will become temporarily unavailable during
-                    restart.</p>
+                <h2 id="reset-modal-title" data-i18n="restart.confirm_title">Confirm Restart</h2>
+                <div id="reset-modal-desc">
+                    <p data-i18n="restart.confirm_message">Are you sure you want to restart the device?</p>
+                    <p data-i18n="restart.unavailable_message">The device will become temporarily unavailable during
+                        restart.</p>
+                </div>
                 <div class="modal-buttons">
                     <button id="cancelButton" class="button" data-i18n="common.cancel">Cancel</button>
                     <button id="confirmButton" class="button danger" data-i18n="restart.confirm_button">Restart</button>
