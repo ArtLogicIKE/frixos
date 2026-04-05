@@ -29,7 +29,9 @@
     "wifi": {
       "available_networks": "Available WiFi Networks",
       "scanning": "Scanning for networks...",
-      "scan_button": "Scan available networks"
+      "scan_button": "Scan available networks",
+      "no_scan_message": "Click \"Scan available networks\" to see WiFi networks",
+      "no_networks": "No networks found"
     }
   },
   "advanced": {
@@ -153,6 +155,12 @@
       "compile_time": "Compile Time",
       "free_heap": "Free Heap Memory",
       "min_free_heap": "Min Free Heap"
+    },
+    "logs": {
+      "title": "System Logs"
+    },
+    "integration_status": {
+      "title": "Integration Status"
     },
     "refresh_button": "Refresh Status"
   },
