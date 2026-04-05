@@ -104,48 +104,34 @@ bool is_wifi_connected(void)
 
 
 // Function to URL-encode a string.
-// The caller MUST ensure the output buffer is large enough.
 // Unsafe characters (non-alphanumeric except -_.~) are converted to %XX.
-void url_encode_string(const char *input, char *output)
+// output_size is the total size of the output buffer (including null terminator).
+// Input and output MUST NOT overlap.
+void url_encode_string(const char *input, char *output, size_t output_size)
 {
-    if (!input || !output)
+    if (!input || !output || output_size < 2)
         return;
 
-    // First pass: calculate the required length
-    size_t needed_len = 0;
-    for (const char *p = input; *p; p++)
-    {
-        // Check if the character is alphanumeric or one of the safe characters (-_.~)
-        if (isalnum((unsigned char)*p) || *p == '-' || *p == '_' || *p == '.' || *p == '~')
-        {
-            needed_len += 1;
-        }
-        else
-        {
-            needed_len += 3; // %XX
-        }
-    }
-    needed_len++; // For null terminator
-
-    // Note: We assume the caller provided a buffer of at least needed_len.
-    // A safer version might check output buffer size or allocate dynamically.
-
-    // Second pass: build the encoded string
     char *dst = output;
+    char *dst_end = output + output_size - 1; // Reserve space for null terminator
+
     for (const char *p = input; *p; p++)
     {
         if (isalnum((unsigned char)*p) || *p == '-' || *p == '_' || *p == '.' || *p == '~')
         {
-            *dst++ = *p; // Safe character, copy directly
+            if (dst >= dst_end)
+                break;
+            *dst++ = *p;
         }
         else
         {
-            // Unsafe character, encode as %XX
+            if (dst + 3 > dst_end)
+                break;
             snprintf(dst, 4, "%%%02X", (unsigned char)*p);
             dst += 3;
         }
     }
-    *dst = '\0'; // Null terminate
+    *dst = '\0';
 }
 
 // Initialize mDNS service
@@ -1084,7 +1070,7 @@ bool wifi_get_location()
             char url[128];
             // HTML escape the internet_location
             char escaped_location[64];
-            url_encode_string(internet_location, escaped_location);
+            url_encode_string(internet_location, escaped_location, sizeof(escaped_location));
             snprintf(url, sizeof(url), "%s/timezone?location=%s", UPDATE_SERVER_BASE, escaped_location);
             esp_http_client_config_t config = {
                 .url = url,

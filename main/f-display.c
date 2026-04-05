@@ -1610,7 +1610,7 @@ void replace_placeholders(const char *input, char *output, size_t output_size)
     greeting_index = 3; // good night
   }
 
-  strcpy(greeting, greetings[lang_index][greeting_index]);
+  snprintf(greeting, sizeof(greeting), "%s", greetings[lang_index][greeting_index]);
 
   ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Greeting hour %d: %s", current_timeinfo.tm_hour, greeting);
 

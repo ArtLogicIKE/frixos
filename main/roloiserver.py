@@ -176,8 +176,7 @@ class UpdateHTTPRequestHandler(RobustHTTPRequestHandler):
 
     def __check_header(self):
         ex_headers_templ = ['x-*-STA-MAC', 'x-*-AP-MAC', 'x-*-FREE-SPACE', 'x-*-SKETCH-SIZE', 'x-*-SKETCH-MD5', 'x-*-CHIP-SIZE', 'x-*-SDK-VERSION']
-        ex_headers = []
-        for ex_header in ex_headers:
+        for ex_header in ex_headers_templ:
             if ex_header not in self.headers:
                 # logger.info('Missing header {0} to identify a legitimate request'.format(ex_header))
                 return False
@@ -199,9 +198,8 @@ class UpdateHTTPRequestHandler(RobustHTTPRequestHandler):
             self.send_header('Content-Length', fsize)
             self.send_header('x-MD5', get_MD5(filename))
             self.end_headers()
-            f = open(filename, 'rb')
-            self.wfile.write(f.read())
-            f.close()
+            with open(filename, 'rb') as f:
+                self.wfile.write(f.read())
         except Exception as e:
             err = str(e)
             # logger.error(err)

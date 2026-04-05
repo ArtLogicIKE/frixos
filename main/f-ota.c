@@ -287,7 +287,7 @@ void f_ota_report_status(update_status_t status, const char *error_msg)
              mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
     // URL encode the error message
-    url_encode_string(error_msg ? error_msg : "", encoded_error_msg);
+    url_encode_string(error_msg ? error_msg : "", encoded_error_msg, sizeof(encoded_error_msg));
 
     // Format URL with parameters
     snprintf(update_result_url, sizeof(update_result_url),
@@ -397,7 +397,7 @@ void f_ota_check_update(void)
     integrations[int_idx] = '\0';
 
     char escaped_hostname[64];
-    url_encode_string(eeprom_hostname, escaped_hostname);
+    url_encode_string(eeprom_hostname, escaped_hostname, sizeof(escaped_hostname));
 
     snprintf(url, 512,
              "%s/latest?host=%s&fw=%d&mac=%02X%02X%02X%02X%02X%02X&rev=%s&ver=%s&fla=%d&app=%d&poh=%lu&int=%s",
@@ -600,9 +600,10 @@ void f_ota_check_update(void)
             {
                 fclose(manifest);
                 char error_msg[256];
+                char encoded_err[512];
                 snprintf(error_msg, sizeof(error_msg), "Failed to download file: %s/%.128s", update_dir, line);
-                url_encode_string(error_msg, error_msg);
-                ota_handle_failure(error_msg, UPDATE_ERROR_DOWNLOAD, true);
+                url_encode_string(error_msg, encoded_err, sizeof(encoded_err));
+                ota_handle_failure(encoded_err, UPDATE_ERROR_DOWNLOAD, true);
                 return;
             }
         }
