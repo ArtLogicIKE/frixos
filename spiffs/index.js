@@ -16,6 +16,20 @@ const LANGUAGE_NAMES = {
 // Helper for element selection
 const el = (id) => document.getElementById(id);
 
+// Helper for toggling button loading state
+function toggleLoading(btn, isLoading) {
+    if (!btn) return;
+    if (isLoading) {
+        btn.classList.add('is-loading');
+        btn.disabled = true;
+        btn.setAttribute('aria-busy', 'true');
+    } else {
+        btn.classList.remove('is-loading');
+        btn.disabled = false;
+        btn.removeAttribute('aria-busy');
+    }
+}
+
 // Translations object
 const translations = {
     en: {
@@ -470,6 +484,7 @@ function setupLanguageSelector() {
             const selectedLang = this.getAttribute('data-lang');
             changeLanguage(selectedLang);
             languageDropdown.style.display = 'none';
+            languageToggle.focus();
         });
     });
 }
@@ -481,29 +496,35 @@ async function changeLanguage(lang) {
         return;
     }
     
-    // Apply translation (now async to support lazy-loading)
-    await translate(lang);
+    const languageToggle = el('language-toggle');
+    toggleLoading(languageToggle, true);
     
-    // Save to NVS via API
-    const languageIndex = LANGUAGES.indexOf(lang);
-    fetch('/api/settings', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            p41: languageIndex
+    try {
+        // Apply translation (now async to support lazy-loading)
+        await translate(lang);
+
+        // Save to NVS via API
+        const languageIndex = LANGUAGES.indexOf(lang);
+        await fetch('/api/settings', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                p41: languageIndex
+            })
         })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (!data || data.status !== 'ok') {
-            console.error('Error saving language preference:', data);
-        }
-    })
-    .catch(error => {
-        console.error('Error saving language preference:', error);
-    });
+        .then(response => response.json())
+        .then(data => {
+            if (!data || data.status !== 'ok') {
+                console.error('Error saving language preference:', data);
+            }
+        });
+    } catch (error) {
+        console.error('Error in changeLanguage:', error);
+    } finally {
+        toggleLoading(languageToggle, false);
+    }
 }
 
 // Track which sections have been initialized and which parameters have been loaded
@@ -764,8 +785,9 @@ function navigateToSection() {
         currentSection.style.display = 'block';
         
         // Update page title
-        el('page-title').textContent = 'Frixos - ' +
-            hash.charAt(0).toUpperCase() + hash.slice(1);
+        const sectionName = hash.charAt(0).toUpperCase() + hash.slice(1);
+        el('page-title').textContent = 'Frixos - ' + sectionName;
+        document.title = 'Frixos - ' + sectionName;
         
         // Update active menu item
         document.querySelectorAll('.menu-item').forEach(item => {
@@ -1198,16 +1220,19 @@ function addIfChanged(formData, key, newValue, oldValue) {
 function handleFormSubmit(e, formId) {
     e.preventDefault();
 
-    // Show "Saving..." message
-    showStatus(getMessage('saving_settings'), 'info');
-
     // Get the actual form element to verify fields belong to it
     const form = el(formId);
     if (!form) {
         console.error(`Form ${formId} not found`);
-        showStatus(getMessage('error_saving_unknown'), 'error');
         return;
     }
+
+    // Show "Saving..." message
+    showStatus(getMessage('saving_settings'), 'info');
+
+    // Toggle loading state on the submit button
+    const submitBtn = form.querySelector('button[type="submit"]');
+    toggleLoading(submitBtn, true);
 
     // Helper function to check if an element exists and belongs to this form
     function getFieldInForm(fieldId) {
@@ -1481,7 +1506,10 @@ function handleFormSubmit(e, formId) {
 
     // Save settings using shared function
     // Only network settings require restart notification
-    saveSettings(formData, networkSettingsChanged);
+    saveSettings(formData, networkSettingsChanged)
+        .finally(() => {
+            toggleLoading(submitBtn, false);
+        });
 }
 
 // Shared function to save settings
@@ -1617,6 +1645,9 @@ function startWifiScan() {
     // Update UI to show scanning state
     startScanningUI();
 
+    const scanBtn = el('scan-btn');
+    toggleLoading(scanBtn, true);
+
     // Request scan start
     fetch('/api/wifi/scan')
         .then(response => response.json())
@@ -1661,6 +1692,8 @@ function displayNetworks(networks) {
     const networkList = el('network-list');
     const loadingSpinner = el('loading-spinner');
     const loadingText = el('loading-text');
+    const scanBtn = el('scan-btn');
+    toggleLoading(scanBtn, false);
     
     // Safety check - if networkList doesn't exist, we can't proceed
     if (!networkList) {
@@ -1737,6 +1770,8 @@ function showNetworkError(message) {
     const networkList = el('network-list');
     const loadingSpinner = el('loading-spinner');
     const loadingText = el('loading-text');
+    const scanBtn = el('scan-btn');
+    toggleLoading(scanBtn, false);
     
     // Safety check - if networkList doesn't exist, we can't proceed
     if (!networkList) {
@@ -1806,6 +1841,9 @@ function setupSupportButtons() {
 
 function fetchStatus(includeLogs = false) {
     const url = includeLogs ? '/api/status?logs=1' : '/api/status';
+    const refreshBtn = el('refreshButton');
+    if (includeLogs) toggleLoading(refreshBtn, true);
+
     return fetch(url)
         .then(response => response.json())
         .then(data => {
@@ -1878,6 +1916,9 @@ function fetchStatus(includeLogs = false) {
             console.error('Error fetching status:', error);
             showStatus(getMessage('failed_fetch_status'), 'error');
             throw error; // Re-throw the error for other functions to handle
+        })
+        .finally(() => {
+            if (includeLogs) toggleLoading(refreshBtn, false);
         });
 }
 
@@ -1948,6 +1989,7 @@ function setupUpdateSection() {
         
         // Show uploading status
         showStatus(getMessage('uploading_file'), 'info');
+        toggleLoading(uploadButton, true);
         
         // Create FormData and append file
         const formData = new FormData();
@@ -2014,6 +2056,7 @@ function setupUpdateSection() {
     
     function resetForm() {
         firmwareFile.disabled = false;
+        toggleLoading(uploadButton, false);
         uploadButton.disabled = true;
         firmwareFile.value = '';
         progressContainer.style.display = 'none';
