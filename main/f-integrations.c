@@ -316,7 +316,7 @@ static bool fetch_ha_entity(integration_token_t *token)
     esp_http_client_config_t config = {
         .url = urlstr,
         .event_handler = ha_http_event_handler,
-        .timeout_ms = 3000,                 // Reduced timeout to 3 seconds
+        .timeout_ms = 8000,                 // 8 second timeout for SSL handshake
         .buffer_size = HTTP_BUFFER_SIZE,    // Use HTTP_BUFFER_SIZE
         .buffer_size_tx = HTTP_BUFFER_SIZE, // Use HTTP_BUFFER_SIZE
         .transport_type = HTTP_TRANSPORT_OVER_SSL,
@@ -345,7 +345,7 @@ static bool fetch_ha_entity(integration_token_t *token)
     snprintf(auth_header, AUTH_BUFFER_SIZE, "Bearer %.240s", eeprom_ha_token);
     esp_http_client_set_header(client, "Authorization", auth_header);
     esp_http_client_set_header(client, "Content-Type", "application/json");
-    esp_http_client_set_header(client, "Connection", "keep-close");
+    esp_http_client_set_header(client, "Connection", "close");
 
     // Add retry logic with exponential backoff
     int max_retries = 3;
