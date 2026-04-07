@@ -13,3 +13,7 @@
 ## 2026-04-06 - Optimized Status API Serialization
 **Learning:** Using `cJSON_Print()` for API responses on an embedded system is inefficient due to its "pretty-printing" overhead. The added whitespace and newlines increase heap allocation during string generation and inflate the network payload size without providing any benefit to the consuming web UI, which is agnostic to JSON formatting.
 **Action:** Use `cJSON_PrintUnformatted()` for all JSON API responses. This reduces the heap memory requirement for the serialized string and shrinks the network payload by approximately 23% for standard status objects, improving both system stability and response latency.
+
+## 2026-04-07 - Optimized Token Replacement in Scrolling Message
+**Learning:** The previous implementation of `replace_placeholders` performed redundant string copies into a temporary buffer and used a nested O(N*M) loop to match dynamic integration tokens (HA/Stock). Additionally, it called `strlen` repeatedly inside the matching loop, which is a hot path for the scrolling display.
+**Action:** Refactor `token_t` to include pre-calculated lengths. Iterate directly over the input string to eliminate the temporary buffer copy. Bind dynamic values directly in `prepare_tokens` to achieve O(N) replacement complexity. Use `memcpy` and `strlcpy` for faster string operations compared to `snprintf`.
