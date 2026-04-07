@@ -1387,22 +1387,23 @@ typedef struct
   char *value;
   int id;
   token_type_t type;
+  size_t len; // Optimization: store token length to avoid repeated strlen calls
 } token_t;
 
 // Define base tokens array
 static const token_t base_tokens[] = {
-    {"[device]", NULL, 1, TOKEN_TYPE_BASE},
-    {"[greeting]", NULL, 2, TOKEN_TYPE_BASE},
-    {"[day]", NULL, 3, TOKEN_TYPE_TIME},
-    {"[date]", NULL, 4, TOKEN_TYPE_TIME},
-    {"[mon]", NULL, 5, TOKEN_TYPE_TIME},
-    {"[temp]", NULL, 6, TOKEN_TYPE_WEATHER},
-    {"[hum]", NULL, 7, TOKEN_TYPE_WEATHER},
-    {"[high]", NULL, 8, TOKEN_TYPE_WEATHER},
-    {"[low]", NULL, 9, TOKEN_TYPE_WEATHER},
-    {"[rise]", NULL, 10, TOKEN_TYPE_WEATHER},
-    {"[set]", NULL, 11, TOKEN_TYPE_WEATHER},
-    {NULL, NULL, 0, TOKEN_TYPE_BASE} // End marker
+    {"[device]", NULL, 1, TOKEN_TYPE_BASE, 8},
+    {"[greeting]", NULL, 2, TOKEN_TYPE_BASE, 10},
+    {"[day]", NULL, 3, TOKEN_TYPE_TIME, 5},
+    {"[date]", NULL, 4, TOKEN_TYPE_TIME, 6},
+    {"[mon]", NULL, 5, TOKEN_TYPE_TIME, 5},
+    {"[temp]", NULL, 6, TOKEN_TYPE_WEATHER, 6},
+    {"[hum]", NULL, 7, TOKEN_TYPE_WEATHER, 5},
+    {"[high]", NULL, 8, TOKEN_TYPE_WEATHER, 6},
+    {"[low]", NULL, 9, TOKEN_TYPE_WEATHER, 5},
+    {"[rise]", NULL, 10, TOKEN_TYPE_WEATHER, 6},
+    {"[set]", NULL, 11, TOKEN_TYPE_WEATHER, 5},
+    {NULL, NULL, 0, TOKEN_TYPE_BASE, 0} // End marker
 };
 
 // Global token list that persists between calls
@@ -1470,6 +1471,7 @@ void prepare_tokens(void)
       all_tokens[prepared_tokens_count].id = prepared_tokens_count + i + 1;
       all_tokens[prepared_tokens_count].type = TOKEN_TYPE_HA;
       all_tokens[prepared_tokens_count].value = integration_active_tokens[INTEGRATION_HA][i].value;
+      all_tokens[prepared_tokens_count].len = strlen(all_tokens[prepared_tokens_count].token);
       prepared_tokens_count++;
     }
   }
@@ -1483,6 +1485,7 @@ void prepare_tokens(void)
       all_tokens[prepared_tokens_count].id = prepared_tokens_count + i + 1;
       all_tokens[prepared_tokens_count].type = TOKEN_TYPE_STOCK;
       all_tokens[prepared_tokens_count].value = integration_active_tokens[INTEGRATION_STOCK][i].value;
+      all_tokens[prepared_tokens_count].len = strlen(all_tokens[prepared_tokens_count].token);
       prepared_tokens_count++;
     }
   }
@@ -1497,6 +1500,7 @@ void prepare_tokens(void)
     all_tokens[prepared_tokens_count].id = prepared_tokens_count + 1;
     all_tokens[prepared_tokens_count].type = TOKEN_TYPE_GLUCOSE;
     all_tokens[prepared_tokens_count].value = NULL; // Will be formatted on-demand in replace_placeholders
+    all_tokens[prepared_tokens_count].len = strlen(all_tokens[prepared_tokens_count].token);
     prepared_tokens_count++;
     
     // Add [CGM:reading] token (will be formatted differently in replacement)
@@ -1504,6 +1508,7 @@ void prepare_tokens(void)
     all_tokens[prepared_tokens_count].id = prepared_tokens_count + 1;
     all_tokens[prepared_tokens_count].type = TOKEN_TYPE_GLUCOSE;
     all_tokens[prepared_tokens_count].value = NULL; // Will be formatted on-demand in replace_placeholders
+    all_tokens[prepared_tokens_count].len = strlen(all_tokens[prepared_tokens_count].token);
     prepared_tokens_count++;
   }
   // Check if Freestyle Libre is active
@@ -1514,6 +1519,7 @@ void prepare_tokens(void)
     all_tokens[prepared_tokens_count].id = prepared_tokens_count + 1;
     all_tokens[prepared_tokens_count].type = TOKEN_TYPE_GLUCOSE;
     all_tokens[prepared_tokens_count].value = NULL; // Will be formatted on-demand in replace_placeholders
+    all_tokens[prepared_tokens_count].len = strlen(all_tokens[prepared_tokens_count].token);
     prepared_tokens_count++;
     
     // Add [CGM:reading] token (will be formatted differently in replacement)
@@ -1521,6 +1527,7 @@ void prepare_tokens(void)
     all_tokens[prepared_tokens_count].id = prepared_tokens_count + 1;
     all_tokens[prepared_tokens_count].type = TOKEN_TYPE_GLUCOSE;
     all_tokens[prepared_tokens_count].value = NULL; // Will be formatted on-demand in replace_placeholders
+    all_tokens[prepared_tokens_count].len = strlen(all_tokens[prepared_tokens_count].token);
     prepared_tokens_count++;
   }
   else if (integration_active[INTEGRATION_NIGHTSCOUT])
@@ -1530,6 +1537,7 @@ void prepare_tokens(void)
     all_tokens[prepared_tokens_count].id = prepared_tokens_count + 1;
     all_tokens[prepared_tokens_count].type = TOKEN_TYPE_GLUCOSE;
     all_tokens[prepared_tokens_count].value = NULL; // Will be formatted on-demand in replace_placeholders
+    all_tokens[prepared_tokens_count].len = strlen(all_tokens[prepared_tokens_count].token);
     prepared_tokens_count++;
     
     // Add [CGM:reading] token (will be formatted differently in replacement)
@@ -1537,6 +1545,7 @@ void prepare_tokens(void)
     all_tokens[prepared_tokens_count].id = prepared_tokens_count + 1;
     all_tokens[prepared_tokens_count].type = TOKEN_TYPE_GLUCOSE;
     all_tokens[prepared_tokens_count].value = NULL; // Will be formatted on-demand in replace_placeholders
+    all_tokens[prepared_tokens_count].len = strlen(all_tokens[prepared_tokens_count].token);
     prepared_tokens_count++;
   }
 
@@ -1544,12 +1553,14 @@ void prepare_tokens(void)
   all_tokens[prepared_tokens_count].token = NULL;
   all_tokens[prepared_tokens_count].id = 0;
   all_tokens[prepared_tokens_count].type = TOKEN_TYPE_BASE;
+  all_tokens[prepared_tokens_count].len = 0;
 
   // Update prepared tokens
   prepared_tokens = (const token_t *)all_tokens;
 }
 
 // Function to replace tokens in a string
+// Optimization: Direct iteration over input, pre-calculated token lengths, and O(N) lookup for dynamic values.
 void replace_placeholders(const char *input, char *output, size_t output_size)
 {
   // Add null pointer and size checks
@@ -1569,16 +1580,15 @@ void replace_placeholders(const char *input, char *output, size_t output_size)
     prepare_tokens();
   }
 
-  char temp[SCROLL_MSG_LENGTH];
-  char *src = temp;
+  const char *src = input;
   char *dst = output;
   char *end = output + output_size - 1;
 
   // Get current local time for greeting calculation
-  time_t now;
+  time_t now_time;
   struct tm current_timeinfo;
-  time(&now);
-  localtime_r(&now, &current_timeinfo);
+  time(&now_time);
+  localtime_r(&now_time, &current_timeinfo);
 
   // replace greeting with good morning, good afternoon, good evening, or good night.
   // Use language-specific greetings based on eeprom_language
@@ -1614,27 +1624,8 @@ void replace_placeholders(const char *input, char *output, size_t output_size)
 
   ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Greeting hour %d: %s", current_timeinfo.tm_hour, greeting);
 
-  // Copy input to temp buffer with proper bounds checking
-  size_t input_len = strlen(input);
-  if (input_len >= sizeof(temp))
-  {
-    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Input string truncated");
-    input_len = sizeof(temp) - 1;
-  }
-  strncpy(temp, input, input_len);
-  temp[input_len] = '\0';
-
   // Initialize output buffer
   output[0] = '\0';
-
-  // ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Prepared tokens: %d", prepared_tokens_count);
-  // debug: show all tokens
-  for (int i = 0; i < prepared_tokens_count; i++)
-  {
-    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Token %d: %s=%s", i,
-                prepared_tokens[i].token ? prepared_tokens[i].token : "null",
-                prepared_tokens[i].value ? prepared_tokens[i].value : "null");
-  }
 
   while (*src && dst < end)
   {
@@ -1644,21 +1635,23 @@ void replace_placeholders(const char *input, char *output, size_t output_size)
       const token_t *token = prepared_tokens;
       while (token->token)
       {
-        if (strncmp(src, token->token, strlen(token->token)) == 0)
+        if (strncmp(src, token->token, token->len) == 0)
         {
           // Found a match, handle it in switch
           char replacement[64];
-          strcpy(replacement, "-");
+          replacement[0] = '-';
+          replacement[1] = '\0';
+
           switch (token->type)
           {
           case TOKEN_TYPE_BASE:
             switch (token->id)
             {
             case 1: // [device]
-              snprintf(replacement, sizeof(replacement), "%s", eeprom_hostname);
+              strlcpy(replacement, eeprom_hostname, sizeof(replacement));
               break;
             case 2: // [greeting]
-              snprintf(replacement, sizeof(replacement), "%s", greeting);
+              strlcpy(replacement, greeting, sizeof(replacement));
               break;
             }
             break;
@@ -1667,13 +1660,13 @@ void replace_placeholders(const char *input, char *output, size_t output_size)
             switch (token->id)
             {
             case 3: // [day]
-              snprintf(replacement, sizeof(replacement), "%s", day_names[lang_index][timeinfo.tm_wday]);
+              strlcpy(replacement, day_names[lang_index][timeinfo.tm_wday], sizeof(replacement));
               break;
             case 4: // [date]
               snprintf(replacement, sizeof(replacement), "%d", timeinfo.tm_mday);
               break;
             case 5: // [mon]
-              snprintf(replacement, sizeof(replacement), "%s", month_names[lang_index][timeinfo.tm_mon]);
+              strlcpy(replacement, month_names[lang_index][timeinfo.tm_mon], sizeof(replacement));
               break;
             }
             break;
@@ -1681,7 +1674,6 @@ void replace_placeholders(const char *input, char *output, size_t output_size)
           case TOKEN_TYPE_WEATHER:
             if (!weather_valid)
             {
-              strcpy(replacement, "-");
               break;
             }
             switch (token->id)
@@ -1763,41 +1755,11 @@ void replace_placeholders(const char *input, char *output, size_t output_size)
             break;
 
           case TOKEN_TYPE_HA:
-            // Find the corresponding HA token by name
-            if (integration_active_tokens[INTEGRATION_HA] != NULL)
-            {
-              for (int i = 0; i < integration_active_tokens_count[INTEGRATION_HA]; i++)
-              {
-                if (integration_active_tokens[INTEGRATION_HA][i].name != NULL && integration_active_tokens[INTEGRATION_HA][i].name[0] != '\0' && integration_active_tokens[INTEGRATION_HA][i].value[0] != '\0')
-                {
-                  ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Check HA %s", integration_active_tokens[INTEGRATION_HA][i].name);
-                  if (integration_active_tokens[INTEGRATION_HA][i].name != NULL && strcmp(integration_active_tokens[INTEGRATION_HA][i].name, token->token) == 0)
-                  {
-                    snprintf(replacement, sizeof(replacement), "%s", integration_active_tokens[INTEGRATION_HA][i].value);
-                    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "HA %s=%s", token->token, integration_active_tokens[INTEGRATION_HA][i].value);
-                    break;
-                  }
-                }
-              }
-            }
-            break;
-
           case TOKEN_TYPE_STOCK:
-            // Find the corresponding stock token by name
-            if (integration_active_tokens[INTEGRATION_STOCK] != NULL)
+            // Optimization: dynamic values are already linked in prepare_tokens
+            if (token->value && token->value[0] != '\0')
             {
-              for (int i = 0; i < integration_active_tokens_count[INTEGRATION_STOCK]; i++)
-              {
-                if (integration_active_tokens[INTEGRATION_STOCK][i].name != NULL && integration_active_tokens[INTEGRATION_STOCK][i].name[0] != '\0' && integration_active_tokens[INTEGRATION_STOCK][i].value[0] != '\0')
-                {
-                  if (integration_active_tokens[INTEGRATION_STOCK][i].name != NULL && strcmp(integration_active_tokens[INTEGRATION_STOCK][i].name, token->token) == 0)
-                  {
-                    snprintf(replacement, sizeof(replacement), "%s", integration_active_tokens[INTEGRATION_STOCK][i].value);
-                    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Stock %s=%s", token->token, integration_active_tokens[INTEGRATION_STOCK][i].value);
-                    break;
-                  }
-                }
-              }
+              strlcpy(replacement, token->value, sizeof(replacement));
             }
             break;
 
@@ -1824,10 +1786,19 @@ void replace_placeholders(const char *input, char *output, size_t output_size)
           }
 
           // Copy the replacement to output with bounds checking
-          int len = snprintf(dst, end - dst + 1, "%s", replacement);
-          if (len > 0 && len < (end - dst + 1))
-            dst += len;
-          src += strlen(token->token);
+          size_t rem = end - dst + 1;
+          size_t rlen = strlen(replacement);
+          if (rlen < rem)
+          {
+            memcpy(dst, replacement, rlen);
+            dst += rlen;
+          }
+          else if (rem > 1)
+          {
+            memcpy(dst, replacement, rem - 1);
+            dst += rem - 1;
+          }
+          src += token->len;
           goto next_char;
         }
         token++;
