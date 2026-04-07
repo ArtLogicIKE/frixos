@@ -1010,6 +1010,11 @@ h1 {
     margin: 0 auto;
 }
 
+.message-tokens ul{list-style:none;padding-left:0 !important}.message-tokens li{margin-bottom:8px}
+.message-tokens code{cursor:pointer;background-color:var(--input-bg);border:1px solid var(--border-color);padding:2px 6px;border-radius:4px;transition:all .2s;user-select:none;display:inline-block;font-family:monospace;color:var(--primary-color)}
+.message-tokens code:hover{border-color:var(--primary-color);background-color:var(--section-content-bg);transform:translateY(-1px)}
+.message-tokens code:active{transform:translateY(0)}.message-tokens code:focus-visible{outline:2px solid var(--primary-color);outline-offset:2px}
+
 .message-counter {
     width: 100%;
     text-align: right;

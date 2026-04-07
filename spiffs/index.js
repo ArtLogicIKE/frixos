@@ -2120,6 +2120,21 @@ function setupRestartSection() {
     });
 }
 
+function setupTokenClicking() {
+    const container = document.querySelector('.message-tokens'), input = el('message'), counter = el('message-counter');
+    if (!container || !input) return;
+    const insert = (token) => {
+        const start = input.selectionStart, end = input.selectionEnd, val = input.value;
+        if (val.length + token.length > 511) return;
+        input.value = val.substring(0, start) + token + val.substring(end);
+        input.setSelectionRange(start + token.length, start + token.length);
+        input.focus();
+        if (counter) counter.textContent = `${input.value.length} / 511`;
+    };
+    container.addEventListener('click', (e) => { if (e.target.tagName === 'CODE') insert(e.target.textContent); });
+    container.addEventListener('keydown', (e) => { if (e.target.tagName === 'CODE' && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); insert(e.target.textContent); } });
+}
+
 function resetDevice() {
     showStatus(getMessage('sending_reset'), 'warning');
     
@@ -2180,6 +2195,8 @@ function setupAdvancedSection() {
                 messageCounter.textContent = `${this.value.length} / 511`;
             });
         }
+
+        setupTokenClicking();
     }
 
     // Populate fields if settings are loaded
