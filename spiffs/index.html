@@ -83,18 +83,18 @@
                     <div class="section-content">
                         <div class="form-group">
                             <label for="wifi_ssid" data-i18n="settings.connection.wifi_ssid">WiFi SSID</label>
-                            <input type="text" id="wifi_ssid" name="wifi_ssid">
+                            <input type="text" id="wifi_ssid" name="wifi_ssid" autocomplete="username">
                         </div>
                         <div class="form-group">
                             <label for="wifi_pass" data-i18n="settings.connection.wifi_password">WiFi Password</label>
                             <div class="password-input-wrapper">
-                                <input type="password" id="wifi_pass" name="wifi_pass">
+                                <input type="password" id="wifi_pass" name="wifi_pass" autocomplete="current-password">
                                 <button type="button" class="password-toggle" aria-label="Toggle password visibility">👁️</button>
                             </div>
                         </div>
                         <div class="form-group">
                             <label for="hostname" data-i18n="settings.connection.hostname">Hostname</label>
-                            <input type="text" id="hostname" name="hostname" required>
+                            <input type="text" id="hostname" name="hostname" required aria-required="true">
                             <span id="hostname-error" class="input-error"></span>
                         </div>
                         <div class="checkbox-container">
@@ -748,7 +748,8 @@
                                 data-i18n="integrations.glucose_monitors.username">Username</label>
                             <input type="text" id="eeprom_glucose_username" name="eeprom_glucose_username"
                                 maxlength="64"
-                                data-i18n-placeholder="integrations.glucose_monitors.username_placeholder">
+                                data-i18n-placeholder="integrations.glucose_monitors.username_placeholder"
+                                autocomplete="username">
                             <span id="eeprom_glucose_username-error" class="input-error"></span>
                         </div>
                         <div class="form-group">
@@ -757,7 +758,8 @@
                             <div class="password-input-wrapper">
                                 <input type="password" id="eeprom_glucose_password" name="eeprom_glucose_password"
                                     maxlength="64"
-                                    data-i18n-placeholder="integrations.glucose_monitors.password_placeholder">
+                                    data-i18n-placeholder="integrations.glucose_monitors.password_placeholder"
+                                    autocomplete="current-password">
                                 <button type="button" class="password-toggle" aria-label="Toggle password visibility">👁️</button>
                             </div>
                             <span id="eeprom_glucose_password-error" class="input-error"></span>

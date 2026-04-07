@@ -409,7 +409,10 @@ h1 {
     flex-basis: 100%;
 }
 
-.input-invalid {
+.input-invalid,
+input[aria-invalid="true"],
+select[aria-invalid="true"],
+textarea[aria-invalid="true"] {
     border-color: var(--error-color) !important;
     outline-color: var(--error-color) !important;
     box-shadow: 0 0 0 1px var(--error-color) !important;

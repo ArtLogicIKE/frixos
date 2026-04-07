@@ -641,6 +641,9 @@ document.addEventListener('DOMContentLoaded', function() {
             // Setup additional field validations
             setupFieldValidations();
             
+            // Initialize accessibility
+            initA11y();
+
             setupAdvancedSection();
             setupStatusSection();
             setupUpdateSection();
@@ -875,6 +878,21 @@ function toggleSection(header) {
     section.classList.toggle('collapsed');
 }
 
+// Function to initialize accessibility attributes
+function initA11y() {
+    // Link inputs to error labels, counters, and token masks via aria-describedby
+    const selectors = '.input-error, #message-counter, .token-mask, [data-i18n="advanced.message.scroll_delay_help"]';
+    document.querySelectorAll(selectors).forEach(el_desc => {
+        let inputId = el_desc.id ? el_desc.id.replace(/-(error|counter|mask|help)/, '') : '';
+        if (el_desc.dataset.i18n === 'advanced.message.scroll_delay_help') inputId = 'scroll_delay';
+        const input = el(inputId);
+        if (!input) return;
+        if (!el_desc.id) el_desc.id = inputId + '-help';
+        const desc = input.getAttribute('aria-describedby') || '';
+        if (!desc.includes(el_desc.id)) input.setAttribute('aria-describedby', (desc + ' ' + el_desc.id).trim());
+    });
+}
+
 // Function to validate input fields according to specified constraints
 function setupFieldValidations() {
     // Common validator functions
@@ -984,10 +1002,12 @@ function setupFieldValidations() {
             
             if (errorMessage) {
                 input.classList.add('input-invalid');
+                input.setAttribute('aria-invalid', 'true');
                 error.textContent = errorMessage;
                 error.style.display = 'block';
             } else {
                 input.classList.remove('input-invalid');
+                input.setAttribute('aria-invalid', 'false');
                 error.style.display = 'none';
             }
         });
@@ -998,6 +1018,7 @@ function setupFieldValidations() {
             
             if (errorMessage) {
                 input.classList.add('input-invalid');
+                input.setAttribute('aria-invalid', 'true');
                 error.textContent = errorMessage;
                 error.style.display = 'block';
             }
@@ -1025,6 +1046,7 @@ function setupFieldValidations() {
                 if (errorMessage) {
                     e.preventDefault(); // Prevent form submission
                     input.classList.add('input-invalid');
+                    input.setAttribute('aria-invalid', 'true');
                     error.textContent = errorMessage;
                     error.style.display = 'block';
                     
@@ -1075,10 +1097,12 @@ function setupHostnameValidation() {
         
         if (errorMessage) {
             hostnameInput.classList.add('input-invalid');
+            hostnameInput.setAttribute('aria-invalid', 'true');
             hostnameError.textContent = errorMessage;
             hostnameError.style.display = 'block';
         } else {
             hostnameInput.classList.remove('input-invalid');
+            hostnameInput.setAttribute('aria-invalid', 'false');
             hostnameError.style.display = 'none';
         }
     });
@@ -1095,6 +1119,7 @@ function setupHostnameValidation() {
                 if (errorMessage) {
                     e.preventDefault(); // Prevent form submission
                     hostnameInput.classList.add('input-invalid');
+                    hostnameInput.setAttribute('aria-invalid', 'true');
                     hostnameError.textContent = errorMessage;
                     hostnameError.style.display = 'block';
                     hostnameInput.focus();
