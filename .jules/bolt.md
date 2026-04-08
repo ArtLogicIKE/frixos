@@ -17,3 +17,7 @@
 ## 2026-04-07 - Optimized Token Replacement in Scrolling Message
 **Learning:** The previous implementation of `replace_placeholders` performed redundant string copies into a temporary buffer and used a nested O(N*M) loop to match dynamic integration tokens (HA/Stock). Additionally, it called `strlen` repeatedly inside the matching loop, which is a hot path for the scrolling display.
 **Action:** Refactor `token_t` to include pre-calculated lengths. Iterate directly over the input string to eliminate the temporary buffer copy. Bind dynamic values directly in `prepare_tokens` to achieve O(N) replacement complexity. Use `memcpy` and `strlcpy` for faster string operations compared to `snprintf`.
+
+## 2026-04-08 - High-Frequency Loop Optimization in Display Task
+**Learning:** Frequent system calls and library updates in high-frequency tasks (e.g., the 65ms display loop) create significant CPU overhead. Specifically, restarting an `esp_timer` (watchdog) and calling `lv_obj_set_style_opa` (breathing dots) every iteration triggered expensive system context switches and internal LVGL invalidations, even when states remained identical.
+**Action:** Replace `esp_timer_stop`/`start` with a simple `volatile` heartbeat counter that a slow periodic timer callback (30s) monitors for progress. Implement a state-and-value guard for breathing dots to ensure `lv_obj_set_style_opa` and port locks only occur on actual changes. This pattern preserves CPU cycles for critical rendering tasks.

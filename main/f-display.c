@@ -875,17 +875,28 @@ void show_qr_code(void)
   lvgl_port_unlock();
 }
 
-// Watchdog callback function (defined outside display_task)
+// Watchdog mechanism for display task hang detection
 static volatile bool watchdog_triggered = false;
+static volatile uint32_t display_task_heartbeat = 0;
+static uint32_t last_display_task_heartbeat = 0xFFFFFFFF;
 
 static void watchdog_callback(void *arg)
 {
-  ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Watchdog: display task hung");
-  watchdog_triggered = true;
-  // Force a system restart after 5 seconds if the task is still hung
-  ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Restart in 5s (display hang)");
-  // Note: In a real implementation, you might want to call esp_restart() directly
-  // or use a proper restart mechanism. For now, we'll just log the issue.
+  // Optimization: Use a lightweight heartbeat counter check instead of resetting the timer.
+  // This avoids expensive system calls in the high-frequency display loop.
+  if (display_task_heartbeat == last_display_task_heartbeat)
+  {
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Watchdog: display task hung (heartbeat %lu)", display_task_heartbeat);
+    watchdog_triggered = true;
+    // Force a system restart after 5 seconds if the task is still hung
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Restart in 5s (display hang)");
+    // Note: In a real implementation, you might want to call esp_restart() directly
+    // or use a proper restart mechanism. For now, we'll just log the issue.
+  }
+  else
+  {
+    last_display_task_heartbeat = display_task_heartbeat;
+  }
 }
 
 static int last_integration_update_hour = -1; // Track last hour we updated integration message
@@ -1237,6 +1248,9 @@ void display_task(void *pvParameters)
   esp_timer_handle_t watchdog_timer = NULL;
   esp_timer_create_args_t watchdog_args = {.callback = watchdog_callback, .name = "display_watchdog"};
   esp_timer_create(&watchdog_args, &watchdog_timer);
+  // Start the watchdog timer periodically (every 30 seconds).
+  // The display_task will increment a heartbeat counter, and this timer's callback
+  // will verify that the counter is still advancing.
   esp_timer_start_periodic(watchdog_timer, 30000000);
 
   TickType_t lastrun_tick = xTaskGetTickCount();
@@ -1285,21 +1299,38 @@ void display_task(void *pvParameters)
       float opacity_factor = ease_in_out_quad(t);
       int opacity = (int)(opacity_factor * 255);
 
-      // Apply opacity to the dots
-      lvgl_port_lock(0);
-      if (eeprom_dots_breathe == 1 || showing_glucose)
+      // Bolt Optimization: Guard against redundant LVGL style updates and port locks.
+      // Breathing is often disabled, yet the fade timer continues to trigger every 200ms.
+      static int last_op = -1;
+      static bool last_disabled = false;
+      bool currently_disabled = (eeprom_dots_breathe == 1 || showing_glucose);
+
+      if (currently_disabled)
       {
-        // Breathing disabled - show dots at full brightness
-        lv_obj_set_style_opa(dots[0], 255, LV_PART_MAIN);
-        lv_obj_set_style_opa(dots[1], 255, LV_PART_MAIN);
+        if (!last_disabled)
+        {
+          // Breathing newly disabled - show dots at full brightness once
+          lvgl_port_lock(0);
+          lv_obj_set_style_opa(dots[0], 255, LV_PART_MAIN);
+          lv_obj_set_style_opa(dots[1], 255, LV_PART_MAIN);
+          lvgl_port_unlock();
+          last_disabled = true;
+          last_op = 255;
+        }
       }
       else
       {
-        // Breathing enabled - use variable opacity
-        lv_obj_set_style_opa(dots[0], opacity, LV_PART_MAIN);
-        lv_obj_set_style_opa(dots[1], 255 - opacity, LV_PART_MAIN);
+        // Breathing enabled - update only if opacity changed or if we were previously disabled
+        if (opacity != last_op || last_disabled)
+        {
+          lvgl_port_lock(0);
+          lv_obj_set_style_opa(dots[0], opacity, LV_PART_MAIN);
+          lv_obj_set_style_opa(dots[1], 255 - opacity, LV_PART_MAIN);
+          lvgl_port_unlock();
+          last_op = opacity;
+          last_disabled = false;
+        }
       }
-      lvgl_port_unlock();
     }
 
     // Check if IP display timer has expired
@@ -1345,9 +1376,10 @@ void display_task(void *pvParameters)
       display_changed();
     }
 
-    // Feed the watchdog timer by stopping and restarting it
-    esp_timer_stop(watchdog_timer);
-    esp_timer_start_periodic(watchdog_timer, 30000000);
+    // Bolt Optimization: Feed the watchdog using a lightweight heartbeat counter.
+    // This replaces the overhead-heavy esp_timer_stop/start_periodic calls
+    // which were executing every ~65ms in the high-frequency display loop.
+    display_task_heartbeat++;
 
     // vTaskDelay(pdMS_TO_TICKS(eeprom_scroll_delay));
     xTaskDelayUntil(&lastrun_tick, pdMS_TO_TICKS(eeprom_scroll_delay)); // this is probably causing jumpy scrolling
