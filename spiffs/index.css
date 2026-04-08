@@ -1021,6 +1021,11 @@ textarea[aria-invalid="true"] {
     margin-top: 4px;
 }
 
+.token-code { cursor: pointer; padding: 2px 4px; border-radius: 4px; background-color: var(--section-header-bg); transition: all 0.2s; display: inline-block; border: 1px solid var(--border-color); }
+.token-code:hover { background-color: var(--primary-color); color: white; }
+.token-code:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
+.token-code:active { transform: scale(0.95); }
+
 @media (max-width: 768px) and (hover: none) and (pointer: coarse) {
     .font-samples-container {
         margin: 0 -10px;

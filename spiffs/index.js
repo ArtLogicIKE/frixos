@@ -47,7 +47,8 @@ const translations = {
             show_password: 'Show password',
             hide_password: 'Hide password',
             change_language: 'Change language',
-            toggle_theme: 'Toggle theme'
+            toggle_theme: 'Toggle theme',
+            insert: 'Insert'
         },
         settings: {
             connection: {
@@ -423,6 +424,12 @@ async function translate(lang) {
                 button.setAttribute('aria-label', translation);
             }
         }
+    });
+
+    // Update token ARIA labels after language change
+    document.querySelectorAll('.token-code').forEach(token => {
+        const insertLabel = getNestedTranslation(trans, 'common.insert') || 'Insert';
+        token.setAttribute('aria-label', `${insertLabel} ${token.textContent}`);
     });
 
     const nameElement = el('current-language-name');
@@ -2197,12 +2204,22 @@ function setupAdvancedSection() {
             advancedForm.addEventListener('submit', (e) => handleFormSubmit(e, 'advancedForm'));
         }
 
-        // Setup message character counter
+        // Setup message character counter and interactive tokens
         const messageInput = el('message');
-        const messageCounter = el('message-counter');
-        if (messageInput && messageCounter) {
-            messageInput.addEventListener('input', function() {
-                messageCounter.textContent = `${this.value.length} / 511`;
+        if (messageInput) {
+            messageInput.addEventListener('input', () => el('message-counter').textContent = `${messageInput.value.length} / 511`);
+            document.querySelectorAll('.token-code').forEach(t => {
+                const insert = () => {
+                    const s = messageInput.selectionStart, e = messageInput.selectionEnd, v = messageInput.value, text = t.textContent;
+                    messageInput.value = v.slice(0, s) + text + v.slice(e);
+                    messageInput.setSelectionRange(s + text.length, s + text.length);
+                    messageInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    messageInput.focus();
+                };
+                t.onclick = insert;
+                t.onkeydown = (e) => ['Enter', ' '].includes(e.key) && (e.preventDefault(), insert());
+                const updateA11y = () => t.setAttribute('aria-label', `${getNestedTranslation(translations[currentLanguage] || translations.en, 'common.insert') || 'Insert'} ${t.textContent}`);
+                updateA11y();
             });
         }
     }

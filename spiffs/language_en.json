@@ -13,7 +13,8 @@
     "show_password": "Show password",
     "hide_password": "Hide password",
     "change_language": "Change language",
-    "toggle_theme": "Toggle theme"
+    "toggle_theme": "Toggle theme",
+    "insert": "Insert"
   },
   "settings": {
     "connection": {
