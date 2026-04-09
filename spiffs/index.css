@@ -806,6 +806,28 @@ textarea[aria-invalid="true"] {
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
+.network-item:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+    background-color: var(--section-content-bg);
+}
+
+.input-highlight {
+    animation: input-highlight 1s ease-out;
+}
+
+@keyframes input-highlight {
+    0% {
+        box-shadow: 0 0 0 0 rgba(0, 170, 255, 0);
+    }
+    30% {
+        box-shadow: 0 0 0 4px rgba(0, 170, 255, 0.4);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(0, 170, 255, 0);
+    }
+}
+
 .signal-strength {
     display: flex;
     align-items: center;
