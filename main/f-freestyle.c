@@ -150,10 +150,10 @@ void generateSHA256(const unsigned char* text, char* hash)
 	mbedtls_md_finish(&ctx, (unsigned char*)binhash);
 	mbedtls_md_free(&ctx);
     
-    // now convert the hash to a hexadecimal string
+    // now convert the hash to a hexadecimal string (3 = 2 hex digits + NUL each step)
     for (int i = 0; i < 32; i++)
     {
-        sprintf(hash + i*2, "%02x", binhash[i]);
+        snprintf(hash + i * 2, 3, "%02x", (unsigned char)binhash[i]);
     }
     hash[64] = '\0';
    // ESP_LOG_WEB(ESP_LOG_INFO, TAG, "SHA256 source: %.32s, hash: %.32s", text, hash);    
@@ -622,6 +622,16 @@ bool login_freestyle(void)
     cJSON_AddStringToObject(login_json, "password", eeprom_glucose_password);
     char *post_data = cJSON_PrintUnformatted(login_json);
     cJSON_Delete(login_json);
+
+    if (!post_data)
+    {
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "cJSON_PrintUnformatted failed (login body)");
+        release_shared_buffer(freestyle_response_buffer);
+        freestyle_response_buffer = NULL;
+        release_ssl_semaphore();
+        login_freestyle_in_progress = false;
+        return false;
+    }
 
     esp_http_client_set_post_field(freestyle_client, post_data, strlen(post_data));
 

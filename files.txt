@@ -63,15 +63,15 @@ kaboom-font.jpg
 ficasso-font.jpg
 lichten-font.jpg
 timezone.txt
-language_en.json
 robrito-font.jpg
 kablame-font.jpg
+language_en.json
 language_da.json
 language_sv.json
 language_it.json
 language_pl.json
-language_de.json
 language_pt.json
+language_de.json
 language_es.json
 language_fr.json
 index.css
