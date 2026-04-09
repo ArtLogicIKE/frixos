@@ -66,7 +66,8 @@ const translations = {
                 scanning: 'Scanning for networks...',
                 scan_button: 'Scan available networks',
                 no_scan_message: 'Click "Scan available networks" to see WiFi networks',
-                no_networks: 'No networks found'
+                no_networks: 'No networks found',
+                connect_to: 'Connect to'
             }
         },
         advanced: {
@@ -1757,7 +1758,20 @@ function displayNetworks(networks) {
     networks.forEach(network => {
         const networkItem = document.createElement('div');
         networkItem.className = 'network-item';
+        networkItem.setAttribute('role', 'button');
+        networkItem.setAttribute('tabindex', '0');
+
+        const trans = translations[currentLanguage] || translations.en;
+        const connectTo = getNestedTranslation(trans, 'settings.wifi.connect_to') || 'Connect to';
+        networkItem.setAttribute('aria-label', `${connectTo} ${network.ssid}, signal strength ${network.signal_strength}%`);
+
         networkItem.onclick = () => selectNetwork(network.ssid);
+        networkItem.onkeydown = (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                selectNetwork(network.ssid);
+            }
+        };
 
         // Create network name element
         const nameSpan = document.createElement('span');
@@ -1794,7 +1808,12 @@ function displayNetworks(networks) {
 }
 
 function selectNetwork(ssid) {
-    el('wifi_ssid').value = ssid;
+    const ssidInput = el('wifi_ssid');
+    ssidInput.value = ssid;
+    ssidInput.classList.add('input-highlight');
+    setTimeout(() => {
+        ssidInput.classList.remove('input-highlight');
+    }, 1000);
     el('wifi_pass').focus();
 }
 
