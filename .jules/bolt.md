@@ -21,3 +21,7 @@
 ## 2026-04-08 - High-Frequency Loop Optimization in Display Task
 **Learning:** Frequent system calls and library updates in high-frequency tasks (e.g., the 65ms display loop) create significant CPU overhead. Specifically, restarting an `esp_timer` (watchdog) and calling `lv_obj_set_style_opa` (breathing dots) every iteration triggered expensive system context switches and internal LVGL invalidations, even when states remained identical.
 **Action:** Replace `esp_timer_stop`/`start` with a simple `volatile` heartbeat counter that a slow periodic timer callback (30s) monitors for progress. Implement a state-and-value guard for breathing dots to ensure `lv_obj_set_style_opa` and port locks only occur on actual changes. This pattern preserves CPU cycles for critical rendering tasks.
+
+## 2025-04-09 - Optimized Settings API Parameter Filtering
+**Learning:** The Settings API was using a shared static buffer for query parameters, which led to a bug where multiple filters could not be applied simultaneously (the second filter would overwrite the first). Additionally, filtering logic performed O(N*M) string parsing and comparisons for every request, where N is the number of parameters (~55) and M is the number of tokens in the filter.
+**Action:** Replace repeated string parsing with a one-time calculation of an inclusion bitmask. Refactor query parameter retrieval to use caller-provided buffers to eliminate shared state bugs. Use bitwise AND operations for O(1) inclusion checks per parameter.
