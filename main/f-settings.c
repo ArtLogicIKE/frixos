@@ -386,6 +386,67 @@ esp_err_t generic_file_handler(httpd_req_t *req)
 
 #define MAX_LOG_LINE_LENGTH 256 // Maximum characters per log line chunk
 
+// Helper: format a C string as a JSON-escaped string literal (with quotes).
+// Writes to buf, returns the number of bytes written (excluding null terminator).
+static int format_json_string(char *buf, int buf_size, const char *str)
+{
+    int j = 0;
+    if (j < buf_size - 1) buf[j++] = '"';
+    for (int i = 0; str[i] && j < buf_size - 2; i++)
+    {
+        unsigned char c = (unsigned char)str[i];
+        if (c == '"' || c == '\\')
+        {
+            if (j + 2 > buf_size - 2) break;
+            buf[j++] = '\\';
+            buf[j++] = c;
+        }
+        else if (c == '\n')
+        {
+            if (j + 2 > buf_size - 2) break;
+            buf[j++] = '\\';
+            buf[j++] = 'n';
+        }
+        else if (c == '\r')
+        {
+            continue;
+        }
+        else if (c == '\t')
+        {
+            if (j + 2 > buf_size - 2) break;
+            buf[j++] = '\\';
+            buf[j++] = 't';
+        }
+        else if (c < 0x20)
+        {
+            if (j + 6 > buf_size - 2) break;
+            j += snprintf(buf + j, buf_size - j, "\\u%04x", c);
+        }
+        else
+        {
+            buf[j++] = c;
+        }
+    }
+    if (j < buf_size) buf[j++] = '"';
+    if (j < buf_size) buf[j] = '\0';
+    return j;
+}
+
+// Helper: send a string as a JSON array element via chunked HTTP transfer.
+// Handles comma separation between elements. Sets *first to false after first call.
+static void stream_json_array_string(httpd_req_t *req, const char *str, bool *first)
+{
+    char buf[1100];
+    int off = 0;
+    if (!*first)
+    {
+        buf[off++] = ',';
+    }
+    *first = false;
+    off += format_json_string(buf + off, sizeof(buf) - off, str);
+    httpd_resp_send_chunk(req, buf, off);
+}
+
 // Helper function to get query parameter value from URI
 static const char *get_query_param(const char *uri, const char *param_name, char *out_buf, size_t out_len)
 {
@@ -1986,45 +2047,56 @@ esp_err_t status_api_handler(httpd_req_t *req)
     cJSON_AddStringToObject(root, "longitude", my_lon);
     cJSON_AddStringToObject(root, "timezone", my_timezone);
 
-    // Add system logs and integration tokens only if requested via logs=1
     if (include_logs)
     {
-        // Add system logs
-        cJSON *logs_array = cJSON_CreateArray();
-        if (logs_array)
+        // Memory optimization: use chunked HTTP transfer to stream logs and
+        // integration info directly, instead of building a large cJSON tree
+        // (which would require ~15-20 KB peak heap for tree + serialized string).
+        // This approach keeps peak heap at ~4 KB.
+
+        // Serialize the base status fields (small, ~1-2 KB)
+        char *base_json = cJSON_PrintUnformatted(root);
+        track_memory_free(sizeof(cJSON));
+        cJSON_Delete(root);
+        root = NULL;
+
+        if (!base_json)
         {
-            if (weblog.capacity > 0 && weblog.buffer != NULL)
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to create response");
+            goto cleanup;
+        }
+
+        // Send base JSON without the closing '}' — we'll append more fields
+        size_t base_len = strlen(base_json);
+        httpd_resp_send_chunk(req, base_json, base_len - 1);
+        free(base_json);
+
+        // Stream system_logs array directly from circular buffer
+        httpd_resp_send_chunk(req, ",\"system_logs\":[", HTTPD_RESP_USE_STRLEN);
+        if (weblog.capacity > 0 && weblog.buffer != NULL)
+        {
+            int start_index = weblog.full ? weblog.head : 0;
+            int line_idx = 0;
+            char line_buffer[MAX_LOG_LINE_LENGTH];
+            bool first_log = true;
+
+            for (int i = 0; i < weblog.size; i++)
             {
-                int start_index = weblog.full ? weblog.head : 0;
-                int current_buf_idx;
-                int line_idx = 0;
-                char line_buffer[MAX_LOG_LINE_LENGTH];
+                int current_buf_idx = (start_index + i) % weblog.capacity;
+                char c = weblog.buffer[current_buf_idx];
 
-                for (int i = 0; i < weblog.size; i++)
+                bool end_of_line = (c == '\n');
+                bool buffer_full = (line_idx >= MAX_LOG_LINE_LENGTH - 1);
+
+                if (end_of_line || buffer_full)
                 {
-                    current_buf_idx = (start_index + i) % weblog.capacity;
-                    char c = weblog.buffer[current_buf_idx];
-
-                    bool end_of_line = (c == '\n');
-                    bool buffer_full = (line_idx >= MAX_LOG_LINE_LENGTH - 1);
-
-                    if (end_of_line || buffer_full)
+                    if (line_idx > 0)
                     {
-                        if (line_idx > 0)
-                        {
-                            line_buffer[line_idx] = '\0';
-                            cJSON_AddItemToArray(logs_array, cJSON_CreateString(line_buffer));
-                        }
-                        line_idx = 0;
-                        if (buffer_full && !end_of_line && c != '\r')
-                        {
-                            if (line_idx < MAX_LOG_LINE_LENGTH - 1)
-                            {
-                                line_buffer[line_idx++] = c;
-                            }
-                        }
+                        line_buffer[line_idx] = '\0';
+                        stream_json_array_string(req, line_buffer, &first_log);
                     }
-                    else if (c != '\r')
+                    line_idx = 0;
+                    if (buffer_full && !end_of_line && c != '\r')
                     {
                         if (line_idx < MAX_LOG_LINE_LENGTH - 1)
                         {
@@ -2032,161 +2104,155 @@ esp_err_t status_api_handler(httpd_req_t *req)
                         }
                     }
                 }
-
-                // Add any remaining characters
-                if (line_idx > 0)
+                else if (c != '\r')
                 {
-                    line_buffer[line_idx] = '\0';
-                    cJSON_AddItemToArray(logs_array, cJSON_CreateString(line_buffer));
+                    if (line_idx < MAX_LOG_LINE_LENGTH - 1)
+                    {
+                        line_buffer[line_idx++] = c;
+                    }
                 }
             }
-            cJSON_AddItemToObject(root, "system_logs", logs_array);
-        }
 
-        // Create JSON array for HA tokens
-        cJSON *integration_log = cJSON_CreateArray();
-        // Add HA tokens if available
-
-        if (integration_log == NULL)
-        {
-            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to create HA tokens array");
-            return ESP_FAIL;
-        }
-
-        // Add combined info for all tokens
-        char info[512];
-        snprintf(info, sizeof(info), "Home Assistant tokens: %d, Last update: %s",
-                 integration_active_tokens_count[INTEGRATION_HA],
-                 ctime(&integration_last_update[INTEGRATION_HA]));
-        cJSON_AddStringToObject(integration_log, "info", info);
-
-        if (integration_active_tokens_count[INTEGRATION_HA] > 0)
-        {
-
-            // Add each HA token
-            for (int i = 0; i < integration_active_tokens_count[INTEGRATION_HA]; i++)
+            if (line_idx > 0)
             {
-                snprintf(info, sizeof(info), "%d: %s entity %s path %s value %s", i,
-                         integration_active_tokens[INTEGRATION_HA][i].name ? integration_active_tokens[INTEGRATION_HA][i].name : "(null)",
-                         integration_active_tokens[INTEGRATION_HA][i].entity ? integration_active_tokens[INTEGRATION_HA][i].entity : "(null)",
-                         integration_active_tokens[INTEGRATION_HA][i].path ? integration_active_tokens[INTEGRATION_HA][i].path : "(null)",
-                         integration_active_tokens[INTEGRATION_HA][i].value);
-                cJSON_AddStringToObject(integration_log, "info", info);
+                line_buffer[line_idx] = '\0';
+                stream_json_array_string(req, line_buffer, &first_log);
             }
         }
+        httpd_resp_send_chunk(req, "]", 1);
 
-        snprintf(info, sizeof(info), "\nStock (finnhub.io) tokens: %d, Last update: %s",
-                 integration_active_tokens_count[INTEGRATION_STOCK],
-                 ctime(&integration_last_update[INTEGRATION_STOCK]));
-        cJSON_AddStringToObject(integration_log, "info", info);
-
-        // Add stock tokens if available
-        if (integration_active_tokens[INTEGRATION_STOCK] != NULL && integration_active_tokens_count[INTEGRATION_STOCK] > 0)
+        // Stream ha_tokens array (integration status info)
+        httpd_resp_send_chunk(req, ",\"ha_tokens\":[", HTTPD_RESP_USE_STRLEN);
         {
-            // Add each stock token
-            for (int i = 0; i < integration_active_tokens_count[INTEGRATION_STOCK]; i++)
+            char info[512];
+            bool first_entry = true;
+
+            snprintf(info, sizeof(info), "Home Assistant tokens: %d, Last update: %s",
+                     integration_active_tokens_count[INTEGRATION_HA],
+                     ctime(&integration_last_update[INTEGRATION_HA]));
+            stream_json_array_string(req, info, &first_entry);
+
+            if (integration_active_tokens_count[INTEGRATION_HA] > 0)
             {
-                snprintf(info, sizeof(info), "%d: %s symbol %s value %s", i,
-                         integration_active_tokens[INTEGRATION_STOCK][i].name ? integration_active_tokens[INTEGRATION_STOCK][i].name : "(null)",
-                         integration_active_tokens[INTEGRATION_STOCK][i].entity ? integration_active_tokens[INTEGRATION_STOCK][i].entity : "(null)",
-                         integration_active_tokens[INTEGRATION_STOCK][i].value);
-                cJSON_AddStringToObject(integration_log, "info", info);
+                for (int i = 0; i < integration_active_tokens_count[INTEGRATION_HA]; i++)
+                {
+                    snprintf(info, sizeof(info), "%d: %s entity %s path %s value %s", i,
+                             integration_active_tokens[INTEGRATION_HA][i].name ? integration_active_tokens[INTEGRATION_HA][i].name : "(null)",
+                             integration_active_tokens[INTEGRATION_HA][i].entity ? integration_active_tokens[INTEGRATION_HA][i].entity : "(null)",
+                             integration_active_tokens[INTEGRATION_HA][i].path ? integration_active_tokens[INTEGRATION_HA][i].path : "(null)",
+                             integration_active_tokens[INTEGRATION_HA][i].value);
+                    stream_json_array_string(req, info, &first_entry);
+                }
             }
-        }
-        cJSON_AddItemToObject(root, "ha_tokens", integration_log);
 
-        // Add dexcom tokens
-        if (integration_active[INTEGRATION_DEXCOM])
-        {
-            snprintf(info, sizeof(info), "\nDexcom active: %d tokens, last update %s",
-                     integration_active_tokens_count[INTEGRATION_DEXCOM],
-                     ctime(&integration_last_update[INTEGRATION_DEXCOM]));
-            cJSON_AddStringToObject(integration_log, "info", info);
+            snprintf(info, sizeof(info), "\nStock (finnhub.io) tokens: %d, Last update: %s",
+                     integration_active_tokens_count[INTEGRATION_STOCK],
+                     ctime(&integration_last_update[INTEGRATION_STOCK]));
+            stream_json_array_string(req, info, &first_entry);
 
-            // Format glucose value directly from glucose_data
-            char glucose_value[64];
-            if (glucose_data.current_gl_mgdl > 0)
+            if (integration_active_tokens[INTEGRATION_STOCK] != NULL && integration_active_tokens_count[INTEGRATION_STOCK] > 0)
             {
-                format_glucose_token(glucose_value, sizeof(glucose_value));
-                snprintf(info, sizeof(info), "[CGM:glucose] value %s", glucose_value);
+                for (int i = 0; i < integration_active_tokens_count[INTEGRATION_STOCK]; i++)
+                {
+                    snprintf(info, sizeof(info), "%d: %s symbol %s value %s", i,
+                             integration_active_tokens[INTEGRATION_STOCK][i].name ? integration_active_tokens[INTEGRATION_STOCK][i].name : "(null)",
+                             integration_active_tokens[INTEGRATION_STOCK][i].entity ? integration_active_tokens[INTEGRATION_STOCK][i].entity : "(null)",
+                             integration_active_tokens[INTEGRATION_STOCK][i].value);
+                    stream_json_array_string(req, info, &first_entry);
+                }
             }
-            else
-            {
-                snprintf(info, sizeof(info), "[CGM:glucose] value N/A");
-            }
-            cJSON_AddStringToObject(integration_log, "info", info);
-        }
-        else
-        {
-            snprintf(info, sizeof(info), "\nDexcom not active");
-            cJSON_AddStringToObject(integration_log, "info", info);
-        }
 
-        // Add freestyle libre tokens
-        if (integration_active[INTEGRATION_FREESTYLE])
-        {
-            snprintf(info, sizeof(info), "\nFreeStyle Libre active: %d tokens, last update %s",
-                     integration_active_tokens_count[INTEGRATION_FREESTYLE],
-                     ctime(&integration_last_update[INTEGRATION_FREESTYLE]));
-            cJSON_AddStringToObject(integration_log, "info", info);
-
-            // Format glucose value directly from glucose_data
-            char glucose_value[64];
-            if (glucose_data.current_gl_mgdl > 0)
+            if (integration_active[INTEGRATION_DEXCOM])
             {
-                format_glucose_token(glucose_value, sizeof(glucose_value));
-                snprintf(info, sizeof(info), "[CGM:glucose] value %s", glucose_value);
+                snprintf(info, sizeof(info), "\nDexcom active: %d tokens, last update %s",
+                         integration_active_tokens_count[INTEGRATION_DEXCOM],
+                         ctime(&integration_last_update[INTEGRATION_DEXCOM]));
+                stream_json_array_string(req, info, &first_entry);
+
+                char glucose_value[64];
+                if (glucose_data.current_gl_mgdl > 0)
+                {
+                    format_glucose_token(glucose_value, sizeof(glucose_value));
+                    snprintf(info, sizeof(info), "[CGM:glucose] value %s", glucose_value);
+                }
+                else
+                {
+                    snprintf(info, sizeof(info), "[CGM:glucose] value N/A");
+                }
+                stream_json_array_string(req, info, &first_entry);
             }
             else
             {
-                snprintf(info, sizeof(info), "[CGM:glucose] value N/A");
+                snprintf(info, sizeof(info), "\nDexcom not active");
+                stream_json_array_string(req, info, &first_entry);
             }
-            cJSON_AddStringToObject(integration_log, "info", info);
-        }
-        else
-        {
-            snprintf(info, sizeof(info), "\nFreeStyle Libre not active");
-            cJSON_AddStringToObject(integration_log, "info", info);
-        }
 
-        // Add Nightscout tokens
-        if (integration_active[INTEGRATION_NIGHTSCOUT])
-        {
-            snprintf(info, sizeof(info), "\nNightscout active: %d tokens, last update %s",
-                     integration_active_tokens_count[INTEGRATION_NIGHTSCOUT],
-                     ctime(&integration_last_update[INTEGRATION_NIGHTSCOUT]));
-            cJSON_AddStringToObject(integration_log, "info", info);
-
-            char glucose_value[64];
-            if (glucose_data.current_gl_mgdl > 0)
+            if (integration_active[INTEGRATION_FREESTYLE])
             {
-                format_glucose_token(glucose_value, sizeof(glucose_value));
-                snprintf(info, sizeof(info), "[CGM:glucose] value %s", glucose_value);
+                snprintf(info, sizeof(info), "\nFreeStyle Libre active: %d tokens, last update %s",
+                         integration_active_tokens_count[INTEGRATION_FREESTYLE],
+                         ctime(&integration_last_update[INTEGRATION_FREESTYLE]));
+                stream_json_array_string(req, info, &first_entry);
+
+                char glucose_value[64];
+                if (glucose_data.current_gl_mgdl > 0)
+                {
+                    format_glucose_token(glucose_value, sizeof(glucose_value));
+                    snprintf(info, sizeof(info), "[CGM:glucose] value %s", glucose_value);
+                }
+                else
+                {
+                    snprintf(info, sizeof(info), "[CGM:glucose] value N/A");
+                }
+                stream_json_array_string(req, info, &first_entry);
             }
             else
             {
-                snprintf(info, sizeof(info), "[CGM:glucose] value N/A");
+                snprintf(info, sizeof(info), "\nFreeStyle Libre not active");
+                stream_json_array_string(req, info, &first_entry);
             }
-            cJSON_AddStringToObject(integration_log, "info", info);
-        }
-        else
-        {
-            snprintf(info, sizeof(info), "\nNightscout not active");
-            cJSON_AddStringToObject(integration_log, "info", info);
-        }
-    }
 
-    // Send the response
-    // Bolt Optimization: Use unformatted print to reduce heap usage and network payload size (~23% reduction)
-    char *response = cJSON_PrintUnformatted(root);
-    if (response)
-    {
-        httpd_resp_sendstr(req, response);
-        free(response);
+            if (integration_active[INTEGRATION_NIGHTSCOUT])
+            {
+                snprintf(info, sizeof(info), "\nNightscout active: %d tokens, last update %s",
+                         integration_active_tokens_count[INTEGRATION_NIGHTSCOUT],
+                         ctime(&integration_last_update[INTEGRATION_NIGHTSCOUT]));
+                stream_json_array_string(req, info, &first_entry);
+
+                char glucose_value[64];
+                if (glucose_data.current_gl_mgdl > 0)
+                {
+                    format_glucose_token(glucose_value, sizeof(glucose_value));
+                    snprintf(info, sizeof(info), "[CGM:glucose] value %s", glucose_value);
+                }
+                else
+                {
+                    snprintf(info, sizeof(info), "[CGM:glucose] value N/A");
+                }
+                stream_json_array_string(req, info, &first_entry);
+            }
+            else
+            {
+                snprintf(info, sizeof(info), "\nNightscout not active");
+                stream_json_array_string(req, info, &first_entry);
+            }
+        }
+        httpd_resp_send_chunk(req, "]}", HTTPD_RESP_USE_STRLEN);
+        httpd_resp_send_chunk(req, NULL, 0);
     }
     else
     {
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to create response");
+        // No logs requested — the base JSON is small (~1-2 KB), send directly
+        char *response = cJSON_PrintUnformatted(root);
+        if (response)
+        {
+            httpd_resp_sendstr(req, response);
+            free(response);
+        }
+        else
+        {
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to create response");
+        }
     }
 
 cleanup:
@@ -3050,19 +3116,22 @@ esp_err_t wifi_scan_start_handler(httpd_req_t *req)
 }
 
 // Handler for getting WiFi scan status and results
+// Memory optimization: uses chunked HTTP transfer instead of cJSON tree.
+// Reduces peak heap from ~15 KB (150 cJSON nodes + serialized string) to ~1.5 KB.
 esp_err_t wifi_scan_status_handler(httpd_req_t *req)
 {
     ESP_LOG_WEB(ESP_LOG_INFO, TAG, "WiFi scan status request received");
 
-    cJSON *root = cJSON_CreateObject();
-    cJSON_AddBoolToObject(root, "scanning", wifi_scan_running);
-    cJSON_AddBoolToObject(root, "scan_done", wifi_scan_done);
+    httpd_resp_set_type(req, "application/json");
 
-    // Add networks array if scan is done
+    char chunk[256];
+    snprintf(chunk, sizeof(chunk), "{\"scanning\":%s,\"scan_done\":%s",
+             wifi_scan_running ? "true" : "false",
+             wifi_scan_done ? "true" : "false");
+    httpd_resp_send_chunk(req, chunk, HTTPD_RESP_USE_STRLEN);
+
     if (wifi_scan_done && ap_count > 0)
     {
-        cJSON *networks = cJSON_CreateArray();
-
 // Create a map to track unique SSIDs and their strongest signal
 // We'll use a simple array-based approach since we have limited memory
 #define MAX_UNIQUE_NETWORKS MAX_AP_SCAN
@@ -3120,46 +3189,39 @@ esp_err_t wifi_scan_status_handler(httpd_req_t *req)
 
         ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Found %d unique networks out of %d total networks", unique_count, ap_count);
 
-        // Second pass: create JSON objects for unique networks
+        // Stream each network as a JSON object — no cJSON tree needed
+        httpd_resp_send_chunk(req, ",\"networks\":[", HTTPD_RESP_USE_STRLEN);
         for (int i = 0; i < unique_count; i++)
         {
-            cJSON *network = cJSON_CreateObject();
-
-            cJSON_AddStringToObject(network, "ssid", unique_networks[i].ssid);
-            cJSON_AddNumberToObject(network, "rssi", unique_networks[i].rssi);
-
-            // Calculate signal strength percentage
             int rssi_percentage = 2 * (100 + unique_networks[i].rssi);
             if (rssi_percentage > 99)
                 rssi_percentage = 99;
             if (rssi_percentage < 0)
                 rssi_percentage = 0;
-            cJSON_AddNumberToObject(network, "signal_strength", rssi_percentage);
-
-            // Add authentication mode
             bool requires_password = (unique_networks[i].authmode != WIFI_AUTH_OPEN);
-            cJSON_AddBoolToObject(network, "requires_password", requires_password);
 
-            cJSON_AddItemToArray(networks, network);
+            char escaped_ssid[96];
+            format_json_string(escaped_ssid, sizeof(escaped_ssid), unique_networks[i].ssid);
+
+            snprintf(chunk, sizeof(chunk),
+                     "%s{\"ssid\":%s,\"rssi\":%d,\"signal_strength\":%d,\"requires_password\":%s}",
+                     i > 0 ? "," : "",
+                     escaped_ssid,
+                     unique_networks[i].rssi,
+                     rssi_percentage,
+                     requires_password ? "true" : "false");
+            httpd_resp_send_chunk(req, chunk, HTTPD_RESP_USE_STRLEN);
         }
 
-        cJSON_AddItemToObject(root, "networks", networks);
-        cJSON_AddNumberToObject(root, "count", cJSON_GetArraySize(networks));
+        snprintf(chunk, sizeof(chunk), "],\"count\":%d}", unique_count);
+        httpd_resp_send_chunk(req, chunk, HTTPD_RESP_USE_STRLEN);
     }
     else
     {
-        cJSON_AddNumberToObject(root, "count", 0);
+        httpd_resp_send_chunk(req, ",\"count\":0}", HTTPD_RESP_USE_STRLEN);
     }
 
-    // Convert JSON to string and send response
-    char *json_str = cJSON_PrintUnformatted(root); // Reduced memory usage
-    httpd_resp_set_type(req, "application/json");
-    httpd_resp_send(req, json_str, HTTPD_RESP_USE_STRLEN);
-
-    // Clean up
-    cJSON_free(json_str);
-    cJSON_Delete(root);
-
+    httpd_resp_send_chunk(req, NULL, 0);
     return ESP_OK;
 }
 
