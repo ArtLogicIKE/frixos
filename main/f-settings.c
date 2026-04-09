@@ -387,9 +387,7 @@ esp_err_t generic_file_handler(httpd_req_t *req)
 #define MAX_LOG_LINE_LENGTH 256 // Maximum characters per log line chunk
 
 // Helper function to get query parameter value from URI
-// Returns static buffer with parameter value (caller should copy if needed)
-static char query_param_buffer[256];
-static const char *get_query_param(const char *uri, const char *param_name)
+static const char *get_query_param(const char *uri, const char *param_name, char *out_buf, size_t out_len)
 {
     const char *query_start = strchr(uri, '?');
     if (!query_start)
@@ -414,14 +412,14 @@ static const char *get_query_param(const char *uri, const char *param_name)
             }
 
             size_t value_len = value_end - value_start;
-            if (value_len >= sizeof(query_param_buffer))
+            if (value_len >= out_len)
             {
-                value_len = sizeof(query_param_buffer) - 1;
+                value_len = out_len - 1;
             }
 
-            strncpy(query_param_buffer, value_start, value_len);
-            query_param_buffer[value_len] = '\0';
-            return query_param_buffer;
+            strncpy(out_buf, value_start, value_len);
+            out_buf[value_len] = '\0';
+            return out_buf;
         }
 
         // Move to next parameter (after '&' or end of string)
@@ -434,104 +432,68 @@ static const char *get_query_param(const char *uri, const char *param_name)
     return NULL;
 }
 
-// Helper function to check if a parameter should be included based on filter
-static bool should_include_param(const char *param_key, const char *group_filter, const char *params_filter)
+// Helper function to calculate a bitmask of parameters to include in JSON response.
+// Bit N corresponds to parameter pN.
+static uint64_t calculate_include_mask(const char *group, const char *params)
 {
-    // If no filters specified, include all
-    if (!group_filter && !params_filter)
+    // If no filters specified, include everything (bits 0-63 set)
+    if ((!group || group[0] == '\0') && (!params || params[0] == '\0'))
     {
-        return true;
+        return ~0ULL;
     }
 
-    // Check params filter (comma-separated list like "p40,p41")
-    if (params_filter)
+    uint64_t mask = 0;
+
+    // Process group filter
+    if (group && group[0] != '\0')
     {
-        const char *search_start = params_filter;
-        size_t param_len = strlen(param_key);
-
-        while (*search_start)
+        if (strcmp(group, "theme") == 0)
         {
-            // Skip whitespace
-            while (*search_start == ' ' || *search_start == ',')
-            {
-                search_start++;
-            }
-            if (!*search_start)
-                break;
-
-            // Find next comma or end
-            const char *param_end = strchr(search_start, ',');
-            size_t check_len = param_end ? (size_t)(param_end - search_start) : strlen(search_start);
-
-            // Trim trailing whitespace
-            while (check_len > 0 && (search_start[check_len - 1] == ' '))
-            {
-                check_len--;
-            }
-
-            // Check if this matches
-            if (check_len == param_len && strncmp(search_start, param_key, param_len) == 0)
-            {
-                return true;
-            }
-
-            if (!param_end)
-                break;
-            search_start = param_end + 1;
+            // p40, p41
+            mask |= (1ULL << 40) | (1ULL << 41);
+        }
+        else if (strcmp(group, "settings") == 0)
+        {
+            // p00, p34, p35, p36, p37, p39
+            mask |= (1ULL << 0) | (1ULL << 34) | (1ULL << 35) |
+                    (1ULL << 36) | (1ULL << 37) | (1ULL << 39);
+        }
+        else if (strcmp(group, "advanced") == 0)
+        {
+            // p01-p24, p42, p43, p46, p47, p50
+            for (int i = 1; i <= 24; i++) mask |= (1ULL << i);
+            mask |= (1ULL << 42) | (1ULL << 43) | (1ULL << 46) |
+                    (1ULL << 47) | (1ULL << 50);
+        }
+        else if (strcmp(group, "integrations") == 0)
+        {
+            // p25-p33, p44, p45, p48, p49, p51-p54
+            for (int i = 25; i <= 33; i++) mask |= (1ULL << i);
+            mask |= (1ULL << 44) | (1ULL << 45) | (1ULL << 48) |
+                    (1ULL << 49) | (1ULL << 51) | (1ULL << 52) |
+                    (1ULL << 53) | (1ULL << 54);
         }
     }
 
-    // Check group filter
-    if (group_filter)
+    // Process individual params filter (e.g. "p40,p41")
+    if (params && params[0] != '\0')
     {
-        if (strcmp(group_filter, "theme") == 0)
+        const char *p = params;
+        while ((p = strchr(p, 'p')) != NULL)
         {
-            // Theme group: p40, p41
-            return (strcmp(param_key, "p40") == 0 || strcmp(param_key, "p41") == 0);
-        }
-        else if (strcmp(group_filter, "settings") == 0)
-        {
-            // Settings group: p00, p34-p39
-            return (strcmp(param_key, "p00") == 0 ||
-                    strcmp(param_key, "p34") == 0 || strcmp(param_key, "p35") == 0 ||
-                    strcmp(param_key, "p36") == 0 || strcmp(param_key, "p37") == 0 ||
-                    strcmp(param_key, "p39") == 0);
-        }
-        else if (strcmp(group_filter, "advanced") == 0)
-        {
-            // Advanced group: p01-p24, p42-p43
-            return (strcmp(param_key, "p01") == 0 || strcmp(param_key, "p02") == 0 ||
-                    strcmp(param_key, "p03") == 0 || strcmp(param_key, "p04") == 0 ||
-                    strcmp(param_key, "p05") == 0 || strcmp(param_key, "p06") == 0 ||
-                    strcmp(param_key, "p07") == 0 || strcmp(param_key, "p08") == 0 ||
-                    strcmp(param_key, "p09") == 0 || strcmp(param_key, "p10") == 0 ||
-                    strcmp(param_key, "p11") == 0 || strcmp(param_key, "p12") == 0 ||
-                    strcmp(param_key, "p13") == 0 || strcmp(param_key, "p14") == 0 ||
-                    strcmp(param_key, "p15") == 0 || strcmp(param_key, "p16") == 0 ||
-                    strcmp(param_key, "p17") == 0 || strcmp(param_key, "p18") == 0 ||
-                    strcmp(param_key, "p19") == 0 || strcmp(param_key, "p20") == 0 ||
-                    strcmp(param_key, "p21") == 0 || strcmp(param_key, "p22") == 0 ||
-                    strcmp(param_key, "p23") == 0 || strcmp(param_key, "p24") == 0 ||
-                    strcmp(param_key, "p42") == 0 || strcmp(param_key, "p43") == 0 ||
-                    strcmp(param_key, "p46") == 0 || strcmp(param_key, "p47") == 0 ||
-                    strcmp(param_key, "p50") == 0);
-        }
-        else if (strcmp(group_filter, "integrations") == 0)
-        {
-            // Integrations group: p25-p33, p44, p45, p48, p49, p51-p54
-            return (strcmp(param_key, "p25") == 0 || strcmp(param_key, "p26") == 0 ||
-                    strcmp(param_key, "p27") == 0 || strcmp(param_key, "p28") == 0 ||
-                    strcmp(param_key, "p29") == 0 || strcmp(param_key, "p30") == 0 ||
-                    strcmp(param_key, "p31") == 0 || strcmp(param_key, "p32") == 0 ||
-                    strcmp(param_key, "p33") == 0 || strcmp(param_key, "p45") == 0 ||
-                    strcmp(param_key, "p44") == 0 || strcmp(param_key, "p48") == 0 ||
-                    strcmp(param_key, "p49") == 0 || strcmp(param_key, "p51") == 0 ||
-                    strcmp(param_key, "p52") == 0 || strcmp(param_key, "p53") == 0 ||
-                    strcmp(param_key, "p54") == 0);
+            p++; // Skip 'p'
+            if (isdigit((unsigned char)*p))
+            {
+                int p_num = atoi(p);
+                if (p_num >= 0 && p_num < 64)
+                {
+                    mask |= (1ULL << p_num);
+                }
+            }
         }
     }
 
-    return false;
+    return mask;
 }
 
 esp_err_t send_json_settings(httpd_req_t *req)
@@ -540,75 +502,39 @@ esp_err_t send_json_settings(httpd_req_t *req)
     esp_err_t ret = ESP_OK;
     cJSON *root = cJSON_CreateObject();
 
-    // Parse query parameters
-    const char *group_param = get_query_param(req->uri, "group");
-    const char *params_param = get_query_param(req->uri, "params");
+    // Parse query parameters into local buffers to fix the static buffer overwrite bug in get_query_param
+    char group_local[64] = {0};
+    char params_local[256] = {0};
+    get_query_param(req->uri, "group", group_local, sizeof(group_local));
+    get_query_param(req->uri, "params", params_local, sizeof(params_local));
 
-    if (group_param || params_param)
+    if (group_local[0] != '\0' || params_local[0] != '\0')
     {
         ESP_LOG_WEB(ESP_LOG_DEBUG, TAG, "Query params: group=%s, params=%s",
-                    group_param ? group_param : "none", params_param ? params_param : "none");
+                    group_local[0] != '\0' ? group_local : "none",
+                    params_local[0] != '\0' ? params_local : "none");
     }
 
-    // Add parameters based on filter
-    if (should_include_param("p00", group_param, params_param))
-    {
-        cJSON_AddStringToObject(root, "p00", eeprom_hostname);
-    }
-    if (should_include_param("p34", group_param, params_param))
-    {
-        cJSON_AddStringToObject(root, "p34", eeprom_wifi_ssid);
-    }
-    if (should_include_param("p35", group_param, params_param))
-    {
-        cJSON_AddStringToObject(root, "p35", eeprom_wifi_pass);
-    }
-    if (should_include_param("p17", group_param, params_param))
-    {
-        cJSON_AddStringToObject(root, "p17", eeprom_lat);
-    }
-    if (should_include_param("p18", group_param, params_param))
-    {
-        cJSON_AddStringToObject(root, "p18", eeprom_lon);
-    }
-    if (should_include_param("p19", group_param, params_param))
-    {
-        cJSON_AddStringToObject(root, "p19", eeprom_timezone);
-    }
-    if (should_include_param("p46", group_param, params_param))
-    {
-        cJSON_AddNumberToObject(root, "p46", eeprom_wifi_start);
-    }
-    if (should_include_param("p47", group_param, params_param))
-    {
-        cJSON_AddNumberToObject(root, "p47", eeprom_wifi_end);
-    }
-    if (should_include_param("p04", group_param, params_param))
-    {
-        cJSON_AddStringToObject(root, "p04", eeprom_font[0]);
-    }
-    if (should_include_param("p05", group_param, params_param))
-    {
-        cJSON_AddStringToObject(root, "p05", eeprom_font[1]);
-    }
-    if (should_include_param("p20", group_param, params_param))
-    {
-        cJSON_AddNumberToObject(root, "p20", eeprom_lux_sensitivity);
-    }
-    if (should_include_param("p21", group_param, params_param))
-    {
-        cJSON_AddNumberToObject(root, "p21", eeprom_lux_threshold);
-    }
-    if (should_include_param("p22", group_param, params_param))
-    {
-        cJSON_AddNumberToObject(root, "p22", eeprom_dim_disable);
-    }
-    if (should_include_param("p16", group_param, params_param))
-    {
-        cJSON_AddStringToObject(root, "p16", eeprom_message);
-    }
+    // Pre-calculate inclusion mask once to optimize performance from O(N*M) to O(1)
+    uint64_t mask = calculate_include_mask(group_local, params_local);
 
-    if (should_include_param("p23", group_param, params_param))
+    // Add parameters based on mask
+    if (mask & (1ULL << 0)) cJSON_AddStringToObject(root, "p00", eeprom_hostname);
+    if (mask & (1ULL << 34)) cJSON_AddStringToObject(root, "p34", eeprom_wifi_ssid);
+    if (mask & (1ULL << 35)) cJSON_AddStringToObject(root, "p35", eeprom_wifi_pass);
+    if (mask & (1ULL << 17)) cJSON_AddStringToObject(root, "p17", eeprom_lat);
+    if (mask & (1ULL << 18)) cJSON_AddStringToObject(root, "p18", eeprom_lon);
+    if (mask & (1ULL << 19)) cJSON_AddStringToObject(root, "p19", eeprom_timezone);
+    if (mask & (1ULL << 46)) cJSON_AddNumberToObject(root, "p46", eeprom_wifi_start);
+    if (mask & (1ULL << 47)) cJSON_AddNumberToObject(root, "p47", eeprom_wifi_end);
+    if (mask & (1ULL << 4)) cJSON_AddStringToObject(root, "p04", eeprom_font[0]);
+    if (mask & (1ULL << 5)) cJSON_AddStringToObject(root, "p05", eeprom_font[1]);
+    if (mask & (1ULL << 20)) cJSON_AddNumberToObject(root, "p20", eeprom_lux_sensitivity);
+    if (mask & (1ULL << 21)) cJSON_AddNumberToObject(root, "p21", eeprom_lux_threshold);
+    if (mask & (1ULL << 22)) cJSON_AddNumberToObject(root, "p22", eeprom_dim_disable);
+    if (mask & (1ULL << 16)) cJSON_AddStringToObject(root, "p16", eeprom_message);
+
+    if (mask & (1ULL << 23))
     {
         cJSON *brightness_array = cJSON_CreateArray();
         for (int i = 0; i < 2; i++)
@@ -618,41 +544,20 @@ esp_err_t send_json_settings(httpd_req_t *req)
         cJSON_AddItemToObject(root, "p23", brightness_array);
     }
 
-    if (should_include_param("p36", group_param, params_param))
-    {
-        cJSON_AddNumberToObject(root, "p36", eeprom_fahrenheit);
-    }
-    if (should_include_param("p37", group_param, params_param))
-    {
-        cJSON_AddNumberToObject(root, "p37", eeprom_12hour);
-    }
-    if (should_include_param("p24", group_param, params_param))
-    {
-        cJSON_AddNumberToObject(root, "p24", eeprom_show_leading_zero);
-    }
-    if (should_include_param("p50", group_param, params_param))
-    {
-        cJSON_AddNumberToObject(root, "p50", eeprom_dots_breathe);
-    }
-    if (should_include_param("p06", group_param, params_param))
-    {
-        cJSON_AddNumberToObject(root, "p06", eeprom_quiet_scroll);
-    }
-    if (should_include_param("p07", group_param, params_param))
-    {
-        cJSON_AddNumberToObject(root, "p07", eeprom_quiet_weather);
-    }
-    if (should_include_param("p10", group_param, params_param))
-    {
-        cJSON_AddNumberToObject(root, "p10", eeprom_color_filter[0]);
-    }
-    if (should_include_param("p11", group_param, params_param))
+    if (mask & (1ULL << 36)) cJSON_AddNumberToObject(root, "p36", eeprom_fahrenheit);
+    if (mask & (1ULL << 37)) cJSON_AddNumberToObject(root, "p37", eeprom_12hour);
+    if (mask & (1ULL << 24)) cJSON_AddNumberToObject(root, "p24", eeprom_show_leading_zero);
+    if (mask & (1ULL << 50)) cJSON_AddNumberToObject(root, "p50", eeprom_dots_breathe);
+    if (mask & (1ULL << 6)) cJSON_AddNumberToObject(root, "p06", eeprom_quiet_scroll);
+    if (mask & (1ULL << 7)) cJSON_AddNumberToObject(root, "p07", eeprom_quiet_weather);
+    if (mask & (1ULL << 10)) cJSON_AddNumberToObject(root, "p10", eeprom_color_filter[0]);
+    if (mask & (1ULL << 11))
     {
         cJSON_AddNumberToObject(root, "p11", eeprom_color_filter[1]);
         ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Sending night_color_filter in JSON response: %u", eeprom_color_filter[1]);
     }
 
-    if (should_include_param("p12", group_param, params_param))
+    if (mask & (1ULL << 12))
     {
         char day_color_hex[8];
         snprintf(day_color_hex, sizeof(day_color_hex), "#%02x%02x%02x",
@@ -660,7 +565,7 @@ esp_err_t send_json_settings(httpd_req_t *req)
         cJSON_AddStringToObject(root, "p12", day_color_hex);
     }
 
-    if (should_include_param("p15", group_param, params_param))
+    if (mask & (1ULL << 15))
     {
         char night_color_hex[8];
         snprintf(night_color_hex, sizeof(night_color_hex), "#%02x%02x%02x",
@@ -668,138 +573,46 @@ esp_err_t send_json_settings(httpd_req_t *req)
         cJSON_AddStringToObject(root, "p15", night_color_hex);
     }
 
-    if (should_include_param("p13", group_param, params_param))
-    {
-        cJSON_AddNumberToObject(root, "p13", eeprom_msg_font);
-    }
-
-    if (should_include_param("p01", group_param, params_param))
-    {
-        cJSON_AddNumberToObject(root, "p01", eeprom_ofs_x);
-    }
-    if (should_include_param("p02", group_param, params_param))
-    {
-        cJSON_AddNumberToObject(root, "p02", eeprom_ofs_y);
-    }
-    if (should_include_param("p03", group_param, params_param))
-    {
-        cJSON_AddNumberToObject(root, "p03", eeprom_rotation);
-    }
-    if (should_include_param("p09", group_param, params_param))
-    {
-        cJSON_AddNumberToObject(root, "p09", eeprom_mirroring);
-    }
-    if (should_include_param("p08", group_param, params_param))
-    {
-        cJSON_AddNumberToObject(root, "p08", eeprom_show_grid);
-    }
-    if (should_include_param("p38", group_param, params_param))
-    {
-        cJSON_AddNumberToObject(root, "p38", eeprom_scroll_speed);
-    }
-    if (should_include_param("p14", group_param, params_param))
-    {
-        cJSON_AddNumberToObject(root, "p14", eeprom_scroll_delay);
-    }
-    if (should_include_param("p39", group_param, params_param))
-    {
-        cJSON_AddNumberToObject(root, "p39", eeprom_update_firmware);
-    }
-    if (should_include_param("p40", group_param, params_param))
-    {
-        cJSON_AddNumberToObject(root, "p40", eeprom_dark_theme);
-    }
-    if (should_include_param("p41", group_param, params_param))
-    {
-        cJSON_AddNumberToObject(root, "p41", eeprom_language);
-    }
-    if (should_include_param("p42", group_param, params_param))
-    {
-        cJSON_AddNumberToObject(root, "p42", eeprom_pwm_frequency);
-    }
-    if (should_include_param("p43", group_param, params_param))
-    {
-        cJSON_AddNumberToObject(root, "p43", eeprom_max_power);
-    }
+    if (mask & (1ULL << 13)) cJSON_AddNumberToObject(root, "p13", eeprom_msg_font);
+    if (mask & (1ULL << 1)) cJSON_AddNumberToObject(root, "p01", eeprom_ofs_x);
+    if (mask & (1ULL << 2)) cJSON_AddNumberToObject(root, "p02", eeprom_ofs_y);
+    if (mask & (1ULL << 3)) cJSON_AddNumberToObject(root, "p03", eeprom_rotation);
+    if (mask & (1ULL << 9)) cJSON_AddNumberToObject(root, "p09", eeprom_mirroring);
+    if (mask & (1ULL << 8)) cJSON_AddNumberToObject(root, "p08", eeprom_show_grid);
+    if (mask & (1ULL << 38)) cJSON_AddNumberToObject(root, "p38", eeprom_scroll_speed);
+    if (mask & (1ULL << 14)) cJSON_AddNumberToObject(root, "p14", eeprom_scroll_delay);
+    if (mask & (1ULL << 39)) cJSON_AddNumberToObject(root, "p39", eeprom_update_firmware);
+    if (mask & (1ULL << 40)) cJSON_AddNumberToObject(root, "p40", eeprom_dark_theme);
+    if (mask & (1ULL << 41)) cJSON_AddNumberToObject(root, "p41", eeprom_language);
+    if (mask & (1ULL << 42)) cJSON_AddNumberToObject(root, "p42", eeprom_pwm_frequency);
+    if (mask & (1ULL << 43)) cJSON_AddNumberToObject(root, "p43", eeprom_max_power);
 
     // Add Home Assistant integration settings
-    if (should_include_param("p25", group_param, params_param))
-    {
-        cJSON_AddStringToObject(root, "p25", eeprom_ha_url);
-    }
-    if (should_include_param("p26", group_param, params_param))
-    {
-        cJSON_AddStringToObject(root, "p26", eeprom_ha_token);
-    }
-    if (should_include_param("p27", group_param, params_param))
-    {
-        cJSON_AddNumberToObject(root, "p27", eeprom_ha_refresh_mins);
-    }
+    if (mask & (1ULL << 25)) cJSON_AddStringToObject(root, "p25", eeprom_ha_url);
+    if (mask & (1ULL << 26)) cJSON_AddStringToObject(root, "p26", eeprom_ha_token);
+    if (mask & (1ULL << 27)) cJSON_AddNumberToObject(root, "p27", eeprom_ha_refresh_mins);
 
     // Add Stock Quote Service settings
-    if (should_include_param("p28", group_param, params_param))
-    {
-        cJSON_AddStringToObject(root, "p28", eeprom_stock_key);
-    }
-    if (should_include_param("p29", group_param, params_param))
-    {
-        cJSON_AddNumberToObject(root, "p29", eeprom_stock_refresh_mins);
-    }
+    if (mask & (1ULL << 28)) cJSON_AddStringToObject(root, "p28", eeprom_stock_key);
+    if (mask & (1ULL << 29)) cJSON_AddNumberToObject(root, "p29", eeprom_stock_refresh_mins);
 
     // Add Dexcom settings
-    if (should_include_param("p30", group_param, params_param))
-    {
-        cJSON_AddNumberToObject(root, "p30", eeprom_dexcom_region);
-    }
-    if (should_include_param("p31", group_param, params_param))
-    {
-        cJSON_AddStringToObject(root, "p31", eeprom_glucose_username);
-    }
-    if (should_include_param("p32", group_param, params_param))
-    {
-        cJSON_AddStringToObject(root, "p32", eeprom_glucose_password);
-    }
-    if (should_include_param("p33", group_param, params_param))
-    {
-        cJSON_AddNumberToObject(root, "p33", eeprom_glucose_refresh);
-    }
-    if (should_include_param("p45", group_param, params_param))
-    {
-        cJSON_AddNumberToObject(root, "p45", glucose_validity_duration);
-    }
-    if (should_include_param("p48", group_param, params_param))
-    {
-        cJSON_AddNumberToObject(root, "p48", eeprom_sec_time);
-    }
-    if (should_include_param("p49", group_param, params_param))
-    {
-        cJSON_AddNumberToObject(root, "p49", eeprom_sec_cgm);
-    }
+    if (mask & (1ULL << 30)) cJSON_AddNumberToObject(root, "p30", eeprom_dexcom_region);
+    if (mask & (1ULL << 31)) cJSON_AddStringToObject(root, "p31", eeprom_glucose_username);
+    if (mask & (1ULL << 32)) cJSON_AddStringToObject(root, "p32", eeprom_glucose_password);
+    if (mask & (1ULL << 33)) cJSON_AddNumberToObject(root, "p33", eeprom_glucose_refresh);
+    if (mask & (1ULL << 45)) cJSON_AddNumberToObject(root, "p45", glucose_validity_duration);
+    if (mask & (1ULL << 48)) cJSON_AddNumberToObject(root, "p48", eeprom_sec_time);
+    if (mask & (1ULL << 49)) cJSON_AddNumberToObject(root, "p49", eeprom_sec_cgm);
 
     // Add Libre settings (region only - other fields are internal and set by API responses)
-    if (should_include_param("p44", group_param, params_param))
-    {
-        cJSON_AddNumberToObject(root, "p44", eeprom_libre_region);
-    }
-
-    if (should_include_param("p54", group_param, params_param))
-    {
-        cJSON_AddStringToObject(root, "p54", eeprom_ns_url);
-    }
+    if (mask & (1ULL << 44)) cJSON_AddNumberToObject(root, "p44", eeprom_libre_region);
+    if (mask & (1ULL << 54)) cJSON_AddStringToObject(root, "p54", eeprom_ns_url);
 
     // Add Glucose Thresholds and Unit
-    if (should_include_param("p51", group_param, params_param))
-    {
-        cJSON_AddNumberToObject(root, "p51", eeprom_glucose_high);
-    }
-    if (should_include_param("p52", group_param, params_param))
-    {
-        cJSON_AddNumberToObject(root, "p52", eeprom_glucose_low);
-    }
-    if (should_include_param("p53", group_param, params_param))
-    {
-        cJSON_AddNumberToObject(root, "p53", eeprom_glucose_unit);
-    }
+    if (mask & (1ULL << 51)) cJSON_AddNumberToObject(root, "p51", eeprom_glucose_high);
+    if (mask & (1ULL << 52)) cJSON_AddNumberToObject(root, "p52", eeprom_glucose_low);
+    if (mask & (1ULL << 53)) cJSON_AddNumberToObject(root, "p53", eeprom_glucose_unit);
 
     // Convert to string and send response
     char *json_str = cJSON_PrintUnformatted(root);
@@ -2076,7 +1889,8 @@ esp_err_t status_api_handler(httpd_req_t *req)
     ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Status API request received");
 
     // Check if we should include logs and integration details
-    const char *logs_param = get_query_param(req->uri, "logs");
+    char logs_buffer[8] = {0};
+    const char *logs_param = get_query_param(req->uri, "logs", logs_buffer, sizeof(logs_buffer));
     bool include_logs = (logs_param != NULL && strcmp(logs_param, "1") == 0);
 
     // Set response headers first to ensure proper HTTP response
