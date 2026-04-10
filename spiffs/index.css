@@ -806,6 +806,12 @@ textarea[aria-invalid="true"] {
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
+.network-item:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+    background-color: var(--section-content-bg);
+}
+
 .signal-strength {
     display: flex;
     align-items: center;
@@ -1011,6 +1017,16 @@ textarea[aria-invalid="true"] {
     height: auto;
     display: block;
     margin: 0 auto;
+}
+
+@keyframes input-highlight {
+    0% { background-color: var(--input-bg); }
+    50% { background-color: rgba(0, 170, 255, 0.3); }
+    100% { background-color: var(--input-bg); }
+}
+
+.input-highlight {
+    animation: input-highlight 0.8s ease-in-out;
 }
 
 .message-counter {

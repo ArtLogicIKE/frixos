@@ -1757,7 +1757,14 @@ function displayNetworks(networks) {
     networks.forEach(network => {
         const networkItem = document.createElement('div');
         networkItem.className = 'network-item';
-        networkItem.onclick = () => selectNetwork(network.ssid);
+        networkItem.setAttribute('role', 'button');
+        networkItem.setAttribute('tabindex', '0');
+        const ariaLabel = `${network.ssid}, ${network.signal_strength}% signal${network.requires_password ? ', secure' : ''}`;
+        networkItem.setAttribute('aria-label', ariaLabel);
+
+        const select = () => selectNetwork(network.ssid);
+        networkItem.onclick = select;
+        networkItem.onkeydown = (e) => ['Enter', ' '].includes(e.key) && (e.preventDefault(), select());
 
         // Create network name element
         const nameSpan = document.createElement('span');
@@ -1794,8 +1801,23 @@ function displayNetworks(networks) {
 }
 
 function selectNetwork(ssid) {
-    el('wifi_ssid').value = ssid;
-    el('wifi_pass').focus();
+    const ssidField = el('wifi_ssid');
+    const passField = el('wifi_pass');
+
+    ssidField.value = ssid;
+    ssidField.classList.add('input-highlight');
+    ssidField.dispatchEvent(new Event('input', { bubbles: true }));
+    ssidField.focus();
+
+    // Remove highlight class after animation finishes
+    setTimeout(() => {
+        ssidField.classList.remove('input-highlight');
+    }, 1000);
+
+    // Focus password field if it exists
+    if (passField) {
+        setTimeout(() => passField.focus(), 800);
+    }
 }
 
 function showNetworkError(message) {
