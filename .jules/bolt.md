@@ -25,3 +25,11 @@
 ## 2025-04-09 - Optimized Settings API Parameter Filtering
 **Learning:** The Settings API was using a shared static buffer for query parameters, which led to a bug where multiple filters could not be applied simultaneously (the second filter would overwrite the first). Additionally, filtering logic performed O(N*M) string parsing and comparisons for every request, where N is the number of parameters (~55) and M is the number of tokens in the filter.
 **Action:** Replace repeated string parsing with a one-time calculation of an inclusion bitmask. Refactor query parameter retrieval to use caller-provided buffers to eliminate shared state bugs. Use bitwise AND operations for O(1) inclusion checks per parameter.
+
+## 2025-04-10 - Native Container-Based Scrolling Message
+**Learning:** The previous implementation manually calculated substrings and re-rendered the scrolling text in the main display loop every 65ms. This triggered expensive internal LVGL operations, including string parsing and character measurement, on every frame, consuming significant CPU cycles in a hot loop.
+**Action:** Use a clipped LVGL container and shift the label's X position instead of re-rendering substrings. Offloading the clipping and layout management to LVGL's native rendering engine eliminates redundant processing and significantly improves performance. Ensure  is cleared on the container to prevent automatic scroll interference.
+
+## 2025-04-10 - Native Container-Based Scrolling Message
+**Learning:** The previous implementation manually calculated substrings and re-rendered the scrolling text in the main display loop every 65ms. This triggered expensive internal LVGL operations, including string parsing and character measurement, on every frame, consuming significant CPU cycles in a hot loop.
+**Action:** Use a clipped LVGL container and shift the label's X position instead of re-rendering substrings. Offloading the clipping and layout management to LVGL's native rendering engine eliminates redundant processing and significantly improves performance. Ensure `LV_OBJ_FLAG_SCROLLABLE` is cleared on the container to prevent automatic scroll interference.
