@@ -32,6 +32,25 @@ async def read_index():
 async def get_settings(group: str = None):
     return JSONResponse(content=settings)
 
+@app.post("/api/settings")
+async def post_settings(request: Request):
+    return JSONResponse(content={"status": "ok"})
+
+@app.get("/api/wifi/scan")
+async def wifi_scan():
+    return JSONResponse(content={"status": "ok"})
+
+@app.get("/api/wifi/status")
+async def wifi_status():
+    return JSONResponse(content={
+        "scanning": False,
+        "scan_done": True,
+        "networks": [
+            {"ssid": "Network1", "signal_strength": 90, "requires_password": True},
+            {"ssid": "Network2", "signal_strength": 70, "requires_password": False}
+        ]
+    })
+
 @app.get("/api/status")
 async def get_status(logs: str = None):
     status_data = {
