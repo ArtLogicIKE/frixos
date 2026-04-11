@@ -15,3 +15,7 @@
 ## 2025-05-15 - [Credential UX vs Security]
 **Learning:** While `autocomplete` attributes like `current-password` and `username` greatly improve UX for WiFi and user accounts, they should be omitted for API tokens and integration keys to prevent password managers from incorrectly identifying them as primary site credentials.
 **Action:** Selectively apply `autocomplete` only to standard user/password fields and avoid them for technical tokens or machine keys.
+
+## 2025-05-15 - [Transient Visual Feedback for Programmatic Updates]
+**Learning:** When one UI interaction programmatically updates a distant field (e.g., selecting a WiFi network to populate a text field), users may miss the change. A transient background highlight animation, re-triggered by forcing a reflow (e.g., `void element.offsetWidth`), provides a clear "bridge" between the action and its result without requiring permanent UI state changes.
+**Action:** Use a `highlightElement` helper with CSS keyframes to provide immediate visual confirmation for all programmatic input updates.
