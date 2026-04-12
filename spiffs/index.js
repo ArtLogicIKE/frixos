@@ -2894,6 +2894,8 @@ async function loadAllSystemData() {
 
 // Function to send system information to support
 async function sendSystemInfoToSupport() {
+    const btn = el('sendToSupportButton');
+    if (btn) toggleLoading(btn, true);
     try {
         // Show loading message
         showStatus('Loading all system data...', 'info');
@@ -2935,11 +2937,15 @@ async function sendSystemInfoToSupport() {
     } catch (error) {
         console.error('Error in sendSystemInfoToSupport:', error);
         showStatus('Error preparing email: ' + error.message + '. Try using "Copy to clipboard" instead.', 'error');
+    } finally {
+        if (btn) toggleLoading(btn, false);
     }
 }
 
 // Function to copy system information to clipboard
 async function copySystemInfoToClipboard(skipDataLoad = false) {
+    const btn = el('copyToClipboardButton');
+    if (!skipDataLoad && btn) toggleLoading(btn, true);
     try {
         // Load all data from all sections first (unless already loaded)
         if (!skipDataLoad) {
@@ -2968,6 +2974,8 @@ async function copySystemInfoToClipboard(skipDataLoad = false) {
     } catch (error) {
         console.error('Error in copySystemInfoToClipboard:', error);
         showStatus(getMessage('error_preparing_info') + error.message, 'error');
+    } finally {
+        if (!skipDataLoad && btn) toggleLoading(btn, false);
     }
 }
 
