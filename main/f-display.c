@@ -105,6 +105,7 @@ lv_obj_t *img_digits_sprite = NULL,
          *img_wifi = NULL,
          *img_mgdl = NULL; // all the images on screen - ok, digits is off-screen
 
+static lv_obj_t *msg_container = NULL;
 lv_obj_t *label_msg = NULL;
 
 // Define digit width & height (adjust based on actual sprite sheet)
@@ -164,11 +165,6 @@ static void handle_integration_and_messages(void);
 static void handle_alternate_mode_switching(time_t now, uint32_t loop_counter, bool *should_update_display);
 static void update_display_content(time_t now);
 void update_weather_msg(void);
-void display_string_substring(const char *text, int32_t x, int32_t y,
-                              int32_t start_pixel, int32_t width_pixels,
-                              lv_obj_t *label_obj, const lv_font_t *font);
-void init_char_width_cache(const lv_font_t *font);
-void invalidate_char_width_cache(void);
 static bool is_glucose_on();
 static bool is_glucose_fresh();
 
@@ -411,50 +407,40 @@ void set_scroll_message(const char *msg)
     ESP_LOG_WEB(ESP_LOG_WARN, TAG, "set_scroll_message: null pointer");
     return;
   }
-  // Validate font index bounds
-  if (eeprom_msg_font > MAX_FONT_INDEX)
-  {
-    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "set_scroll_message: invalid font %d, using default", eeprom_msg_font);
-    eeprom_msg_font = 0; // Reset to default
-  }
-  // Get the selected font and validate it
-  const lv_font_t *font = get_selected_font(eeprom_msg_font);
-  if (font == NULL)
-  {
-    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "set_scroll_message: invalid font, using default");
-    font = &frixos_8; // Use default font
-  }
 
-  // Create a temporary buffer to measure text size
-  lv_point_t size;
-
-  lvgl_port_lock(0);
   // Use LVGL's safe text setting function
-  lv_label_set_text(label_msg, msg);
+  // Bolt Optimization: Offload substring rendering to LVGL using a clipped container.
+  // This eliminates the CPU-intensive manual UTF-8 decoding and width measurement loop.
+  lvgl_port_lock(0);
+  if (strcmp(lv_label_get_text(label_msg), msg) != 0)
+  {
+    lv_label_set_text(label_msg, msg);
+  }
+
+  const lv_font_t *font = get_selected_font(eeprom_msg_font);
+  lv_point_t size;
   lv_text_get_size(&size, msg, font, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
   label_size = size.x;
+
   if (label_size > MSG_WIDTH)
-  { // scrolling, left aligned
-    lv_obj_set_style_text_align(label_msg, LV_TEXT_ALIGN_LEFT, 0);
+  {
+    // Scrolling mode
     lv_obj_set_width(label_msg, LV_SIZE_CONTENT);
-    lv_obj_set_pos(label_msg, eeprom_ofs_x + MSG_WIDTH, eeprom_ofs_y + label_msg_ofs_y);
-    label_max_pos = (label_size);
+    lv_obj_set_style_text_align(label_msg, LV_TEXT_ALIGN_LEFT, 0);
+    label_max_pos = label_size;
+    label_scroll_pos = -MSG_WIDTH; // Start from right edge
+    lv_obj_set_x(label_msg, MSG_WIDTH);
   }
   else
-  { // centered
+  {
+    // Centered mode
+    lv_obj_set_width(label_msg, MSG_WIDTH);
     lv_obj_set_style_text_align(label_msg, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_width(label_msg, MSG_WIDTH - MSG_EXTRA_WIDTH);
-    lv_obj_set_pos(label_msg, eeprom_ofs_x, eeprom_ofs_y + label_msg_ofs_y);
-    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "set_scroll_message: centered");
     label_max_pos = 0;
+    label_scroll_pos = 0;
+    lv_obj_set_x(label_msg, 0);
   }
   lvgl_port_unlock();
-  // Calculate optimal animation time based on text length
-  // Use a minimum time for short text and scale up for longer text
-  // uint32_t anim_time = LV_MAX(MIN_ANIMATION_TIME, eeprom_scroll_delay * size.x);
-  // lv_obj_set_style_anim_time(label_msg, anim_time, LV_PART_MAIN);
-  // lv_obj_update_layout(label_msg);
-  // ESP_LOG_WEB(ESP_LOG_INFO, TAG, "set_scroll_message: anim_time %d, delay %d", anim_time, eeprom_scroll_delay);
 }
 
 // this is reboot only stuff
@@ -467,10 +453,8 @@ void startup_display(void)
   st7735_set_rotation_and_mirror(eeprom_rotation, eeprom_mirroring);
   show_grid(eeprom_show_grid); // will create the grid if needed
 
-  // Remove eeprom_ofs_x/y assignments since we'll use eeprom_ofs_x/y directly
-
   // Set the background color to BLACK
-  lv_obj_set_style_bg_color(scr, lv_color_hex(0x000000), 0); // (R,G,B)
+  lv_obj_set_style_bg_color(scr, lv_color_hex(0x000000), 0);
   lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
 
   img_logo = lv_image_create(lv_scr_act());
@@ -478,25 +462,35 @@ void startup_display(void)
   lv_image_set_inner_align(img_logo, LV_ALIGN_CENTER);
   lv_obj_align(img_logo, LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 20, eeprom_ofs_y + 10);
 
-  label_msg = lv_label_create(lv_scr_act());
+  // Bolt Optimization: Create a clipped container for the scrolling message.
+  // This offloads the heavy work of clipping and substring rendering to LVGL's native engine.
+  msg_container = lv_obj_create(lv_scr_act());
+  if (msg_container == NULL)
+  {
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to create msg_container");
+    lvgl_port_unlock();
+    return;
+  }
+  lv_obj_set_size(msg_container, MSG_WIDTH, 14); // Fixed width, height for max font
+  lv_obj_set_style_bg_opa(msg_container, LV_OPA_TRANSP, 0);
+  lv_obj_set_style_border_width(msg_container, 0, 0);
+  lv_obj_set_style_pad_all(msg_container, 0, 0);
+  lv_obj_clear_flag(msg_container, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_style_clip_corner(msg_container, true, 0);
+  lv_obj_set_scrollbar_mode(msg_container, LV_SCROLLBAR_MODE_OFF);
+  lv_obj_set_pos(msg_container, eeprom_ofs_x, eeprom_ofs_y + label_msg_ofs_y);
+
+  label_msg = lv_label_create(msg_container);
   if (label_msg == NULL)
   {
     ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to create label_msg");
+    lvgl_port_unlock();
     return;
   }
   lv_label_set_long_mode(label_msg, LV_LABEL_LONG_CLIP);
   lv_obj_set_height(label_msg, LV_SIZE_CONTENT);
-  lv_obj_set_width(label_msg, LV_SIZE_CONTENT); // Set fixed width to match available space
   lv_obj_set_style_text_color(label_msg, lv_color_hex(0xFFFFFF), 0);
   lv_obj_set_style_text_font(label_msg, get_selected_font(eeprom_msg_font), 0);
-  lv_obj_set_style_bg_color(label_msg, lv_color_black(), LV_PART_MAIN);
-  lv_obj_set_style_bg_opa(label_msg, LV_OPA_COVER, LV_PART_MAIN);
-  lv_obj_set_style_text_align(label_msg, LV_TEXT_ALIGN_CENTER, 0);
-  lv_obj_set_pos(label_msg, eeprom_ofs_x, eeprom_ofs_y + label_msg_ofs_y);
-
-  // Optimize label for smooth scrolling
-  // lv_obj_set_style_anim_speed(label_msg, 150, LV_PART_MAIN); // Optimized animation speed for smoothness
-  // lv_obj_set_style_anim_time(label_msg, 1000, LV_PART_MAIN); // Base animation time
 
   set_scroll_message("Starting...");
 
@@ -756,20 +750,17 @@ void display_changed(void)
   lv_obj_align(dots[1], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 2 * 18 + 1, eeprom_ofs_y + 25 + 26);
 
   lv_obj_set_style_text_color(label_msg, lv_color_make(eeprom_msg_red[font_index], eeprom_msg_green[font_index], eeprom_msg_blue[font_index]), 0);
-  // Set the font based on eeprom_msg_font parameter
   lv_obj_set_style_text_font(label_msg, get_selected_font(eeprom_msg_font), 0);
-  // Invalidate character width cache when font changes
-  invalidate_char_width_cache();
   lv_obj_set_height(label_msg, LV_SIZE_CONTENT);
-  lv_obj_set_pos(label_msg, eeprom_ofs_x, eeprom_ofs_y + label_msg_ofs_y);
-
-  // display_changed invalidates tokens, so it causes a set_scroll_message from the main thread anyways
-  // set_scroll_message(msg_scrolling);
+  if (msg_container)
+  {
+    lv_obj_set_pos(msg_container, eeprom_ofs_x, eeprom_ofs_y + label_msg_ofs_y);
+  }
 
   show_object(img_ampm, eeprom_12hour && time_valid);                                  // show AM/PM indicator if 12 hour time AND we have valid time
   show_object(img_weather, eeprom_quiet_weather && last_weather_update && time_valid); // show weather forecast icon if weather data is valid
   show_object(img_moon, eeprom_quiet_weather && time_valid);                           // show moon icon if we have valid time
-  show_object(label_msg, eeprom_quiet_scroll || !time_valid);                          // show scrolling information message if quiet scroll is enabled or time is not valid
+  show_object(msg_container, eeprom_quiet_scroll || !time_valid);                      // show scrolling information message if quiet scroll is enabled or time is not valid
 
   // Show/hide glucose icon, WiFi icon, and trend arrow
   if (wifi_disabled_by_active_hours)
@@ -1350,15 +1341,16 @@ void display_task(void *pvParameters)
     }
 
     if (label_size > MSG_WIDTH)
-    { // scrolling, left aligned
-      // ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Label pos %d, max %d", label_scroll_pos, label_max_pos);
+    {
+      // Bolt Optimization: Scrolling is now a simple x-coordinate shift within a clipped container.
+      // This offloads all pixel-level rendering and clipping logic to LVGL's optimized core.
       lvgl_port_lock(0);
       label_scroll_pos++;
       if (label_scroll_pos >= label_max_pos)
+      {
         label_scroll_pos = -MSG_WIDTH;
-
-      display_string_substring(msg_scrolling, (eeprom_ofs_x > 6 ? eeprom_ofs_x - 6 : eeprom_ofs_x), eeprom_ofs_y + label_msg_ofs_y,
-                               label_scroll_pos, MSG_WIDTH, label_msg, get_selected_font(eeprom_msg_font));
+      }
+      lv_obj_set_x(label_msg, -label_scroll_pos);
       lvgl_port_unlock();
     }
 
@@ -1871,325 +1863,3 @@ void cleanup_tokens(void)
   }
 }
 
-// Character width cache for Unicode code points
-// Using a simple hash table approach for Unicode characters
-#define CACHE_SIZE 512
-static struct
-{
-  uint32_t code_point;
-  uint8_t width;
-} char_width_cache[CACHE_SIZE] = {0};
-static const lv_font_t *cached_font = NULL;
-static bool cache_valid = false;
-
-// Function to initialize the character width cache
-void init_char_width_cache(const lv_font_t *font)
-{
-  if (font == NULL)
-  {
-    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "init_char_width_cache: null font");
-    return;
-  }
-
-  // Check if cache is already valid for this font
-  if (cache_valid && cached_font == font)
-  {
-    return; // Cache is already valid
-  }
-
-  ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Char width cache init");
-
-  // Clear the cache (initialize with -1 to indicate empty, as 0 is a valid code point but not really used for widths)
-  // Actually code_point 0 is space in many mappings, so let's use 0xFFFFFFFF for empty
-  for (int i = 0; i < CACHE_SIZE; i++) {
-    char_width_cache[i].code_point = 0xFFFFFFFF;
-    char_width_cache[i].width = 0;
-  }
-
-  // Pre-calculate width for ASCII characters (0-127)
-  for (int i = 0; i < 128; i++)
-  {
-    int cache_index = i % CACHE_SIZE;
-    char_width_cache[cache_index].code_point = i;
-    // We ignore kerning (letter_next) to keep cache hits consistent.
-    // Frixos fonts currently don't use kerning tables.
-    char_width_cache[cache_index].width = (uint8_t)lv_font_get_glyph_width(font, i, '\0');
-  }
-
-  // Cache common Unicode characters
-  uint32_t common_chars[] = {0xB0, 0x00A0, 0x00A1, 0x00A2, 0x00A3, 0x00A4, 0x00A5, 0x00A6, 0x00A7, 0x00A8, 0x00A9, 0x00AA, 0x00AB, 0x00AC, 0x00AD, 0x00AE, 0x00AF};
-  for (int i = 0; i < sizeof(common_chars) / sizeof(common_chars[0]); i++)
-  {
-    int cache_index = common_chars[i] % CACHE_SIZE;
-    char_width_cache[cache_index].code_point = common_chars[i];
-    char_width_cache[cache_index].width = (uint8_t)lv_font_get_glyph_width(font, common_chars[i], '\0');
-  }
-
-  cached_font = font;
-  cache_valid = true;
-
-  ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Char width cache ready");
-}
-
-// Function to get cached character width for Unicode code points
-// Optimized with O(1) hash-style lookup to reduce CPU usage during scrolling message measurement.
-static uint8_t get_cached_char_width(uint32_t code_point, const lv_font_t *font, const char *text, int text_pos)
-{
-  (void)text;
-  (void)text_pos;
-
-  if (!cache_valid)
-  {
-    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "get_cached_char_width: not init");
-    return 0;
-  }
-
-  // O(1) Lookup: Use modulo for direct indexing. Handle collisions by simple replacement.
-  int cache_index = code_point % CACHE_SIZE;
-
-  if (char_width_cache[cache_index].code_point == code_point)
-  {
-    return char_width_cache[cache_index].width;
-  }
-
-  // Cache miss: calculate, store and return.
-  // We ignore kerning (letter_next) to keep cache hits consistent and avoid O(L^2) complexity from strlen/scans.
-  // Frixos fonts currently don't use kerning tables.
-  uint8_t width = (uint8_t)lv_font_get_glyph_width(font, code_point, '\0');
-
-  char_width_cache[cache_index].code_point = code_point;
-  char_width_cache[cache_index].width = width;
-
-  return width;
-}
-
-// Function to invalidate the cache (call when font changes)
-void invalidate_char_width_cache(void)
-{
-  cache_valid = false;
-  cached_font = NULL;
-  ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Char width cache invalidated");
-}
-
-// UTF-8 decoder function
-// Returns the Unicode code point and sets bytes_consumed to the number of bytes read
-static uint32_t decode_utf8(const char *text, int text_len, int pos, int *bytes_consumed)
-{
-  if (pos >= text_len)
-  {
-    *bytes_consumed = 0;
-    return 0;
-  }
-
-  uint8_t first_byte = (uint8_t)text[pos];
-
-  if (first_byte < 0x80)
-  {
-    // ASCII character (1 byte)
-    *bytes_consumed = 1;
-    return first_byte;
-  }
-  else if ((first_byte & 0xE0) == 0xC0)
-  {
-    // 2-byte UTF-8 sequence
-    if (pos + 1 < text_len && ((uint8_t)text[pos + 1] & 0xC0) == 0x80)
-    {
-      *bytes_consumed = 2;
-      uint32_t code_point = ((first_byte & 0x1F) << 6) | (text[pos + 1] & 0x3F);
-      // Validate range (0x80 to 0x7FF)
-      if (code_point >= 0x80 && code_point <= 0x7FF)
-      {
-        return code_point;
-      }
-    }
-  }
-  else if ((first_byte & 0xF0) == 0xE0)
-  {
-    // 3-byte UTF-8 sequence
-    if (pos + 2 < text_len &&
-        ((uint8_t)text[pos + 1] & 0xC0) == 0x80 &&
-        ((uint8_t)text[pos + 2] & 0xC0) == 0x80)
-    {
-      *bytes_consumed = 3;
-      uint32_t code_point = ((first_byte & 0x0F) << 12) |
-                            (((uint8_t)text[pos + 1] & 0x3F) << 6) |
-                            (text[pos + 2] & 0x3F);
-      // Validate range (0x800 to 0xFFFF, excluding surrogates)
-      if (code_point >= 0x800 && code_point <= 0xFFFF &&
-          (code_point < 0xD800 || code_point > 0xDFFF))
-      {
-        return code_point;
-      }
-    }
-  }
-  else if ((first_byte & 0xF8) == 0xF0)
-  {
-    // 4-byte UTF-8 sequence
-    if (pos + 3 < text_len &&
-        ((uint8_t)text[pos + 1] & 0xC0) == 0x80 &&
-        ((uint8_t)text[pos + 2] & 0xC0) == 0x80 &&
-        ((uint8_t)text[pos + 3] & 0xC0) == 0x80)
-    {
-      *bytes_consumed = 4;
-      uint32_t code_point = ((first_byte & 0x07) << 18) |
-                            (((uint8_t)text[pos + 1] & 0x3F) << 12) |
-                            (((uint8_t)text[pos + 2] & 0x3F) << 6) |
-                            (text[pos + 3] & 0x3F);
-      // Validate range (0x10000 to 0x10FFFF)
-      if (code_point >= 0x10000 && code_point <= 0x10FFFF)
-      {
-        return code_point;
-      }
-    }
-  }
-
-  // Invalid UTF-8 sequence - return replacement character
-  *bytes_consumed = 1;
-
-  return 0xFFFD; // Unicode replacement character
-}
-
-void display_string_substring(const char *text, int32_t x, int32_t y,
-                              int32_t start_pixel, int32_t width_pixels,
-                              lv_obj_t *label_obj, const lv_font_t *font)
-{
-  if (text == NULL || label_obj == NULL || font == NULL)
-  {
-    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "display_string_substring: null ptr");
-    return;
-  }
-
-  if (width_pixels <= 0)
-  {
-    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "display_string_substring: invalid width");
-    return;
-  }
-
-  // Initialize cache if needed
-  init_char_width_cache(font);
-
-  lvgl_port_lock(0);
-
-  // Only set font if it changed (avoid unnecessary style updates)
-  static const lv_font_t *last_font = NULL;
-  if (last_font != font)
-  {
-    lv_obj_set_style_text_font(label_obj, font, 0);
-    last_font = font;
-  }
-
-  int32_t text_len = strlen(text);
-
-  // Early exit if text is empty
-  if (text_len == 0)
-  {
-    lv_label_set_text(label_obj, "");
-    lv_obj_set_pos(label_obj, x, y);
-    lvgl_port_unlock();
-    return;
-  }
-
-  // Handle negative start_pixel by adding padding
-  int32_t effective_start_pixel = start_pixel;
-  int32_t padding_offset = 0;
-  if (start_pixel < 0)
-  {
-    effective_start_pixel = 0;
-    padding_offset = -start_pixel;
-  }
-
-  // Calculate which characters to display based on pixel positions
-  // Optimized: Single pass to find both start and end character indices,
-  // reducing redundant UTF-8 decoding and character width lookups.
-  int32_t current_pixel = 0;
-  int32_t start_char_index = 0;
-  int32_t end_char_index = text_len;
-  int32_t char_offset = 0;
-  int32_t end_pixel = effective_start_pixel + width_pixels;
-  bool start_found = false;
-
-  for (int i = 0; i < text_len; )
-  {
-    int bytes_consumed;
-    uint32_t code_point = decode_utf8(text, text_len, i, &bytes_consumed);
-
-    if (bytes_consumed == 0)
-    {
-      break; // End of string
-    }
-
-    uint8_t char_width = get_cached_char_width(code_point, font, text, i);
-
-    // Find the starting character (first character that contains effective_start_pixel)
-    if (!start_found && current_pixel + char_width > effective_start_pixel)
-    {
-      start_char_index = i;
-      char_offset = effective_start_pixel - current_pixel;
-      start_found = true;
-    }
-
-    // Find the ending character (last character that contains effective_start_pixel + width_pixels)
-    if (current_pixel + char_width > end_pixel)
-    {
-      end_char_index = i;
-      break; // Found both indices, can stop scanning
-    }
-
-    current_pixel += char_width;
-    i += bytes_consumed;
-  }
-
-  // Create substring with only the characters that will be visible
-  int32_t substring_len = end_char_index - start_char_index;
-  if (substring_len <= 0)
-  {
-    // No characters to display
-    lv_label_set_text(label_obj, "");
-    lv_obj_set_pos(label_obj, x, y);
-    lvgl_port_unlock();
-    return;
-  }
-
-  // Use static buffer (128 characters max)
-  static char substring_buffer[128];
-  if (substring_len >= sizeof(substring_buffer))
-  {
-    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "display_string_substring: truncated");
-    substring_len = sizeof(substring_buffer) - 1;
-  }
-
-  // Copy only the characters that will be visible
-  if (substring_len > 0)
-  {
-    memcpy(substring_buffer, text + start_char_index, substring_len);
-    substring_buffer[substring_len] = '\0';
-  }
-
-  // Set only the substring text (this is a key optimization!)
-  // Bolt Optimization: Only call lv_label_set_text if the content actually changed.
-  // This avoids expensive internal LVGL re-parsing and layout during scrolling.
-  if (strcmp(lv_label_get_text(label_obj), substring_buffer) != 0)
-  {
-    lv_label_set_text(label_obj, substring_buffer);
-  }
-
-  // Cache position to avoid unnecessary LVGL calls
-  static int32_t last_x = -1, last_y = -1, last_width = -1;
-  int32_t new_x = x - char_offset + padding_offset;
-
-  if (last_x != new_x || last_y != y)
-  {
-    lv_obj_set_pos(label_obj, new_x, y);
-    last_x = new_x;
-    last_y = y;
-  }
-
-  // Set the width to limit what's visible
-  if (last_width != width_pixels)
-  {
-    lv_obj_set_width(label_obj, width_pixels);
-    last_width = width_pixels;
-  }
-
-  lvgl_port_unlock();
-}
