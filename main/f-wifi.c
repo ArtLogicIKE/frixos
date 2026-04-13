@@ -20,6 +20,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 #include "esp_http_client.h"
 #include "cJSON.h"
 #include "esp_system.h"
@@ -93,6 +94,8 @@ void ota_update_timer_callback(void *arg);
 void mdns_announcement_timer_callback(void *arg);
 static void wifi_active_hours_timer_callback(void *arg);
 static bool is_wifi_active_hours(void);
+static void shutdown_mdns_on_link_loss(void);
+static void copy_mdns_hostname_label(char *dst, size_t dst_sz);
 
 // Function to check if WiFi is connected
 bool is_wifi_connected(void)
@@ -148,6 +151,32 @@ void url_encode_string(const char *input, char *output)
     *dst = '\0'; // Null terminate
 }
 
+// Single mDNS host label for mdns_hostname_set (no ".local" suffix; see ESP-IDF mDNS docs)
+static void copy_mdns_hostname_label(char *dst, size_t dst_sz)
+{
+    if (dst_sz == 0)
+        return;
+    strncpy(dst, eeprom_hostname, dst_sz - 1);
+    dst[dst_sz - 1] = '\0';
+    size_t n = strlen(dst);
+    if (n >= 6 && strcasecmp(dst + n - 6, ".local") == 0)
+        dst[n - 6] = '\0';
+}
+
+// Stop mDNS when STA loses IP or disconnects so clients do not cache stale records / broken stack state
+static void shutdown_mdns_on_link_loss(void)
+{
+    if (mdns_announcement_timer != NULL)
+        esp_timer_stop(mdns_announcement_timer);
+
+    if (mdns_initialized)
+    {
+        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Stopping mDNS (link down or IP lost)");
+        mdns_free();
+        mdns_initialized = false;
+    }
+}
+
 // Initialize mDNS service
 void initialize_mdns(void)
 {
@@ -156,6 +185,14 @@ void initialize_mdns(void)
         ESP_LOG_WEB(ESP_LOG_INFO, TAG, "mDNS already initialized, stopping previous instance");
         mdns_free();
         mdns_initialized = false;
+    }
+
+    char mdns_host[sizeof(eeprom_hostname)];
+    copy_mdns_hostname_label(mdns_host, sizeof(mdns_host));
+    if (mdns_host[0] == '\0')
+    {
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "mDNS: empty hostname, skipping init");
+        return;
     }
 
     // Initialize mDNS
@@ -167,15 +204,16 @@ void initialize_mdns(void)
     }
 
     // Set hostname
-    err = mdns_hostname_set(eeprom_hostname);
+    err = mdns_hostname_set(mdns_host);
     if (err != ESP_OK)
     {
         ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to set mDNS hostname: %s", esp_err_to_name(err));
+        mdns_free();
         return;
     }
     else
     {
-        ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "mDNS hostname set to: %s", eeprom_hostname);
+        ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "mDNS hostname set to: %s", mdns_host);
     }
 
     // Set default instance
@@ -183,6 +221,7 @@ void initialize_mdns(void)
     if (err != ESP_OK)
     {
         ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to set mDNS instance name: %s", esp_err_to_name(err));
+        mdns_free();
         return;
     }
 
@@ -205,7 +244,7 @@ void initialize_mdns(void)
         return;
     }
 
-    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "mDNS initialized. Hostname: %s.local", eeprom_hostname);
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "mDNS initialized. Hostname: %s.local", mdns_host);
     mdns_initialized = true;
 }
 
@@ -343,11 +382,7 @@ void wifi_event_handler(void *arg, esp_event_base_t event_base,
                 ota_update_timer = NULL;
             }
 
-            // Stop mDNS announcement timer when disconnected
-            if (mdns_announcement_timer != NULL)
-            {
-                esp_timer_stop(mdns_announcement_timer);
-            }
+            shutdown_mdns_on_link_loss();
 
             // Don't reconnect if WiFi was intentionally disabled due to active hours
             if (!wifi_disabled_by_active_hours)
@@ -364,7 +399,12 @@ void wifi_event_handler(void *arg, esp_event_base_t event_base,
     }
     else if (event_base == IP_EVENT)
     {
-        if (event_id == IP_EVENT_STA_GOT_IP)
+        if (event_id == IP_EVENT_STA_LOST_IP)
+        {
+            ESP_LOG_WEB(ESP_LOG_INFO, TAG, "STA lost IP, stopping mDNS");
+            shutdown_mdns_on_link_loss();
+        }
+        else if (event_id == IP_EVENT_STA_GOT_IP)
         {
             ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
             snprintf(internal_ip, sizeof(internal_ip), IPSTR, IP2STR(&event->ip_info.ip));
@@ -372,10 +412,10 @@ void wifi_event_handler(void *arg, esp_event_base_t event_base,
             retry_count = 0;
             if (manufacturer_mode) // if in manufacturer mode, use custom device name
             {
-                // Append last 3 bytes of MAC address to hostname
                 uint8_t mac[6];
                 esp_efuse_mac_get_default(mac);
-                snprintf(eeprom_hostname, sizeof(eeprom_hostname), "frixos-%02X", mac[5]);
+                snprintf(eeprom_hostname, sizeof(eeprom_hostname), "frixos-%02X%02X%02X",
+                         mac[3], mac[4], mac[5]);
             }
             wifi_connected = true;
             
@@ -531,6 +571,7 @@ void wifi_task(void *pvParameters)
     // Register event handlers for WiFi events
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL));
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &wifi_event_handler, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_LOST_IP, &wifi_event_handler, NULL));
 
     // Create a one-shot timer for location retrieval
     esp_timer_create_args_t location_timer_args = {
