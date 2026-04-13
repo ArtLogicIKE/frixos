@@ -16,6 +16,14 @@ const LANGUAGE_NAMES = {
 // Helper for element selection
 const el = (id) => document.getElementById(id);
 
+// Helper to provide visual feedback for programmatic updates
+function highlightElement(element) {
+    if (!element) return;
+    element.classList.remove('input-highlight');
+    void element.offsetWidth; // Force reflow to restart animation
+    element.classList.add('input-highlight');
+}
+
 // Helper for toggling button loading state
 function toggleLoading(btn, isLoading) {
     if (!btn) return;
@@ -1757,7 +1765,19 @@ function displayNetworks(networks) {
     networks.forEach(network => {
         const networkItem = document.createElement('div');
         networkItem.className = 'network-item';
-        networkItem.onclick = () => selectNetwork(network.ssid);
+        networkItem.setAttribute('tabindex', '0');
+        networkItem.setAttribute('role', 'button');
+        const lockIcon = network.requires_password ? ' (locked)' : '';
+        networkItem.setAttribute('aria-label', `${network.ssid}, signal ${network.signal_strength}%${lockIcon}`);
+
+        const performSelect = () => selectNetwork(network.ssid);
+        networkItem.onclick = performSelect;
+        networkItem.onkeydown = (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                performSelect();
+            }
+        };
 
         // Create network name element
         const nameSpan = document.createElement('span');
@@ -1794,7 +1814,9 @@ function displayNetworks(networks) {
 }
 
 function selectNetwork(ssid) {
-    el('wifi_ssid').value = ssid;
+    const wifiSsid = el('wifi_ssid');
+    wifiSsid.value = ssid;
+    highlightElement(wifiSsid);
     el('wifi_pass').focus();
 }
 
@@ -2214,6 +2236,7 @@ function setupAdvancedSection() {
                     messageInput.value = v.slice(0, s) + text + v.slice(e);
                     messageInput.setSelectionRange(s + text.length, s + text.length);
                     messageInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    highlightElement(messageInput);
                     messageInput.focus();
                 };
                 t.onclick = insert;
