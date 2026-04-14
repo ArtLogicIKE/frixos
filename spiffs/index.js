@@ -16,6 +16,14 @@ const LANGUAGE_NAMES = {
 // Helper for element selection
 const el = (id) => document.getElementById(id);
 
+// Helper to highlight an element (visual feedback for programmatic updates)
+function highlightElement(element) {
+    if (!element) return;
+    element.classList.remove('input-highlight');
+    void element.offsetWidth; // Force reflow
+    element.classList.add('input-highlight');
+}
+
 // Helper for toggling button loading state
 function toggleLoading(btn, isLoading) {
     if (!btn) return;
@@ -1794,8 +1802,13 @@ function displayNetworks(networks) {
 }
 
 function selectNetwork(ssid) {
-    el('wifi_ssid').value = ssid;
-    el('wifi_pass').focus();
+    const ssidInput = el('wifi_ssid');
+    const passInput = el('wifi_pass');
+
+    ssidInput.value = ssid;
+    highlightElement(ssidInput);
+    highlightElement(passInput);
+    passInput.focus();
 }
 
 function showNetworkError(message) {
