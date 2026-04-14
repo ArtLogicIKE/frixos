@@ -4,7 +4,7 @@
 
 ## 2026-03-30 - Conditional Data Fetching for Status API
 **Learning:** Large JSON payloads containing system logs and integration tokens were being generated on every status refresh, causing significant CPU and memory pressure on the ESP32. Even when the UI only needed minimal sensor data (e.g., lux levels for auto-dimming), the backend was performing expensive string formatting and JSON array construction.
-**Action:** Implement conditional data fetching via query parameters (e.g., `?logs=1`). Wrap resource-intensive JSON construction blocks in conditional checks on the backend and update the frontend to request heavy data only when necessary (e.g., viewing the full Status page or generating support reports).
+**Action:** Implement conditional data fetching via query parameters (e.g., `?logs=1`). Wrap resource-intensive JSON construction blocks in conditional checks on the backend and update the frontend to request heavy data only when necessary (e.g., viewing the full Status page or generating support data).
 
 ## 2026-03-31 - Rendering Throttling in LVGL
 **Learning:** Calling `lv_label_set_text` on every rendering frame (e.g., during message scrolling) triggers expensive internal LVGL operations like re-parsing, memory re-allocation, and layout invalidation, even if the text content remains identical. This consumes significant CPU cycles in the main rendering loop.
@@ -25,3 +25,7 @@
 ## 2025-04-09 - Optimized Settings API Parameter Filtering
 **Learning:** The Settings API was using a shared static buffer for query parameters, which led to a bug where multiple filters could not be applied simultaneously (the second filter would overwrite the first). Additionally, filtering logic performed O(N*M) string parsing and comparisons for every request, where N is the number of parameters (~55) and M is the number of tokens in the filter.
 **Action:** Replace repeated string parsing with a one-time calculation of an inclusion bitmask. Refactor query parameter retrieval to use caller-provided buffers to eliminate shared state bugs. Use bitwise AND operations for O(1) inclusion checks per parameter.
+
+## 2025-04-14 - Optimized Scrolling Message using Native LVGL Clipping
+**Learning:** The previous manual scrolling implementation performed UTF-8 decoding, character width calculations, and string slicing on every frame (~65ms). This O(L) operation triggered expensive internal LVGL re-parsing and layout invalidation, consuming significant CPU cycles and causing jumpy animations.
+**Action:** Use a clipped LVGL container (`msg_container`) and update the inner label's X coordinate (`lv_obj_set_x`) to offload rendering to LVGL's optimized engine. Ensure `lv_label_set_text` is only called when the content actually changes and implement strict `NULL` guards for label text retrieval. This approach eliminates the need for manual character measurement and reduces memory by removing the width cache.
