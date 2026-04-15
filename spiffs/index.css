@@ -1013,6 +1013,26 @@ textarea[aria-invalid="true"] {
     margin: 0 auto;
 }
 
+/* Input highlight animation for programmatic updates */
+@keyframes input-highlight {
+    0% {
+        box-shadow: 0 0 0 0 rgba(0, 170, 255, 0.7);
+        background-color: rgba(0, 170, 255, 0.1);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(0, 170, 255, 0);
+        background-color: rgba(0, 170, 255, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(0, 170, 255, 0);
+        background-color: rgba(0, 170, 255, 0);
+    }
+}
+
+.input-highlight {
+    animation: input-highlight 0.8s ease-out;
+}
+
 .message-counter {
     width: 100%;
     text-align: right;
