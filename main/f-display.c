@@ -429,10 +429,19 @@ void set_scroll_message(const char *msg)
   lv_point_t size;
 
   lvgl_port_lock(0);
-  // Use LVGL's safe text setting function
-  lv_label_set_text(label_msg, msg);
+
+  // Bolt Optimization: Only update text if it changed to avoid redundant parsing/layout
+  // We use lv_label_set_text first to ensure measurement is based on the new text.
+  // This also avoids the "stale data" flicker in the scrolling path.
+  const char *current_text = lv_label_get_text(label_msg);
+  if (current_text == NULL || strcmp(current_text, msg) != 0)
+  {
+    lv_label_set_text(label_msg, msg);
+  }
+
   lv_text_get_size(&size, msg, font, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
   label_size = size.x;
+
   if (label_size > MSG_WIDTH)
   { // scrolling, left aligned
     lv_obj_set_style_text_align(label_msg, LV_TEXT_ALIGN_LEFT, 0);
@@ -445,6 +454,7 @@ void set_scroll_message(const char *msg)
     lv_obj_set_style_text_align(label_msg, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_width(label_msg, MSG_WIDTH - MSG_EXTRA_WIDTH);
     lv_obj_set_pos(label_msg, eeprom_ofs_x, eeprom_ofs_y + label_msg_ofs_y);
+
     ESP_LOG_WEB(ESP_LOG_INFO, TAG, "set_scroll_message: centered");
     label_max_pos = 0;
   }

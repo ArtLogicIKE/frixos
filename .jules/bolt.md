@@ -25,3 +25,7 @@
 ## 2025-04-09 - Optimized Settings API Parameter Filtering
 **Learning:** The Settings API was using a shared static buffer for query parameters, which led to a bug where multiple filters could not be applied simultaneously (the second filter would overwrite the first). Additionally, filtering logic performed O(N*M) string parsing and comparisons for every request, where N is the number of parameters (~55) and M is the number of tokens in the filter.
 **Action:** Replace repeated string parsing with a one-time calculation of an inclusion bitmask. Refactor query parameter retrieval to use caller-provided buffers to eliminate shared state bugs. Use bitwise AND operations for O(1) inclusion checks per parameter.
+
+## 2025-04-10 - Optimized set_scroll_message and reduced LVGL overhead
+**Learning:** Redundant `lv_label_set_text` calls in `set_scroll_message` were triggering expensive internal LVGL re-parsing and layout invalidation even when the message content remained unchanged. Initial attempts to optimize by deferring the text set in scrolling paths caused "stale data" flicker.
+**Action:** Implement a `strcmp` guard for `lv_label_set_text` and ensure it is called *before* `lv_text_get_size` when the message changes to ensure accurate measurement while skipping work for identical updates. This pattern maintains both correctness and performance in high-frequency UI updates.
