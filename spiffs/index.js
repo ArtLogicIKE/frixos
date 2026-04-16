@@ -16,6 +16,17 @@ const LANGUAGE_NAMES = {
 // Helper for element selection
 const el = (id) => document.getElementById(id);
 
+// Helper for visual feedback highlight
+function highlightElement(element) {
+    if (!element) return;
+    element.classList.remove('input-highlight');
+    void element.offsetWidth; // Force reflow
+    element.classList.add('input-highlight');
+    setTimeout(() => {
+        element.classList.remove('input-highlight');
+    }, 1500);
+}
+
 // Helper for toggling button loading state
 function toggleLoading(btn, isLoading) {
     if (!btn) return;
@@ -475,13 +486,18 @@ function setupLanguageSelector() {
     // Toggle dropdown on button click
     languageToggle.addEventListener('click', function(e) {
         e.stopPropagation();
-        languageDropdown.style.display = languageDropdown.style.display === 'none' ? 'block' : 'none';
+        const isExpanded = languageDropdown.style.display !== 'none';
+        languageDropdown.style.display = isExpanded ? 'none' : 'block';
+        languageToggle.setAttribute('aria-expanded', !isExpanded);
     });
     
     // Close dropdown when clicking outside
     document.addEventListener('click', function(e) {
         if (!languageToggle.contains(e.target) && !languageDropdown.contains(e.target)) {
-            languageDropdown.style.display = 'none';
+            if (languageDropdown.style.display !== 'none') {
+                languageDropdown.style.display = 'none';
+                languageToggle.setAttribute('aria-expanded', 'false');
+            }
         }
     });
     
@@ -491,6 +507,7 @@ function setupLanguageSelector() {
             const selectedLang = this.getAttribute('data-lang');
             changeLanguage(selectedLang);
             languageDropdown.style.display = 'none';
+            languageToggle.setAttribute('aria-expanded', 'false');
             languageToggle.focus();
         });
     });
@@ -1794,7 +1811,9 @@ function displayNetworks(networks) {
 }
 
 function selectNetwork(ssid) {
-    el('wifi_ssid').value = ssid;
+    const ssidInput = el('wifi_ssid');
+    ssidInput.value = ssid;
+    highlightElement(ssidInput);
     el('wifi_pass').focus();
 }
 
@@ -2214,6 +2233,7 @@ function setupAdvancedSection() {
                     messageInput.value = v.slice(0, s) + text + v.slice(e);
                     messageInput.setSelectionRange(s + text.length, s + text.length);
                     messageInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    highlightElement(messageInput);
                     messageInput.focus();
                 };
                 t.onclick = insert;
