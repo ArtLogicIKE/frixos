@@ -32,7 +32,7 @@
                 <a href="#restart" class="menu-item" data-section="restart-section" data-i18n="menu.restart">Restart</a>
             </div>
             <div class="header-controls">
-                <button id="language-toggle" class="language-toggle" aria-label="Change language" data-i18n-aria-label="common.change_language">
+                <button id="language-toggle" class="language-toggle" aria-label="Change language" data-i18n-aria-label="common.change_language" aria-haspopup="true" aria-expanded="false" aria-controls="language-dropdown">
                     <span id="current-language-name">English</span>
                 </button>
                 <div id="language-dropdown" class="language-dropdown" style="display: none;">
@@ -83,18 +83,18 @@
                     <div class="section-content">
                         <div class="form-group">
                             <label for="wifi_ssid" data-i18n="settings.connection.wifi_ssid">WiFi SSID</label>
-                            <input type="text" id="wifi_ssid" name="wifi_ssid" autocomplete="username">
+                            <input type="text" id="wifi_ssid" name="wifi_ssid" autocomplete="username" maxlength="32">
                         </div>
                         <div class="form-group">
                             <label for="wifi_pass" data-i18n="settings.connection.wifi_password">WiFi Password</label>
                             <div class="password-input-wrapper">
-                                <input type="password" id="wifi_pass" name="wifi_pass" autocomplete="current-password">
+                                <input type="password" id="wifi_pass" name="wifi_pass" autocomplete="current-password" maxlength="64">
                                 <button type="button" class="password-toggle" aria-label="Toggle password visibility">👁️</button>
                             </div>
                         </div>
                         <div class="form-group">
                             <label for="hostname" data-i18n="settings.connection.hostname">Hostname</label>
-                            <input type="text" id="hostname" name="hostname" required aria-required="true">
+                            <input type="text" id="hostname" name="hostname" required aria-required="true" maxlength="32">
                             <span id="hostname-error" class="input-error"></span>
                         </div>
                         <div class="checkbox-container">
