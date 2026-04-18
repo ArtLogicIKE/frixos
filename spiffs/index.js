@@ -370,6 +370,10 @@ function updateCgmExclusivity() {
 // Current language (will be loaded from NVS)
 let currentLanguage = 'en';
 
+// Translation metadata caches (WeakMap prevents memory leaks and handles dynamic elements)
+const i18nCache = new WeakMap();
+const toggleInputCache = new WeakMap();
+
 // Translation function - now async to support lazy-loading
 // Optimization: Persistent early return and DOM mutation diffing to minimize overhead
 async function translate(lang) {
@@ -383,53 +387,75 @@ async function translate(lang) {
     currentLanguage = effectiveLang;
     const trans = translations[effectiveLang];
 
-    // Querying on every call to support dynamic elements while using dataset for readability
+    // Performance Optimization: Cache dataset keys to avoid redundant DOM reads while supporting dynamic elements
     document.querySelectorAll('[data-i18n], [data-i18n-placeholder], [data-i18n-aria-label]').forEach(element => {
-        const i18nKey = element.dataset.i18n;
-        const i18nPlaceholderKey = element.dataset.i18nPlaceholder;
-        const i18nAriaLabelKey = element.dataset.i18nAriaLabel;
+        let meta = i18nCache.get(element);
+        if (!meta) {
+            meta = {
+                key: element.dataset.i18n,
+                placeholderKey: element.dataset.i18nPlaceholder,
+                ariaLabelKey: element.dataset.i18nAriaLabel
+            };
+            i18nCache.set(element, meta);
+        }
 
-        if (i18nKey) {
-            const translation = getNestedTranslation(trans, i18nKey);
-            // Optimization: Only update DOM if content actually changed to avoid layout thrashing
-            if (translation && element.innerHTML !== translation) {
+        if (meta.key) {
+            const translation = getNestedTranslation(trans, meta.key);
+            // Optimization: Use JS property for dirty check to avoid expensive innerHTML reads from DOM
+            if (translation && element._lastI18n !== translation) {
                 element.innerHTML = translation;
+                element._lastI18n = translation;
             }
         }
 
-        if (i18nPlaceholderKey) {
-            const translation = getNestedTranslation(trans, i18nPlaceholderKey);
-            // Optimization: Only update DOM if placeholder actually changed
-            if (translation && element.placeholder !== translation) {
+        if (meta.placeholderKey) {
+            const translation = getNestedTranslation(trans, meta.placeholderKey);
+            if (translation && element._lastPlaceholder !== translation) {
                 element.placeholder = translation;
+                element._lastPlaceholder = translation;
             }
         }
 
-        if (i18nAriaLabelKey) {
-            const translation = getNestedTranslation(trans, i18nAriaLabelKey);
-            if (translation && element.getAttribute('aria-label') !== translation) {
+        if (meta.ariaLabelKey) {
+            const translation = getNestedTranslation(trans, meta.ariaLabelKey);
+            if (translation && element._lastAriaLabel !== translation) {
                 element.setAttribute('aria-label', translation);
+                element._lastAriaLabel = translation;
             }
         }
     });
 
-    // Update password toggle ARIA labels for accessibility after language change
+    // Optimization: Pre-fetch common labels once outside loops
+    const showPassLabel = getNestedTranslation(trans, 'common.show_password') || getNestedTranslation(translations.en, 'common.show_password');
+    const hidePassLabel = getNestedTranslation(trans, 'common.hide_password') || getNestedTranslation(translations.en, 'common.hide_password');
+    const insertLabel = getNestedTranslation(trans, 'common.insert') || getNestedTranslation(translations.en, 'common.insert') || 'Insert';
+
+    // Update password toggle ARIA labels
     document.querySelectorAll('.password-toggle').forEach(button => {
-        const input = button.previousElementSibling;
+        let input = toggleInputCache.get(button);
+        if (input === undefined) {
+            input = button.previousElementSibling || null;
+            toggleInputCache.set(button, input);
+        }
+
         if (input) {
             const isPassword = input.type === 'password';
-            const actionKey = isPassword ? 'common.show_password' : 'common.hide_password';
-            const translation = getNestedTranslation(trans, actionKey);
-            if (translation) {
+            const translation = isPassword ? showPassLabel : hidePassLabel;
+            if (translation && button._lastToggleLabel !== translation) {
                 button.setAttribute('aria-label', translation);
+                button._lastToggleLabel = translation;
             }
         }
     });
 
-    // Update token ARIA labels after language change
+    // Update token ARIA labels
     document.querySelectorAll('.token-code').forEach(token => {
-        const insertLabel = getNestedTranslation(trans, 'common.insert') || 'Insert';
-        token.setAttribute('aria-label', `${insertLabel} ${token.textContent}`);
+        const text = token.textContent;
+        const fullLabel = `${insertLabel} ${text}`;
+        if (token._lastTokenLabel !== fullLabel) {
+            token.setAttribute('aria-label', fullLabel);
+            token._lastTokenLabel = fullLabel;
+        }
     });
 
     const nameElement = el('current-language-name');
