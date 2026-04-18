@@ -475,23 +475,62 @@ function setupLanguageSelector() {
     // Toggle dropdown on button click
     languageToggle.addEventListener('click', function(e) {
         e.stopPropagation();
-        languageDropdown.style.display = languageDropdown.style.display === 'none' ? 'block' : 'none';
+        const isExpanded = languageDropdown.style.display !== 'none';
+        languageDropdown.style.display = isExpanded ? 'none' : 'block';
+        languageToggle.setAttribute('aria-expanded', !isExpanded);
+    });
+
+    languageToggle.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && languageDropdown.style.display !== 'none') {
+            languageDropdown.style.display = 'none';
+            languageToggle.setAttribute('aria-expanded', 'false');
+        }
     });
     
     // Close dropdown when clicking outside
     document.addEventListener('click', function(e) {
         if (!languageToggle.contains(e.target) && !languageDropdown.contains(e.target)) {
             languageDropdown.style.display = 'none';
+            languageToggle.setAttribute('aria-expanded', 'false');
+        }
+    });
+
+    // Keyboard navigation for dropdown
+    languageDropdown.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            languageDropdown.style.display = 'none';
+            languageToggle.setAttribute('aria-expanded', 'false');
+            languageToggle.focus();
+        } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            const options = Array.from(document.querySelectorAll('.language-option'));
+            const index = options.indexOf(document.activeElement);
+            let nextIndex;
+            if (e.key === 'ArrowDown') {
+                nextIndex = (index + 1) % options.length;
+            } else {
+                nextIndex = (index - 1 + options.length) % options.length;
+            }
+            options[nextIndex].focus();
         }
     });
     
     // Handle language selection
     document.querySelectorAll('.language-option').forEach(option => {
-        option.addEventListener('click', function() {
-            const selectedLang = this.getAttribute('data-lang');
+        const selectLang = () => {
+            const selectedLang = option.getAttribute('data-lang');
             changeLanguage(selectedLang);
             languageDropdown.style.display = 'none';
+            languageToggle.setAttribute('aria-expanded', 'false');
             languageToggle.focus();
+        };
+
+        option.addEventListener('click', selectLang);
+        option.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                selectLang();
+            }
         });
     });
 }
