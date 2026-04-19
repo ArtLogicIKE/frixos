@@ -172,6 +172,11 @@ h1 {
     border-color: var(--primary-color);
 }
 
+.language-toggle:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
 #current-language-name {
     font-weight: 500;
     font-size: 0.9rem;
@@ -228,6 +233,11 @@ h1 {
 
 .theme-toggle:hover {
     background-color: rgba(128, 128, 128, 0.1);
+}
+
+.theme-toggle:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
 }
 
 .light-theme .sun-icon,

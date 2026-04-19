@@ -472,26 +472,27 @@ function setupLanguageSelector() {
     const languageToggle = el('language-toggle');
     const languageDropdown = el('language-dropdown');
     
+    const toggleMenu = (show) => {
+        const isShowing = show !== undefined ? show : languageDropdown.style.display === 'none';
+        languageDropdown.style.display = isShowing ? 'block' : 'none';
+        languageToggle.setAttribute('aria-expanded', isShowing);
+    };
+
     // Toggle dropdown on button click
-    languageToggle.addEventListener('click', function(e) {
-        e.stopPropagation();
-        languageDropdown.style.display = languageDropdown.style.display === 'none' ? 'block' : 'none';
-    });
+    languageToggle.addEventListener('click', (e) => { e.stopPropagation(); toggleMenu(); });
     
     // Close dropdown when clicking outside
-    document.addEventListener('click', function(e) {
-        if (!languageToggle.contains(e.target) && !languageDropdown.contains(e.target)) {
-            languageDropdown.style.display = 'none';
-        }
+    document.addEventListener('click', (e) => {
+        if (!languageToggle.contains(e.target) && !languageDropdown.contains(e.target)) toggleMenu(false);
     });
     
-    // Handle language selection
+    // Handle language selection and keyboard accessibility
     document.querySelectorAll('.language-option').forEach(option => {
-        option.addEventListener('click', function() {
-            const selectedLang = this.getAttribute('data-lang');
-            changeLanguage(selectedLang);
-            languageDropdown.style.display = 'none';
-            languageToggle.focus();
+        const select = () => { changeLanguage(option.dataset.lang); toggleMenu(false); languageToggle.focus(); };
+        option.addEventListener('click', select);
+        option.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(); }
+            if (e.key === 'Escape') { e.preventDefault(); toggleMenu(false); languageToggle.focus(); }
         });
     });
 }
