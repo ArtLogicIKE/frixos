@@ -25,3 +25,7 @@
 ## 2025-04-09 - Optimized Settings API Parameter Filtering
 **Learning:** The Settings API was using a shared static buffer for query parameters, which led to a bug where multiple filters could not be applied simultaneously (the second filter would overwrite the first). Additionally, filtering logic performed O(N*M) string parsing and comparisons for every request, where N is the number of parameters (~55) and M is the number of tokens in the filter.
 **Action:** Replace repeated string parsing with a one-time calculation of an inclusion bitmask. Refactor query parameter retrieval to use caller-provided buffers to eliminate shared state bugs. Use bitwise AND operations for O(1) inclusion checks per parameter.
+
+## 2025-04-19 - Optimized Translation Engine via WeakMap and Dirty-Checking
+**Learning:** Reading DOM properties like `innerHTML` during bulk updates triggers layout thrashing as the browser may need to serialize the DOM subtree. Additionally, repeated `dataset` lookups for translation keys (`data-i18n`) in a loop of 180+ elements add significant CPU overhead.
+**Action:** Implement a `WeakMap` based cache to store element-specific translation metadata (keys and last-applied values). Use this cache to perform memory-based dirty-checking before writing to the DOM, and hoist static label lookups outside of loops to minimize translation object traversal.
