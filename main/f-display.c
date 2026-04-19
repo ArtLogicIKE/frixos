@@ -111,6 +111,10 @@ lv_obj_t *label_msg = NULL;
 #define DIGIT_WIDTH 18          // Width of each digit in the sprite sheet
 #define DIGIT_HEIGHT 36         // Height of each digit
 #define SPRITE_SHEET_COLUMNS 10 // Number of digits in the sprite sheet
+/** Free pixels between decimal dot and adjacent digit glyphs (mmol/L glucose display). */
+#define MMOL_DECIMAL_SIDE_GAP_PX 1
+/** If LVGL has not laid out the dot image yet, assume this width (typical theme dot). */
+#define MMOL_DOT_WIDTH_FALLBACK_PX 4
 
 #define NUM_DIGITS 4                   // the 4 time digits
 #define label_msg_ofs_y (25 + 25 + 14) // y offset for the message label
@@ -1181,38 +1185,67 @@ static void update_display_content(time_t now)
   display_digit(2, digit3);
   display_digit(3, digit4);
 
-  if (showing_glucose && alternate_display_active)
+  const int y_digits = eeprom_ofs_y + 25;
+
+  if (showing_glucose && alternate_display_active && eeprom_glucose_unit == 1)
   {
-    lv_obj_align(digit_objs[1], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 1 * 18 + 6, eeprom_ofs_y + 25);
+    int dot_w = lv_obj_get_width(dots[0]);
+    if (dot_w <= 0)
+      dot_w = MMOL_DOT_WIDTH_FALLBACK_PX;
+
+    const int g = MMOL_DECIMAL_SIDE_GAP_PX;
+    /* Shift integer digits (slots 0–2) left so tenths + dot fit before the units label. */
+    const int shift = g + dot_w;
+
+    const int gly_x0 = eeprom_ofs_x + 0;
+    const int gly_x1 = eeprom_ofs_x + 1 * 18 + 6;
+    const int gly_x2 = eeprom_ofs_x + 2 * 18 + 6;
+    const int x0 = gly_x0 - shift;
+    const int x1 = gly_x1 - shift;
+    const int x2 = gly_x2 - shift;
+    const int x3 = x2 + DIGIT_WIDTH + g + dot_w + g;
+
+    lv_obj_align(digit_objs[0], LV_ALIGN_TOP_LEFT, x0, y_digits);
+    lv_obj_align(digit_objs[1], LV_ALIGN_TOP_LEFT, x1, y_digits);
+    lv_obj_align(digit_objs[2], LV_ALIGN_TOP_LEFT, x2, y_digits);
+    lv_obj_align(digit_objs[3], LV_ALIGN_TOP_LEFT, x3, y_digits);
     show_object(img_ampm, false);
+
+    show_object(dots[0], true);
+    show_object(dots[1], false);
+    const int dot_x = x2 + DIGIT_WIDTH + g;
+    lv_obj_align(dots[0], LV_ALIGN_TOP_LEFT, dot_x, eeprom_ofs_y + 25 + 30);
+  }
+  else if (showing_glucose && alternate_display_active)
+  {
+    lv_obj_align(digit_objs[0], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 0, y_digits);
+    lv_obj_align(digit_objs[1], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 1 * 18 + 6, y_digits);
+    lv_obj_align(digit_objs[2], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 2 * 18 + 6, y_digits);
+    lv_obj_align(digit_objs[3], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 3 * 18 + 6, y_digits);
+    show_object(img_ampm, false);
+
+    show_object(dots[0], show_dots);
+    show_object(dots[1], show_dots);
+    lv_obj_align(dots[0], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 2 * 18 + 1, eeprom_ofs_y + 25 + 10);
+    lv_obj_align(dots[1], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 2 * 18 + 1, eeprom_ofs_y + 25 + 26);
   }
   else
   {
-    lv_obj_align(digit_objs[1], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 1 * 18, eeprom_ofs_y + 25);
+    lv_obj_align(digit_objs[0], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 0, y_digits);
+    lv_obj_align(digit_objs[1], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 1 * 18, y_digits);
+    lv_obj_align(digit_objs[2], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 2 * 18 + 6, y_digits);
+    lv_obj_align(digit_objs[3], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 3 * 18 + 6, y_digits);
     show_object(img_ampm, eeprom_12hour && time_valid);
+
+    show_object(dots[0], show_dots);
+    show_object(dots[1], show_dots);
+    lv_obj_align(dots[0], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 2 * 18 + 1, eeprom_ofs_y + 25 + 10);
+    lv_obj_align(dots[1], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 2 * 18 + 1, eeprom_ofs_y + 25 + 26);
   }
 
   lv_image_set_offset_x(img_weather, -weather_icon_index * 32);
   lv_image_set_offset_x(img_moon, -moon_icon_index * 14);
   lv_image_set_offset_x(img_ampm, show_ampm ? -10 : 0);
-
-  if (showing_glucose && alternate_display_active && eeprom_glucose_unit == 1)
-  {
-    show_object(dots[0], true);
-    show_object(dots[1], false);
-    int dot_x_pos = eeprom_ofs_x + 3 * 18 + 6 - 4;
-    lv_obj_align(dots[0], LV_ALIGN_TOP_LEFT, dot_x_pos, eeprom_ofs_y + 25 + 30);
-  }
-  else
-  {
-    show_object(dots[0], show_dots);
-    show_object(dots[1], show_dots);
-    if (!showing_glucose || !alternate_display_active)
-    {
-      lv_obj_align(dots[0], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 2 * 18 + 1, eeprom_ofs_y + 25 + 10);
-      lv_obj_align(dots[1], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 2 * 18 + 1, eeprom_ofs_y + 25 + 26);
-    }
-  }
   show_object(img_mgdl, showing_glucose && alternate_display_active && is_glucose_on() && glucose_data.current_gl_mgdl > 0);
   lv_image_set_offset_x(img_mgdl, -eeprom_glucose_unit * 12);
   lvgl_port_unlock();
@@ -1352,14 +1385,14 @@ void display_task(void *pvParameters)
     if (label_size > MSG_WIDTH)
     { // scrolling, left aligned
       // ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Label pos %d, max %d", label_scroll_pos, label_max_pos);
-      lvgl_port_lock(0);
       label_scroll_pos++;
       if (label_scroll_pos >= label_max_pos)
         label_scroll_pos = -MSG_WIDTH;
 
+      // display_string_substring() already acquires/releases the LVGL lock.
+      // Taking lvgl_port_lock() here causes a self-deadlock in the display task.
       display_string_substring(msg_scrolling, (eeprom_ofs_x > 6 ? eeprom_ofs_x - 6 : eeprom_ofs_x), eeprom_ofs_y + label_msg_ofs_y,
                                label_scroll_pos, MSG_WIDTH, label_msg, get_selected_font(eeprom_msg_font));
-      lvgl_port_unlock();
     }
 
     // NOTE: Do NOT call lv_task_handler() here! The esp_lvgl_port creates its own

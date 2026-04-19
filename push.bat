@@ -9,6 +9,7 @@ del files.txt
 dir /l /os /b > ..\files.txt
 copy ..\files.txt .\
 echo re-created files.txt
+mkdir c:\source\frixos-web\www\%1
 copy * c:\source\frixos-web\www\%1\ /b/y > nul
 echo copied spiffs
 cd ..
