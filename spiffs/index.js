@@ -471,27 +471,67 @@ function setupPasswordToggles() {
 function setupLanguageSelector() {
     const languageToggle = el('language-toggle');
     const languageDropdown = el('language-dropdown');
+    const options = document.querySelectorAll('.language-option');
     
+    function toggleMenu(forceState) {
+        const isExpanded = forceState !== undefined ? !forceState : languageToggle.getAttribute('aria-expanded') === 'true';
+        const newState = !isExpanded;
+        languageToggle.setAttribute('aria-expanded', newState);
+        languageDropdown.style.display = newState ? 'block' : 'none';
+        return newState;
+    }
+
     // Toggle dropdown on button click
     languageToggle.addEventListener('click', function(e) {
         e.stopPropagation();
-        languageDropdown.style.display = languageDropdown.style.display === 'none' ? 'block' : 'none';
+        toggleMenu();
     });
     
+    // Keyboard navigation for the toggle button
+    languageToggle.addEventListener('keydown', function(e) {
+        if (['Enter', ' ', 'ArrowDown'].includes(e.key)) {
+            e.preventDefault();
+            if (toggleMenu(true)) { // Force open
+                options[0].focus();
+            }
+        }
+    });
+
     // Close dropdown when clicking outside
     document.addEventListener('click', function(e) {
         if (!languageToggle.contains(e.target) && !languageDropdown.contains(e.target)) {
-            languageDropdown.style.display = 'none';
+            if (languageToggle.getAttribute('aria-expanded') === 'true') {
+                toggleMenu(false); // Force close
+            }
         }
     });
     
-    // Handle language selection
-    document.querySelectorAll('.language-option').forEach(option => {
+    // Handle language selection and navigation
+    options.forEach((option, index) => {
         option.addEventListener('click', function() {
             const selectedLang = this.getAttribute('data-lang');
             changeLanguage(selectedLang);
-            languageDropdown.style.display = 'none';
+            toggleMenu(false); // Force close
             languageToggle.focus();
+        });
+
+        option.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                this.click();
+            } else if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                const nextIndex = (index + 1) % options.length;
+                options[nextIndex].focus();
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                const prevIndex = (index - 1 + options.length) % options.length;
+                options[prevIndex].focus();
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                toggleMenu(false); // Force close
+                languageToggle.focus();
+            }
         });
     });
 }
