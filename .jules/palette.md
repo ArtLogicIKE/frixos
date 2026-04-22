@@ -15,3 +15,7 @@
 ## 2025-05-15 - [Credential UX vs Security]
 **Learning:** While `autocomplete` attributes like `current-password` and `username` greatly improve UX for WiFi and user accounts, they should be omitted for API tokens and integration keys to prevent password managers from incorrectly identifying them as primary site credentials.
 **Action:** Selectively apply `autocomplete` only to standard user/password fields and avoid them for technical tokens or machine keys.
+
+## 2025-05-16 - [Keyboard Accessible Dropdowns]
+**Learning:** For custom dropdowns in vanilla JS, implementing the WAI-ARIA Listbox pattern (aria-expanded, aria-haspopup, role="listbox", role="option") combined with manual focus management for Arrow keys provides the most accessible experience. Focus restoration to the toggle button on Escape or selection is critical for user orientation.
+**Action:** Always implement full keyboard navigation (arrows, enter/space, escape) and focus management when creating custom interactive UI components to meet WCAG standards.
