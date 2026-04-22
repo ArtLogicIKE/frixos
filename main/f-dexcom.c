@@ -40,6 +40,13 @@ static int dexcom_response_len = 0;
 static esp_http_client_handle_t dexcom_client = NULL;
 bool dexcom_client_initialized = false;
 
+// Drop TLS/TCP state so the next perform() opens a new connection (recover from HTTP_EVENT_ERROR).
+static void dexcom_reset_connection(void)
+{
+    if (dexcom_client)
+        esp_http_client_close(dexcom_client);
+}
+
 // HTTP event handler for Dexcom requests
 static esp_err_t dexcom_http_event_handler(esp_http_client_event_t *evt)
 {
@@ -197,11 +204,13 @@ bool authenticate_dexcom_account(void)
         else
         {
             ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Dexcom account auth failed, status: %d", esp_http_client_get_status_code(dexcom_client));
+            dexcom_reset_connection();
         }
     }
     else
     {
         ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Dexcom auth HTTP failed");
+        dexcom_reset_connection();
     }
 
     release_shared_buffer(dexcom_response_buffer);
@@ -269,11 +278,13 @@ bool login_dexcom(void)
         else
         {
             ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Dexcom login failed %d", esp_http_client_get_status_code(dexcom_client));
+            dexcom_reset_connection();
         }
     }
     else
     {
         ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Dexcom login HTTP failed");
+        dexcom_reset_connection();
     }
 
     release_shared_buffer(dexcom_response_buffer);
@@ -436,6 +447,7 @@ bool fetch_dexcom_glucose()
             else
             {
                 ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Dexcom glucose fetch returned http error: %d", status_code);
+                dexcom_reset_connection();
                 // Don't retry for other errors
                 release_shared_buffer(dexcom_response_buffer);
                 dexcom_response_buffer = NULL;
@@ -446,6 +458,8 @@ bool fetch_dexcom_glucose()
         else
         {
             ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Dexcom fetch failed");
+            dexcom_reset_connection();
+            dexcom_session_id[0] = '\0';
         }
 
         release_shared_buffer(dexcom_response_buffer);
@@ -454,7 +468,7 @@ bool fetch_dexcom_glucose()
     }
 
     ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Dexcom fetch failed (retry)");
-    release_ssl_semaphore();
+    cleanup_dexcom_client();
     return false;
 }
 

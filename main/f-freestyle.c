@@ -38,6 +38,13 @@ static int freestyle_response_len = 0;
 // Persistent HTTP client for Freestyle
 static esp_http_client_handle_t freestyle_client = NULL;
 
+// Drop TLS/TCP state so next request starts clean after transport errors.
+static void freestyle_reset_connection(void)
+{
+    if (freestyle_client)
+        esp_http_client_close(freestyle_client);
+}
+
 // Chunk processing mode for glucose fetch
 static bool is_glucose_chunk_mode = false;
 static double latest_glucose_value = 0.0;
@@ -840,125 +847,134 @@ static bool fetch_patient_id(void)
 
 bool fetch_freestyle_glucose(void)
 {
-
-    if (!freestyle_client_initialized)
+    for (int attempt = 0; attempt < 2; attempt++)
     {
-        if (!init_freestyle_client())
+        if (!freestyle_client_initialized)
         {
+            if (!init_freestyle_client())
+                return false;
+        }
+
+        if (eeprom_libre_token[0] == '\0' || libre_account_id[0] == '\0')
+        {
+            if (!login_freestyle())
+                return false;
+        }
+
+        if (eeprom_libre_patient_id[0] == '\0')
+        {
+            if (!fetch_patient_id())
+                return false;
+        }
+
+        char graph_url[256];
+        snprintf(graph_url, sizeof(graph_url), "%s/llu/connections/%s/graph", get_freestyle_base_url(), eeprom_libre_patient_id);
+
+        // Enable chunk processing mode for glucose fetch
+        is_glucose_chunk_mode = true;
+        glucose_chunk_buffer_len = 0;
+        latest_glucose_value = 0.0;
+        latest_trend_arrow = 0;
+        latest_timestamp = 0;
+
+        // Update URL and method for this request
+        esp_http_client_set_url(freestyle_client, graph_url);
+        esp_http_client_set_method(freestyle_client, HTTP_METHOD_GET);
+
+        if (!acquire_ssl_semaphore("fetch_freestyle_glucose"))
+        {
+            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to acquire SSL semaphore for fetch_freestyle_glucose");
+            is_glucose_chunk_mode = false;
             return false;
         }
-    }
 
-    if (eeprom_libre_token[0] == '\0' || libre_account_id[0] == '\0')
-    {
-        if (!login_freestyle())
-            return false;
-    }
-
-    if (eeprom_libre_patient_id[0] == '\0')
-    {
-        if (!fetch_patient_id())
-            return false;
-    }
-
-    char graph_url[256];
-    snprintf(graph_url, sizeof(graph_url), "%s/llu/connections/%s/graph", get_freestyle_base_url(), eeprom_libre_patient_id);  
-
-    // Enable chunk processing mode for glucose fetch
-    is_glucose_chunk_mode = true;
-    glucose_chunk_buffer_len = 0;
-    latest_glucose_value = 0.0;
-    latest_trend_arrow = 0;
-    latest_timestamp = 0;
-
-    // Update URL and method for this request
-    esp_http_client_set_url(freestyle_client, graph_url);
-    esp_http_client_set_method(freestyle_client, HTTP_METHOD_GET);
-
-    // headers set from previous requests, no need to set them again
-    
-    // Acquire SSL connection semaphore before making SSL connection
-    if (!acquire_ssl_semaphore("fetch_freestyle_glucose"))
-    {
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to acquire SSL semaphore for fetch_freestyle_glucose");
-        is_glucose_chunk_mode = false;
-        return false;
-    }
-    
-    bool success = false;
-    if (esp_http_client_perform(freestyle_client) == ESP_OK)
-    {
-        int status_code = esp_http_client_get_status_code(freestyle_client);
-        if (status_code == 200)
+        bool success = false;
+        esp_err_t http_err = esp_http_client_perform(freestyle_client);
+        if (http_err == ESP_OK)
         {
-            success = true; // HTTP request succeeded
-            // Use the latest glucose value extracted from chunks
-            if (latest_timestamp > glucose_data.timestamp)
+            int status_code = esp_http_client_get_status_code(freestyle_client);
+            if (status_code == 200)
             {
-                glucose_data.previous_gl_mgdl = glucose_data.current_gl_mgdl;
-                glucose_data.current_gl_mgdl = latest_glucose_value;
-                if (glucose_data.previous_gl_mgdl > 0)            
-                    glucose_data.gl_diff = glucose_data.current_gl_mgdl - glucose_data.previous_gl_mgdl;
-                else
-                    glucose_data.gl_diff = 0;             
-                // Map Freestyle trend_arrow (1-5) to standard values (0-4)
-                // Freestyle: 1=down fast, 2=down, 3=stable, 4=up, 5=up fast
-                // Standard:  0=down fast, 1=down, 2=stable, 3=up, 4=up fast
-                if (latest_trend_arrow >= 1 && latest_trend_arrow <= 5)
-                    glucose_data.trend_arrow = latest_trend_arrow - 1; // Map 1-5 to 0-4
-                else
-                    glucose_data.trend_arrow = -1; // no arrow if invalid or 0
-                // Use timestamp from CGM data if available, otherwise use current time
-                if (latest_timestamp > 0)
+                success = true; // HTTP request succeeded
+                // Use the latest glucose value extracted from chunks
+                if (latest_timestamp > glucose_data.timestamp)
                 {
-                    glucose_data.timestamp = latest_timestamp;
+                    glucose_data.previous_gl_mgdl = glucose_data.current_gl_mgdl;
+                    glucose_data.current_gl_mgdl = latest_glucose_value;
+                    if (glucose_data.previous_gl_mgdl > 0)
+                        glucose_data.gl_diff = glucose_data.current_gl_mgdl - glucose_data.previous_gl_mgdl;
+                    else
+                        glucose_data.gl_diff = 0;
+                    // Map Freestyle trend_arrow (1-5) to standard values (0-4)
+                    // Freestyle: 1=down fast, 2=down, 3=stable, 4=up, 5=up fast
+                    // Standard:  0=down fast, 1=down, 2=stable, 3=up, 4=up fast
+                    if (latest_trend_arrow >= 1 && latest_trend_arrow <= 5)
+                        glucose_data.trend_arrow = latest_trend_arrow - 1; // Map 1-5 to 0-4
+                    else
+                        glucose_data.trend_arrow = -1; // no arrow if invalid or 0
+                    // Use timestamp from CGM data if available, otherwise use current time
+                    if (latest_timestamp > 0)
+                    {
+                        glucose_data.timestamp = latest_timestamp;
+                    }
+                    else
+                    {
+                        time(&glucose_data.timestamp); // Fallback to current time if parsing failed
+                    }
+                    success = true; // Data was updated
+                    if (eeprom_glucose_unit == 1)
+                    {
+                        float glucose_mmol = glucose_data.current_gl_mgdl / 18.0182f;
+                        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Freestyle ok %.1f mmol/L trend %i", glucose_mmol, glucose_data.trend_arrow);
+                    }
+                    else
+                    {
+                        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Freestyle ok %.0f mg/dL trend %i", glucose_data.current_gl_mgdl, glucose_data.trend_arrow);
+                    }
                 }
                 else
                 {
-                    time(&glucose_data.timestamp); // Fallback to current time if parsing failed
+                    // Data not newer, but HTTP request was successful
+                    // Return true so timestamp gets updated to respect refresh interval
+                    if (glucose_data.timestamp != latest_timestamp)
+                    {
+                        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Freestyle not newer %.0f ts %ld", glucose_data.current_gl_mgdl, (long)glucose_data.timestamp);
+                        success = true; // Data was updated
+                    }
                 }
-                success = true; // Data was updated
-                if (eeprom_glucose_unit == 1)
-                {
-                    float glucose_mmol = glucose_data.current_gl_mgdl / 18.0182f;
-                    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Freestyle ok %.1f mmol/L trend %i", glucose_mmol, glucose_data.trend_arrow);
-                }
-                else
-                {
-                    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Freestyle ok %.0f mg/dL trend %i", glucose_data.current_gl_mgdl, glucose_data.trend_arrow);
-                }
+            }
+            else if (status_code == 401)
+            {
+                ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Freestyle unauthorized, retry login");
+                eeprom_libre_token[0] = '\0';
+                eeprom_libre_patient_id[0] = '\0';
             }
             else
             {
-                // Data not newer, but HTTP request was successful
-                // Return true so timestamp gets updated to respect refresh interval
-                if (glucose_data.timestamp != latest_timestamp)
-                {
-                    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Freestyle not newer %.0f ts %ld", glucose_data.current_gl_mgdl, (long)glucose_data.timestamp);
-                    success = true; // Data was updated
-                }                
+                ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Freestyle glucose fetch returned http error: %d", status_code);
+                freestyle_reset_connection();
             }
         }
-        else if (status_code == 401)
+        else
         {
-            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Freestyle unauthorized, retry login");
-            eeprom_libre_token[0] = '\0'; // Trigger re-login next time
+            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Freestyle fetch failed");
+            freestyle_reset_connection();
+            eeprom_libre_token[0] = '\0';
+            eeprom_libre_patient_id[0] = '\0';
         }
+
+        // Disable chunk processing mode and release SSL semaphore before any retry/return.
+        is_glucose_chunk_mode = false;
+        glucose_chunk_buffer_len = 0;
+        release_ssl_semaphore();
+
+        if (success)
+            return true;
     }
 
-    // Disable chunk processing mode
-    is_glucose_chunk_mode = false;
-    glucose_chunk_buffer_len = 0;
-    
-    // Always release SSL semaphore before returning
-    release_ssl_semaphore();
-    
-    // Note: We do NOT clean up the client here because:
-    // 1. The client is shared between login_freestyle(), fetch_patient_id(), and fetch_freestyle_glucose()
-    // 2. Headers are set on the client and persist across calls
-    // 3. The client needs to remain initialized for the next glucose fetch cycle
-    
-    return success;
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Freestyle fetch failed (retry)");
+    cleanup_freestyle_client();
+    return false;
 }
 
 void format_glucose_token(char *buffer, size_t buffer_size)

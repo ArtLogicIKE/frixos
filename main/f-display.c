@@ -446,9 +446,22 @@ void set_scroll_message(const char *msg)
   }
   else
   { // centered
+    const int centered_label_width = MSG_WIDTH - MSG_EXTRA_WIDTH;
+    int dot_w = MMOL_DOT_WIDTH_FALLBACK_PX;
+    if (dots[0] != NULL)
+    {
+      int measured_dot_w = lv_obj_get_width(dots[0]);
+      if (measured_dot_w > 0)
+      {
+        dot_w = measured_dot_w;
+      }
+    }
+    const int colon_center_x = eeprom_ofs_x + (2 * DIGIT_WIDTH) + 1 + (dot_w / 2);
+    const int centered_label_x = colon_center_x - (centered_label_width / 2);
+
     lv_obj_set_style_text_align(label_msg, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_width(label_msg, MSG_WIDTH - MSG_EXTRA_WIDTH);
-    lv_obj_set_pos(label_msg, eeprom_ofs_x, eeprom_ofs_y + label_msg_ofs_y);
+    lv_obj_set_width(label_msg, centered_label_width);
+    lv_obj_set_pos(label_msg, centered_label_x, eeprom_ofs_y + label_msg_ofs_y);
     ESP_LOG_WEB(ESP_LOG_INFO, TAG, "set_scroll_message: centered");
     label_max_pos = 0;
   }

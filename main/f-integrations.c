@@ -422,6 +422,8 @@ static bool fetch_ha_entity(integration_token_t *token)
 
         if (!success && retry_count < max_retries - 1)
         {
+            // Reset transport state between retries so next perform() starts fresh.
+            esp_http_client_close(client);
             retry_count++;
             ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Retry in %d ms", backoff_ms);
             vTaskDelay(pdMS_TO_TICKS(backoff_ms));
@@ -597,11 +599,8 @@ static void integration_update_task(void *pvParameters)
                         if (!dexcom_client_initialized)
                         {
                             if (!init_dexcom_client())
-                            {
                                 ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Dexcom client init failed");
-                                dexcom_client_initialized = true;
-                            }
-                            if (!authenticate_dexcom_account())
+                            else if (!authenticate_dexcom_account())
                                 ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Dexcom auth failed");
                         }
 
