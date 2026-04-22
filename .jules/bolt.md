@@ -25,3 +25,7 @@
 ## 2025-04-09 - Optimized Settings API Parameter Filtering
 **Learning:** The Settings API was using a shared static buffer for query parameters, which led to a bug where multiple filters could not be applied simultaneously (the second filter would overwrite the first). Additionally, filtering logic performed O(N*M) string parsing and comparisons for every request, where N is the number of parameters (~55) and M is the number of tokens in the filter.
 **Action:** Replace repeated string parsing with a one-time calculation of an inclusion bitmask. Refactor query parameter retrieval to use caller-provided buffers to eliminate shared state bugs. Use bitwise AND operations for O(1) inclusion checks per parameter.
+
+## 2025-05-14 - Optimized Web UI Translation Engine
+**Learning:** The `translate()` function in `spiffs/index.js` was performing full DOM queries and expensive `dataset` lookups on every language change. Reading `innerHTML` for dirty checking also caused unnecessary layout thrashing and serialization overhead. This is particularly impactful on lower-end client devices accessing the ESP32-hosted web interface.
+**Action:** Use a `WeakMap` (`i18nCache`) to store element metadata and the last applied translation values. This avoids redundant `dataset` access and DOM reads. Implement dirty-checking against the cached values to skip redundant DOM writes. Hoist translation lookups out of loops to reduce complexity from O(N) to O(1) for static labels.
