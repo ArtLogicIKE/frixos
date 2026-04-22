@@ -207,6 +207,12 @@ h1 {
     background-color: var(--section-content-bg);
 }
 
+.language-option:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: -2px;
+    background-color: var(--section-content-bg);
+}
+
 .language-option .lang-name {
     font-size: 0.9rem;
 }
