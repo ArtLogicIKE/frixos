@@ -15,3 +15,7 @@
 ## 2025-05-15 - [Credential UX vs Security]
 **Learning:** While `autocomplete` attributes like `current-password` and `username` greatly improve UX for WiFi and user accounts, they should be omitted for API tokens and integration keys to prevent password managers from incorrectly identifying them as primary site credentials.
 **Action:** Selectively apply `autocomplete` only to standard user/password fields and avoid them for technical tokens or machine keys.
+
+## 2025-05-16 - [List-to-Field Interaction Patterns]
+**Learning:** When users select an item from a list (like WiFi networks) to populate a form field, providing both accessibility and immediate visual feedback is crucial. Simple `onclick` handlers on `div` elements are insufficient for keyboard users.
+**Action:** Always implement `role="button"`, `tabindex="0"`, and `onkeydown` (Enter/Space) handlers for interactive list items. Use a temporary CSS animation class (e.g., `.input-highlight`) on the target input field and programmatically shift focus to the next logical field (e.g., password) to streamline the flow.
