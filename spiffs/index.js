@@ -16,6 +16,15 @@ const LANGUAGE_NAMES = {
 // Helper for element selection
 const el = (id) => document.getElementById(id);
 
+// Helper to highlight an element briefly (e.g. after programmatic update)
+function highlightElement(element) {
+    if (!element) return;
+    element.classList.remove('input-highlight');
+    void element.offsetWidth; // Force reflow
+    element.classList.add('input-highlight');
+    setTimeout(() => element.classList.remove('input-highlight'), 1500);
+}
+
 // Helper for toggling button loading state
 function toggleLoading(btn, isLoading) {
     if (!btn) return;
@@ -1757,7 +1766,13 @@ function displayNetworks(networks) {
     networks.forEach(network => {
         const networkItem = document.createElement('div');
         networkItem.className = 'network-item';
-        networkItem.onclick = () => selectNetwork(network.ssid);
+        networkItem.tabIndex = 0;
+        networkItem.role = 'button';
+        networkItem.setAttribute('aria-label', `${network.ssid}, ${network.signal_strength}% signal`);
+
+        const select = () => selectNetwork(network.ssid);
+        networkItem.onclick = select;
+        networkItem.onkeydown = (e) => ['Enter', ' '].includes(e.key) && (e.preventDefault(), select());
 
         // Create network name element
         const nameSpan = document.createElement('span');
@@ -1794,7 +1809,9 @@ function displayNetworks(networks) {
 }
 
 function selectNetwork(ssid) {
-    el('wifi_ssid').value = ssid;
+    const ssidInput = el('wifi_ssid');
+    ssidInput.value = ssid;
+    highlightElement(ssidInput);
     el('wifi_pass').focus();
 }
 
@@ -2216,8 +2233,12 @@ function setupAdvancedSection() {
                     messageInput.dispatchEvent(new Event('input', { bubbles: true }));
                     messageInput.focus();
                 };
-                t.onclick = insert;
-                t.onkeydown = (e) => ['Enter', ' '].includes(e.key) && (e.preventDefault(), insert());
+                const wrappedInsert = () => {
+                    insert();
+                    highlightElement(messageInput);
+                };
+                t.onclick = wrappedInsert;
+                t.onkeydown = (e) => ['Enter', ' '].includes(e.key) && (e.preventDefault(), wrappedInsert());
                 const updateA11y = () => t.setAttribute('aria-label', `${getNestedTranslation(translations[currentLanguage] || translations.en, 'common.insert') || 'Insert'} ${t.textContent}`);
                 updateA11y();
             });
