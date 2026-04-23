@@ -471,29 +471,30 @@ function setupPasswordToggles() {
 function setupLanguageSelector() {
     const languageToggle = el('language-toggle');
     const languageDropdown = el('language-dropdown');
-    
-    // Toggle dropdown on button click
-    languageToggle.addEventListener('click', function(e) {
-        e.stopPropagation();
-        languageDropdown.style.display = languageDropdown.style.display === 'none' ? 'block' : 'none';
-    });
-    
-    // Close dropdown when clicking outside
-    document.addEventListener('click', function(e) {
-        if (!languageToggle.contains(e.target) && !languageDropdown.contains(e.target)) {
-            languageDropdown.style.display = 'none';
+    const options = Array.from(document.querySelectorAll('.language-option'));
+    const toggle = (show = languageDropdown.style.display === 'none') => {
+        languageDropdown.style.display = show ? 'block' : 'none';
+        languageToggle.setAttribute('aria-expanded', show);
+    };
+    languageToggle.addEventListener('click', e => { e.stopPropagation(); toggle(); });
+    document.addEventListener('click', e => { if (!languageToggle.contains(e.target) && !languageDropdown.contains(e.target)) toggle(false); });
+    languageToggle.addEventListener('keydown', e => {
+        if (['Enter', ' ', 'ArrowDown'].includes(e.key)) {
+            e.preventDefault(); toggle(true);
+            (options.find(opt => opt.getAttribute('aria-selected') === 'true') || options[0]).focus();
         }
     });
-    
-    // Handle language selection
-    document.querySelectorAll('.language-option').forEach(option => {
-        option.addEventListener('click', function() {
-            const selectedLang = this.getAttribute('data-lang');
-            changeLanguage(selectedLang);
-            languageDropdown.style.display = 'none';
-            languageToggle.focus();
-        });
+    languageDropdown.addEventListener('keydown', e => {
+        const i = options.indexOf(document.activeElement);
+        if (e.key === 'ArrowDown') { e.preventDefault(); options[(i + 1) % options.length].focus(); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); options[(i - 1 + options.length) % options.length].focus(); }
+        else if (['Enter', ' '].includes(e.key)) { e.preventDefault(); document.activeElement.click(); }
+        else if (e.key === 'Escape') { e.preventDefault(); toggle(false); languageToggle.focus(); }
     });
+    options.forEach(opt => opt.addEventListener('click', function() {
+        options.forEach(o => o.setAttribute('aria-selected', o === this));
+        changeLanguage(this.getAttribute('data-lang')); toggle(false); languageToggle.focus();
+    }));
 }
 
 // Change language function
@@ -575,6 +576,9 @@ async function fetchThemeParams() {
         // Load and apply language preference
         const languageIndex = data.p41 !== undefined ? data.p41 : 0;
         const selectedLang = LANGUAGES[languageIndex] || 'en';
+        document.querySelectorAll('.language-option').forEach(opt => {
+            opt.setAttribute('aria-selected', opt.getAttribute('data-lang') === selectedLang);
+        });
         await translate(selectedLang);
 
         return data;
