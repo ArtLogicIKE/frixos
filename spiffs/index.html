@@ -32,10 +32,10 @@
                 <a href="#restart" class="menu-item" data-section="restart-section" data-i18n="menu.restart">Restart</a>
             </div>
             <div class="header-controls">
-                <button id="language-toggle" class="language-toggle" aria-label="Change language" data-i18n-aria-label="common.change_language">
+                <button id="language-toggle" class="language-toggle" aria-label="Change language" data-i18n-aria-label="common.change_language" aria-haspopup="listbox" aria-expanded="false" aria-controls="language-dropdown">
                     <span id="current-language-name">English</span>
                 </button>
-                <div id="language-dropdown" class="language-dropdown" style="display: none;">
+                <div id="language-dropdown" class="language-dropdown" style="display: none;" role="listbox" tabindex="-1">
                     <div class="language-option" data-lang="en">
                         <span class="lang-name">English</span>
                     </div>
@@ -117,7 +117,7 @@
 
                         <div class="network-section">
                             <h3 data-i18n="settings.wifi.available_networks">Available WiFi Networks</h3>
-                            <div class="network-list" id="network-list">
+                            <div class="network-list" id="network-list" aria-live="polite">
                                 <div class="loading-spinner" id="loading-spinner" style="display: none;"></div>
                                 <div class="loading-text" id="loading-text" style="display: none;"
                                     data-i18n="settings.wifi.scanning">Scanning for

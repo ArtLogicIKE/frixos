@@ -15,3 +15,7 @@
 ## 2025-05-15 - [Credential UX vs Security]
 **Learning:** While `autocomplete` attributes like `current-password` and `username` greatly improve UX for WiFi and user accounts, they should be omitted for API tokens and integration keys to prevent password managers from incorrectly identifying them as primary site credentials.
 **Action:** Selectively apply `autocomplete` only to standard user/password fields and avoid them for technical tokens or machine keys.
+
+## 2025-05-16 - [ARIA Listbox for Dynamic Content]
+**Learning:** For custom dropdown components (like the language selector) in a vanilla JS environment, implementing the WAI-ARIA Listbox pattern (`aria-haspopup="listbox"`, `role="listbox"`, `role="option"`) provides essential semantics for screen readers that standard buttons lack. Management of `aria-expanded` and `aria-selected` must be explicitly handled in JS to maintain an accurate accessibility tree during user interaction.
+**Action:** When building custom interactive components that behave like standard form controls, always implement the corresponding WAI-ARIA design pattern to ensure cross-browser and assistive technology compatibility.

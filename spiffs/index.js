@@ -471,28 +471,72 @@ function setupPasswordToggles() {
 function setupLanguageSelector() {
     const languageToggle = el('language-toggle');
     const languageDropdown = el('language-dropdown');
+    const options = document.querySelectorAll('.language-option');
     
+    const toggleDropdown = (show) => {
+        const isShowing = show !== undefined ? show : languageDropdown.style.display === 'none';
+        languageDropdown.style.display = isShowing ? 'block' : 'none';
+        languageToggle.setAttribute('aria-expanded', isShowing);
+        if (isShowing) {
+            // Mark current language as selected
+            options.forEach(opt => {
+                const isSelected = opt.getAttribute('data-lang') === currentLanguage;
+                opt.setAttribute('aria-selected', isSelected);
+                opt.classList.toggle('selected', isSelected);
+            });
+        }
+    };
+
     // Toggle dropdown on button click
     languageToggle.addEventListener('click', function(e) {
         e.stopPropagation();
-        languageDropdown.style.display = languageDropdown.style.display === 'none' ? 'block' : 'none';
+        toggleDropdown();
     });
     
     // Close dropdown when clicking outside
     document.addEventListener('click', function(e) {
         if (!languageToggle.contains(e.target) && !languageDropdown.contains(e.target)) {
-            languageDropdown.style.display = 'none';
+            toggleDropdown(false);
         }
     });
     
-    // Handle language selection
-    document.querySelectorAll('.language-option').forEach(option => {
+    // Handle language selection and keyboard navigation
+    options.forEach((option, index) => {
+        option.setAttribute('role', 'option');
+        option.setAttribute('tabindex', '-1');
+
         option.addEventListener('click', function() {
             const selectedLang = this.getAttribute('data-lang');
             changeLanguage(selectedLang);
-            languageDropdown.style.display = 'none';
+            toggleDropdown(false);
             languageToggle.focus();
         });
+
+        option.addEventListener('keydown', function(e) {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                (options[index + 1] || options[0]).focus();
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                (options[index - 1] || options[options.length - 1]).focus();
+            } else if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                this.click();
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                toggleDropdown(false);
+                languageToggle.focus();
+            }
+        });
+    });
+
+    languageToggle.addEventListener('keydown', function(e) {
+        if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            toggleDropdown(true);
+            const firstOption = document.querySelector(`.language-option[data-lang="${currentLanguage}"]`) || options[0];
+            if (firstOption) firstOption.focus();
+        }
     });
 }
 
