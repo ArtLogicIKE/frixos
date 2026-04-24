@@ -172,6 +172,12 @@ h1 {
     border-color: var(--primary-color);
 }
 
+.language-toggle:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px rgba(0, 170, 255, 0.3);
+}
+
 #current-language-name {
     font-weight: 500;
     font-size: 0.9rem;
@@ -228,6 +234,12 @@ h1 {
 
 .theme-toggle:hover {
     background-color: rgba(128, 128, 128, 0.1);
+}
+
+.theme-toggle:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px rgba(0, 170, 255, 0.3);
 }
 
 .light-theme .sun-icon,
@@ -843,6 +855,12 @@ textarea[aria-invalid="true"] {
     background-color: var(--primary-hover);
     transform: translateY(-1px);
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.scan-btn:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px rgba(0, 170, 255, 0.3);
 }
 
 .scan-btn:active {
