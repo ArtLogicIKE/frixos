@@ -23,6 +23,17 @@ extern bool wifi_first_connect, weather_valid;
 extern time_t sunrise, sunset;
 extern double weather_temp, weather_humidity;
 extern double weather_high, weather_low;
+extern double weather_wind_speed_mps;
+extern double weather_gust_mps;
+extern int    weather_wind_dir_deg;
+extern double weather_precip_mm;
+extern double weather_precip_prob;
+extern double weather_uv;
+extern double weather_pressure_hpa;
+extern double weather_pressure_prev_hpa;
+extern int    weather_pressure_trend;
+extern double weather_3day_high;
+extern double weather_3day_low;
 extern char greeting[64];
 
 // OTA update thread control
@@ -34,7 +45,9 @@ extern SemaphoreHandle_t ota_update_semaphore;
 void initialize_mdns(void);
 bool is_wifi_connected(void);
 bool wifi_get_location(void);
-bool wifi_get_weather(void);
+bool wifi_get_openweather(void);
+bool wifi_get_metno_weather(void);
+bool wifi_get_metno_sunrise(void);
 void wifi_task(void *pvParameters);
 void ota_update_timer_callback(void *arg);
 esp_err_t f_http_post(const char* url, const char* data);

@@ -1481,6 +1481,13 @@ static const token_t base_tokens[] = {
     {"[low]", NULL, 9, TOKEN_TYPE_WEATHER, 5},
     {"[rise]", NULL, 10, TOKEN_TYPE_WEATHER, 6},
     {"[set]", NULL, 11, TOKEN_TYPE_WEATHER, 5},
+    {"[wind]", NULL, 12, TOKEN_TYPE_WEATHER, 6},
+    {"[gust]", NULL, 13, TOKEN_TYPE_WEATHER, 6},
+    {"[precip]", NULL, 14, TOKEN_TYPE_WEATHER, 8},
+    {"[uv]", NULL, 15, TOKEN_TYPE_WEATHER, 4},
+    {"[pressure]", NULL, 16, TOKEN_TYPE_WEATHER, 10},
+    {"[3high]", NULL, 17, TOKEN_TYPE_WEATHER, 7},
+    {"[3low]", NULL, 18, TOKEN_TYPE_WEATHER, 6},
     {NULL, NULL, 0, TOKEN_TYPE_BASE, 0} // End marker
 };
 
@@ -1504,7 +1511,7 @@ void prepare_tokens(void)
 
   // Start with base tokens
   prepared_tokens = base_tokens;
-  prepared_tokens_count = 11; // Base tokens count
+  prepared_tokens_count = 18; // Base tokens count (incl. met.no extended weather: wind/gust/precip/uv/pressure/3high/3low)
 
   // Allocate space for all tokens
   int tokencount = 0;
@@ -1809,6 +1816,84 @@ void replace_placeholders(const char *input, char *output, size_t output_size)
               }
             }
             break;
+            case 12: // [wind] — speed + cardinal direction
+            {
+              static const char *cardinals[] = {"N","NE","E","SE","S","SW","W","NW"};
+              const char *dir = cardinals[((weather_wind_dir_deg + 22) / 45) & 7];
+              if (eeprom_fahrenheit)
+              {
+                // m/s -> mph (1 m/s = 2.236936 mph)
+                snprintf(replacement, sizeof(replacement), "%.1f mph %s",
+                         weather_wind_speed_mps * 2.236936, dir);
+              }
+              else
+              {
+                snprintf(replacement, sizeof(replacement), "%.1f m/s %s",
+                         weather_wind_speed_mps, dir);
+              }
+            }
+            break;
+            case 13: // [gust] — gust speed + same direction
+            {
+              static const char *cardinals[] = {"N","NE","E","SE","S","SW","W","NW"};
+              const char *dir = cardinals[((weather_wind_dir_deg + 22) / 45) & 7];
+              if (eeprom_fahrenheit)
+              {
+                snprintf(replacement, sizeof(replacement), "%.1f mph %s",
+                         weather_gust_mps * 2.236936, dir);
+              }
+              else
+              {
+                snprintf(replacement, sizeof(replacement), "%.1f m/s %s",
+                         weather_gust_mps, dir);
+              }
+            }
+            break;
+            case 14: // [precip] — next-hour amount + probability
+              if (eeprom_fahrenheit)
+              {
+                // mm -> inches (1 mm = 0.0393701 in)
+                snprintf(replacement, sizeof(replacement), "%.2f in. (%.0f%%)",
+                         weather_precip_mm * 0.0393701, weather_precip_prob);
+              }
+              else
+              {
+                snprintf(replacement, sizeof(replacement), "%.1f mm (%.0f%%)",
+                         weather_precip_mm, weather_precip_prob);
+              }
+              break;
+            case 15: // [uv]
+              snprintf(replacement, sizeof(replacement), "%.1f", weather_uv);
+              break;
+            case 16: // [pressure] — integer hPa or inHg + trend arrow
+            {
+              const char *arrow = (weather_pressure_trend > 0) ? " ↑" :
+                                  (weather_pressure_trend < 0) ? " ↓" : " →";
+              if (eeprom_fahrenheit)
+              {
+                // hPa -> inHg (1 hPa = 0.02953 inHg). Two decimals are conventional.
+                snprintf(replacement, sizeof(replacement), "%.2f inHg%s",
+                         weather_pressure_hpa * 0.02953, arrow);
+              }
+              else
+              {
+                snprintf(replacement, sizeof(replacement), "%.0f hPa%s",
+                         weather_pressure_hpa, arrow);
+              }
+            }
+            break;
+            case 17: // [3high] — max temp across today + 2 days
+              if (eeprom_fahrenheit)
+                snprintf(replacement, sizeof(replacement), "%.0f°F", (weather_3day_high * 9.0 / 5.0) + 32);
+              else
+                snprintf(replacement, sizeof(replacement), "%.0f°C", weather_3day_high);
+              break;
+            case 18: // [3low] — min temp across today + 2 days
+              if (eeprom_fahrenheit)
+                snprintf(replacement, sizeof(replacement), "%.0f°F", (weather_3day_low * 9.0 / 5.0) + 32);
+              else
+                snprintf(replacement, sizeof(replacement), "%.0f°C", weather_3day_low);
+              break;
             case 11: // [set]
             {
               struct tm sunset_tm;
