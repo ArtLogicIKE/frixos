@@ -15,3 +15,7 @@
 ## 2025-05-15 - [Credential UX vs Security]
 **Learning:** While `autocomplete` attributes like `current-password` and `username` greatly improve UX for WiFi and user accounts, they should be omitted for API tokens and integration keys to prevent password managers from incorrectly identifying them as primary site credentials.
 **Action:** Selectively apply `autocomplete` only to standard user/password fields and avoid them for technical tokens or machine keys.
+
+## 2025-05-16 - [Focus Management in Async UI]
+**Learning:** When an interactive element (like a button) is temporarily disabled during an asynchronous operation, focus can be lost if the user expects it to remain. For accessibility, always `await` the async operation before programmatically restoring focus to the trigger element to ensure it's re-enabled and ready to receive focus.
+**Action:** In event listeners for async actions, ensure focus restoration happens after the `await` keyword.

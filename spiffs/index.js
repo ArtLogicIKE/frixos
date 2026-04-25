@@ -471,26 +471,64 @@ function setupPasswordToggles() {
 function setupLanguageSelector() {
     const languageToggle = el('language-toggle');
     const languageDropdown = el('language-dropdown');
+    const options = Array.from(document.querySelectorAll('.language-option'));
+    let currentFocusIndex = -1;
+
+    const toggleDropdown = (show) => {
+        const isVisible = show !== undefined ? show : languageDropdown.style.display === 'none';
+        languageDropdown.style.display = isVisible ? 'block' : 'none';
+        languageToggle.setAttribute('aria-expanded', isVisible);
+        if (!isVisible) currentFocusIndex = -1;
+    };
     
     // Toggle dropdown on button click
     languageToggle.addEventListener('click', function(e) {
         e.stopPropagation();
-        languageDropdown.style.display = languageDropdown.style.display === 'none' ? 'block' : 'none';
+        toggleDropdown();
     });
     
     // Close dropdown when clicking outside
     document.addEventListener('click', function(e) {
         if (!languageToggle.contains(e.target) && !languageDropdown.contains(e.target)) {
-            languageDropdown.style.display = 'none';
+            toggleDropdown(false);
+        }
+    });
+
+    languageToggle.addEventListener('keydown', function(e) {
+        if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(e.key)) {
+            e.preventDefault();
+            if (languageDropdown.style.display === 'none') {
+                toggleDropdown(true);
+            }
+            currentFocusIndex = e.key === 'ArrowUp' ? options.length - 1 : 0;
+            options[currentFocusIndex].focus();
+        }
+    });
+
+    languageDropdown.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            toggleDropdown(false);
+            languageToggle.focus();
+        } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            currentFocusIndex = (currentFocusIndex + 1) % options.length;
+            options[currentFocusIndex].focus();
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            currentFocusIndex = (currentFocusIndex - 1 + options.length) % options.length;
+            options[currentFocusIndex].focus();
+        } else if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            options[currentFocusIndex].click();
         }
     });
     
     // Handle language selection
-    document.querySelectorAll('.language-option').forEach(option => {
-        option.addEventListener('click', function() {
+    options.forEach(option => {
+        option.addEventListener('click', async function() {
             const selectedLang = this.getAttribute('data-lang');
-            changeLanguage(selectedLang);
-            languageDropdown.style.display = 'none';
+            toggleDropdown(false);
+            await changeLanguage(selectedLang);
             languageToggle.focus();
         });
     });
