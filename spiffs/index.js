@@ -467,32 +467,70 @@ function setupPasswordToggles() {
     });
 }
 
-// Setup language selector
+// Setup language selector with WAI-ARIA Menu pattern and keyboard support
 function setupLanguageSelector() {
-    const languageToggle = el('language-toggle');
-    const languageDropdown = el('language-dropdown');
+    const toggle = el('language-toggle');
+    const menu = el('language-dropdown');
+    const options = Array.from(menu.querySelectorAll('.language-option'));
+
+    function setExpanded(isExpanded) {
+        menu.style.display = isExpanded ? 'block' : 'none';
+        toggle.setAttribute('aria-expanded', isExpanded);
+    }
     
-    // Toggle dropdown on button click
-    languageToggle.addEventListener('click', function(e) {
+    toggle.onclick = (e) => {
         e.stopPropagation();
-        languageDropdown.style.display = languageDropdown.style.display === 'none' ? 'block' : 'none';
-    });
-    
-    // Close dropdown when clicking outside
-    document.addEventListener('click', function(e) {
-        if (!languageToggle.contains(e.target) && !languageDropdown.contains(e.target)) {
-            languageDropdown.style.display = 'none';
+        setExpanded(menu.style.display !== 'block');
+    };
+
+    document.addEventListener('click', (e) => {
+        if (!toggle.contains(e.target) && !menu.contains(e.target)) {
+            setExpanded(false);
         }
     });
     
-    // Handle language selection
-    document.querySelectorAll('.language-option').forEach(option => {
-        option.addEventListener('click', function() {
-            const selectedLang = this.getAttribute('data-lang');
-            changeLanguage(selectedLang);
-            languageDropdown.style.display = 'none';
-            languageToggle.focus();
-        });
+    function handleKeys(e) {
+        const isVis = menu.style.display === 'block';
+        const idx = options.indexOf(document.activeElement);
+        if (e.key === 'Escape' && isVis) {
+            setExpanded(false);
+            toggle.focus();
+        } else if (e.key === 'ArrowDown') {
+            if (isVis) {
+                options[(idx + 1) % options.length].focus();
+            } else {
+                setExpanded(true);
+                options[0].focus();
+            }
+        } else if (e.key === 'ArrowUp') {
+            if (isVis) {
+                options[(idx - 1 + options.length) % options.length].focus();
+            } else {
+                setExpanded(true);
+                options[options.length - 1].focus();
+            }
+        } else {
+            return;
+        }
+        e.preventDefault();
+    }
+
+    [toggle, menu].forEach(el => el.addEventListener('keydown', handleKeys));
+    
+    options.forEach(opt => {
+        opt.setAttribute('role', 'menuitem');
+        opt.tabIndex = -1;
+        opt.onclick = async () => {
+            setExpanded(false);
+            await changeLanguage(opt.dataset.lang);
+            toggle.focus();
+        };
+        opt.onkeydown = (e) => {
+            if (['Enter', ' '].includes(e.key)) {
+                e.preventDefault();
+                opt.onclick();
+            }
+        };
     });
 }
 
