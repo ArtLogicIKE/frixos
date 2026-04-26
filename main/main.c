@@ -291,6 +291,19 @@ int64_t ip_display_start_time = 0; // Changed to int64_t for esp_timer_get_time(
 char boot_ip_address[18] = "";
 uint8_t font_index = 0;
 double weather_temp, weather_humidity;
+// Met.no extended weather fields. All in metric base units; the display layer
+// converts to imperial when eeprom_fahrenheit is set.
+double weather_wind_speed_mps = 0.0;       // m/s, from instant.details.wind_speed
+double weather_gust_mps = 0.0;             // m/s, from instant.details.wind_speed_of_gust (0 if absent)
+int    weather_wind_dir_deg = 0;           // degrees, from instant.details.wind_from_direction
+double weather_precip_mm = 0.0;            // mm, next_1_hours.details.precipitation_amount
+double weather_precip_prob = 0.0;          // %, next_1_hours.details.probability_of_precipitation (0 if absent)
+double weather_uv = 0.0;                   // dimensionless, next_1_hours.details.ultraviolet_index_clear_sky_max
+double weather_pressure_hpa = 0.0;         // hPa, instant.details.air_pressure_at_sea_level
+double weather_pressure_prev_hpa = 0.0;    // hPa, value from previous successful fetch (for trend)
+int    weather_pressure_trend = 0;         // -1=falling, 0=steady, +1=rising
+double weather_3day_high = -100.0;         // °C, max instant temperature over today + next 2 calendar days
+double weather_3day_low  =  100.0;         // °C, min instant temperature over today + next 2 calendar days
 
 i2c_master_bus_handle_t i2c_bus;
 ltr303_dev_t ltr_dev;
