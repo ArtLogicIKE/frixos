@@ -368,7 +368,7 @@ function updateCgmExclusivity() {
 }
 
 // Current language (will be loaded from NVS)
-let currentLanguage = 'en';
+let currentLanguage = '';
 
 // Translation function - now async to support lazy-loading
 // Optimization: Persistent early return and DOM mutation diffing to minimize overhead
@@ -382,6 +382,13 @@ async function translate(lang) {
 
     currentLanguage = effectiveLang;
     const trans = translations[effectiveLang];
+
+    // Update language selection UI
+    document.querySelectorAll('.language-option').forEach(option => {
+        const isCurrent = option.dataset.lang === effectiveLang;
+        option.classList.toggle('is-active', isCurrent);
+        option.setAttribute('aria-current', isCurrent ? 'true' : 'false');
+    });
 
     // Querying on every call to support dynamic elements while using dataset for readability
     document.querySelectorAll('[data-i18n], [data-i18n-placeholder], [data-i18n-aria-label]').forEach(element => {
@@ -469,30 +476,68 @@ function setupPasswordToggles() {
 
 // Setup language selector
 function setupLanguageSelector() {
-    const languageToggle = el('language-toggle');
-    const languageDropdown = el('language-dropdown');
-    
-    // Toggle dropdown on button click
-    languageToggle.addEventListener('click', function(e) {
+    const toggle = el('language-toggle');
+    const dropdown = el('language-dropdown');
+    const options = Array.from(dropdown.querySelectorAll('.language-option'));
+    let currentIndex = -1;
+
+    const open = () => {
+        dropdown.style.display = 'block';
+        toggle.setAttribute('aria-expanded', 'true');
+    };
+
+    const close = () => {
+        dropdown.style.display = 'none';
+        toggle.setAttribute('aria-expanded', 'false');
+        currentIndex = -1;
+    };
+
+    toggle.addEventListener('click', (e) => {
         e.stopPropagation();
-        languageDropdown.style.display = languageDropdown.style.display === 'none' ? 'block' : 'none';
+        dropdown.style.display === 'none' ? open() : close();
     });
-    
-    // Close dropdown when clicking outside
-    document.addEventListener('click', function(e) {
-        if (!languageToggle.contains(e.target) && !languageDropdown.contains(e.target)) {
-            languageDropdown.style.display = 'none';
+
+    toggle.addEventListener('keydown', (e) => {
+        if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(e.key)) {
+            e.preventDefault();
+            open();
+            currentIndex = e.key === 'ArrowUp' ? options.length - 1 : 0;
+            options[currentIndex].focus();
+        } else if (e.key === 'Escape') {
+            close();
         }
     });
-    
-    // Handle language selection
-    document.querySelectorAll('.language-option').forEach(option => {
-        option.addEventListener('click', function() {
-            const selectedLang = this.getAttribute('data-lang');
-            changeLanguage(selectedLang);
-            languageDropdown.style.display = 'none';
-            languageToggle.focus();
+
+    dropdown.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            close();
+            toggle.focus();
+        } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            currentIndex = (currentIndex + 1) % options.length;
+            options[currentIndex].focus();
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            currentIndex = (currentIndex - 1 + options.length) % options.length;
+            options[currentIndex].focus();
+        } else if (['Enter', ' '].includes(e.key)) {
+            e.preventDefault();
+            options[currentIndex].click();
+        }
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!toggle.contains(e.target) && !dropdown.contains(e.target)) close();
+    });
+
+    options.forEach((option, index) => {
+        option.addEventListener('click', async function() {
+            const lang = this.getAttribute('data-lang');
+            close();
+            await changeLanguage(lang);
+            toggle.focus();
         });
+        option.addEventListener('mouseenter', () => currentIndex = index);
     });
 }
 
