@@ -203,8 +203,20 @@ h1 {
     white-space: nowrap;
 }
 
-.language-option:hover {
+.language-option:hover,
+.language-option:focus {
     background-color: var(--section-content-bg);
+    outline: none;
+}
+
+.language-option.is-active {
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
+.language-option.is-active::after {
+    content: ' ✓';
+    margin-left: auto;
 }
 
 .language-option .lang-name {
