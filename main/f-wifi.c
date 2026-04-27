@@ -1281,6 +1281,14 @@ bool wifi_get_metno_sunrise(void)
     }
     response_len = 0;
 
+    // Serialize TLS connections with the rest of the integrations so the
+    // mbedTLS record buffers (~4 KB in + ~4 KB out) are never duplicated.
+    if (!acquire_ssl_semaphore("wifi_get_metno_sunrise"))
+    {
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Sunrise: SSL lock failed");
+        return false;
+    }
+
     esp_http_client_config_t config = {
         .url = url,
         .event_handler = http_event_handler,
@@ -1344,6 +1352,7 @@ bool wifi_get_metno_sunrise(void)
         wifi_http_buffer = NULL;
     }
     response_len = 0;
+    release_ssl_semaphore();
     return ok;
 }
 
@@ -1408,6 +1417,14 @@ bool wifi_get_metno_weather(void)
     response_len = 0;
     is_metno_request = true;
     is_forecast_request = false;
+
+    // Serialize TLS connections so mbedTLS record buffers stay singleton.
+    if (!acquire_ssl_semaphore("wifi_get_metno_weather"))
+    {
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Met.no: SSL lock failed");
+        is_metno_request = false;
+        return false;
+    }
 
     esp_http_client_config_t config = {
         .url = url,
@@ -1499,6 +1516,7 @@ bool wifi_get_metno_weather(void)
         wifi_http_buffer = NULL;
     }
     response_len = 0;
+    release_ssl_semaphore();
     return result;
 }
 
