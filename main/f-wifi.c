@@ -23,7 +23,6 @@
 #include <strings.h>
 #include "esp_http_client.h"
 #include "cJSON.h"
-#include "esp_heap_caps.h"
 #include "esp_system.h"
 #include "esp_err.h"
 #include "nvs_flash.h"
@@ -87,6 +86,22 @@ static bool is_forecast_request = false;
 static double forecast_high = -100.0;
 static double forecast_low = 100.0;
 static int forecast_temp_count = 0;
+
+// Met.no streaming-parser state. We never hold the whole response in memory:
+// instead we feed bytes into the shared 4 KB wifi_http_buffer, and as soon as
+// the buffer would overflow we process every fully-contained timeseries entry
+// (each begins with the marker {"time":"...") and shift the trailing partial
+// entry back to offset 0. See metno_process_buffer().
+static bool   is_metno_request = false;
+static int    metno_entry_idx = 0;
+static int    metno_today_yday = 0;
+static int    metno_today_year = 0;
+static double metno_day_hi[3] = { -1000.0, -1000.0, -1000.0 };
+static double metno_day_lo[3] = {  1000.0,  1000.0,  1000.0 };
+static char   metno_pending_lm[64] = {0};   // Last-Modified seen during in-flight request
+static char   metno_last_modified[64] = {0};// Last-Modified saved from previous successful response
+static int    metno_last_sunrise_yday = -1;
+static int    metno_last_sunrise_year = -1;
 
 // NTP server functionality removed - using default servers only
 
@@ -647,14 +662,23 @@ static void process_forecast_chunk(const char *chunk, int len) {
     }
 }
 
+// Forward declaration — defined in the met.no section below.
+static int metno_process_buffer(char *buf, int buf_used, bool final);
+
 esp_err_t http_event_handler(esp_http_client_event_t *evt)
 {
     switch (evt->event_id)
     {
+    case HTTP_EVENT_ON_HEADER:
+        if (is_metno_request && evt->header_key && evt->header_value &&
+            strcasecmp(evt->header_key, "Last-Modified") == 0)
+        {
+            strlcpy(metno_pending_lm, evt->header_value, sizeof(metno_pending_lm));
+        }
+        break;
     case HTTP_EVENT_ERROR:
     case HTTP_EVENT_REDIRECT:
     case HTTP_EVENT_ON_CONNECTED:
-    case HTTP_EVENT_ON_HEADER:
     case HTTP_EVENT_DISCONNECTED:
     case HTTP_EVENT_HEADERS_SENT:
         break;
@@ -676,10 +700,50 @@ esp_err_t http_event_handler(esp_http_client_event_t *evt)
                 response_len = 0;
             }
 
-            if ((response_len + evt->data_len) < HTTP_BUFFER_SIZE)
+            int incoming = evt->data_len;
+            const char *src = (const char *)evt->data;
+
+            if (is_metno_request)
             {
-                memcpy(wifi_http_buffer + response_len, evt->data, evt->data_len);
-                response_len += evt->data_len;
+                // Streaming met.no: consume the incoming chunk in pieces, draining
+                // the buffer whenever it is too full to accept more bytes.
+                while (incoming > 0)
+                {
+                    int slack = (HTTP_BUFFER_SIZE - 1) - response_len;
+                    if (slack <= 0)
+                    {
+                        // Buffer full. Process every complete entry and shift
+                        // the partial trailing entry to offset 0.
+                        int kept = metno_process_buffer(wifi_http_buffer, response_len, false);
+                        if (kept <= 0 || kept >= response_len)
+                        {
+                            // No marker found in 4 KB → entry too big. Drop and resync.
+                            ESP_LOG_WEB(ESP_LOG_ERROR, TAG,
+                                        "Met.no entry > %d bytes, dropping buffer", HTTP_BUFFER_SIZE);
+                            response_len = 0;
+                        }
+                        else
+                        {
+                            int tail = response_len - kept;
+                            memmove(wifi_http_buffer, wifi_http_buffer + kept, tail);
+                            response_len = tail;
+                            wifi_http_buffer[response_len] = '\0';
+                        }
+                        slack = (HTTP_BUFFER_SIZE - 1) - response_len;
+                        if (slack <= 0) { response_len = 0; slack = HTTP_BUFFER_SIZE - 1; }
+                    }
+                    int take = (incoming < slack) ? incoming : slack;
+                    memcpy(wifi_http_buffer + response_len, src, take);
+                    response_len += take;
+                    wifi_http_buffer[response_len] = '\0';
+                    src += take;
+                    incoming -= take;
+                }
+            }
+            else if ((response_len + incoming) < HTTP_BUFFER_SIZE)
+            {
+                memcpy(wifi_http_buffer + response_len, src, incoming);
+                response_len += incoming;
                 wifi_http_buffer[response_len] = '\0';
             }
             else
@@ -943,18 +1007,15 @@ bool wifi_get_openweather(void)
 // Freestyle/Nightscout). Conditional GET via Last-Modified is honored: a 304
 // keeps the previously parsed values valid.
 //
-// The "complete" endpoint can return ~30-50 KB for the full 9-day forecast,
-// which doesn't fit in the 4 KB shared buffer, so we allocate a one-shot
-// dedicated heap buffer for the duration of the request.
-#define METNO_BUFFER_SIZE   (48 * 1024)
-#define METNO_LM_LEN        64
-
-static char *metno_buffer = NULL;
-static int   metno_buffer_used = 0;
-static char  metno_last_modified[METNO_LM_LEN] = {0};   // valid LM from previous successful response
-static char  metno_pending_lm[METNO_LM_LEN] = {0};      // LM seen during the in-flight request
-static int   metno_last_sunrise_yday = -1;              // local-time day-of-year of the last sunrise fetch
-static int   metno_last_sunrise_year = -1;
+// The "complete" payload is far larger than the 4 KB shared buffer, so we
+// stream-parse: bytes are appended to wifi_http_buffer; whenever it would
+// overflow we run metno_process_buffer() which finds every fully-contained
+// timeseries entry (each starts with {"time":"...) and processes it via
+// process_one_metno_entry(), then shifts the partial trailing entry back to
+// offset 0. Each entry fits in 4 KB; we never hold the full document.
+// All streaming state (entry index, day high/low buckets, Last-Modified) lives
+// in static globals declared near the top of this file alongside the existing
+// is_forecast_request flag.
 
 // Compute UTC time_t from individual UTC date/time components without relying
 // on timegm() (not exposed by ESP-IDF newlib).
@@ -1034,44 +1095,158 @@ int map_metno_symbol(const char *symbol)
     return -1;
 }
 
-// Met.no-specific HTTP event handler: streams response bytes into metno_buffer
-// and captures the Last-Modified header into metno_pending_lm.
-static esp_err_t metno_http_event_handler(esp_http_client_event_t *evt)
+// Bucket a parsed timeseries time_t into one of three day slots: 0=today,
+// 1=tomorrow, 2=day-after, all in local time. Returns -1 if outside that
+// window (so we ignore later forecast entries when computing day high/low).
+static int metno_day_bucket(time_t et)
 {
-    switch (evt->event_id)
+    if (et <= 0) return -1;
+    struct tm el;
+    localtime_r(&et, &el);
+    if (el.tm_year == metno_today_year && el.tm_yday == metno_today_yday) return 0;
+    if (el.tm_year == metno_today_year && el.tm_yday == metno_today_yday + 1) return 1;
+    if (el.tm_year == metno_today_year && el.tm_yday == metno_today_yday + 2) return 2;
+    // Year-end wrap-around
+    if (el.tm_year == metno_today_year + 1 && metno_today_yday >= 364 && el.tm_yday == 0) return 1;
+    if (el.tm_year == metno_today_year + 1 && metno_today_yday >= 363 && el.tm_yday <= 1) return 2;
+    return -1;
+}
+
+// Pull a fresh value out of a single met.no timeseries entry's text. The
+// JSON parser uses strstr("\"key\""), so a partial-name key like "wind_speed"
+// will not match "wind_speed_of_gust" — substrings are guarded by the quotes.
+// idx is the entry's 0-based position in the timeseries array.
+static void process_one_metno_entry(const char *entry, int idx)
+{
+    char val[64];
+
+    // time → day bucket (used for high/low across today + 2 days)
+    get_value_from_JSON_string(entry, "time", val, sizeof(val), NULL);
+    time_t et = (val[0] && strcmp(val, "-") != 0) ? metno_parse_iso8601(val) : 0;
+    int day = metno_day_bucket(et);
+
+    // air_temperature → bucket high/low; first entry also drives weather_temp
+    get_value_from_JSON_string(entry, "air_temperature", val, sizeof(val), NULL);
+    if (strcmp(val, "-") != 0)
     {
-    case HTTP_EVENT_ON_HEADER:
-        if (evt->header_key && evt->header_value &&
-            strcasecmp(evt->header_key, "Last-Modified") == 0)
+        double t = strtod(val, NULL);
+        if (day >= 0)
         {
-            strlcpy(metno_pending_lm, evt->header_value, sizeof(metno_pending_lm));
+            if (t > metno_day_hi[day]) metno_day_hi[day] = t;
+            if (t < metno_day_lo[day]) metno_day_lo[day] = t;
         }
-        break;
-    case HTTP_EVENT_ON_DATA:
-        if (metno_buffer == NULL) break;
-        if ((metno_buffer_used + evt->data_len) < (METNO_BUFFER_SIZE - 1))
+        if (idx == 0) weather_temp = t;
+    }
+
+    // First entry also carries the current humidity / wind / pressure / icon
+    // / precipitation / UV. Later entries are temperature-only for high/low.
+    if (idx != 0) return;
+
+    get_value_from_JSON_string(entry, "relative_humidity", val, sizeof(val), NULL);
+    if (strcmp(val, "-") != 0) weather_humidity = strtod(val, NULL);
+
+    get_value_from_JSON_string(entry, "wind_speed", val, sizeof(val), NULL);
+    if (strcmp(val, "-") != 0) weather_wind_speed_mps = strtod(val, NULL);
+
+    get_value_from_JSON_string(entry, "wind_speed_of_gust", val, sizeof(val), NULL);
+    weather_gust_mps = (strcmp(val, "-") != 0) ? strtod(val, NULL) : 0.0;
+
+    get_value_from_JSON_string(entry, "wind_from_direction", val, sizeof(val), NULL);
+    if (strcmp(val, "-") != 0)
+    {
+        int d = (int)(strtod(val, NULL) + 0.5);
+        d %= 360;
+        if (d < 0) d += 360;
+        weather_wind_dir_deg = d;
+    }
+
+    get_value_from_JSON_string(entry, "air_pressure_at_sea_level", val, sizeof(val), NULL);
+    if (strcmp(val, "-") != 0)
+    {
+        double new_p = strtod(val, NULL);
+        if (weather_pressure_prev_hpa > 0.0)
         {
-            memcpy(metno_buffer + metno_buffer_used, evt->data, evt->data_len);
-            metno_buffer_used += evt->data_len;
-            metno_buffer[metno_buffer_used] = '\0';
+            double diff = new_p - weather_pressure_prev_hpa;
+            if      (diff >  0.5) weather_pressure_trend =  1;
+            else if (diff < -0.5) weather_pressure_trend = -1;
+            else                  weather_pressure_trend =  0;
+        }
+        weather_pressure_prev_hpa = (weather_pressure_hpa > 0.0) ? weather_pressure_hpa : new_p;
+        weather_pressure_hpa = new_p;
+    }
+
+    get_value_from_JSON_string(entry, "symbol_code", val, sizeof(val), NULL);
+    if (strcmp(val, "-") != 0)
+    {
+        int sidx = map_metno_symbol(val);
+        if (sidx >= 0)
+        {
+            weather_icon_index = sidx;
+            strlcpy(icon_today, val, sizeof(icon_today));
+        }
+    }
+
+    get_value_from_JSON_string(entry, "precipitation_amount", val, sizeof(val), NULL);
+    weather_precip_mm = (strcmp(val, "-") != 0) ? strtod(val, NULL) : 0.0;
+
+    get_value_from_JSON_string(entry, "probability_of_precipitation", val, sizeof(val), NULL);
+    weather_precip_prob = (strcmp(val, "-") != 0) ? strtod(val, NULL) : 0.0;
+
+    get_value_from_JSON_string(entry, "ultraviolet_index_clear_sky_max", val, sizeof(val), NULL);
+    weather_uv = (strcmp(val, "-") != 0) ? strtod(val, NULL) : 0.0;
+}
+
+// Drain wifi_http_buffer up to the last fully-contained timeseries entry.
+// Returns the offset of the partial trailing entry (its starting marker)
+// which the caller must keep for the next chunk. If `final` is true, the
+// trailing entry is treated as complete (last entry of the response).
+// Returns buf_used if the whole buffer was consumed.
+static int metno_process_buffer(char *buf, int buf_used, bool final)
+{
+    static const char marker[] = "{\"time\":\"";
+    static const int  marker_len = 9;
+
+    if (buf_used <= 0) return buf_used;
+    buf[buf_used] = '\0';  // strstr needs a NUL; caller leaves one byte slack
+
+    int pos = 0;
+    while (pos < buf_used)
+    {
+        char *m = strstr(buf + pos, marker);
+        if (!m) return buf_used;            // no markers anywhere → keep nothing? actually drop everything before
+        int m_off = m - buf;
+        char *next = strstr(m + marker_len, marker);
+        int entry_end;
+        if (next)
+        {
+            entry_end = (int)(next - buf);
+        }
+        else if (final)
+        {
+            entry_end = buf_used;
         }
         else
         {
-            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Met.no buffer overflow at %d bytes", metno_buffer_used);
-            metno_buffer_used = -1; // sentinel for overflow
+            // No further marker — this entry is still being received.
+            return m_off;
         }
-        break;
-    default:
-        break;
+        char saved = buf[entry_end];
+        buf[entry_end] = '\0';
+        process_one_metno_entry(buf + m_off, metno_entry_idx);
+        buf[entry_end] = saved;
+        metno_entry_idx++;
+        pos = entry_end;
     }
-    return ESP_OK;
+    return buf_used;
 }
 
 /**
- * Fetch the daily sunrise/sunset for the device coordinates from
- * api.met.no/weatherapi/sunrise/3.0/sun. Stores results in `sunrise`/`sunset`
- * (Unix UTC time_t — display layer uses localtime_r). Called at startup and
- * once per local calendar day.
+ * Fetch sunrise/sunset for the device coordinates from
+ * api.met.no/weatherapi/sunrise/3.0/sun. The response is tiny (~250 bytes)
+ * so it fits comfortably in the shared 4 KB wifi_http_buffer with no
+ * streaming. Stores results in `sunrise`/`sunset` as Unix UTC time_t
+ * (display layer uses localtime_r). Called at startup and once per local
+ * calendar day from wifi_get_metno_weather().
  */
 bool wifi_get_metno_sunrise(void)
 {
@@ -1095,18 +1270,20 @@ bool wifi_get_metno_sunrise(void)
              "https://api.met.no/weatherapi/sunrise/3.0/sun?lat=%s&lon=%s&date=%s",
              my_lat, my_lon, date_str);
 
-    metno_buffer = heap_caps_malloc(8 * 1024, MALLOC_CAP_8BIT);
-    if (!metno_buffer)
+    // Buffered (non-streaming) — uses the regular branch of http_event_handler
+    // which fills wifi_http_buffer up to HTTP_BUFFER_SIZE.
+    is_metno_request = false;
+    is_forecast_request = false;
+    if (wifi_http_buffer != NULL)
     {
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Sunrise: heap alloc failed");
-        return false;
+        release_shared_buffer(wifi_http_buffer);
+        wifi_http_buffer = NULL;
     }
-    metno_buffer[0] = '\0';
-    metno_buffer_used = 0;
+    response_len = 0;
 
     esp_http_client_config_t config = {
         .url = url,
-        .event_handler = metno_http_event_handler,
+        .event_handler = http_event_handler,
         .timeout_ms = 8000,
         .crt_bundle_attach = custom_crt_bundle_attach,
         .transport_type = HTTP_TRANSPORT_OVER_SSL,
@@ -1118,38 +1295,42 @@ bool wifi_get_metno_sunrise(void)
     bool ok = false;
     esp_err_t err = esp_http_client_perform(client);
     int status = (err == ESP_OK) ? esp_http_client_get_status_code(client) : -1;
-    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Sunrise HTTP status %d, %d bytes", status, metno_buffer_used);
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Sunrise HTTP %d, %d bytes", status, response_len);
 
-    if (err == ESP_OK && status == 200 && metno_buffer_used > 0)
+    if (err == ESP_OK && status == 200 && wifi_http_buffer && response_len > 0)
     {
-        cJSON *root = cJSON_Parse(metno_buffer);
-        if (root)
+        char val[40];
+        // Grab the "sunrise":{"time":"..."} block then read its "time".
+        char *blk_end = NULL;
+        get_value_from_JSON_string(wifi_http_buffer, "sunrise", val, sizeof(val), &blk_end);
+        // The above returns the {} block contents but our buffer still contains
+        // the raw text. Easier: pull the two "time":"..." occurrences directly
+        // — there are exactly two of them in the response, in order: sunrise
+        // then sunset.
+        char *rem = NULL;
+        get_value_from_JSON_string(wifi_http_buffer, "time", val, sizeof(val), &rem);
+        time_t r = (val[0] && strcmp(val, "-") != 0) ? metno_parse_iso8601(val) : 0;
+        time_t s = 0;
+        if (rem)
         {
-            cJSON *props = cJSON_GetObjectItemCaseSensitive(root, "properties");
-            cJSON *sr = props ? cJSON_GetObjectItemCaseSensitive(props, "sunrise") : NULL;
-            cJSON *ss = props ? cJSON_GetObjectItemCaseSensitive(props, "sunset")  : NULL;
-            cJSON *sr_time = sr ? cJSON_GetObjectItemCaseSensitive(sr, "time") : NULL;
-            cJSON *ss_time = ss ? cJSON_GetObjectItemCaseSensitive(ss, "time") : NULL;
-
-            if (cJSON_IsString(sr_time) && cJSON_IsString(ss_time))
-            {
-                time_t r = metno_parse_iso8601(sr_time->valuestring);
-                time_t s = metno_parse_iso8601(ss_time->valuestring);
-                if (r > 0 && s > 0)
-                {
-                    sunrise = r;
-                    sunset  = s;
-                    metno_last_sunrise_yday = now_local.tm_yday;
-                    metno_last_sunrise_year = now_local.tm_year;
-                    ok = true;
-                    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Sunrise %ld, sunset %ld (date %s)",
-                                (long)sunrise, (long)sunset, date_str);
-                }
-            }
-            cJSON_Delete(root);
+            get_value_from_JSON_string(rem, "time", val, sizeof(val), NULL);
+            if (val[0] && strcmp(val, "-") != 0) s = metno_parse_iso8601(val);
         }
-        if (!ok)
-            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Sunrise: JSON parse / field missing");
+        if (r > 0 && s > 0)
+        {
+            sunrise = r;
+            sunset  = s;
+            metno_last_sunrise_yday = now_local.tm_yday;
+            metno_last_sunrise_year = now_local.tm_year;
+            ok = true;
+            ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Sunrise %ld, sunset %ld (date %s)",
+                        (long)sunrise, (long)sunset, date_str);
+        }
+        else
+        {
+            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Sunrise: parse failed (r=%ld s=%ld)",
+                        (long)r, (long)s);
+        }
     }
     else if (err != ESP_OK)
     {
@@ -1157,20 +1338,29 @@ bool wifi_get_metno_sunrise(void)
     }
 
     esp_http_client_cleanup(client);
-    free(metno_buffer);
-    metno_buffer = NULL;
-    metno_buffer_used = 0;
+    if (wifi_http_buffer != NULL)
+    {
+        release_shared_buffer(wifi_http_buffer);
+        wifi_http_buffer = NULL;
+    }
+    response_len = 0;
     return ok;
 }
 
 /**
- * Fetch current weather + forecast from met.no Locationforecast 2.0/complete.
- * Populates: weather_icon_index, weather_temp, weather_humidity,
- *            weather_wind_speed_mps, weather_gust_mps, weather_wind_dir_deg,
- *            weather_pressure_hpa, weather_pressure_trend,
- *            weather_precip_mm, weather_precip_prob, weather_uv,
- *            weather_high/low (today), weather_3day_high/low (today + 2 days).
- * Honors Last-Modified / If-Modified-Since: a 304 keeps existing values valid.
+ * Fetch current weather + 3-day forecast from met.no Locationforecast 2.0
+ * /complete using a streaming parser over the existing 4 KB shared buffer.
+ *
+ * Approach: bytes are accumulated into wifi_http_buffer; whenever it fills
+ * we call metno_process_buffer() which scans for {"time":"..." entry markers,
+ * processes every fully-contained timeseries entry via process_one_metno_entry
+ * (which extracts current values from entry 0 and feeds today / +1 / +2 day
+ * temperature buckets for high/low from later entries), then shifts the
+ * partial trailing entry back to offset 0.
+ *
+ * Conditional GET: an If-Modified-Since header is sent on every request; on
+ * 304 we keep the previously parsed values and just update last_weather_update.
+ *
  * Also re-fetches sunrise/sunset on the first call after local-time midnight.
  */
 bool wifi_get_metno_weather(void)
@@ -1181,40 +1371,47 @@ bool wifi_get_metno_weather(void)
         return false;
     }
 
-    // Refresh sunrise/sunset on the first call of a new local day (or first ever).
+    // Snapshot today's local-day index for the streaming parser to bucket against.
+    time_t now_t = 0;
+    time(&now_t);
+    struct tm tnow;
+    localtime_r(&now_t, &tnow);
+    metno_today_yday = tnow.tm_yday;
+    metno_today_year = tnow.tm_year;
+
+    // Refresh sunrise/sunset on the first call of a new local day (or first run).
+    if (metno_last_sunrise_yday < 0 ||
+        metno_last_sunrise_year != tnow.tm_year ||
+        metno_last_sunrise_yday != tnow.tm_yday)
     {
-        time_t now_t = 0;
-        time(&now_t);
-        struct tm tnow;
-        localtime_r(&now_t, &tnow);
-        if (metno_last_sunrise_yday < 0 ||
-            metno_last_sunrise_year != tnow.tm_year ||
-            metno_last_sunrise_yday != tnow.tm_yday)
-        {
-            ESP_LOG_WEB(ESP_LOG_INFO, TAG, "New local day or first run; fetching sunrise");
-            wifi_get_metno_sunrise();
-        }
+        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "New local day or first run; fetching sunrise");
+        wifi_get_metno_sunrise();
     }
 
     char url[256];
     snprintf(url, sizeof(url),
              "https://api.met.no/weatherapi/locationforecast/2.0/complete?lat=%s&lon=%s",
              my_lat, my_lon);
-    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Fetching met.no weather: %.40s...", url);
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Fetching met.no weather: %.50s...", url);
 
-    metno_buffer = heap_caps_malloc(METNO_BUFFER_SIZE, MALLOC_CAP_8BIT);
-    if (!metno_buffer)
-    {
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Met.no: heap_caps_malloc(%d) failed", METNO_BUFFER_SIZE);
-        return false;
-    }
-    metno_buffer[0] = '\0';
-    metno_buffer_used = 0;
+    // Reset streaming state. Day buckets use sentinels that the final
+    // assignment below converts to skip-if-empty.
+    metno_entry_idx = 0;
+    for (int i = 0; i < 3; i++) { metno_day_hi[i] = -1000.0; metno_day_lo[i] = 1000.0; }
     metno_pending_lm[0] = '\0';
+
+    if (wifi_http_buffer != NULL)
+    {
+        release_shared_buffer(wifi_http_buffer);
+        wifi_http_buffer = NULL;
+    }
+    response_len = 0;
+    is_metno_request = true;
+    is_forecast_request = false;
 
     esp_http_client_config_t config = {
         .url = url,
-        .event_handler = metno_http_event_handler,
+        .event_handler = http_event_handler,
         .timeout_ms = 10000,
         .crt_bundle_attach = custom_crt_bundle_attach,
         .transport_type = HTTP_TRANSPORT_OVER_SSL,
@@ -1228,8 +1425,8 @@ bool wifi_get_metno_weather(void)
     bool result = false;
     esp_err_t err = esp_http_client_perform(client);
     int status = (err == ESP_OK) ? esp_http_client_get_status_code(client) : -1;
-    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Met.no status %d, %d bytes, lm='%s'",
-                status, metno_buffer_used, metno_pending_lm);
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Met.no status %d, parsed %d entries, lm='%s'",
+                status, metno_entry_idx, metno_pending_lm);
 
     if (err == ESP_OK && status == 304)
     {
@@ -1238,167 +1435,54 @@ bool wifi_get_metno_weather(void)
         weather_valid = true;
         result = true;
     }
-    else if (err == ESP_OK && status == 200 && metno_buffer_used > 0)
+    else if (err == ESP_OK && status == 200)
     {
-        cJSON *root = cJSON_Parse(metno_buffer);
-        if (!root)
+        // Drain the trailing partial entry as the final entry.
+        if (wifi_http_buffer && response_len > 0)
         {
-            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Met.no: JSON parse failed");
+            metno_process_buffer(wifi_http_buffer, response_len, true);
+        }
+
+        if (metno_entry_idx > 0)
+        {
+            // Today's high/low and 3-day high/low from the bucketed instants.
+            if (metno_day_hi[0] > -999.0)
+            {
+                weather_high = metno_day_hi[0];
+                weather_low  = metno_day_lo[0];
+            }
+            double h3 = metno_day_hi[0], l3 = metno_day_lo[0];
+            for (int i = 1; i < 3; i++)
+            {
+                if (metno_day_hi[i] > -999.0 && metno_day_hi[i] > h3) h3 = metno_day_hi[i];
+                if (metno_day_lo[i] <  999.0 && metno_day_lo[i] < l3) l3 = metno_day_lo[i];
+            }
+            if (h3 > -999.0)
+            {
+                weather_3day_high = h3;
+                weather_3day_low  = l3;
+            }
+
+            ESP_LOG_WEB(ESP_LOG_INFO, TAG,
+                        "Met.no: T=%.1f°C H=%.0f%% W=%.1fm/s@%d° G=%.1f P=%.0fhPa(t%d) PR=%.1fmm/%.0f%% UV=%.1f Hi/Lo=%.1f/%.1f 3d=%.1f/%.1f",
+                        weather_temp, weather_humidity,
+                        weather_wind_speed_mps, weather_wind_dir_deg,
+                        weather_gust_mps,
+                        weather_pressure_hpa, weather_pressure_trend,
+                        weather_precip_mm, weather_precip_prob, weather_uv,
+                        weather_high, weather_low,
+                        weather_3day_high, weather_3day_low);
+
+            time(&last_weather_update);
+            weather_valid = true;
+            weather_has_updated = true;
+            result = true;
+            if (metno_pending_lm[0] != '\0')
+                strlcpy(metno_last_modified, metno_pending_lm, sizeof(metno_last_modified));
         }
         else
         {
-            cJSON *props = cJSON_GetObjectItemCaseSensitive(root, "properties");
-            cJSON *ts    = props ? cJSON_GetObjectItemCaseSensitive(props, "timeseries") : NULL;
-            if (!cJSON_IsArray(ts) || cJSON_GetArraySize(ts) == 0)
-            {
-                ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Met.no: timeseries missing/empty");
-            }
-            else
-            {
-                cJSON *first = cJSON_GetArrayItem(ts, 0);
-                cJSON *data  = cJSON_GetObjectItemCaseSensitive(first, "data");
-                cJSON *inst  = data ? cJSON_GetObjectItemCaseSensitive(data, "instant") : NULL;
-                cJSON *idet  = inst ? cJSON_GetObjectItemCaseSensitive(inst, "details") : NULL;
-                cJSON *n1h   = data ? cJSON_GetObjectItemCaseSensitive(data, "next_1_hours") : NULL;
-                cJSON *n1sum = n1h  ? cJSON_GetObjectItemCaseSensitive(n1h,  "summary") : NULL;
-                cJSON *n1det = n1h  ? cJSON_GetObjectItemCaseSensitive(n1h,  "details") : NULL;
-
-                // Current values
-                if (idet)
-                {
-                    cJSON *t  = cJSON_GetObjectItemCaseSensitive(idet, "air_temperature");
-                    cJSON *h  = cJSON_GetObjectItemCaseSensitive(idet, "relative_humidity");
-                    cJSON *ws = cJSON_GetObjectItemCaseSensitive(idet, "wind_speed");
-                    cJSON *wg = cJSON_GetObjectItemCaseSensitive(idet, "wind_speed_of_gust");
-                    cJSON *wd = cJSON_GetObjectItemCaseSensitive(idet, "wind_from_direction");
-                    cJSON *p  = cJSON_GetObjectItemCaseSensitive(idet, "air_pressure_at_sea_level");
-
-                    if (cJSON_IsNumber(t))  weather_temp = t->valuedouble;
-                    if (cJSON_IsNumber(h))  weather_humidity = h->valuedouble;
-                    if (cJSON_IsNumber(ws)) weather_wind_speed_mps = ws->valuedouble;
-                    weather_gust_mps = cJSON_IsNumber(wg) ? wg->valuedouble : 0.0;
-                    if (cJSON_IsNumber(wd)) weather_wind_dir_deg = (int)(wd->valuedouble + 0.5) % 360;
-                    if (cJSON_IsNumber(p))
-                    {
-                        double new_p = p->valuedouble;
-                        if (weather_pressure_prev_hpa > 0.0)
-                        {
-                            double diff = new_p - weather_pressure_prev_hpa;
-                            if      (diff >  0.5) weather_pressure_trend =  1;
-                            else if (diff < -0.5) weather_pressure_trend = -1;
-                            else                  weather_pressure_trend =  0;
-                        }
-                        weather_pressure_prev_hpa = weather_pressure_hpa > 0 ? weather_pressure_hpa : new_p;
-                        weather_pressure_hpa = new_p;
-                    }
-                }
-
-                // Symbol from next_1_hours summary
-                if (cJSON_IsObject(n1sum))
-                {
-                    cJSON *sym = cJSON_GetObjectItemCaseSensitive(n1sum, "symbol_code");
-                    if (cJSON_IsString(sym))
-                    {
-                        int idx = map_metno_symbol(sym->valuestring);
-                        if (idx >= 0)
-                        {
-                            weather_icon_index = idx;
-                            strlcpy(icon_today, sym->valuestring, sizeof(icon_today));
-                        }
-                    }
-                }
-
-                // Precip + UV from next_1_hours.details
-                weather_precip_mm = 0.0;
-                weather_precip_prob = 0.0;
-                weather_uv = 0.0;
-                if (cJSON_IsObject(n1det))
-                {
-                    cJSON *pa  = cJSON_GetObjectItemCaseSensitive(n1det, "precipitation_amount");
-                    cJSON *pp  = cJSON_GetObjectItemCaseSensitive(n1det, "probability_of_precipitation");
-                    cJSON *uv  = cJSON_GetObjectItemCaseSensitive(n1det, "ultraviolet_index_clear_sky_max");
-                    if (cJSON_IsNumber(pa)) weather_precip_mm   = pa->valuedouble;
-                    if (cJSON_IsNumber(pp)) weather_precip_prob = pp->valuedouble;
-                    if (cJSON_IsNumber(uv)) weather_uv          = uv->valuedouble;
-                }
-
-                // Walk timeseries to compute today / 3-day high+low using
-                // instant.air_temperature bucketed by local calendar day.
-                time_t now_t = 0;
-                time(&now_t);
-                struct tm tnow;
-                localtime_r(&now_t, &tnow);
-                int today_yday = tnow.tm_yday;
-                int today_year = tnow.tm_year;
-
-                double day_hi[3] = {-1000.0, -1000.0, -1000.0};
-                double day_lo[3] = { 1000.0,  1000.0,  1000.0};
-
-                cJSON *entry = NULL;
-                cJSON_ArrayForEach(entry, ts)
-                {
-                    cJSON *time_field = cJSON_GetObjectItemCaseSensitive(entry, "time");
-                    if (!cJSON_IsString(time_field)) continue;
-                    time_t et = metno_parse_iso8601(time_field->valuestring);
-                    if (et <= 0) continue;
-                    struct tm el;
-                    localtime_r(&et, &el);
-
-                    int day_idx;
-                    if (el.tm_year == today_year && el.tm_yday == today_yday)         day_idx = 0;
-                    else if ((el.tm_year == today_year && el.tm_yday == today_yday + 1) ||
-                             (el.tm_year == today_year + 1 && today_yday >= 364 && el.tm_yday == 0))
-                                                                                       day_idx = 1;
-                    else if ((el.tm_year == today_year && el.tm_yday == today_yday + 2) ||
-                             (el.tm_year == today_year + 1 && today_yday >= 363 && el.tm_yday <= 1))
-                                                                                       day_idx = 2;
-                    else continue;
-
-                    cJSON *e_data = cJSON_GetObjectItemCaseSensitive(entry, "data");
-                    cJSON *e_inst = e_data ? cJSON_GetObjectItemCaseSensitive(e_data, "instant") : NULL;
-                    cJSON *e_idet = e_inst ? cJSON_GetObjectItemCaseSensitive(e_inst, "details") : NULL;
-                    cJSON *e_t    = e_idet ? cJSON_GetObjectItemCaseSensitive(e_idet, "air_temperature") : NULL;
-                    if (!cJSON_IsNumber(e_t)) continue;
-                    double v = e_t->valuedouble;
-                    if (v > day_hi[day_idx]) day_hi[day_idx] = v;
-                    if (v < day_lo[day_idx]) day_lo[day_idx] = v;
-                }
-
-                if (day_hi[0] > -999.0)
-                {
-                    weather_high = day_hi[0];
-                    weather_low  = day_lo[0];
-                }
-                double h3 = day_hi[0], l3 = day_lo[0];
-                for (int i = 1; i < 3; i++)
-                {
-                    if (day_hi[i] > -999.0 && day_hi[i] > h3) h3 = day_hi[i];
-                    if (day_lo[i] <  999.0 && day_lo[i] < l3) l3 = day_lo[i];
-                }
-                if (h3 > -999.0)
-                {
-                    weather_3day_high = h3;
-                    weather_3day_low  = l3;
-                }
-
-                ESP_LOG_WEB(ESP_LOG_INFO, TAG,
-                            "Met.no: T=%.1f°C H=%.0f%% W=%.1fm/s@%d° G=%.1f P=%.0fhPa(t%d) PR=%.1fmm/%.0f%% UV=%.1f Hi/Lo=%.1f/%.1f 3d=%.1f/%.1f",
-                            weather_temp, weather_humidity,
-                            weather_wind_speed_mps, weather_wind_dir_deg,
-                            weather_gust_mps,
-                            weather_pressure_hpa, weather_pressure_trend,
-                            weather_precip_mm, weather_precip_prob, weather_uv,
-                            weather_high, weather_low,
-                            weather_3day_high, weather_3day_low);
-
-                time(&last_weather_update);
-                weather_valid = true;
-                weather_has_updated = true;
-                result = true;
-                if (metno_pending_lm[0] != '\0')
-                    strlcpy(metno_last_modified, metno_pending_lm, sizeof(metno_last_modified));
-            }
-            cJSON_Delete(root);
+            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Met.no: no entries parsed from stream");
         }
     }
     else
@@ -1407,10 +1491,14 @@ bool wifi_get_metno_weather(void)
                     esp_err_to_name(err), status);
     }
 
+    is_metno_request = false;
     esp_http_client_cleanup(client);
-    free(metno_buffer);
-    metno_buffer = NULL;
-    metno_buffer_used = 0;
+    if (wifi_http_buffer != NULL)
+    {
+        release_shared_buffer(wifi_http_buffer);
+        wifi_http_buffer = NULL;
+    }
+    response_len = 0;
     return result;
 }
 
