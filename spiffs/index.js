@@ -321,9 +321,26 @@ async function loadTranslations(lang) {
         });
 }
 
+// Static utility data
+// Optimization: Hoisted to top-level constants to avoid redundant allocations in utility functions
+const BYTE_SIZES = ['Bytes', 'KB', 'MB', 'GB'];
+const MOON_PHASES = [
+    'New Moon',
+    'Waxing Crescent',
+    'First Quarter',
+    'Waxing Gibbous',
+    'Full Moon',
+    'Waning Gibbous',
+    'Last Quarter',
+    'Waning Crescent'
+];
+
 // Helper function to get nested translation
 // Optimization: Cache split paths to avoid redundant string operations for 180+ translatable elements
 const pathCache = new Map();
+// Optimization: Cache translation metadata to skip redundant DOM reads/writes and lookups
+const i18nCache = new WeakMap();
+
 function getNestedTranslation(obj, path) {
     let parts = pathCache.get(path);
     if (!parts) {
@@ -389,37 +406,57 @@ async function translate(lang) {
         const i18nPlaceholderKey = element.dataset.i18nPlaceholder;
         const i18nAriaLabelKey = element.dataset.i18nAriaLabel;
 
+        // Initialize or get cache for this element
+        let cache = i18nCache.get(element);
+        if (!cache) {
+            cache = {};
+            i18nCache.set(element, cache);
+        }
+
         if (i18nKey) {
-            const translation = getNestedTranslation(trans, i18nKey);
-            // Optimization: Only update DOM if content actually changed to avoid layout thrashing
-            if (translation && element.innerHTML !== translation) {
-                element.innerHTML = translation;
+            // Only update if key or language changed
+            if (cache.i18nKey !== i18nKey || cache.lang !== effectiveLang) {
+                const translation = getNestedTranslation(trans, i18nKey);
+                if (translation !== undefined && element.innerHTML !== translation) {
+                    element.innerHTML = translation;
+                }
+                cache.i18nKey = i18nKey;
             }
         }
 
         if (i18nPlaceholderKey) {
-            const translation = getNestedTranslation(trans, i18nPlaceholderKey);
-            // Optimization: Only update DOM if placeholder actually changed
-            if (translation && element.placeholder !== translation) {
-                element.placeholder = translation;
+            if (cache.placeholderKey !== i18nPlaceholderKey || cache.lang !== effectiveLang) {
+                const translation = getNestedTranslation(trans, i18nPlaceholderKey);
+                if (translation !== undefined && element.placeholder !== translation) {
+                    element.placeholder = translation;
+                }
+                cache.placeholderKey = i18nPlaceholderKey;
             }
         }
 
         if (i18nAriaLabelKey) {
-            const translation = getNestedTranslation(trans, i18nAriaLabelKey);
-            if (translation && element.getAttribute('aria-label') !== translation) {
-                element.setAttribute('aria-label', translation);
+            if (cache.ariaLabelKey !== i18nAriaLabelKey || cache.lang !== effectiveLang) {
+                const translation = getNestedTranslation(trans, i18nAriaLabelKey);
+                if (translation !== undefined && element.getAttribute('aria-label') !== translation) {
+                    element.setAttribute('aria-label', translation);
+                }
+                cache.ariaLabelKey = i18nAriaLabelKey;
             }
         }
+
+        cache.lang = effectiveLang;
     });
 
     // Update password toggle ARIA labels for accessibility after language change
+    // Optimization: Fetch labels once outside the loop
+    const showLabel = getNestedTranslation(trans, 'common.show_password');
+    const hideLabel = getNestedTranslation(trans, 'common.hide_password');
+
     document.querySelectorAll('.password-toggle').forEach(button => {
         const input = button.previousElementSibling;
         if (input) {
             const isPassword = input.type === 'password';
-            const actionKey = isPassword ? 'common.show_password' : 'common.hide_password';
-            const translation = getNestedTranslation(trans, actionKey);
+            const translation = isPassword ? showLabel : hideLabel;
             if (translation) {
                 button.setAttribute('aria-label', translation);
             }
@@ -427,8 +464,9 @@ async function translate(lang) {
     });
 
     // Update token ARIA labels after language change
+    // Optimization: Fetch label once outside the loop
+    const insertLabel = getNestedTranslation(trans, 'common.insert') || 'Insert';
     document.querySelectorAll('.token-code').forEach(token => {
-        const insertLabel = getNestedTranslation(trans, 'common.insert') || 'Insert';
         token.setAttribute('aria-label', `${insertLabel} ${token.textContent}`);
     });
 
@@ -1959,27 +1997,15 @@ function formatBytes(bytes, decimals = 2) {
     
     const k = 1024;
     const dm = decimals < 0 ? 0 : decimals;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + BYTE_SIZES[i];
 }
 
 function getMoonPhaseName(index) {
-    const phases = [
-        'New Moon',
-        'Waxing Crescent',
-        'First Quarter',
-        'Waxing Gibbous',
-        'Full Moon',
-        'Waning Gibbous',
-        'Last Quarter',
-        'Waning Crescent'
-    ];
-    
-    if (index >= 0 && index < phases.length) {
-        return phases[index];
+    if (index >= 0 && index < MOON_PHASES.length) {
+        return MOON_PHASES[index];
     } else {
         return 'Unknown (' + index + ')';
     }
