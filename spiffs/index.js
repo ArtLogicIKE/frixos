@@ -383,6 +383,17 @@ async function translate(lang) {
     currentLanguage = effectiveLang;
     const trans = translations[effectiveLang];
 
+    // Update active class in language dropdown
+    document.querySelectorAll('.language-option').forEach(option => {
+        if (option.dataset.lang === effectiveLang) {
+            option.classList.add('is-active');
+            option.setAttribute('aria-current', 'true');
+        } else {
+            option.classList.remove('is-active');
+            option.removeAttribute('aria-current');
+        }
+    });
+
     // Querying on every call to support dynamic elements while using dataset for readability
     document.querySelectorAll('[data-i18n], [data-i18n-placeholder], [data-i18n-aria-label]').forEach(element => {
         const i18nKey = element.dataset.i18n;
@@ -471,26 +482,79 @@ function setupPasswordToggles() {
 function setupLanguageSelector() {
     const languageToggle = el('language-toggle');
     const languageDropdown = el('language-dropdown');
+    const options = Array.from(document.querySelectorAll('.language-option'));
+
+    // Initial A11y setup for options
+    options.forEach(option => {
+        option.setAttribute('role', 'menuitem');
+        option.setAttribute('tabindex', '-1');
+    });
+
+    function toggleMenu(force) {
+        const isExpanded = force !== undefined ? force : languageDropdown.style.display === 'none';
+        languageDropdown.style.display = isExpanded ? 'block' : 'none';
+        languageToggle.setAttribute('aria-expanded', isExpanded);
+        return isExpanded;
+    }
+
+    function focusOption(index) {
+        const idx = (index + options.length) % options.length;
+        options[idx].focus();
+        return idx;
+    }
     
     // Toggle dropdown on button click
     languageToggle.addEventListener('click', function(e) {
         e.stopPropagation();
-        languageDropdown.style.display = languageDropdown.style.display === 'none' ? 'block' : 'none';
+        toggleMenu();
+    });
+
+    languageToggle.addEventListener('keydown', function(e) {
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            toggleMenu(true);
+            const startIndex = e.key === 'ArrowUp' ? options.length - 1 : 0;
+            focusOption(startIndex);
+        }
     });
     
     // Close dropdown when clicking outside
     document.addEventListener('click', function(e) {
         if (!languageToggle.contains(e.target) && !languageDropdown.contains(e.target)) {
-            languageDropdown.style.display = 'none';
+            toggleMenu(false);
+        }
+    });
+
+    languageDropdown.addEventListener('keydown', function(e) {
+        const currentFocus = document.activeElement;
+        const currentIndex = options.indexOf(currentFocus);
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            focusOption(currentIndex + 1);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            focusOption(currentIndex - 1);
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            toggleMenu(false);
+            languageToggle.focus();
+        } else if (e.key === 'Enter' || e.key === ' ') {
+            if (currentIndex !== -1) {
+                e.preventDefault();
+                options[currentIndex].click();
+            }
+        } else if (e.key === 'Tab') {
+            toggleMenu(false);
         }
     });
     
     // Handle language selection
-    document.querySelectorAll('.language-option').forEach(option => {
-        option.addEventListener('click', function() {
+    options.forEach(option => {
+        option.addEventListener('click', async function() {
             const selectedLang = this.getAttribute('data-lang');
-            changeLanguage(selectedLang);
-            languageDropdown.style.display = 'none';
+            toggleMenu(false);
+            await changeLanguage(selectedLang);
             languageToggle.focus();
         });
     });
