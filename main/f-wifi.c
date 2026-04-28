@@ -1077,6 +1077,47 @@ static time_t metno_parse_iso8601(const char *s)
     return 0;
 }
 
+// Diagnostic logging knob for the met.no calls only. Bumps the ESP log level
+// for mbedTLS, esp-tls, and the HTTP transport to VERBOSE just for the
+// duration of one perform(), then restores prior levels. We rely on
+// CONFIG_MBEDTLS_DEBUG=y / CONFIG_MBEDTLS_DEBUG_LEVEL=4 being set in
+// sdkconfig.ssl so the debug-emitting code is actually compiled in;
+// otherwise these calls are harmless no-ops.
+typedef struct {
+    esp_log_level_t mbedtls;
+    esp_log_level_t esp_tls;
+    esp_log_level_t esp_tls_mbedtls;
+    esp_log_level_t transport_base;
+    esp_log_level_t http_client;
+    esp_log_level_t transport_ssl;
+} metno_log_saved_t;
+
+static void metno_logs_verbose(metno_log_saved_t *s)
+{
+    s->mbedtls         = esp_log_level_get("mbedtls");
+    s->esp_tls         = esp_log_level_get("esp-tls");
+    s->esp_tls_mbedtls = esp_log_level_get("esp-tls-mbedtls");
+    s->transport_base  = esp_log_level_get("transport_base");
+    s->http_client     = esp_log_level_get("HTTP_CLIENT");
+    s->transport_ssl   = esp_log_level_get("transport_ssl");
+    esp_log_level_set("mbedtls",         ESP_LOG_VERBOSE);
+    esp_log_level_set("esp-tls",         ESP_LOG_VERBOSE);
+    esp_log_level_set("esp-tls-mbedtls", ESP_LOG_VERBOSE);
+    esp_log_level_set("transport_base",  ESP_LOG_VERBOSE);
+    esp_log_level_set("HTTP_CLIENT",     ESP_LOG_VERBOSE);
+    esp_log_level_set("transport_ssl",   ESP_LOG_VERBOSE);
+}
+
+static void metno_logs_restore(const metno_log_saved_t *s)
+{
+    esp_log_level_set("mbedtls",         s->mbedtls);
+    esp_log_level_set("esp-tls",         s->esp_tls);
+    esp_log_level_set("esp-tls-mbedtls", s->esp_tls_mbedtls);
+    esp_log_level_set("transport_base",  s->transport_base);
+    esp_log_level_set("HTTP_CLIENT",     s->http_client);
+    esp_log_level_set("transport_ssl",   s->transport_ssl);
+}
+
 // Map a met.no symbol_code (e.g. "partlycloudy_day", "lightrainshowers_night",
 // "heavysnowandthunder") to the existing 0-7 icon-sprite index used by
 // f-display.c. Order matters: thunder dominates snow/sleet which dominates
@@ -1305,9 +1346,14 @@ bool wifi_get_metno_sunrise(void)
     esp_http_client_set_header(client, "Accept", "application/json");
     esp_http_client_set_header(client, "Connection", "close");
 
+    metno_log_saved_t saved_logs;
+    metno_logs_verbose(&saved_logs);
+
     bool ok = false;
     esp_err_t err = esp_http_client_perform(client);
     int status = (err == ESP_OK) ? esp_http_client_get_status_code(client) : -1;
+
+    metno_logs_restore(&saved_logs);
     ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Sunrise HTTP %d, %d bytes", status, response_len);
 
     if (err == ESP_OK && status == 200 && wifi_http_buffer && response_len > 0)
@@ -1455,9 +1501,14 @@ bool wifi_get_metno_weather(void)
     if (metno_last_modified[0] != '\0')
         esp_http_client_set_header(client, "If-Modified-Since", metno_last_modified);
 
+    metno_log_saved_t saved_logs;
+    metno_logs_verbose(&saved_logs);
+
     bool result = false;
     esp_err_t err = esp_http_client_perform(client);
     int status = (err == ESP_OK) ? esp_http_client_get_status_code(client) : -1;
+
+    metno_logs_restore(&saved_logs);
     ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Met.no status %d, parsed %d entries, lm='%s'",
                 status, metno_entry_idx, metno_pending_lm);
 
