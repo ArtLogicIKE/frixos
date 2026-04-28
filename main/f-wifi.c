@@ -1409,8 +1409,12 @@ bool wifi_get_metno_weather(void)
     }
 
     char url[256];
+    // Diagnostic B: use the /compact endpoint instead of /complete. Compact has
+    // a smaller payload but does NOT include wind_speed_of_gust,
+    // ultraviolet_index_clear_sky_max, or probability_of_precipitation, so the
+    // [gust], [uv], and probability portion of [precip] tokens will read 0.
     snprintf(url, sizeof(url),
-             "https://api.met.no/weatherapi/locationforecast/2.0/complete?lat=%s&lon=%s",
+             "https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=%s&lon=%s",
              my_lat, my_lon);
     ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Fetching met.no weather: %.50s...", url);
 
