@@ -1302,9 +1302,13 @@ bool wifi_get_metno_sunrise(void)
     struct tm now_local;
     localtime_r(&now, &now_local);
 
-    char date_str[16];
-    snprintf(date_str, sizeof(date_str), "%04d-%02d-%02d",
-             now_local.tm_year + 1900, now_local.tm_mon + 1, now_local.tm_mday);
+    // YYYY-MM-DD + NUL
+    char date_str[11];
+    if (strftime(date_str, sizeof(date_str), "%Y-%m-%d", &now_local) == 0)
+    {
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Sunrise: failed to format local date");
+        return false;
+    }
 
     char url[256];
     snprintf(url, sizeof(url),
