@@ -1299,6 +1299,7 @@ bool wifi_get_metno_sunrise(void)
     };
     esp_http_client_handle_t client = esp_http_client_init(&config);
     esp_http_client_set_header(client, "Accept", "application/json");
+    esp_http_client_set_header(client, "Connection", "close");
 
     bool ok = false;
     esp_err_t err = esp_http_client_perform(client);
@@ -1389,12 +1390,18 @@ bool wifi_get_metno_weather(void)
     metno_today_year = tnow.tm_year;
 
     // Refresh sunrise/sunset on the first call of a new local day (or first run).
+    // After the sunrise TLS connection is torn down, give mbedTLS / lwIP a brief
+    // moment to fully release socket and TLS state before we open another TLS
+    // connection to the same host. Without this, back-to-back calls have been
+    // observed to return MBEDTLS_ERR_SSL_BAD_INPUT_DATA (-0x7100) on the second
+    // call's response read.
     if (metno_last_sunrise_yday < 0 ||
         metno_last_sunrise_year != tnow.tm_year ||
         metno_last_sunrise_yday != tnow.tm_yday)
     {
         ESP_LOG_WEB(ESP_LOG_INFO, TAG, "New local day or first run; fetching sunrise");
         wifi_get_metno_sunrise();
+        vTaskDelay(pdMS_TO_TICKS(100));
     }
 
     char url[256];
@@ -1436,6 +1443,7 @@ bool wifi_get_metno_weather(void)
     };
     esp_http_client_handle_t client = esp_http_client_init(&config);
     esp_http_client_set_header(client, "Accept", "application/json");
+    esp_http_client_set_header(client, "Connection", "close");
     if (metno_last_modified[0] != '\0')
         esp_http_client_set_header(client, "If-Modified-Since", metno_last_modified);
 
