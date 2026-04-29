@@ -21,6 +21,7 @@
 #include "time.h"
 #include "math.h"
 #include "esp_timer.h"
+#include "esp_system.h"
 #include "esp_lcd_st7735.h"
 #include <unistd.h>
 #include "lvgl.h"
@@ -893,26 +894,33 @@ void show_qr_code(void)
 }
 
 // Watchdog mechanism for display task hang detection
-static volatile bool watchdog_triggered = false;
 static volatile uint32_t display_task_heartbeat = 0;
 static uint32_t last_display_task_heartbeat = 0xFFFFFFFF;
+static uint8_t watchdog_missed_count = 0;
+
+// Restart after this many consecutive 30s windows with a frozen heartbeat.
+// 2 windows ≈ 60s, long enough to ride out legitimately slow operations
+// without leaving the device permanently bricked when the display task
+// deadlocks (e.g. on the LVGL port lock).
+#define WATCHDOG_MISS_LIMIT 2
 
 static void watchdog_callback(void *arg)
 {
-  // Optimization: Use a lightweight heartbeat counter check instead of resetting the timer.
-  // This avoids expensive system calls in the high-frequency display loop.
   if (display_task_heartbeat == last_display_task_heartbeat)
   {
-    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Watchdog: display task hung (heartbeat %lu)", display_task_heartbeat);
-    watchdog_triggered = true;
-    // Force a system restart after 5 seconds if the task is still hung
-    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Restart in 5s (display hang)");
-    // Note: In a real implementation, you might want to call esp_restart() directly
-    // or use a proper restart mechanism. For now, we'll just log the issue.
+    watchdog_missed_count++;
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Watchdog: display task hung (heartbeat %lu, miss %u/%u)",
+                display_task_heartbeat, watchdog_missed_count, WATCHDOG_MISS_LIMIT);
+    if (watchdog_missed_count >= WATCHDOG_MISS_LIMIT)
+    {
+      ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Restarting now (display hang)");
+      esp_restart();
+    }
   }
   else
   {
     last_display_task_heartbeat = display_task_heartbeat;
+    watchdog_missed_count = 0;
   }
 }
 
@@ -1412,15 +1420,6 @@ void display_task(void *pvParameters)
     // task that runs lv_timer_handler. Calling it from display_task causes two tasks
     // to run the LVGL timer handler, corrupting the event list and crashing in
     // lv_event_mark_deleted when objects are deleted. See LVGL issue #6677.
-
-    // Check if watchdog was triggered
-    if (watchdog_triggered)
-    {
-      ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Watchdog triggered, recovering");
-      watchdog_triggered = false;
-      // Try to recover by forcing a display refresh
-      display_changed();
-    }
 
     // Bolt Optimization: Feed the watchdog using a lightweight heartbeat counter.
     // This replaces the overhead-heavy esp_timer_stop/start_periodic calls
