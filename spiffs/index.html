@@ -395,7 +395,7 @@
                         <div class="form-group">
                             <label for="pwm_frequency" data-i18n="advanced.brightness.pwm_frequency">PWM
                                 Frequency</label>
-                            <input type="number" id="pwm_frequency" name="pwm_frequency" min="10" max="1000000"
+                            <input type="number" id="pwm_frequency" name="pwm_frequency" min="10" max="78000"
                                 value="133">
                             <span id="pwm_frequency-error" class="input-error"></span>
                         </div>
@@ -460,6 +460,13 @@
                                         time</span></li>
                                 <li><code class="token-code" tabindex="0" role="button">[set]</code> - <span data-i18n="advanced.message.token_set">Sunset time</span>
                                 </li>
+                                <li><code class="token-code" tabindex="0" role="button">[wind]</code> - <span data-i18n="advanced.message.token_wind">Wind speed and direction</span></li>
+                                <li><code class="token-code" tabindex="0" role="button">[gust]</code> - <span data-i18n="advanced.message.token_gust">Wind gust speed and direction</span></li>
+                                <li><code class="token-code" tabindex="0" role="button">[precip]</code> - <span data-i18n="advanced.message.token_precip">Precipitation amount and probability</span></li>
+                                <li><code class="token-code" tabindex="0" role="button">[uv]</code> - <span data-i18n="advanced.message.token_uv">UV index</span></li>
+                                <li><code class="token-code" tabindex="0" role="button">[pressure]</code> - <span data-i18n="advanced.message.token_pressure">Sea-level pressure with trend</span></li>
+                                <li><code class="token-code" tabindex="0" role="button">[3high]</code> - <span data-i18n="advanced.message.token_3high">Highest temperature across 3 days</span></li>
+                                <li><code class="token-code" tabindex="0" role="button">[3low]</code> - <span data-i18n="advanced.message.token_3low">Lowest temperature across 3 days</span></li>
                                 <li><code class="token-code" tabindex="0" role="button">[HA:entity_id:path]</code> - <span data-i18n="advanced.message.token_ha">Fetch
                                         settings from Home Assistant (needs enabled
                                         integration)</span></li>

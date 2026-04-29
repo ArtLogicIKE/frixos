@@ -56,7 +56,7 @@ void reconfigure_led_pwm_frequency(void)
     // Validate frequency range
     uint32_t freq = eeprom_pwm_frequency;
     if (freq < 10) freq = 10;
-    if (freq > 1000000) freq = 1000000;
+    if (freq > 78000) freq = 78000;
     if (freq == 133) freq = 200; // replace 133 with 200 for backwards compatibility
     
     // Configure the LEDC timer with new frequency

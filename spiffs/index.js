@@ -56,7 +56,7 @@ const translations = {
                 wifi_ssid: 'WiFi SSID',
                 wifi_password: 'WiFi Password',
                 hostname: 'Hostname',
-                fahrenheit: 'Temperature in Fahrenheit',
+                fahrenheit: 'US measurement units (F, mph, ...)',
                 hour12: 'Time in 12-hour format',
                 auto_update: 'Automatically check for firmware updates',
                 restart_note: '* Changing connection settings will restart the device.'
@@ -144,6 +144,13 @@ const translations = {
                 token_low: 'Today\'s low temperature',
                 token_rise: 'Sunrise time',
                 token_set: 'Sunset time',
+                token_wind: 'Wind speed and direction',
+                token_gust: 'Wind gust speed and direction',
+                token_precip: 'Precipitation amount and probability',
+                token_uv: 'UV index',
+                token_pressure: 'Sea-level pressure with trend',
+                token_3high: 'Highest temperature across 3 days',
+                token_3low: 'Lowest temperature across 3 days',
                 token_ha: 'Fetch settings from Home Assistant (needs enabled integration)',
                 token_stock: 'Fetch stock price quote (needs enabled stock integration with Finnhub.io)',
                 token_cgm_glucose: 'Latest glucose reading from your CGM device, formatted, e.g. 157 mg/dl (+3 @ 12:01). (needs active CGM integration)',
@@ -965,11 +972,11 @@ function setupFieldValidations() {
             return null; // Valid
         },
         
-        // PWM Frequency: 10-1000000 integer
+        // PWM Frequency: 10-78000 integer
         pwmFrequencyValidator: function(value) {
             const num = parseInt(value);
             if (isNaN(num)) return "Must be a whole number";
-            if (num < 10 || num > 1000000) return "Must be between 10 and 1000000";
+            if (num < 10 || num > 78000) return "Must be between 10 and 78000";
             return null; // Valid
         },
         
@@ -1224,7 +1231,7 @@ function addIfChanged(formData, key, newValue, oldValue) {
  * - p22 = dim_disable (Maintain full brightness)
  * - p23 = brightness_LED (LED brightness array)
  * - p24 = show_leading_zero (Show leading zero)
- * - p42 = pwm_frequency (PWM frequency in Hz, range 10-1000000)
+ * - p42 = pwm_frequency (PWM frequency in Hz, range 10-78000)
  * - p43 = max_power (Max power, range 1-1023)
  * - p46 = wifi_start (WiFi Active Hours Start, 0-23)
  * - p47 = wifi_end (WiFi Active Hours End, 0-23)

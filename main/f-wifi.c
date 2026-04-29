@@ -78,6 +78,9 @@ char greeting[64] = "Hello";
 uint64_t weather_delay_ms = 30 * 60 * 1000; // 30 minutes — twice an hour, polite for met.no
 esp_timer_handle_t location_timer;
 uint64_t location_delay_ms = 100; // Start with 0.1 seconds
+static int weather_retry_attempts = 0;
+#define WEATHER_RETRY_DELAY_MS (30 * 1000) // 30 seconds
+#define WEATHER_MAX_RETRIES 2
 
 #define UPDATE_SERVER_BASE "http://update.artlogic.gr:8080"
 
@@ -524,16 +527,34 @@ int map_weather_icon(const char *icon)
 void weather_timer_callback(void *arg)
 {
     ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "ESP Weather timer triggered.");
-    wifi_get_metno_weather();
+    bool ok = wifi_get_metno_weather();
 
     // we might as well calculate the moon phase too
     // we do it here, with every weather, but also when NTP is synchronized
     moon_icon_index = get_moon_index();
     ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Moon phase: %d", moon_icon_index);
 
-    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Weather next in %.1f minutes.", (weather_delay_ms / (1000 * 60.0)));
-    // Restart the timer with the new delay
-    ESP_ERROR_CHECK(esp_timer_start_once(weather_timer, weather_delay_ms * 1000)); // Convert ms to microseconds
+    if (ok)
+    {
+        weather_retry_attempts = 0;
+        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Weather next in %.1f minutes.", (weather_delay_ms / (1000 * 60.0)));
+        ESP_ERROR_CHECK(esp_timer_start_once(weather_timer, weather_delay_ms * 1000)); // Convert ms to microseconds
+    }
+    else if (weather_retry_attempts < WEATHER_MAX_RETRIES)
+    {
+        weather_retry_attempts++;
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Weather fetch failed, retry %d/%d in %.0f seconds.",
+                    weather_retry_attempts, WEATHER_MAX_RETRIES, WEATHER_RETRY_DELAY_MS / 1000.0);
+        ESP_ERROR_CHECK(esp_timer_start_once(weather_timer, WEATHER_RETRY_DELAY_MS * 1000)); // Convert ms to microseconds
+    }
+    else
+    {
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Weather fetch failed after %d retries, resuming regular schedule.",
+                    WEATHER_MAX_RETRIES);
+        weather_retry_attempts = 0;
+        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Weather next in %.1f minutes.", (weather_delay_ms / (1000 * 60.0)));
+        ESP_ERROR_CHECK(esp_timer_start_once(weather_timer, weather_delay_ms * 1000)); // Convert ms to microseconds
+    }
 
     // Your task logic here
 }
@@ -1233,7 +1254,11 @@ static void process_one_metno_entry(const char *entry, int idx)
     get_value_from_JSON_string(entry, "probability_of_precipitation", val, sizeof(val), NULL);
     weather_precip_prob = (strcmp(val, "-") != 0) ? strtod(val, NULL) : 0.0;
 
-    get_value_from_JSON_string(entry, "ultraviolet_index_clear_sky_max", val, sizeof(val), NULL);
+    // met.no Locationforecast uses ultraviolet_index_clear_sky in instant.details.
+    // Keep _max as a compatibility fallback for older payload variants.
+    get_value_from_JSON_string(entry, "ultraviolet_index_clear_sky", val, sizeof(val), NULL);
+    if (strcmp(val, "-") == 0)
+        get_value_from_JSON_string(entry, "ultraviolet_index_clear_sky_max", val, sizeof(val), NULL);
     weather_uv = (strcmp(val, "-") != 0) ? strtod(val, NULL) : 0.0;
 }
 
@@ -1310,10 +1335,15 @@ bool wifi_get_metno_sunrise(void)
         return false;
     }
 
+    // Send a stable precision to met.no regardless of stored coordinate text.
+    char lat_4[16], lon_4[16];
+    snprintf(lat_4, sizeof(lat_4), "%.4f", strtod(my_lat, NULL));
+    snprintf(lon_4, sizeof(lon_4), "%.4f", strtod(my_lon, NULL));
+
     char url[256];
     snprintf(url, sizeof(url),
              "https://api.met.no/weatherapi/sunrise/3.0/sun?lat=%s&lon=%s&date=%s",
-             my_lat, my_lon, date_str);
+             lat_4, lon_4, date_str);
 
     // Buffered (non-streaming) — uses the regular branch of http_event_handler
     // which fills wifi_http_buffer up to HTTP_BUFFER_SIZE.
@@ -1454,10 +1484,15 @@ bool wifi_get_metno_weather(void)
         vTaskDelay(pdMS_TO_TICKS(100));
     }
 
+    // Send a stable precision to met.no regardless of stored coordinate text.
+    char lat_4[16], lon_4[16];
+    snprintf(lat_4, sizeof(lat_4), "%.4f", strtod(my_lat, NULL));
+    snprintf(lon_4, sizeof(lon_4), "%.4f", strtod(my_lon, NULL));
+
     char url[256];
     snprintf(url, sizeof(url),
              "https://api.met.no/weatherapi/locationforecast/2.0/complete?lat=%s&lon=%s",
-             my_lat, my_lon);
+             lat_4, lon_4);
     ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Fetching met.no weather: %.50s...", url);
 
     // Reset streaming state. Day buckets use sentinels that the final

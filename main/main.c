@@ -247,7 +247,7 @@ uint8_t eeprom_dexcom_region = 0;     // 0=disabled, 1=US, 2=Japan, 3=Rest of Wo
 uint16_t eeprom_glucose_high = 175;   // Default high threshold in mg/dL
 uint16_t eeprom_glucose_low = 70;     // Default low threshold in mg/dL
 uint8_t eeprom_glucose_unit = 0;      // Glucose display unit: 0=mg/dL, 1=mmol/L
-uint32_t eeprom_pwm_frequency = 200;  // Default PWM frequency in Hz (range 10-1000000)
+uint32_t eeprom_pwm_frequency = 200;  // Default PWM frequency in Hz (range 10-78000)
 uint16_t eeprom_max_power = MAX_DUTY; // Default max power (range 1-1023)
 
 // LibreLinkUp settings
