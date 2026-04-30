@@ -15,3 +15,7 @@
 ## 2025-05-15 - [Credential UX vs Security]
 **Learning:** While `autocomplete` attributes like `current-password` and `username` greatly improve UX for WiFi and user accounts, they should be omitted for API tokens and integration keys to prevent password managers from incorrectly identifying them as primary site credentials.
 **Action:** Selectively apply `autocomplete` only to standard user/password fields and avoid them for technical tokens or machine keys.
+
+## 2025-05-16 - [WAI-ARIA Menu for Language Selection]
+**Learning:** For language selectors, the WAI-ARIA Menu pattern (`role="menu"`, `role="menuitem"`) combined with keyboard navigation (Arrows, Escape) and visual/ARIA state synchronization (`.is-active`, `aria-current`) provides a significant accessibility and UX boost compared to simple click-only toggles.
+**Action:** Implement full keyboard support and clear visual indicators for current selection in custom dropdown menus to ensure they are fully accessible and intuitive.
