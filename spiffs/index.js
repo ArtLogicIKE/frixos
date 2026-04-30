@@ -375,7 +375,7 @@ function updateCgmExclusivity() {
 }
 
 // Current language (will be loaded from NVS)
-let currentLanguage = 'en';
+let currentLanguage = '';
 
 // Translation function - now async to support lazy-loading
 // Optimization: Persistent early return and DOM mutation diffing to minimize overhead
@@ -439,6 +439,13 @@ async function translate(lang) {
         token.setAttribute('aria-label', `${insertLabel} ${token.textContent}`);
     });
 
+    // Update language selection state in dropdown
+    document.querySelectorAll('.language-option').forEach(option => {
+        const isActive = option.dataset.lang === effectiveLang;
+        option.classList.toggle('is-active', isActive);
+        option.setAttribute('aria-current', isActive ? 'true' : 'false');
+    });
+
     const nameElement = el('current-language-name');
     if (nameElement) nameElement.textContent = LANGUAGE_NAMES[effectiveLang] || LANGUAGE_NAMES['en'];
 
@@ -478,27 +485,60 @@ function setupPasswordToggles() {
 function setupLanguageSelector() {
     const languageToggle = el('language-toggle');
     const languageDropdown = el('language-dropdown');
+    const options = Array.from(document.querySelectorAll('.language-option'));
     
-    // Toggle dropdown on button click
-    languageToggle.addEventListener('click', function(e) {
+    const toggleDropdown = (show) => {
+        const isVisible = show !== undefined ? show : languageDropdown.style.display === 'none';
+        languageDropdown.style.display = isVisible ? 'block' : 'none';
+        languageToggle.setAttribute('aria-expanded', isVisible);
+        if (!isVisible) {
+            languageToggle.focus();
+        }
+    };
+
+    languageToggle.addEventListener('click', (e) => {
         e.stopPropagation();
-        languageDropdown.style.display = languageDropdown.style.display === 'none' ? 'block' : 'none';
+        toggleDropdown();
     });
     
-    // Close dropdown when clicking outside
-    document.addEventListener('click', function(e) {
+    document.addEventListener('click', (e) => {
         if (!languageToggle.contains(e.target) && !languageDropdown.contains(e.target)) {
-            languageDropdown.style.display = 'none';
+            toggleDropdown(false);
+        }
+    });
+
+    languageToggle.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            toggleDropdown(true);
+            const activeOption = options.find(opt => opt.classList.contains('is-active')) || options[0];
+            activeOption.focus();
+        }
+    });
+
+    languageDropdown.addEventListener('keydown', (e) => {
+        const currentFocus = document.activeElement;
+        const currentIndex = options.indexOf(currentFocus);
+
+        if (e.key === 'Escape') {
+            toggleDropdown(false);
+        } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            options[(currentIndex + 1) % options.length].focus();
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            options[(currentIndex - 1 + options.length) % options.length].focus();
+        } else if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            currentFocus.click();
         }
     });
     
-    // Handle language selection
-    document.querySelectorAll('.language-option').forEach(option => {
+    options.forEach(option => {
         option.addEventListener('click', function() {
             const selectedLang = this.getAttribute('data-lang');
             changeLanguage(selectedLang);
-            languageDropdown.style.display = 'none';
-            languageToggle.focus();
+            toggleDropdown(false);
         });
     });
 }
