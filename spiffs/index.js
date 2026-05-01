@@ -375,7 +375,7 @@ function updateCgmExclusivity() {
 }
 
 // Current language (will be loaded from NVS)
-let currentLanguage = 'en';
+let currentLanguage = '';
 
 // Translation function - now async to support lazy-loading
 // Optimization: Persistent early return and DOM mutation diffing to minimize overhead
@@ -442,6 +442,18 @@ async function translate(lang) {
     const nameElement = el('current-language-name');
     if (nameElement) nameElement.textContent = LANGUAGE_NAMES[effectiveLang] || LANGUAGE_NAMES['en'];
 
+    // Update active class in language dropdown
+    document.querySelectorAll('.language-option').forEach(option => {
+        const isActive = option.getAttribute('data-lang') === effectiveLang;
+        if (isActive) {
+            option.classList.add('is-active');
+            option.setAttribute('aria-checked', 'true');
+        } else {
+            option.classList.remove('is-active');
+            option.setAttribute('aria-checked', 'false');
+        }
+    });
+
     const hash = window.location.hash.substring(1);
     if (hash && hash !== 'settings') {
         const sectionName = hash.charAt(0).toUpperCase() + hash.slice(1);
@@ -494,11 +506,18 @@ function setupLanguageSelector() {
     
     // Handle language selection
     document.querySelectorAll('.language-option').forEach(option => {
-        option.addEventListener('click', function() {
-            const selectedLang = this.getAttribute('data-lang');
+        const select = function() {
+            const selectedLang = option.getAttribute('data-lang');
             changeLanguage(selectedLang);
             languageDropdown.style.display = 'none';
             languageToggle.focus();
+        };
+        option.addEventListener('click', select);
+        option.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                select();
+            }
         });
     });
 }
@@ -1764,7 +1783,24 @@ function displayNetworks(networks) {
     networks.forEach(network => {
         const networkItem = document.createElement('div');
         networkItem.className = 'network-item';
-        networkItem.onclick = () => selectNetwork(network.ssid);
+        networkItem.setAttribute('role', 'button');
+        networkItem.setAttribute('tabindex', '0');
+
+        const trans = translations[currentLanguage] || translations.en;
+        const securityStatus = network.requires_password
+            ? (getNestedTranslation(trans, 'settings.wifi.secure') || 'Secure')
+            : (getNestedTranslation(trans, 'settings.wifi.open') || 'Open');
+
+        networkItem.setAttribute('aria-label', `${network.ssid}, ${network.signal_strength}% signal, ${securityStatus}`);
+
+        const select = () => selectNetwork(network.ssid);
+        networkItem.onclick = select;
+        networkItem.onkeydown = (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                select();
+            }
+        };
 
         // Create network name element
         const nameSpan = document.createElement('span');

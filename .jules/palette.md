@@ -15,3 +15,7 @@
 ## 2025-05-15 - [Credential UX vs Security]
 **Learning:** While `autocomplete` attributes like `current-password` and `username` greatly improve UX for WiFi and user accounts, they should be omitted for API tokens and integration keys to prevent password managers from incorrectly identifying them as primary site credentials.
 **Action:** Selectively apply `autocomplete` only to standard user/password fields and avoid them for technical tokens or machine keys.
+
+## 2025-05-20 - [Menu Accessibility Patterns]
+**Learning:** For dropdowns acting as selection menus (like language toggles), using `role="menuitemradio"` with `aria-checked` provides clearer state information to screen readers than generic `role="menuitem"`. Additionally, ensuring all interactive elements in dynamic lists (like WiFi networks) have explicit `role="button"`, `tabindex="0"`, and localized `aria-label` ensures they are discoverable and usable by keyboard-only and assistive technology users.
+**Action:** Use specific ARIA roles for selection states and always provide keyboard listeners (`Enter`/`Space`) for any element promoted to an interactive role via `tabindex`.

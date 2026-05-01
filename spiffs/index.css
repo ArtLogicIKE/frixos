@@ -207,6 +207,17 @@ h1 {
     background-color: var(--section-content-bg);
 }
 
+.language-option.is-active {
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
+.language-option.is-active::after {
+    content: '✓';
+    margin-left: auto;
+    font-weight: bold;
+}
+
 .language-option .lang-name {
     font-size: 0.9rem;
 }
