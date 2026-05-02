@@ -32,7 +32,9 @@
       "scanning": "Scanning for networks...",
       "scan_button": "Scan available networks",
       "no_scan_message": "Click \"Scan available networks\" to see WiFi networks",
-      "no_networks": "No networks found"
+      "no_networks": "No networks found",
+      "secure": "Secure",
+      "open": "Open"
     }
   },
   "advanced": {

@@ -801,9 +801,12 @@ textarea[aria-invalid="true"] {
     border: 1px solid var(--border-color);
 }
 
-.network-item:hover {
+.network-item:hover,
+.network-item:focus-visible {
     transform: translateY(-2px);
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
 }
 
 .signal-strength {
