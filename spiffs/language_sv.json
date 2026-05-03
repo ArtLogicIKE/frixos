@@ -27,7 +27,10 @@
       "scanning": "Söker efter nätverk...",
       "scan_button": "Skanna tillgängliga nätverk",
       "no_scan_message": "Klicka på \"Sök tillgängliga nätverk\" för att se WiFi-nätverk",
-      "no_networks": "Inga nätverk hittades"
+      "no_networks": "Inga nätverk hittades",
+      "signal": "Signal",
+      "secure": "Säker",
+      "open": "Öppen"
     }
   },
   "advanced": {

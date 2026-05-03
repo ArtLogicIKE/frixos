@@ -27,7 +27,10 @@
       "scanning": "Søger efter netværk...",
       "scan_button": "Scan tilgængelige netværk",
       "no_scan_message": "Klik på \"Scan tilgængelige netværk\" for at se WiFi-netværk",
-      "no_networks": "Ingen netværk fundet"
+      "no_networks": "Ingen netværk fundet",
+      "signal": "Signal",
+      "secure": "Sikker",
+      "open": "Åben"
     }
   },
   "advanced": {
