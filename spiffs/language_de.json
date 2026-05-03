@@ -31,7 +31,10 @@
       "scanning": "Suche nach Netzwerken...",
       "scan_button": "Verfügbare Netzwerke scannen",
       "no_scan_message": "Klicken Sie auf \"Verfügbare Netzwerke scannen\", um WiFi-Netzwerke anzuzeigen",
-      "no_networks": "Keine Netzwerke gefunden"
+      "no_networks": "Keine Netzwerke gefunden",
+      "signal": "Signal",
+      "secure": "Sicher",
+      "open": "Offen"
     }
   },
   "advanced": {
