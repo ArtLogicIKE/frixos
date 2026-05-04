@@ -31,7 +31,10 @@
       "scanning": "Buscando redes...",
       "scan_button": "Escanear redes disponibles",
       "no_scan_message": "Haga clic en \"Buscar redes disponibles\" para ver las redes WiFi",
-      "no_networks": "No se encontraron redes"
+      "no_networks": "No se encontraron redes",
+      "signal": "Señal",
+      "secure": "Segura",
+      "open": "Abierta"
     }
   },
   "advanced": {

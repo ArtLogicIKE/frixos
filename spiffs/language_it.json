@@ -27,7 +27,10 @@
       "scanning": "Scansione reti in corso...",
       "scan_button": "Scansiona reti disponibili",
       "no_scan_message": "Clicca su \"Scansiona reti disponibili\" per vedere le reti WiFi",
-      "no_networks": "Nessuna rete trovata"
+      "no_networks": "Nessuna rete trovata",
+      "signal": "Segnale",
+      "secure": "Protetta",
+      "open": "Aperta"
     }
   },
   "advanced": {

@@ -66,7 +66,10 @@ const translations = {
                 scanning: 'Scanning for networks...',
                 scan_button: 'Scan available networks',
                 no_scan_message: 'Click "Scan available networks" to see WiFi networks',
-                no_networks: 'No networks found'
+                no_networks: 'No networks found',
+                signal: 'Signal',
+                secure: 'Secured',
+                open: 'Open'
             }
         },
         advanced: {
@@ -1785,16 +1788,27 @@ function displayNetworks(networks) {
     }
 
     // Add each network to the list
+    const trans = translations[currentLanguage] || translations.en;
+    const signalLabel = getNestedTranslation(trans, 'settings.wifi.signal') || 'Signal';
+    const secureLabel = getNestedTranslation(trans, 'settings.wifi.secure') || 'Secured';
+    const openLabel = getNestedTranslation(trans, 'settings.wifi.open') || 'Open';
+
     networks.forEach(network => {
         const networkItem = document.createElement('div');
         networkItem.className = 'network-item';
-        networkItem.onclick = () => selectNetwork(network.ssid);
+        networkItem.tabIndex = 0;
+        networkItem.role = 'button';
+        networkItem.setAttribute('aria-label', `${network.ssid}, ${signalLabel}: ${network.signal_strength}%, ${network.requires_password ? secureLabel : openLabel}`);
+
+        const select = () => selectNetwork(network.ssid);
+        networkItem.onclick = select;
+        networkItem.onkeydown = (e) => ['Enter', ' '].includes(e.key) && (e.preventDefault(), select());
 
         // Create network name element
         const nameSpan = document.createElement('span');
         nameSpan.textContent = network.ssid;
         if (network.requires_password) {
-            nameSpan.innerHTML += ' <i>🔒</i>';
+            nameSpan.innerHTML += ' <i aria-hidden="true">🔒</i>';
         }
 
         // Create signal strength indicator

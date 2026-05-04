@@ -69,6 +69,21 @@ async def get_status(logs: str = None):
 
     return JSONResponse(content=status_data)
 
+@app.get("/api/wifi/scan")
+async def start_scan():
+    return JSONResponse(content={"status": "ok"})
+
+@app.get("/api/wifi/status")
+async def get_wifi_status():
+    return JSONResponse(content={
+        "scanning": False,
+        "scan_done": True,
+        "networks": [
+            {"ssid": "MockSecureNetwork", "signal_strength": 80, "requires_password": True},
+            {"ssid": "MockOpenNetwork", "signal_strength": 60, "requires_password": False}
+        ]
+    })
+
 @app.get("/language_{lang}.json")
 async def get_language(lang: str):
     path = f"spiffs/language_{lang}.json"

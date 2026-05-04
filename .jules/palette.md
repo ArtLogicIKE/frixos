@@ -15,3 +15,7 @@
 ## 2025-05-15 - [Credential UX vs Security]
 **Learning:** While `autocomplete` attributes like `current-password` and `username` greatly improve UX for WiFi and user accounts, they should be omitted for API tokens and integration keys to prevent password managers from incorrectly identifying them as primary site credentials.
 **Action:** Selectively apply `autocomplete` only to standard user/password fields and avoid them for technical tokens or machine keys.
+
+## 2025-05-16 - [Keyboard Accessible Dynamic Lists]
+**Learning:** For dynamic lists like WiFi networks, simply adding `onclick` is insufficient for accessibility. Interactive list items must have `tabindex="0"`, `role="button"`, and explicit `onkeydown` handlers for 'Enter' and 'Space' to be usable by keyboard and screen reader users. Localized `aria-label` attributes should provide a summary of the item's state (e.g., signal strength, security).
+**Action:** When generating list items programmatically, always include keyboard event listeners and state-descriptive ARIA labels.
