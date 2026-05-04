@@ -7,6 +7,13 @@ CONFIG_PARTITION_TABLE_FILENAME="partitions.csv"
 CONFIG_ESPTOOLPY_FLASHSIZE_8MB=y
 CONFIG_ESPTOOLPY_FLASHSIZE="8MB"
 
+# Don't compile LVGL examples into the firmware
+CONFIG_LV_BUILD_EXAMPLES=n
+
+# Optimization: use CONFIG_COMPILER_OPTIMIZATION_SIZE=y (replaces DEFAULT) for release
+# builds to match the official ~1.2MB binary size. Keep DEFAULT (-Og) during development
+# so coredumps and idf.py monitor give meaningful backtraces.
+
 # LVGL POSIX filesystem driver — drive letter 'S' (83) mapped to /spiffs
 CONFIG_LV_USE_FS_POSIX=y
 CONFIG_LV_FS_POSIX_LETTER=83
