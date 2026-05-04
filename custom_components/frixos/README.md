@@ -22,7 +22,7 @@ This custom integration allows you to control and monitor your Frixos device dir
 - Last Time Update
 
 ### Switches
-- Temperature in Fahrenheit
+- US units (F, mph, ...)
 - 12-Hour Time Format
 - Show Scrolling Message
 - Show Weather Forecast

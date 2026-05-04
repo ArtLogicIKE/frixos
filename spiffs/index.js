@@ -56,7 +56,7 @@ const translations = {
                 wifi_ssid: 'WiFi SSID',
                 wifi_password: 'WiFi Password',
                 hostname: 'Hostname',
-                fahrenheit: 'US measurement units (F, mph, ...)',
+                fahrenheit: 'US units (F, mph, ...)',
                 hour12: 'Time in 12-hour format',
                 auto_update: 'Automatically check for firmware updates',
                 restart_note: '* Changing connection settings will restart the device.'
@@ -835,6 +835,9 @@ function navigateToSection() {
                     console.error('Error loading advanced section:', error);
                 });
         } else if (hash === 'integrations' && !window.sectionsInitialized.integrations) {
+            const integrationsFormEarly = el('integrationsForm');
+            const submitWhileLoading = integrationsFormEarly && integrationsFormEarly.querySelector('button[type="submit"]');
+            if (submitWhileLoading) submitWhileLoading.disabled = true;
             fetchSectionParams('integrations')
                 .then(data => {
                     setupIntegrationsSection();
@@ -1054,6 +1057,8 @@ function setupFieldValidations() {
                 const error = el(`${config.id}-error`);
                 
                 if (!input || !error) return;
+                // Only validate fields that belong to the form being submitted (both forms share the same IDs in DOM)
+                if (!form.contains(input)) return;
                 
                 const errorMessage = config.validator.call(input, input.value);
                 
@@ -1424,8 +1429,13 @@ function handleFormSubmit(e, formId) {
     // Integrations form fields (integrationsForm)
     if (formId === 'integrationsForm') {
         const haUrlInput = getFieldInForm('eeprom_ha_url');
-        if (haUrlInput && addIfChanged(formData, 'p25', haUrlInput.value.trim(), window.settings.p25)) {
-            changedCount++;
+        if (haUrlInput) {
+            const newUrl = haUrlInput.value.trim();
+            const oldUrl = window.settings.p25;
+            if (hasValueChanged(newUrl, oldUrl) || ((oldUrl === undefined || oldUrl === null) && newUrl !== '')) {
+                formData.p25 = newUrl;
+                changedCount++;
+            }
         }
         
         const haTokenInput = getFieldInForm('eeprom_ha_token');
@@ -1517,8 +1527,13 @@ function handleFormSubmit(e, formId) {
         }
 
         const glucoseUsernameInput = getFieldInForm('eeprom_glucose_username');
-        if (glucoseUsernameInput && addIfChanged(formData, 'p31', glucoseUsernameInput.value.trim(), window.settings.p31)) {
-            changedCount++;
+        if (glucoseUsernameInput) {
+            const newUser = glucoseUsernameInput.value.trim();
+            const oldUser = window.settings.p31;
+            if (hasValueChanged(newUser, oldUser) || ((oldUser === undefined || oldUser === null) && newUser !== '')) {
+                formData.p31 = newUser;
+                changedCount++;
+            }
         }
 
         const glucosePasswordInput = getFieldInForm('eeprom_glucose_password');
@@ -1561,10 +1576,19 @@ function saveSettings(formData, isNetworkSettings = false) {
         },
         body: JSON.stringify(formData)
     })
-    .then(response => {
-        return response.json();
-    })
-    .then(data => {
+    .then(async (response) => {
+        const text = await response.text();
+        let data = null;
+        if (text) {
+            try {
+                data = JSON.parse(text);
+            } catch (parseErr) {
+                const preview = text.length > 160 ? text.slice(0, 160) + '…' : text;
+                console.error('Non-JSON settings response:', preview);
+                showStatus(getMessage('error_saving_settings') + preview, 'error');
+                return;
+            }
+        }
         if (data && data.status === 'ok') {
             // Update window.settings with new values
             window.settings = { ...window.settings, ...formData };
@@ -2466,6 +2490,13 @@ function setupIntegrationsSection() {
             updateTokenMask(window.settings.p32, glucosePasswordMask);
         }
     }
+
+    if (form) {
+        const submitBtnIntegrations = form.querySelector('button[type="submit"]');
+        if (submitBtnIntegrations) {
+            submitBtnIntegrations.disabled = !window.settingsLoaded.integrations;
+        }
+    }
 }
 
 // Function to handle Home Assistant Integration settings
@@ -2809,7 +2840,7 @@ function formatSystemInfoForEmail(info) {
     emailBody += '=== SETTINGS ===\n';
     emailBody += `Hostname: ${info.settings.hostname}\n`;
     emailBody += `WiFi SSID: ${info.settings.wifi_ssid}\n`;
-    emailBody += `Temperature Unit: ${info.settings.fahrenheit === 'Yes' ? 'Fahrenheit' : 'Celsius'}\n`;
+    emailBody += `Use US units: ${info.settings.fahrenheit}\n`;
     emailBody += `Time Format: ${info.settings.hour12 === 'Yes' ? '12-hour' : '24-hour'}\n`;
     emailBody += `Auto Update: ${info.settings.update_firmware === 'Yes' ? 'Enabled' : 'Disabled'}\n`;
     emailBody += `X Offset: ${info.settings.ofs_x}\n`;

@@ -21,7 +21,7 @@
       "wifi_ssid": "SSID WiFi",
       "wifi_password": "Contraseña WiFi",
       "hostname": "Nombre de host",
-      "fahrenheit": "Temperatura en Fahrenheit",
+      "fahrenheit": "Unidades estadounidenses (F, mph, ...)",
       "hour12": "Hora en formato de 12 horas",
       "auto_update": "Verificar automáticamente actualizaciones de firmware",
       "restart_note": "* Cambiar la configuración de conexión reiniciará el dispositivo."

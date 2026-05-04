@@ -17,7 +17,7 @@
       "wifi_ssid": "WiFi SSID",
       "wifi_password": "WiFi-lösenord",
       "hostname": "Värdnamn",
-      "fahrenheit": "Temperatur i Fahrenheit",
+      "fahrenheit": "Amerikanska enheter (F, mph, ...)",
       "hour12": "Tid i 12-timmarsformat",
       "auto_update": "Kontrollera automatiskt efter firmware-uppdateringar",
       "restart_note": "* Ändring av anslutningsinställningar kommer att starta om enheten."

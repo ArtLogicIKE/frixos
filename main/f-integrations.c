@@ -159,6 +159,11 @@ static int ha_response_len = 0;
 static TaskHandle_t integration_update_task_handle = NULL;
 const int32_t int_update_secs = 60; // update timer should tick every 60 seconds
 
+/** After ESP_ERR_HTTP_CONNECT / CONNECTING, skip HA until this wall time (see fetch_ha_entity). */
+static time_t ha_http_connect_backoff_until = 0;
+/** Set when a HA entity hit connect error; skip remaining entities this cycle. */
+static bool ha_abort_remaining_tokens = false;
+
 // Semaphore for SSL connections - ESP32 can only handle one SSL connection at a time
 static SemaphoreHandle_t ssl_connection_semaphore = NULL;
 #define SSL_SEMAPHORE_TIMEOUT_MS (30 * 1000)    // 30 seconds timeout
@@ -316,7 +321,9 @@ static bool fetch_ha_entity(integration_token_t *token)
     esp_http_client_config_t config = {
         .url = urlstr,
         .event_handler = ha_http_event_handler,
-        .timeout_ms = 8000,                 // 8 second timeout for SSL handshake
+        // Keep the per-attempt budget short so a stalled HA can't tie up the radio
+        // and CPU for ages. We retry on the next 60s integration cycle anyway.
+        .timeout_ms = 5000,
         .buffer_size = HTTP_BUFFER_SIZE,    // Use HTTP_BUFFER_SIZE
         .buffer_size_tx = HTTP_BUFFER_SIZE, // Use HTTP_BUFFER_SIZE
         .transport_type = HTTP_TRANSPORT_OVER_SSL,
@@ -347,11 +354,13 @@ static bool fetch_ha_entity(integration_token_t *token)
     esp_http_client_set_header(client, "Content-Type", "application/json");
     esp_http_client_set_header(client, "Connection", "close");
 
-    // Add retry logic with exponential backoff
-    int max_retries = 3;
+    // Single attempt per token per cycle. The integration task wakes again
+    // every int_update_secs (60s); piling on multiple SSL handshakes against
+    // a sick HA inside one cycle hurts the radio/CPU more than it helps.
+    int max_retries = 1;
     int retry_count = 0;
     bool success = false;
-    int backoff_ms = 500; // Start with 0.5 seconds
+    int backoff_ms = 500;
 
     ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Fetching HA entity %s for path %s", token->entity, token->path);
 
@@ -400,6 +409,7 @@ static bool fetch_ha_entity(integration_token_t *token)
                         strcpy(token->value, "-");
                     }
                     success = true;
+                    ha_http_connect_backoff_until = 0;
                     ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "HA %s %s=%s",
                                 token->entity, token->path, token->value);
                 }
@@ -418,6 +428,17 @@ static bool fetch_ha_entity(integration_token_t *token)
         {
             ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "HA request failed: %s (attempt %d/%d)",
                         esp_err_to_name(err), retry_count + 1, max_retries);
+
+            // Any transport-level failure: don't keep hammering. Most likely HA is
+            // down or the link is bad — and retrying repeatedly inside one cycle
+            // is exactly what made the device unreachable to ping. Skip the rest
+            // of this cycle and back off for at least 30s.
+            time_t now = time(NULL);
+            ha_http_connect_backoff_until = now + 30;
+            ha_abort_remaining_tokens = true;
+            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "HA transport error (%s); backing off 30s",
+                        esp_err_to_name(err));
+            break;
         }
 
         if (!success && retry_count < max_retries - 1)
@@ -497,23 +518,43 @@ static void integration_update_task(void *pvParameters)
                     // has it been long enough?
                     if (integration_last_update[INTEGRATION_HA] + (eeprom_ha_refresh_mins * 60) < time(NULL))
                     {
-                        // Check memory before attempting SSL connection (HA needs ~15KB for SSL)
-                        size_t ha_heap = heap_caps_get_free_size(MALLOC_CAP_8BIT);
-                        if (ha_heap < 15000)
+                        time_t now_wall = time(NULL);
+                        if (now_wall < ha_http_connect_backoff_until)
                         {
-                            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Skip HA: low mem %d (need ~15K)", ha_heap);
+                            ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "HA in post-connect-error backoff (%lds left)",
+                                        (long)(ha_http_connect_backoff_until - now_wall));
                         }
+                        // Check memory before attempting SSL connection (HA needs ~15KB for SSL)
                         else
                         {
-                            // ESP_LOGI_STACK(TAG, "Updating integrations");
-                            // Use timeout for http_mutex to prevent indefinite blocking
-                            if (xSemaphoreTake(http_mutex, pdMS_TO_TICKS(10000)) == pdTRUE) // 10 second timeout
+                            size_t ha_heap = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+                            if (ha_heap < 15000)
                             {
-
-                                // Process each token sequentially
+                                ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Skip HA: low mem %d (need ~15K)", ha_heap);
+                            }
+                            else
+                            {
+                                // Take http_mutex per token (not for the whole loop) so the web
+                                // server can serve requests between HA fetches — otherwise a slow
+                                // or timing-out HA endpoint blocks the UI for tens of seconds.
+                                ha_abort_remaining_tokens = false;
+                                bool ha_mutex_failed = false;
                                 for (int i = 0; i < integration_active_tokens_count[INTEGRATION_HA]; i++)
                                 {
-                                    if (fetch_ha_entity(&integration_active_tokens[INTEGRATION_HA][i]))
+                                    if (ha_abort_remaining_tokens)
+                                        break;
+
+                                    if (xSemaphoreTake(http_mutex, pdMS_TO_TICKS(5000)) != pdTRUE)
+                                    {
+                                        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "http_mutex timeout (HA token %d)", i);
+                                        ha_mutex_failed = true;
+                                        break;
+                                    }
+
+                                    bool ok = fetch_ha_entity(&integration_active_tokens[INTEGRATION_HA][i]);
+                                    xSemaphoreGive(http_mutex);
+
+                                    if (ok)
                                     {
                                         ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "HA token %d %s=%s",
                                                     i, integration_active_tokens[INTEGRATION_HA][i].name ? integration_active_tokens[INTEGRATION_HA][i].name : "(null)",
@@ -525,17 +566,16 @@ static void integration_update_task(void *pvParameters)
                                         ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "HA token %d failed %s",
                                                     i, integration_active_tokens[INTEGRATION_HA][i].entity ? integration_active_tokens[INTEGRATION_HA][i].entity : "(null)");
                                     }
+
+                                    // Yield between tokens so httpd / lwIP / WiFi tasks on PRO_CPU
+                                    // get plenty of CPU and radio time before the next handshake.
+                                    vTaskDelay(pdMS_TO_TICKS(250));
                                 }
-                                xSemaphoreGive(http_mutex);
-                                if (!update_ok[INTEGRATION_HA])
+                                if (!ha_mutex_failed && !update_ok[INTEGRATION_HA])
                                     ESP_LOG_WEB(ESP_LOG_INFO, TAG, "HA update failed");
+                                // Small delay to allow memory cleanup before next integration
+                                vTaskDelay(pdMS_TO_TICKS(100));
                             }
-                            else
-                            {
-                                ESP_LOG_WEB(ESP_LOG_WARN, TAG, "http_mutex timeout (HA)");
-                            }
-                            // Small delay to allow memory cleanup before next integration
-                            vTaskDelay(pdMS_TO_TICKS(100));
                         }
                     }
                 }
@@ -556,34 +596,39 @@ static void integration_update_task(void *pvParameters)
                         {
                             ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Stock update %d",
                                         integration_active_tokens_count[INTEGRATION_STOCK]);
-                            // Use timeout for http_mutex to prevent indefinite blocking
-                            if (xSemaphoreTake(http_mutex, pdMS_TO_TICKS(10000)) == pdTRUE) // 10 second timeout
+                            // Take http_mutex per token (not for the whole loop) so the web UI
+                            // stays responsive while we poll quotes one by one.
+                            bool stock_mutex_failed = false;
+                            for (int i = 0; i < integration_active_tokens_count[INTEGRATION_STOCK]; i++)
                             {
-
-                                // Process each token sequentially
-                                for (int i = 0; i < integration_active_tokens_count[INTEGRATION_STOCK]; i++)
+                                if (xSemaphoreTake(http_mutex, pdMS_TO_TICKS(5000)) != pdTRUE)
                                 {
-                                    if (fetch_stock_quote(&integration_active_tokens[INTEGRATION_STOCK][i]))
-                                    {
-                                        ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Stock token %d %s=%s",
-                                                    i, integration_active_tokens[INTEGRATION_STOCK][i].entity ? integration_active_tokens[INTEGRATION_STOCK][i].entity : "(null)",
-                                                    integration_active_tokens[INTEGRATION_STOCK][i].value);
-                                        update_ok[INTEGRATION_STOCK] = true;
-                                    }
-                                    else
-                                    {
-                                        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Stock token %d failed %s",
-                                                    i, integration_active_tokens[INTEGRATION_STOCK][i].entity);
-                                    }
+                                    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "http_mutex timeout (Stock token %d)", i);
+                                    stock_mutex_failed = true;
+                                    break;
                                 }
+
+                                bool ok = fetch_stock_quote(&integration_active_tokens[INTEGRATION_STOCK][i]);
                                 xSemaphoreGive(http_mutex);
-                                if (!update_ok[INTEGRATION_STOCK])
-                                    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Stock update failed");
+
+                                if (ok)
+                                {
+                                    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Stock token %d %s=%s",
+                                                i, integration_active_tokens[INTEGRATION_STOCK][i].entity ? integration_active_tokens[INTEGRATION_STOCK][i].entity : "(null)",
+                                                integration_active_tokens[INTEGRATION_STOCK][i].value);
+                                    update_ok[INTEGRATION_STOCK] = true;
+                                }
+                                else
+                                {
+                                    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Stock token %d failed %s",
+                                                i, integration_active_tokens[INTEGRATION_STOCK][i].entity);
+                                }
+
+                                // Yield between tokens so httpd can serve UI requests.
+                                vTaskDelay(pdMS_TO_TICKS(250));
                             }
-                            else
-                            {
-                                ESP_LOG_WEB(ESP_LOG_WARN, TAG, "http_mutex timeout (Stock)");
-                            }
+                            if (!stock_mutex_failed && !update_ok[INTEGRATION_STOCK])
+                                ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Stock update failed");
                             // Small delay to allow memory cleanup before next integration
                             vTaskDelay(pdMS_TO_TICKS(100));
                         }
@@ -901,14 +946,18 @@ void startup_integrations(void)
 
     // Create the integration update task with increased stack size
     // Increased to 10KB to handle SSL connections and HTTP buffers when multiple integrations run
+    // Pin to APP_CPU (core 1). WiFi/lwIP/httpd run on PRO_CPU (core 0) and
+    // heavy mbedtls handshakes here would otherwise starve them — observable
+    // as multi-second ping latency or "destination host unreachable" while a
+    // failing HA endpoint is being retried.
     BaseType_t task_created = xTaskCreatePinnedToCore(
         integration_update_task,         // Task function
         "integration_update_task",       // Task name
-        8192 + 2048,                     // Increased stack size to 10KB for multiple SSL connections
+        8192 + 2048,                     // 10KB stack for multiple SSL connections
         NULL,                            // Task parameters
         3,                               // Task priority (reduced from 5 to 3)
         &integration_update_task_handle, // Task handle
-        0                                // ping to the APP core
+        1                                // APP_CPU (NOT 0 / PRO_CPU)
     );
 
     if (task_created != pdPASS)
@@ -949,6 +998,9 @@ void startup_integrations(void)
 void force_integration_update(void)
 {
     ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Force integration update");
+
+    ha_http_connect_backoff_until = 0;
+    ha_abort_remaining_tokens = false;
 
     // Reset last update times to force immediate update
     integration_last_update[INTEGRATION_HA] = 0;

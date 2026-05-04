@@ -25,7 +25,7 @@ from .entity import FrixosEntity
 SWITCH_DESCRIPTIONS: tuple[SwitchEntityDescription, ...] = (
     SwitchEntityDescription(
         key=PARAM_FAHRENHEIT,
-        name="Temperature in Fahrenheit",
+        name="US units (F, mph, ...)",
         icon="mdi:thermometer",
         entity_category=EntityCategory.CONFIG,
     ),

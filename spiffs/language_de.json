@@ -21,7 +21,7 @@
       "wifi_ssid": "WiFi SSID",
       "wifi_password": "WiFi-Passwort",
       "hostname": "Hostname",
-      "fahrenheit": "Temperatur in Fahrenheit",
+      "fahrenheit": "US-Einheiten (F, mph, ...)",
       "hour12": "Zeit im 12-Stunden-Format",
       "auto_update": "Automatisch nach Firmware-Updates suchen",
       "restart_note": "* Änderungen der Verbindungseinstellungen starten das Gerät neu."

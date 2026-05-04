@@ -22,7 +22,7 @@
       "wifi_ssid": "WiFi SSID",
       "wifi_password": "WiFi Password",
       "hostname": "Hostname",
-      "fahrenheit": "US measurement units (F, mph, ...)",
+      "fahrenheit": "US units (F, mph, ...)",
       "hour12": "Time in 12-hour format",
       "auto_update": "Automatically check for firmware updates",
       "restart_note": "* Changing connection settings will restart the device."

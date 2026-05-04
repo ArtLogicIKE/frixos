@@ -2757,17 +2757,25 @@ static bool validate_http_request(httpd_req_t *req)
     return true;
 }
 
-// Wrapper for handlers that need HTTP mutex protection during OTA
+// Must be long enough for integration_update_task to finish a HA/Stock cycle while holding
+// http_mutex (see f-integrations.c); otherwise POST /api/settings fails with 503 while the
+// device is not doing firmware OTA at all.
+#define HTTP_MUTEX_WEB_HANDLER_WAIT_MS 15000
+
+// Wrapper for handlers that need HTTP mutex (OTA, integration SSL fetches, exclusive buffers)
 static esp_err_t http_mutex_wrapper(httpd_req_t *req, esp_err_t (*handler)(httpd_req_t *))
 {
     // Log the request before processing
     ESP_LOG_WEB(ESP_LOG_DEBUG, TAG, "Processing request: %s", req->uri);
 
-    // Try to take HTTP mutex with timeout to prevent blocking during OTA
-    if (xSemaphoreTake(http_mutex, pdMS_TO_TICKS(5000)) != pdTRUE)
+    if (xSemaphoreTake(http_mutex, pdMS_TO_TICKS(HTTP_MUTEX_WEB_HANDLER_WAIT_MS)) != pdTRUE)
     {
-        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "HTTP mutex unavailable, request blocked during OTA update");
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Service temporarily unavailable during update");
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "HTTP mutex unavailable (firmware update or integration fetch in progress)");
+        httpd_resp_set_status(req, "503 Service Unavailable");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_send(req,
+                        "{\"status\":\"error\",\"message\":\"Web server busy; try again in a few seconds.\"}",
+                        HTTPD_RESP_USE_STRLEN);
         return ESP_FAIL;
     }
 

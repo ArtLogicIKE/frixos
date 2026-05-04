@@ -803,16 +803,17 @@ void f_ota_start_update_thread(void)
         return;
     }
 
-    // Create OTA update task
+    // Create OTA update task on APP_CPU (core 1). Same rationale as wifi_task /
+    // integration_update_task: keep heavy HTTP / mbedtls work off PRO_CPU so
+    // WiFi, lwIP and httpd remain responsive.
     BaseType_t xReturned = xTaskCreatePinnedToCore(
         ota_update_task,
         "ota_update_task",
-        8192, // Stack size
-        NULL, // Task parameters
-        3,    // Priority
+        8192,
+        NULL,
+        3,
         &ota_update_task_handle,
-        0 // ping to the APP core
-    );
+        1); // APP_CPU
 
     if (xReturned != pdPASS)
     {

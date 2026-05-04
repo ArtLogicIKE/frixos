@@ -116,6 +116,30 @@ static bool is_wifi_active_hours(void);
 static void shutdown_mdns_on_link_loss(void);
 static void copy_mdns_hostname_label(char *dst, size_t dst_sz);
 
+// Background-work notifications for wifi_task. esp_timer callbacks must NOT
+// block (they run on a single high-priority task pinned to PRO_CPU and back
+// up the entire timer queue if they do TLS HTTP), so weather/location/sunrise
+// fetches are performed by wifi_task after a notification.
+#define WIFI_NOTIFY_WEATHER  (1u << 0)
+#define WIFI_NOTIFY_LOCATION (1u << 1)
+#define WIFI_NOTIFY_MDNS_INIT (1u << 2)
+static TaskHandle_t wifi_task_handle = NULL;
+
+// One-shot timer used to delay esp_wifi_connect() after a disconnect without
+// sleeping inside the default event loop task (which would back up every
+// other event in the system on PRO_CPU).
+static esp_timer_handle_t wifi_reconnect_timer = NULL;
+#define WIFI_RECONNECT_DELAY_MS 5000
+
+static void wifi_reconnect_timer_callback(void *arg)
+{
+    if (!wifi_disabled_by_active_hours)
+    {
+        ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "WiFi reconnect timer fired, calling esp_wifi_connect()");
+        esp_wifi_connect();
+    }
+}
+
 // Function to check if WiFi is connected
 bool is_wifi_connected(void)
 {
@@ -406,8 +430,32 @@ void wifi_event_handler(void *arg, esp_event_base_t event_base,
             // Don't reconnect if WiFi was intentionally disabled due to active hours
             if (!wifi_disabled_by_active_hours)
             {
-                vTaskDelay(pdMS_TO_TICKS(5000)); // Small 5 sec delay before retry
-                esp_wifi_connect();
+                // Schedule a deferred reconnect via esp_timer instead of
+                // sleeping here. This event handler runs on the default event
+                // loop task (PRO_CPU); blocking it for 5s would queue every
+                // other system event behind us and was visibly contributing
+                // to ping latency / unreachable bursts during link flaps.
+                if (wifi_reconnect_timer != NULL)
+                {
+                    esp_timer_stop(wifi_reconnect_timer); // no-op if not running
+                    esp_err_t terr = esp_timer_start_once(
+                        wifi_reconnect_timer,
+                        (uint64_t)WIFI_RECONNECT_DELAY_MS * 1000);
+                    if (terr != ESP_OK)
+                    {
+                        ESP_LOG_WEB(ESP_LOG_WARN, TAG,
+                                    "wifi_reconnect_timer start failed: %s, reconnecting now",
+                                    esp_err_to_name(terr));
+                        esp_wifi_connect();
+                    }
+                }
+                else
+                {
+                    // Timer not yet created (very early boot). Fall back to
+                    // an immediate reconnect without the 5s pause; better
+                    // than blocking the event loop.
+                    esp_wifi_connect();
+                }
                 retry_count++;
             }
             else
@@ -447,7 +495,11 @@ void wifi_event_handler(void *arg, esp_event_base_t event_base,
                 ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Will display IP address %s for %d seconds", boot_ip_address, IP_DISPLAY_DURATION_SEC);
             }
 
-            initialize_mdns();
+            // mdns_init/hostname_set/service_add allocate buffers and bind a
+            // socket; defer to wifi_task so the default event loop returns
+            // quickly and doesn't queue up other WiFi/IP events.
+            if (wifi_task_handle != NULL)
+                xTaskNotify(wifi_task_handle, WIFI_NOTIFY_MDNS_INIT, eSetBits);
 
             // Create and start OTA update timer if not already created
             if (ota_update_timer == NULL)
@@ -524,9 +576,26 @@ int map_weather_icon(const char *icon)
     return -1;
 }
 
+// esp_timer callbacks below must do *no* blocking work. They only signal
+// wifi_task to do the HTTP/TLS fetch on its own task context (APP_CPU).
 void weather_timer_callback(void *arg)
 {
     ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "ESP Weather timer triggered.");
+    if (wifi_task_handle != NULL)
+        xTaskNotify(wifi_task_handle, WIFI_NOTIFY_WEATHER, eSetBits);
+}
+
+void location_timer_callback(void *arg)
+{
+    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "ESP Location timer triggered.");
+    if (wifi_task_handle != NULL)
+        xTaskNotify(wifi_task_handle, WIFI_NOTIFY_LOCATION, eSetBits);
+}
+
+// Heavy fetch logic, run from wifi_task (NOT esp_timer). Reschedules the
+// matching timer based on success/failure.
+static void wifi_task_do_weather(void)
+{
     bool ok = wifi_get_metno_weather();
 
     // we might as well calculate the moon phase too
@@ -538,14 +607,14 @@ void weather_timer_callback(void *arg)
     {
         weather_retry_attempts = 0;
         ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Weather next in %.1f minutes.", (weather_delay_ms / (1000 * 60.0)));
-        ESP_ERROR_CHECK(esp_timer_start_once(weather_timer, weather_delay_ms * 1000)); // Convert ms to microseconds
+        ESP_ERROR_CHECK(esp_timer_start_once(weather_timer, weather_delay_ms * 1000));
     }
     else if (weather_retry_attempts < WEATHER_MAX_RETRIES)
     {
         weather_retry_attempts++;
         ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Weather fetch failed, retry %d/%d in %.0f seconds.",
                     weather_retry_attempts, WEATHER_MAX_RETRIES, WEATHER_RETRY_DELAY_MS / 1000.0);
-        ESP_ERROR_CHECK(esp_timer_start_once(weather_timer, WEATHER_RETRY_DELAY_MS * 1000)); // Convert ms to microseconds
+        ESP_ERROR_CHECK(esp_timer_start_once(weather_timer, WEATHER_RETRY_DELAY_MS * 1000));
     }
     else
     {
@@ -553,19 +622,16 @@ void weather_timer_callback(void *arg)
                     WEATHER_MAX_RETRIES);
         weather_retry_attempts = 0;
         ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Weather next in %.1f minutes.", (weather_delay_ms / (1000 * 60.0)));
-        ESP_ERROR_CHECK(esp_timer_start_once(weather_timer, weather_delay_ms * 1000)); // Convert ms to microseconds
+        ESP_ERROR_CHECK(esp_timer_start_once(weather_timer, weather_delay_ms * 1000));
     }
-
-    // Your task logic here
 }
 
-void location_timer_callback(void *arg)
+static void wifi_task_do_location(void)
 {
-    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "ESP Location timer triggered.");
     if (wifi_get_location()) // If successful
     {
         ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Location acquired successfully, stopping retries.");
-        
+
         // Use default NTP servers
         ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Initializing NTP with default servers");
         sync_time_with_ntp();
@@ -577,7 +643,7 @@ void location_timer_callback(void *arg)
         // Increase delay for next attempt (10s, 20s, 30s, ...)
         location_delay_ms += 10000;
         // Restart the timer with the new delay
-        ESP_ERROR_CHECK(esp_timer_start_once(location_timer, location_delay_ms * 1000)); // Convert ms to microseconds
+        ESP_ERROR_CHECK(esp_timer_start_once(location_timer, location_delay_ms * 1000));
     }
 
     // if this is the first connection, launch the weather timer
@@ -601,6 +667,8 @@ void location_timer_callback(void *arg)
 void wifi_task(void *pvParameters)
 {
     ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Wifi task (wifi_task) started.");
+
+    wifi_task_handle = xTaskGetCurrentTaskHandle();
 
     // Start the OTA update thread
     f_ota_start_update_thread();
@@ -626,6 +694,13 @@ void wifi_task(void *pvParameters)
         .callback = &wifi_active_hours_timer_callback,
         .name = "wifi_active_hours_timer"};
     ESP_ERROR_CHECK(esp_timer_create(&wifi_active_hours_timer_args, &wifi_active_hours_timer));
+
+    // Create WiFi reconnect timer (used by event handler to defer reconnect
+    // without sleeping in the default event loop task on PRO_CPU).
+    esp_timer_create_args_t wifi_reconnect_timer_args = {
+        .callback = &wifi_reconnect_timer_callback,
+        .name = "wifi_reconnect_timer"};
+    ESP_ERROR_CHECK(esp_timer_create(&wifi_reconnect_timer_args, &wifi_reconnect_timer));
     
     // Start WiFi Active Hours timer (first check after 10 minutes, then periodic)
     esp_err_t err = esp_timer_start_periodic(wifi_active_hours_timer, WIFI_ACTIVE_HOURS_CHECK_INTERVAL_MS * 1000); // Convert to microseconds
@@ -651,8 +726,19 @@ void wifi_task(void *pvParameters)
             ESP_ERROR_CHECK(esp_timer_start_once(location_timer, location_delay_ms * 1000));
         }
 
-        taskYIELD();
-        vTaskDelay(pdMS_TO_TICKS(1000)); // Tick every second
+        // Wait up to 1s for any background work the esp_timer callbacks asked
+        // us to do, so the heavy TLS HTTP fetches happen in this task instead
+        // of in the high-priority esp_timer task on PRO_CPU.
+        uint32_t notify_bits = 0;
+        if (xTaskNotifyWait(0, UINT32_MAX, &notify_bits, pdMS_TO_TICKS(1000)) == pdTRUE)
+        {
+            if (notify_bits & WIFI_NOTIFY_MDNS_INIT)
+                initialize_mdns();
+            if (notify_bits & WIFI_NOTIFY_LOCATION)
+                wifi_task_do_location();
+            if (notify_bits & WIFI_NOTIFY_WEATHER)
+                wifi_task_do_weather();
+        }
     }
     vTaskDelete(NULL);
 }

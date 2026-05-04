@@ -68,8 +68,8 @@ kablame-font.jpg
 language_en.json
 language_da.json
 language_sv.json
-language_pl.json
 language_it.json
+language_pl.json
 language_pt.json
 language_de.json
 language_es.json

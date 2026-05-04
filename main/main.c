@@ -46,7 +46,7 @@ static int rescue_mode_this_boot = 0; // Set by check_boot_fail_count() when 3 c
 
 // versioning variables
 const char app[10] = "Frixos";
-const char version[10] = "2.21b";
+const char version[10] = "2.24b";
 static const char *TAG = "frixos main"; // in case we use ESP_LOGE -rror/W-arning/I-info (also D-ebug/V-erbose)
 const int fwversion = 64;
 const int rescuemode = 0; // 0 = normal, 1 = rescue mode
@@ -611,9 +611,8 @@ void startup_read_eeprom(void)
     {
       const nvs_setting_t *s = &settings_table[i];
 
-      // if rescue mode (compile-time override or auto-rescue after 3 failed boots), read only SSID and password
-      // these are the first two entries in settings_table
-      if ((rescuemode == 1 || rescue_mode_this_boot) && i > 1)
+      // In rescue mode, read only WiFi credentials and power-on hours; other keys use in-RAM defaults then get written.
+      if ((rescuemode == 1 || rescue_mode_this_boot) && i > 1 && strcmp(s->key, "poh") != 0)
         continue;
 
       err = nvs_read_setting(nvs_handle, s);
@@ -637,7 +636,9 @@ void startup_read_eeprom(void)
 
     if (rescuemode == 1 || rescue_mode_this_boot)
     {
-      // save all default values back to eeprom
+      // save all default values back to eeprom (WiFi + poh were read from NVS above)
+      current_poh = eeprom_poh;
+      last_poh_save = time(NULL);
       nvs_close(nvs_handle);
       write_nvs_parameters();
       return;
@@ -906,15 +907,17 @@ void startup_threads()
       NULL,           /* Task handle to keep track of created task */
       1);             /* ping to the APP core */
 
-  // Create a task, pinnned to core 0, to take care of Internet and Web updates
+  // Create a task on APP_CPU (core 1) to handle Internet/Web background work.
+  // Heavy TLS HTTP fetches (weather, location, OTA report) happen here so they
+  // don't compete with WiFi/lwIP/httpd on PRO_CPU (core 0).
   xTaskCreatePinnedToCore(
-      wifi_task,   /* Task function. */
-      "wifi_task", /* name of task. */
-      8192,        /* Stack size of task */
-      NULL,        /* parameter of the task */
-      3,           /* priority of the task */
-      NULL,        /* Task handle to keep track of created task */
-      0);          /* pin to app core*/
+      wifi_task,
+      "wifi_task",
+      8192,
+      NULL,
+      3,
+      NULL,
+      1); // APP_CPU
 }
 
 void startup_poh_timer()
