@@ -148,6 +148,7 @@ extern uint8_t eeprom_glucose_unit;  // Glucose display unit: 0=mg/dL, 1=mmol/L
 extern uint16_t glucose_validity_duration;
 extern uint8_t eeprom_sec_time;
 extern uint8_t eeprom_sec_cgm;
+extern uint8_t eeprom_sec_weather;
 extern char eeprom_libre_patient_id[64];
 extern char eeprom_libre_token[512];
 extern char libre_account_id[64];

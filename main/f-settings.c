@@ -90,6 +90,7 @@
  * - p45 = glucose_validity_duration (Glucose data validity duration in minutes)
  * - p48 = eeprom_sec_time (Alternate time display duration in seconds)
  * - p49 = eeprom_sec_cgm (Alternate CGM display duration in seconds)
+ * - p55 = eeprom_sec_weather (Alternate weather temperature display duration in seconds)
  * - p44 = eeprom_libre_region (Libre region)
  * - p54 = eeprom_ns_url (Nightscout URL, max 100 chars)
  */
@@ -665,6 +666,7 @@ esp_err_t send_json_settings(httpd_req_t *req)
     if (mask & (1ULL << 45)) cJSON_AddNumberToObject(root, "p45", glucose_validity_duration);
     if (mask & (1ULL << 48)) cJSON_AddNumberToObject(root, "p48", eeprom_sec_time);
     if (mask & (1ULL << 49)) cJSON_AddNumberToObject(root, "p49", eeprom_sec_cgm);
+    if (mask & (1ULL << 55)) cJSON_AddNumberToObject(root, "p55", eeprom_sec_weather);
 
     // Add Libre settings (region only - other fields are internal and set by API responses)
     if (mask & (1ULL << 44)) cJSON_AddNumberToObject(root, "p44", eeprom_libre_region);
@@ -1048,11 +1050,13 @@ static bool validate_json_params(cJSON *root, char *err_buf, size_t err_size)
     if ((item = cJSON_GetObjectItem(root, "p45")) && cJSON_IsNumber(item))
         CHECK_RANGE("glucose_validity_duration", item->valueint, 10, 360);
 
-    /* p48 sec_time, p49 sec_cgm */
+    /* p48 sec_time, p49 sec_cgm, p55 sec_weather */
     if ((item = cJSON_GetObjectItem(root, "p48")) && cJSON_IsNumber(item))
         CHECK_RANGE("sec_time", item->valueint, 0, 120);
     if ((item = cJSON_GetObjectItem(root, "p49")) && cJSON_IsNumber(item))
         CHECK_RANGE("sec_cgm", item->valueint, 0, 120);
+    if ((item = cJSON_GetObjectItem(root, "p55")) && cJSON_IsNumber(item))
+        CHECK_RANGE("sec_weather", item->valueint, 0, 120);
 
     /* p44 libre_region */
     if ((item = cJSON_GetObjectItem(root, "p44")) && cJSON_IsNumber(item))
@@ -1694,6 +1698,14 @@ esp_err_t settings_post_handler(httpd_req_t *req)
         if (sec_cgm >= 0 && sec_cgm <= 120)
         {
             eeprom_sec_cgm = (uint8_t)sec_cgm;
+        }
+    }
+    if (cJSON_HasObjectItem(root, "p55"))
+    {
+        int sec_weather = cJSON_GetObjectItem(root, "p55")->valueint;
+        if (sec_weather >= 0 && sec_weather <= 120)
+        {
+            eeprom_sec_weather = (uint8_t)sec_weather;
         }
     }
 

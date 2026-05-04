@@ -143,9 +143,10 @@ time_t ota_start_time = 0; // Track when OTA update started
 time_t now;
 struct tm timeinfo;
 
-// Alternate time/CGM display state
+// Alternate time/CGM/weather display state
 bool alternate_display_active = false; // True if alternating display is enabled
-bool showing_glucose = false;          // True if currently showing glucose, false if showing time
+bool showing_glucose = false;          // True if currently showing glucose
+bool showing_weather = false;          // True if currently showing outside temperature
 time_t alternate_display_start = 0;    // When the current display mode started
 
 // fader stuff
@@ -688,6 +689,7 @@ void display_changed(void)
   // Reset alternate display state to force update
   alternate_display_start = 0;
   showing_glucose = false;
+  showing_weather = false;
 
 
   lvgl_port_lock(0);
@@ -1069,18 +1071,20 @@ static void handle_alternate_mode_switching(time_t now, uint32_t loop_counter, b
   {
     bool mode_changed = false;
     static bool last_showing_glucose = false;
+    static bool last_showing_weather = false;
     static time_t last_minute_slot = 0;
     time_t current_minute_slot = now / 60;
     bool minute_changed = (current_minute_slot != last_minute_slot);
 
-    /* Alternate only when both phases have a non-zero duration; otherwise keep the clock on the digits. */
-    alternate_display_active = (eeprom_sec_time > 0 && eeprom_sec_cgm > 0);
+    /* Alternate when time phase is non-zero and at least one alternate mode is enabled. */
+    alternate_display_active = (eeprom_sec_time > 0 && (eeprom_sec_cgm > 0 || eeprom_sec_weather > 0));
 
     static time_t last_alternate_display_start = 0;
     if (alternate_display_start == 0 && last_alternate_display_start != 0)
     {
       mode_changed = true;
       last_showing_glucose = false;
+      last_showing_weather = false;
     }
     last_alternate_display_start = alternate_display_start;
 
@@ -1088,7 +1092,8 @@ static void handle_alternate_mode_switching(time_t now, uint32_t loop_counter, b
     {
       if (alternate_display_start == 0)
       {
-        showing_glucose = false; /* always start with time, then switch to CGM after sec_time */
+        showing_glucose = false; /* always start with time */
+        showing_weather = false;
         alternate_display_start = now;
         mode_changed = true;
       }
@@ -1096,19 +1101,48 @@ static void handle_alternate_mode_switching(time_t now, uint32_t loop_counter, b
       {
         time_t elapsed = now - alternate_display_start;
         bool should_switch = false;
+
         if (showing_glucose)
         {
-          if (eeprom_sec_cgm > 0 && elapsed >= eeprom_sec_cgm && eeprom_sec_time > 0)
+          if (eeprom_sec_cgm > 0 && elapsed >= eeprom_sec_cgm)
             should_switch = true;
         }
-        else
+        else if (showing_weather)
         {
-          if (eeprom_sec_time > 0 && elapsed >= eeprom_sec_time && is_glucose_fresh())
+          if (eeprom_sec_weather > 0 && elapsed >= eeprom_sec_weather)
             should_switch = true;
         }
+        else /* showing time */
+        {
+          if (eeprom_sec_time > 0 && elapsed >= eeprom_sec_time)
+          {
+            if (eeprom_sec_cgm > 0 && is_glucose_fresh())
+              should_switch = true;
+            else if (eeprom_sec_weather > 0 && last_weather_update > 0)
+              should_switch = true;
+          }
+        }
+
         if (should_switch)
         {
-          showing_glucose = !showing_glucose;
+          if (showing_glucose)
+          {
+            showing_glucose = false;
+            /* After glucose: show weather if enabled, otherwise back to time */
+            if (eeprom_sec_weather > 0 && last_weather_update > 0)
+              showing_weather = true;
+          }
+          else if (showing_weather)
+          {
+            showing_weather = false; /* back to time */
+          }
+          else /* was showing time */
+          {
+            if (eeprom_sec_cgm > 0 && is_glucose_fresh())
+              showing_glucose = true;
+            else if (eeprom_sec_weather > 0 && last_weather_update > 0)
+              showing_weather = true;
+          }
           alternate_display_start = now;
           mode_changed = true;
         }
@@ -1116,17 +1150,19 @@ static void handle_alternate_mode_switching(time_t now, uint32_t loop_counter, b
     }
     else
     {
-      if (showing_glucose != false) mode_changed = true;
+      if (showing_glucose || showing_weather) mode_changed = true;
       showing_glucose = false;
+      showing_weather = false;
       alternate_display_start = 0;
     }
 
-    if (mode_changed || (showing_glucose != last_showing_glucose))
+    if (mode_changed || (showing_glucose != last_showing_glucose) || (showing_weather != last_showing_weather))
     {
       *should_update_display = true;
       last_showing_glucose = showing_glucose;
+      last_showing_weather = showing_weather;
     }
-    else if (!showing_glucose)
+    else if (!showing_glucose && !showing_weather)
     {
       *should_update_display = ((minute_changed || (now % 60 == 0) || (time_just_validated == 1) || weather_has_updated) && time_valid && (now - lastrun > 3));
       last_minute_slot = current_minute_slot;
@@ -1155,7 +1191,19 @@ static void update_display_content(time_t now)
   bool show_dots = true;
   bool show_ampm = false;
 
-  if (showing_glucose && alternate_display_active && is_glucose_on() && glucose_data.current_gl_mgdl > 0)
+  if (showing_weather && alternate_display_active && last_weather_update > 0)
+  {
+    double display_temp = eeprom_fahrenheit ? ((weather_temp * 9.0 / 5.0) + 32.0) : weather_temp;
+    int temp_val = (int)round(display_temp < 0 ? -display_temp : display_temp);
+    if (temp_val > 999) temp_val = 999;
+    digit1 = -1;
+    if (temp_val >= 100) { digit2 = temp_val / 100; digit3 = (temp_val / 10) % 10; digit4 = temp_val % 10; }
+    else if (temp_val >= 10) { digit2 = -1; digit3 = temp_val / 10; digit4 = temp_val % 10; }
+    else { digit2 = -1; digit3 = -1; digit4 = temp_val; }
+    show_dots = false;
+    show_ampm = false;
+  }
+  else if (showing_glucose && alternate_display_active && is_glucose_on() && glucose_data.current_gl_mgdl > 0)
   {
     if (eeprom_glucose_unit == 1)
     {
@@ -1250,6 +1298,16 @@ static void update_display_content(time_t now)
     lv_obj_align(dots[0], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 2 * 18 + 1, eeprom_ofs_y + 25 + 10);
     lv_obj_align(dots[1], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 2 * 18 + 1, eeprom_ofs_y + 25 + 26);
   }
+  else if (showing_weather && alternate_display_active)
+  {
+    lv_obj_align(digit_objs[0], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 0, y_digits);
+    lv_obj_align(digit_objs[1], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 1 * 18 + 6, y_digits);
+    lv_obj_align(digit_objs[2], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 2 * 18 + 6, y_digits);
+    lv_obj_align(digit_objs[3], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 3 * 18 + 6, y_digits);
+    show_object(img_ampm, false);
+    show_object(dots[0], false);
+    show_object(dots[1], false);
+  }
   else
   {
     lv_obj_align(digit_objs[0], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 0, y_digits);
@@ -1328,6 +1386,7 @@ void display_task(void *pvParameters)
       ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Settings updated");
       alternate_display_start = 0;
       showing_glucose = false;
+      showing_weather = false;
       display_changed();
       settings_updated = false;
     }

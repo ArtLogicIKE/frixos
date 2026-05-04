@@ -1257,6 +1257,7 @@ function addIfChanged(formData, key, newValue, oldValue) {
  * - p45 = glucose_validity_duration (Glucose data validity duration in minutes)
  * - p48 = eeprom_sec_time (Alternate time display duration in seconds)
  * - p49 = eeprom_sec_cgm (Alternate CGM display duration in seconds)
+ * - p55 = eeprom_sec_weather (Alternate weather temperature display duration in seconds)
  * - p51 = eeprom_glucose_high (High glucose threshold in mg/dL)
  * - p52 = eeprom_glucose_low (Low glucose threshold in mg/dL)
  * - p53 = cgm_unit (Glucose display unit: 0=mg/dL, 1=mmol/L)
@@ -1523,6 +1524,11 @@ function handleFormSubmit(e, formId) {
 
         const secCgmInput = getFieldInForm('eeprom_sec_cgm');
         if (secCgmInput && addIfChanged(formData, 'p49', parseInt(secCgmInput.value) || 0, window.settings.p49)) {
+            changedCount++;
+        }
+
+        const secWeatherInput = getFieldInForm('eeprom_sec_weather');
+        if (secWeatherInput && addIfChanged(formData, 'p55', parseInt(secWeatherInput.value) || 0, window.settings.p55)) {
             changedCount++;
         }
 
@@ -2477,6 +2483,11 @@ function setupIntegrationsSection() {
         const secCgm = el('eeprom_sec_cgm');
         if (secCgm && typeof window.settings.p49 !== 'undefined') {
             secCgm.value = window.settings.p49 || 0;
+        }
+
+        const secWeather = el('eeprom_sec_weather');
+        if (secWeather && typeof window.settings.p55 !== 'undefined') {
+            secWeather.value = window.settings.p55 || 0;
         }
 
         // Load shared username (p31)

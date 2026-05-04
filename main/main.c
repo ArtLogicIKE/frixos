@@ -177,6 +177,7 @@ static const nvs_setting_t settings_table[] = {
     {"cgm_validity", SETTING_TYPE_U16, &glucose_validity_duration, 0},
     {"sec_time", SETTING_TYPE_U8, &eeprom_sec_time, 0},
     {"sec_cgm", SETTING_TYPE_U8, &eeprom_sec_cgm, 0},
+    {"sec_weather", SETTING_TYPE_U8, &eeprom_sec_weather, 0},
     {"cgm_unit", SETTING_TYPE_U8, &eeprom_glucose_unit, 0},
     {"pwm_frequency", SETTING_TYPE_U32, &eeprom_pwm_frequency, 0},
     {"max_power", SETTING_TYPE_U16, &eeprom_max_power, 0},
@@ -259,7 +260,8 @@ char eeprom_glucose_password[64] = {0};
 uint8_t eeprom_glucose_refresh = 5;      // Default to 5 minutes
 uint16_t glucose_validity_duration = 60; // Default to 60 minutes
 uint8_t eeprom_sec_time = 25;            // Alternate time display duration (0-120 seconds)
-uint8_t eeprom_sec_cgm = 5;              // Alternate CGM display duration (0-120 seconds)
+uint8_t eeprom_sec_cgm = 5;             // Alternate CGM display duration (0-120 seconds)
+uint8_t eeprom_sec_weather = 0;         // Alternate weather temperature display duration (0-120 seconds, 0=disabled)
 char eeprom_libre_patient_id[64] = {0};
 char eeprom_libre_token[512] = {0};
 char libre_account_id[64] = {0};
