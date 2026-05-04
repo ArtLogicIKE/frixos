@@ -2285,6 +2285,7 @@ esp_err_t ota_post_handler(httpd_req_t *req)
     char filename[128] = "firmware.bin"; // Default filename
     int recv_len = 0, total_received = 0, remaining = req->content_len;
     bool is_multipart = false, filename_found = false;
+    char end_marker[136] = {0}; // "\r\n--{boundary}" used to trim trailing boundary from file chunks
     esp_err_t err = ESP_OK;
 
     ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Upload request received with content length: %d", req->content_len);
@@ -2305,6 +2306,22 @@ esp_err_t ota_post_handler(httpd_req_t *req)
         httpd_req_get_hdr_value_str(req, "Content-Type", content_type, content_type_len + 1);
         is_multipart = (strstr(content_type, "multipart/form-data") != NULL);
         ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Content-Type: %s, multipart: %d", content_type, is_multipart);
+        if (is_multipart)
+        {
+            char *b = strstr(content_type, "boundary=");
+            if (b)
+            {
+                b += 9;
+                char boundary[128] = {0};
+                int i = 0;
+                while (b[i] && b[i] != ';' && b[i] != '\r' && b[i] != '\n' && i < (int)sizeof(boundary) - 1)
+                {
+                    boundary[i] = b[i];
+                    i++;
+                }
+                snprintf(end_marker, sizeof(end_marker), "\r\n--%s", boundary);
+            }
+        }
     }
 
     // Check if filename is provided in headers
@@ -2558,22 +2575,24 @@ esp_err_t ota_post_handler(httpd_req_t *req)
             break;
         }
 
-        // For multipart data, check for boundaries
-        if (is_multipart)
+        // For multipart data, search for the end boundary within this chunk and trim if found
+        int write_len = recv_len;
+        bool boundary_found = false;
+        if (is_multipart && end_marker[0])
         {
-            // Simple check for ending boundary (--boundary--)
-            if (recv_len >= 6 && memcmp(buf, "--", 2) == 0 &&
-                (strstr(buf, "--\r\n") != NULL || strstr(buf, "--\r\n\r\n") != NULL))
+            void *pos = memmem(buf, recv_len, end_marker, strlen(end_marker));
+            if (pos)
             {
-                ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Final boundary detected, ending upload");
-                break;
+                write_len = (char *)pos - buf;
+                boundary_found = true;
+                ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Final boundary detected, trimming chunk to %d bytes", write_len);
             }
         }
 
         // Process received data
         if (is_firmware)
         {
-            err = esp_ota_write(ota_handle, buf, recv_len);
+            err = esp_ota_write(ota_handle, buf, write_len);
             if (err != ESP_OK)
             {
                 ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "OTA write error: %s", esp_err_to_name(err));
@@ -2584,15 +2603,21 @@ esp_err_t ota_post_handler(httpd_req_t *req)
         }
         else
         {
-            size_t written = fwrite(buf, 1, recv_len, file);
-            if (written != recv_len)
+            if (write_len > 0)
             {
-                ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "File write error: %d of %d bytes written", written, recv_len);
-                fclose(file);
-                httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "File write error");
-                return ESP_FAIL;
+                size_t written = fwrite(buf, 1, write_len, file);
+                if ((int)written != write_len)
+                {
+                    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "File write error: %d of %d bytes written", written, write_len);
+                    fclose(file);
+                    httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "File write error");
+                    return ESP_FAIL;
+                }
             }
         }
+
+        if (boundary_found)
+            break;
 
         // Update progress counters
         total_received += recv_len;
