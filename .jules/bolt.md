@@ -25,3 +25,7 @@
 ## 2025-04-09 - Optimized Settings API Parameter Filtering
 **Learning:** The Settings API was using a shared static buffer for query parameters, which led to a bug where multiple filters could not be applied simultaneously (the second filter would overwrite the first). Additionally, filtering logic performed O(N*M) string parsing and comparisons for every request, where N is the number of parameters (~55) and M is the number of tokens in the filter.
 **Action:** Replace repeated string parsing with a one-time calculation of an inclusion bitmask. Refactor query parameter retrieval to use caller-provided buffers to eliminate shared state bugs. Use bitwise AND operations for O(1) inclusion checks per parameter.
+
+## 2026-05-05 - Optimized I18n Translation via Metadata Caching
+**Learning:** The client-side translation engine in a large single-page app (~3000 lines) was a major execution-time bottleneck. Repeatedly querying ~180 elements, accessing `dataset` attributes, and performing nested object lookups on every language toggle or initial load created significant main-thread overhead (~23ms per toggle).
+**Action:** Implement a `WeakMap`-based cache (`i18nCache`) to store translation metadata (keys and language) for translatable elements. Use this cache to bypass redundant lookups and DOM writes when state hasn't changed. Hoist invariant translation keys (e.g., action labels) outside of iteration loops to avoid O(N) lookup overhead.

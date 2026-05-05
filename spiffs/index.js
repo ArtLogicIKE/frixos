@@ -311,6 +311,7 @@ const translations = {
 
 // Translation loading cache - tracks which translations have been loaded
 const translationsLoaded = { en: true }; // English is always loaded
+const i18nCache = new WeakMap();
 
 // Async function to load translations for a specific language from JSON file
 async function loadTranslations(lang) {
@@ -375,7 +376,7 @@ function updateCgmExclusivity() {
 }
 
 // Current language (will be loaded from NVS)
-let currentLanguage = 'en';
+let currentLanguage = '';
 
 // Translation function - now async to support lazy-loading
 // Optimization: Persistent early return and DOM mutation diffing to minimize overhead
@@ -390,11 +391,26 @@ async function translate(lang) {
     currentLanguage = effectiveLang;
     const trans = translations[effectiveLang];
 
+    // Hoist invariant translation lookups outside the loop for performance
+    const insertLabel = getNestedTranslation(trans, 'common.insert') || 'Insert';
+    const showLabel = getNestedTranslation(trans, 'common.show_password') || 'Show password';
+    const hideLabel = getNestedTranslation(trans, 'common.hide_password') || 'Hide password';
+
     // Querying on every call to support dynamic elements while using dataset for readability
     document.querySelectorAll('[data-i18n], [data-i18n-placeholder], [data-i18n-aria-label]').forEach(element => {
-        const i18nKey = element.dataset.i18n;
-        const i18nPlaceholderKey = element.dataset.i18nPlaceholder;
-        const i18nAriaLabelKey = element.dataset.i18nAriaLabel;
+        const ds = element.dataset;
+        const i18nKey = ds.i18n;
+        const i18nPlaceholderKey = ds.i18nPlaceholder;
+        const i18nAriaLabelKey = ds.i18nAriaLabel;
+
+        // Optimization: Use WeakMap cache to skip lookups and DOM writes if language and keys are unchanged
+        const cached = i18nCache.get(element);
+        if (cached && cached.lang === effectiveLang &&
+            cached.key === i18nKey &&
+            cached.pKey === i18nPlaceholderKey &&
+            cached.aKey === i18nAriaLabelKey) {
+            return;
+        }
 
         if (i18nKey) {
             const translation = getNestedTranslation(trans, i18nKey);
@@ -406,7 +422,6 @@ async function translate(lang) {
 
         if (i18nPlaceholderKey) {
             const translation = getNestedTranslation(trans, i18nPlaceholderKey);
-            // Optimization: Only update DOM if placeholder actually changed
             if (translation && element.placeholder !== translation) {
                 element.placeholder = translation;
             }
@@ -418,25 +433,32 @@ async function translate(lang) {
                 element.setAttribute('aria-label', translation);
             }
         }
+
+        i18nCache.set(element, {
+            lang: effectiveLang,
+            key: i18nKey,
+            pKey: i18nPlaceholderKey,
+            aKey: i18nAriaLabelKey
+        });
     });
 
-    // Update password toggle ARIA labels for accessibility after language change
+    // Update password toggle ARIA labels using hoisted labels
     document.querySelectorAll('.password-toggle').forEach(button => {
         const input = button.previousElementSibling;
         if (input) {
-            const isPassword = input.type === 'password';
-            const actionKey = isPassword ? 'common.show_password' : 'common.hide_password';
-            const translation = getNestedTranslation(trans, actionKey);
-            if (translation) {
+            const translation = input.type === 'password' ? showLabel : hideLabel;
+            if (button.getAttribute('aria-label') !== translation) {
                 button.setAttribute('aria-label', translation);
             }
         }
     });
 
-    // Update token ARIA labels after language change
+    // Update token ARIA labels using hoisted label
     document.querySelectorAll('.token-code').forEach(token => {
-        const insertLabel = getNestedTranslation(trans, 'common.insert') || 'Insert';
-        token.setAttribute('aria-label', `${insertLabel} ${token.textContent}`);
+        const newAria = `${insertLabel} ${token.textContent}`;
+        if (token.getAttribute('aria-label') !== newAria) {
+            token.setAttribute('aria-label', newAria);
+        }
     });
 
     const nameElement = el('current-language-name');
