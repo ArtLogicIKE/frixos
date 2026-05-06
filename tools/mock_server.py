@@ -23,6 +23,17 @@ settings = {
     "p05": "light",
 }
 
+# WiFi scan state (mock)
+wifi_scan_state = {
+    "scanning": False,
+    "scan_done": False,
+    "networks": [
+        {"ssid": "HomeWiFi", "signal_strength": 95, "requires_password": True},
+        {"ssid": "Guest_Access", "signal_strength": 60, "requires_password": False},
+        {"ssid": "CoffeeShop", "signal_strength": 40, "requires_password": True},
+    ]
+}
+
 @app.get("/")
 async def read_index():
     with open("spiffs/index.html", "r") as f:
@@ -31,6 +42,26 @@ async def read_index():
 @app.get("/api/settings")
 async def get_settings(group: str = None):
     return JSONResponse(content=settings)
+
+@app.get("/api/wifi/scan")
+async def start_wifi_scan():
+    wifi_scan_state["scanning"] = True
+    wifi_scan_state["scan_done"] = False
+    # In a real mock we might use a timer, but for testing we can just set it to done immediately or after a small delay
+    # For simplicity, let's keep it scanning until /api/wifi/status is called or just return scanning=True
+    return JSONResponse(content={"status": "ok"})
+
+@app.get("/api/wifi/status")
+async def get_wifi_status():
+    if wifi_scan_state["scanning"]:
+        wifi_scan_state["scanning"] = False
+        wifi_scan_state["scan_done"] = True
+
+    return JSONResponse(content={
+        "scanning": wifi_scan_state["scanning"],
+        "scan_done": wifi_scan_state["scan_done"],
+        "networks": wifi_scan_state["networks"] if wifi_scan_state["scan_done"] else []
+    })
 
 @app.get("/api/status")
 async def get_status(logs: str = None):

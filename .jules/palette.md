@@ -15,3 +15,7 @@
 ## 2025-05-15 - [Credential UX vs Security]
 **Learning:** While `autocomplete` attributes like `current-password` and `username` greatly improve UX for WiFi and user accounts, they should be omitted for API tokens and integration keys to prevent password managers from incorrectly identifying them as primary site credentials.
 **Action:** Selectively apply `autocomplete` only to standard user/password fields and avoid them for technical tokens or machine keys.
+
+## 2025-05-16 - [Accessible Complex List Items]
+**Learning:** For interactive list items that convey multiple pieces of information visually (e.g., WiFi SSID, signal bars, lock icons), providing a concatenated, localized `aria-label` is superior to individual ARIA attributes on sub-elements. This ensures screen readers announce the full context in a single announcement when the item is focused.
+**Action:** Use a single, descriptive `aria-label` for complex interactive containers and ensure they have `role="button"` and `tabindex="0"` for full keyboard parity.
