@@ -121,7 +121,6 @@ lv_obj_t *label_msg = NULL;
 #define label_msg_ofs_y (25 + 25 + 14) // y offset for the message label
 #define MSG_WIDTH 105                  // width of the message area
 #define MSG_EXTRA_WIDTH 7            // extra width for the message area, useful for scolling but bad for centering
-#define FADE_STEPS 14
 #define FADE_INTERVAL 200       // Time between steps in ms
 #define MAX_TOKEN_COUNT 100     // Maximum number of tokens to prevent memory issues
 #define MAX_FONT_INDEX 2        // Maximum font index (0-2)
@@ -149,6 +148,10 @@ bool showing_glucose = false;          // True if currently showing glucose, fal
 time_t alternate_display_start = 0;    // When the current display mode started
 
 // fader stuff
+#define FADE_STEPS 14
+/** Bolt Optimization: Pre-calculated LUT for the breathing effect to avoid floating-point math in high-frequency loops. */
+static const uint8_t fade_lut[FADE_STEPS + 1] = {0, 2, 10, 23, 41, 65, 93, 127, 161, 189, 213, 231, 244, 252, 255};
+static volatile int current_fade_opacity = 0;
 static int fade_step = 0;
 static bool fading_in = true;                // Flag to track direction
 static esp_timer_handle_t fade_timer = NULL; // ESP timer handle
@@ -828,31 +831,18 @@ void display_digit(int position, int digit)
   // ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Displayed digit %d at position %d (x=%d)", digit, position, digit * DIGIT_WIDTH);
 }
 
-float ease_in_quad(float t)
-{
-  return t * t; // Starts slow, accelerates
-}
-
-float ease_in_out_quad(float t)
-{
-  if (t < 0.5f) return 2.0f * t * t;
-  float f = -2.0f * t + 2.0f;
-  return 1.0f - (f * f) / 2.0f;
-}
-
 // Fade effect callback
 static void fade_timer_cb(void *arg)
 {
-  // Calculate opacity (0 to 255)
-  float t = (float)fade_step / FADE_STEPS;    // Normalize 0-1
-  float opacity_factor = ease_in_out_quad(t); // Apply easing
-  int opacity = (int)(opacity_factor * 255);  // Convert to LVGL opacity
+  // Bolt Optimization: Use LUT for opacity calculation to eliminate floating-point overhead.
+  int opacity = fade_lut[fade_step];
 
   // Store the opacity values for the display task to apply
   static int last_opacity = -1;
   if (opacity != last_opacity)
   {
     last_opacity = opacity;
+    current_fade_opacity = opacity;
     fade_update_needed = true;
   }
 
@@ -1348,10 +1338,8 @@ void display_task(void *pvParameters)
     if (fade_update_needed)
     {
       fade_update_needed = false;
-      // Calculate current opacity
-      float t = (float)fade_step / FADE_STEPS;
-      float opacity_factor = ease_in_out_quad(t);
-      int opacity = (int)(opacity_factor * 255);
+      // Bolt Optimization: Use the opacity already calculated by the timer via LUT.
+      int opacity = current_fade_opacity;
 
       // Bolt Optimization: Guard against redundant LVGL style updates and port locks.
       // Breathing is often disabled, yet the fade timer continues to trigger every 200ms.

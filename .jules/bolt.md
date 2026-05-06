@@ -25,3 +25,7 @@
 ## 2025-04-09 - Optimized Settings API Parameter Filtering
 **Learning:** The Settings API was using a shared static buffer for query parameters, which led to a bug where multiple filters could not be applied simultaneously (the second filter would overwrite the first). Additionally, filtering logic performed O(N*M) string parsing and comparisons for every request, where N is the number of parameters (~55) and M is the number of tokens in the filter.
 **Action:** Replace repeated string parsing with a one-time calculation of an inclusion bitmask. Refactor query parameter retrieval to use caller-provided buffers to eliminate shared state bugs. Use bitwise AND operations for O(1) inclusion checks per parameter.
+
+## 2025-05-06 - Optimized Breathing Effect with LUT
+**Learning:** Floating-point math for easing functions (like quad in/out) is expensive on microcontrollers, especially when called repeatedly in high-frequency loops (e.g., a 65ms display loop) and timer callbacks. Redundantly calculating the same value in both contexts further wastes CPU cycles.
+**Action:** Replace floating-point easing calculations with a pre-calculated uint8_t Look-Up Table (LUT). Use a volatile shared variable to communicate the current animation state between the timer and the main task, ensuring the calculation happens only once per step.
