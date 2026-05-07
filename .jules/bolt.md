@@ -25,3 +25,7 @@
 ## 2025-04-09 - Optimized Settings API Parameter Filtering
 **Learning:** The Settings API was using a shared static buffer for query parameters, which led to a bug where multiple filters could not be applied simultaneously (the second filter would overwrite the first). Additionally, filtering logic performed O(N*M) string parsing and comparisons for every request, where N is the number of parameters (~55) and M is the number of tokens in the filter.
 **Action:** Replace repeated string parsing with a one-time calculation of an inclusion bitmask. Refactor query parameter retrieval to use caller-provided buffers to eliminate shared state bugs. Use bitwise AND operations for O(1) inclusion checks per parameter.
+
+## 2025-05-04 - I18n Metadata Caching with WeakMap
+**Learning:** The `translate()` function was performing redundant DOM queries and lookups for over 180 elements on every language toggle. For an ESP32-based web interface, layout thrashing and redundant string traversals in the browser increase responsiveness latency during transitions.
+**Action:** Implement a `WeakMap` cache to store translation metadata (keys and applied language) for each DOM element. Use this cache to skip expensive object traversals and DOM writes if the state is unchanged. Consolidate specialized loops (toggles/tokens) into a single document scan to minimize traversal overhead.

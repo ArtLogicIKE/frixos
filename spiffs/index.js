@@ -375,10 +375,13 @@ function updateCgmExclusivity() {
 }
 
 // Current language (will be loaded from NVS)
-let currentLanguage = 'en';
+let currentLanguage = ''; // Start empty to ensure first translate() call always runs
+
+// Cache for i18n metadata to skip redundant DOM writes and lookups
+const i18nCache = new WeakMap();
 
 // Translation function - now async to support lazy-loading
-// Optimization: Persistent early return and DOM mutation diffing to minimize overhead
+// Optimization: Persistent early return, metadata caching, and hoisted lookups to minimize overhead
 async function translate(lang) {
     await loadTranslations(lang);
     
@@ -390,11 +393,31 @@ async function translate(lang) {
     currentLanguage = effectiveLang;
     const trans = translations[effectiveLang];
 
-    // Querying on every call to support dynamic elements while using dataset for readability
-    document.querySelectorAll('[data-i18n], [data-i18n-placeholder], [data-i18n-aria-label]').forEach(element => {
+    // Hoist common labels to avoid O(N) redundant lookups inside loops
+    const showLabel = getNestedTranslation(trans, 'common.show_password');
+    const hideLabel = getNestedTranslation(trans, 'common.hide_password');
+    const insertLabel = getNestedTranslation(trans, 'common.insert') || 'Insert';
+
+    // Optimization: Single DOM scan for all translatable and accessibility-critical elements
+    document.querySelectorAll('[data-i18n], [data-i18n-placeholder], [data-i18n-aria-label], .password-toggle, .token-code').forEach(element => {
         const i18nKey = element.dataset.i18n;
         const i18nPlaceholderKey = element.dataset.i18nPlaceholder;
         const i18nAriaLabelKey = element.dataset.i18nAriaLabel;
+        const isPasswordToggle = element.classList.contains('password-toggle');
+        const isTokenCode = element.classList.contains('token-code');
+
+        // Optimization: Use WeakMap cache to skip expensive lookups and DOM writes if nothing changed
+        let cache = i18nCache.get(element);
+        if (cache && cache.lang === effectiveLang &&
+            cache.i18n === i18nKey &&
+            cache.ph === i18nPlaceholderKey &&
+            cache.aria === i18nAriaLabelKey &&
+            !isPasswordToggle && !isTokenCode) return;
+
+        if (!cache) {
+            cache = { lang: '', i18n: '', ph: '', aria: '' };
+            i18nCache.set(element, cache);
+        }
 
         if (i18nKey) {
             const translation = getNestedTranslation(trans, i18nKey);
@@ -418,25 +441,30 @@ async function translate(lang) {
                 element.setAttribute('aria-label', translation);
             }
         }
-    });
 
-    // Update password toggle ARIA labels for accessibility after language change
-    document.querySelectorAll('.password-toggle').forEach(button => {
-        const input = button.previousElementSibling;
-        if (input) {
-            const isPassword = input.type === 'password';
-            const actionKey = isPassword ? 'common.show_password' : 'common.hide_password';
-            const translation = getNestedTranslation(trans, actionKey);
-            if (translation) {
-                button.setAttribute('aria-label', translation);
+        // Accessibility updates for specialized elements
+        if (isPasswordToggle) {
+            const input = element.previousElementSibling;
+            if (input) {
+                const translation = input.type === 'password' ? showLabel : hideLabel;
+                if (translation && element.getAttribute('aria-label') !== translation) {
+                    element.setAttribute('aria-label', translation);
+                }
             }
         }
-    });
 
-    // Update token ARIA labels after language change
-    document.querySelectorAll('.token-code').forEach(token => {
-        const insertLabel = getNestedTranslation(trans, 'common.insert') || 'Insert';
-        token.setAttribute('aria-label', `${insertLabel} ${token.textContent}`);
+        if (isTokenCode) {
+            const ariaLabel = `${insertLabel} ${element.textContent}`;
+            if (element.getAttribute('aria-label') !== ariaLabel) {
+                element.setAttribute('aria-label', ariaLabel);
+            }
+        }
+
+        // Update cache state
+        cache.lang = effectiveLang;
+        cache.i18n = i18nKey;
+        cache.ph = i18nPlaceholderKey;
+        cache.aria = i18nAriaLabelKey;
     });
 
     const nameElement = el('current-language-name');
@@ -791,13 +819,15 @@ function navigateToSection() {
     // Get all page sections
     const sections = document.querySelectorAll('.page-section');
     
-    // Hide all sections first
+    // Bolt Optimization: Only hide previously active section to reduce layout shift
+    const currentSection = el(hash + '-section');
+    if (currentSection && currentSection.style.display === 'block') return;
+
     sections.forEach(section => {
-        section.style.display = 'none';
+        if (section.style.display === 'block') section.style.display = 'none';
     });
     
     // Show the selected section
-    const currentSection = el(hash + '-section');
     if (currentSection) {
         currentSection.style.display = 'block';
         
@@ -1886,68 +1916,65 @@ function fetchStatus(includeLogs = false) {
     return fetch(url)
         .then(response => response.json())
         .then(data => {
-            // Update time & weather status
-            const timeUpdateStatus = el('time_update_status');
-            const weatherUpdateStatus = el('weather_update_status');
+            // Bolt Optimization: Redundant update guards to prevent layout thrashing
+            const setSafe = (id, val, isHtml = false) => {
+                const element = el(id);
+                if (!element) return;
+                if (isHtml) {
+                    if (element.innerHTML !== val) element.innerHTML = val;
+                } else if (element.tagName === 'TEXTAREA' || element.tagName === 'INPUT') {
+                    if (element.value !== val) element.value = val;
+                } else {
+                    if (element.textContent !== val) element.textContent = val;
+                }
+            };
 
-            // Update time status
+            // Update time & weather status
             if (data.time_status) {
                 const timestamp = new Date(data.last_time_update * 1000).toLocaleString();
-                timeUpdateStatus.innerHTML = `<span class="status-icon status-success"></span> ${timestamp}`;
+                setSafe('time_update_status', `<span class="status-icon status-success"></span> ${timestamp}`, true);
             } else {
-                timeUpdateStatus.innerHTML = '<span class="status-icon status-error"></span> Not synced';
+                setSafe('time_update_status', '<span class="status-icon status-error"></span> Not synced', true);
             }
 
-            // Update weather status
             if (data.weather_status) {
                 const timestamp = new Date(data.last_weather_update * 1000).toLocaleString();
-                weatherUpdateStatus.innerHTML = `<span class="status-icon status-success"></span> ${timestamp}`;
+                setSafe('weather_update_status', `<span class="status-icon status-success"></span> ${timestamp}`, true);
             } else {
-                weatherUpdateStatus.innerHTML = '<span class="status-icon status-error"></span> Not synced';
+                setSafe('weather_update_status', '<span class="status-icon status-error"></span> Not synced', true);
             }
 
             // Update other weather-related info
-            el('moon_status').textContent = data.moon_icon_index !== undefined ? getMoonPhaseName(data.moon_icon_index) : '-';
-            el('latitude').textContent = data.latitude || '-';
-            el('longitude').textContent = data.longitude || '-';
-            el('timezone_val').textContent = data.timezone || '-';
+            setSafe('moon_status', data.moon_icon_index !== undefined ? getMoonPhaseName(data.moon_icon_index) : '-');
+            setSafe('latitude', data.latitude || '-');
+            setSafe('longitude', data.longitude || '-');
+            setSafe('timezone_val', data.timezone || '-');
 
             // Update system information
-            el('app').textContent = data.app || '-';
-            el('version').textContent = data.version || '-';
-            el('fwversion').textContent = data.fwversion || '-';
-            el('poh').textContent = data.poh !== undefined ? formatPOH(data.poh) : '-';
-            el('mac_address').textContent = data.mac_address || '-';
-            el('ip_address').textContent = data.ip_address || '-';
-            el('chip_revision').textContent = data.chip_revision || '-';
-            el('flash_size').textContent = data.flash_size ? formatBytes(data.flash_size) : '-';
-            el('cpu_freq').textContent = data.cpu_freq ? `${(data.cpu_freq / 1000000)} MHz` : '-';
-            el('compile_time').textContent = data.compile_time || '-';
-            el('free_heap').textContent = data.free_heap ? formatBytes(data.free_heap) : '-';
-            el('min_free_heap').textContent = data.min_free_heap ? formatBytes(data.min_free_heap) : '-';
+            setSafe('app', data.app || '-');
+            setSafe('version', data.version || '-');
+            setSafe('fwversion', data.fwversion || '-');
+            setSafe('poh', data.poh !== undefined ? formatPOH(data.poh) : '-');
+            setSafe('mac_address', data.mac_address || '-');
+            setSafe('ip_address', data.ip_address || '-');
+            setSafe('chip_revision', data.chip_revision || '-');
+            setSafe('flash_size', data.flash_size ? formatBytes(data.flash_size) : '-');
+            setSafe('cpu_freq', data.cpu_freq ? `${(data.cpu_freq / 1000000)} MHz` : '-');
+            setSafe('compile_time', data.compile_time || '-');
+            setSafe('free_heap', data.free_heap ? formatBytes(data.free_heap) : '-');
+            setSafe('min_free_heap', data.min_free_heap ? formatBytes(data.min_free_heap) : '-');
 
             // Update sensor data
-            el('lux').textContent = data.lux !== undefined ? data.lux.toFixed(1) : '-';
-            if (data.uptime !== undefined) {
-                el('uptime').textContent = formatUptime(data.uptime);
-            } else {
-                el('uptime').textContent = '-';
-            }
+            setSafe('lux', data.lux !== undefined ? data.lux.toFixed(1) : '-');
+            setSafe('uptime', data.uptime !== undefined ? formatUptime(data.uptime) : '-');
 
             // Update system logs
-            const logsTextarea = el('system_logs');
-            if (data.system_logs && Array.isArray(data.system_logs)) {
-                logsTextarea.value = data.system_logs.join('\n');
-            } else {
-                logsTextarea.value = 'No logs available';
-            }
+            const logs = (data.system_logs && Array.isArray(data.system_logs)) ? data.system_logs.join('\n') : 'No logs available';
+            setSafe('system_logs', logs);
 
             // Update HA Status textarea
-            if (data.ha_tokens && Array.isArray(data.ha_tokens)) {
-                el('ha_status_textarea').value = data.ha_tokens.join('\n');
-            } else {
-                el('ha_status_textarea').value = 'No Integrations active';
-            }
+            const haStatus = (data.ha_tokens && Array.isArray(data.ha_tokens)) ? data.ha_tokens.join('\n') : 'No Integrations active';
+            setSafe('ha_status_textarea', haStatus);
 
             return data; // Return the data for other functions to use
         })
