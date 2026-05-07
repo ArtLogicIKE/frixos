@@ -861,6 +861,22 @@ textarea[aria-invalid="true"] {
     color: var(--error-color);
 }
 
+/* Input highlight animation for programmatic updates */
+.input-highlight {
+    animation: input-highlight 1.5s ease-out;
+}
+
+@keyframes input-highlight {
+    0% {
+        background-color: rgba(0, 170, 255, 0.4);
+        box-shadow: 0 0 0 2px var(--primary-color);
+    }
+    100% {
+        background-color: var(--input-bg);
+        box-shadow: none;
+    }
+}
+
 /* File input styling */
 .file-input-container {
     margin-bottom: 15px;
