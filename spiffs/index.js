@@ -386,7 +386,8 @@ function updateCgmExclusivity() {
 }
 
 // Current language (will be loaded from NVS)
-let currentLanguage = 'en';
+// Initialized as empty to ensure first translate() call applies all UI states (like active class)
+let currentLanguage = '';
 
 // Translation function - now async to support lazy-loading
 // Optimization: Persistent early return and DOM mutation diffing to minimize overhead
@@ -400,6 +401,13 @@ async function translate(lang) {
 
     currentLanguage = effectiveLang;
     const trans = translations[effectiveLang];
+
+    // Update active state in language dropdown
+    document.querySelectorAll('.language-option').forEach(option => {
+        const isActive = option.getAttribute('data-lang') === currentLanguage;
+        option.classList.toggle('is-active', isActive);
+        option.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    });
 
     // Querying on every call to support dynamic elements while using dataset for readability
     document.querySelectorAll('[data-i18n], [data-i18n-placeholder], [data-i18n-aria-label]').forEach(element => {
@@ -489,26 +497,66 @@ function setupPasswordToggles() {
 function setupLanguageSelector() {
     const languageToggle = el('language-toggle');
     const languageDropdown = el('language-dropdown');
+    const options = document.querySelectorAll('.language-option');
     
+    const toggleDropdown = (show) => {
+        const isShowing = show !== undefined ? show : languageDropdown.style.display === 'none';
+        languageDropdown.style.display = isShowing ? 'block' : 'none';
+        languageToggle.setAttribute('aria-expanded', isShowing ? 'true' : 'false');
+    };
+
     // Toggle dropdown on button click
     languageToggle.addEventListener('click', function(e) {
         e.stopPropagation();
-        languageDropdown.style.display = languageDropdown.style.display === 'none' ? 'block' : 'none';
+        toggleDropdown();
     });
     
     // Close dropdown when clicking outside
     document.addEventListener('click', function(e) {
         if (!languageToggle.contains(e.target) && !languageDropdown.contains(e.target)) {
-            languageDropdown.style.display = 'none';
+            toggleDropdown(false);
+        }
+    });
+
+    // Keyboard navigation for the dropdown
+    languageToggle.addEventListener('keydown', function(e) {
+        if (e.key === 'ArrowDown' && languageDropdown.style.display === 'none') {
+            e.preventDefault();
+            toggleDropdown(true);
+            const activeOption = languageDropdown.querySelector('.language-option.is-active') || options[0];
+            if (activeOption) activeOption.focus();
+        }
+    });
+
+    languageDropdown.addEventListener('keydown', function(e) {
+        const currentOption = document.activeElement;
+        if (!currentOption.classList.contains('language-option')) return;
+
+        const currentIndex = Array.from(options).indexOf(currentOption);
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            const nextIndex = (currentIndex + 1) % options.length;
+            options[nextIndex].focus();
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            const prevIndex = (currentIndex - 1 + options.length) % options.length;
+            options[prevIndex].focus();
+        } else if (e.key === 'Escape') {
+            toggleDropdown(false);
+            languageToggle.focus();
+        } else if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            currentOption.click();
         }
     });
     
     // Handle language selection
-    document.querySelectorAll('.language-option').forEach(option => {
-        option.addEventListener('click', function() {
+    options.forEach(option => {
+        option.addEventListener('click', async function() {
             const selectedLang = this.getAttribute('data-lang');
-            changeLanguage(selectedLang);
-            languageDropdown.style.display = 'none';
+            toggleDropdown(false);
+            await changeLanguage(selectedLang);
             languageToggle.focus();
         });
     });

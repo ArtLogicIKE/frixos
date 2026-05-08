@@ -207,6 +207,18 @@ h1 {
     background-color: var(--section-content-bg);
 }
 
+.language-option:focus-visible {
+    background-color: var(--section-content-bg);
+    box-shadow: inset 0 0 0 2px var(--primary-color);
+    outline: none;
+}
+
+.language-option.is-active {
+    background-color: rgba(0, 170, 255, 0.1);
+    border-left: 3px solid var(--primary-color);
+    padding-left: 12px;
+}
+
 .language-option .lang-name {
     font-size: 0.9rem;
 }
@@ -352,8 +364,12 @@ h1 {
     z-index: 2;
 }
 
-.password-toggle:hover {
+.password-toggle:hover,
+.password-toggle:focus-visible {
     opacity: 1;
+    outline: none;
+    box-shadow: 0 0 0 2px var(--primary-color);
+    border-radius: 4px;
 }
 
 .form-group input[type="password"] {
