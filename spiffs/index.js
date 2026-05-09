@@ -16,6 +16,14 @@ const LANGUAGE_NAMES = {
 // Helper for element selection
 const el = (id) => document.getElementById(id);
 
+// Helper to highlight an element (visual feedback for programmatic updates)
+function highlightElement(element) {
+    if (!element) return;
+    element.classList.remove('input-highlight');
+    void element.offsetWidth; // Force reflow
+    element.classList.add('input-highlight');
+}
+
 // Helper for toggling button loading state
 function toggleLoading(btn, isLoading) {
     if (!btn) return;
@@ -66,7 +74,10 @@ const translations = {
                 scanning: 'Scanning for networks...',
                 scan_button: 'Scan available networks',
                 no_scan_message: 'Click "Scan available networks" to see WiFi networks',
-                no_networks: 'No networks found'
+                no_networks: 'No networks found',
+                signal: 'Signal strength',
+                secure: 'Secure',
+                open: 'Open'
             }
         },
         advanced: {
@@ -1784,11 +1795,29 @@ function displayNetworks(networks) {
         return;
     }
 
+    // Pre-calculate localized labels for the ARIA labels
+    const trans = translations[currentLanguage] || translations.en;
+    const signalLabel = getNestedTranslation(trans, 'settings.wifi.signal') || 'Signal strength';
+    const secureLabel = getNestedTranslation(trans, 'settings.wifi.secure') || 'Secure';
+    const openLabel = getNestedTranslation(trans, 'settings.wifi.open') || 'Open';
+
     // Add each network to the list
     networks.forEach(network => {
         const networkItem = document.createElement('div');
         networkItem.className = 'network-item';
+        networkItem.setAttribute('role', 'button');
+        networkItem.setAttribute('tabindex', '0');
+
+        const securityStatus = network.requires_password ? secureLabel : openLabel;
+        networkItem.setAttribute('aria-label', `${network.ssid}, ${signalLabel} ${network.signal_strength}%, ${securityStatus}`);
+
         networkItem.onclick = () => selectNetwork(network.ssid);
+        networkItem.onkeydown = (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                selectNetwork(network.ssid);
+            }
+        };
 
         // Create network name element
         const nameSpan = document.createElement('span');
@@ -1825,8 +1854,13 @@ function displayNetworks(networks) {
 }
 
 function selectNetwork(ssid) {
-    el('wifi_ssid').value = ssid;
-    el('wifi_pass').focus();
+    const ssidInput = el('wifi_ssid');
+    const passInput = el('wifi_pass');
+
+    ssidInput.value = ssid;
+    highlightElement(ssidInput);
+    highlightElement(passInput);
+    passInput.focus();
 }
 
 function showNetworkError(message) {
