@@ -25,3 +25,7 @@
 ## 2025-04-09 - Optimized Settings API Parameter Filtering
 **Learning:** The Settings API was using a shared static buffer for query parameters, which led to a bug where multiple filters could not be applied simultaneously (the second filter would overwrite the first). Additionally, filtering logic performed O(N*M) string parsing and comparisons for every request, where N is the number of parameters (~55) and M is the number of tokens in the filter.
 **Action:** Replace repeated string parsing with a one-time calculation of an inclusion bitmask. Refactor query parameter retrieval to use caller-provided buffers to eliminate shared state bugs. Use bitwise AND operations for O(1) inclusion checks per parameter.
+
+## 2026-05-09 - I18n Metadata Caching with WeakMap
+**Learning:** The `translate()` function was performing expensive DOM mutations (`innerHTML`, `setAttribute`) on every call for 180+ elements, even when content hadn't changed. This caused unnecessary layout thrashing. Traditional simple value caching is insufficient because both the translation key (from dataset) and the localized value can change independently.
+**Action:** Implement a `WeakMap` based cache (`i18nCache`) to store metadata for elements. Use it to perform O(1) dirty-checking on both the key and the value before committing DOM updates. Consolidate separate attribute-based DOM scans into a single `querySelectorAll` pass to minimize document traversal overhead.
