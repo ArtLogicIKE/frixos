@@ -13,8 +13,38 @@ const LANGUAGE_NAMES = {
     'es': 'Español'
 };
 
+const BYTE_SIZES = ['Bytes', 'KB', 'MB', 'GB'];
+
+const MOON_PHASES = [
+    'New Moon',
+    'Waxing Crescent',
+    'First Quarter',
+    'Waxing Gibbous',
+    'Full Moon',
+    'Waning Gibbous',
+    'Last Quarter',
+    'Waning Crescent'
+];
+
 // Helper for element selection
 const el = (id) => document.getElementById(id);
+
+/**
+ * Update element property only if it changed to avoid layout thrashing.
+ * @param {HTMLElement|null} element - The DOM element to update.
+ * @param {string|number} value - The new value.
+ * @param {string} prop - The property to update ('textContent', 'innerHTML', 'value', or 'aria-label').
+ */
+function setSafe(element, value, prop = 'textContent') {
+    if (!element) return;
+    if (prop === 'aria-label') {
+        if (element.getAttribute('aria-label') !== value) {
+            element.setAttribute('aria-label', value);
+        }
+    } else if (element[prop] !== value) {
+        element[prop] = value;
+    }
+}
 
 // Helper to highlight an element (visual feedback for programmatic updates)
 function highlightElement(element) {
@@ -409,56 +439,45 @@ async function translate(lang) {
 
         if (i18nKey) {
             const translation = getNestedTranslation(trans, i18nKey);
-            // Optimization: Only update DOM if content actually changed to avoid layout thrashing
-            if (translation && element.innerHTML !== translation) {
-                element.innerHTML = translation;
-            }
+            if (translation) setSafe(element, translation, 'innerHTML');
         }
 
         if (i18nPlaceholderKey) {
             const translation = getNestedTranslation(trans, i18nPlaceholderKey);
-            // Optimization: Only update DOM if placeholder actually changed
-            if (translation && element.placeholder !== translation) {
-                element.placeholder = translation;
-            }
+            if (translation) setSafe(element, translation, 'placeholder');
         }
 
         if (i18nAriaLabelKey) {
             const translation = getNestedTranslation(trans, i18nAriaLabelKey);
-            if (translation && element.getAttribute('aria-label') !== translation) {
-                element.setAttribute('aria-label', translation);
-            }
+            if (translation) setSafe(element, translation, 'aria-label');
         }
     });
 
     // Update password toggle ARIA labels for accessibility after language change
+    const showLabel = getNestedTranslation(trans, 'common.show_password') || 'Show password';
+    const hideLabel = getNestedTranslation(trans, 'common.hide_password') || 'Hide password';
     document.querySelectorAll('.password-toggle').forEach(button => {
         const input = button.previousElementSibling;
         if (input) {
             const isPassword = input.type === 'password';
-            const actionKey = isPassword ? 'common.show_password' : 'common.hide_password';
-            const translation = getNestedTranslation(trans, actionKey);
-            if (translation) {
-                button.setAttribute('aria-label', translation);
-            }
+            const translation = isPassword ? showLabel : hideLabel;
+            setSafe(button, translation, 'aria-label');
         }
     });
 
     // Update token ARIA labels after language change
+    const insertLabel = getNestedTranslation(trans, 'common.insert') || 'Insert';
     document.querySelectorAll('.token-code').forEach(token => {
-        const insertLabel = getNestedTranslation(trans, 'common.insert') || 'Insert';
-        token.setAttribute('aria-label', `${insertLabel} ${token.textContent}`);
+        setSafe(token, `${insertLabel} ${token.textContent}`, 'aria-label');
     });
 
-    const nameElement = el('current-language-name');
-    if (nameElement) nameElement.textContent = LANGUAGE_NAMES[effectiveLang] || LANGUAGE_NAMES['en'];
+    setSafe(el('current-language-name'), LANGUAGE_NAMES[effectiveLang] || LANGUAGE_NAMES['en']);
 
     const hash = window.location.hash.substring(1);
     if (hash && hash !== 'settings') {
         const sectionName = hash.charAt(0).toUpperCase() + hash.slice(1);
         const translatedSection = getNestedTranslation(trans, `menu.${hash}`) || sectionName;
-        const pageTitleElement = el('page-title');
-        if (pageTitleElement) pageTitleElement.textContent = 'Frixos - ' + translatedSection;
+        setSafe(el('page-title'), 'Frixos - ' + translatedSection);
     }
 }
 
@@ -1951,61 +1970,52 @@ function fetchStatus(includeLogs = false) {
             // Update time status
             if (data.time_status) {
                 const timestamp = new Date(data.last_time_update * 1000).toLocaleString();
-                timeUpdateStatus.innerHTML = `<span class="status-icon status-success"></span> ${timestamp}`;
+                setSafe(timeUpdateStatus, `<span class="status-icon status-success"></span> ${timestamp}`, 'innerHTML');
             } else {
-                timeUpdateStatus.innerHTML = '<span class="status-icon status-error"></span> Not synced';
+                setSafe(timeUpdateStatus, '<span class="status-icon status-error"></span> Not synced', 'innerHTML');
             }
 
             // Update weather status
             if (data.weather_status) {
                 const timestamp = new Date(data.last_weather_update * 1000).toLocaleString();
-                weatherUpdateStatus.innerHTML = `<span class="status-icon status-success"></span> ${timestamp}`;
+                setSafe(weatherUpdateStatus, `<span class="status-icon status-success"></span> ${timestamp}`, 'innerHTML');
             } else {
-                weatherUpdateStatus.innerHTML = '<span class="status-icon status-error"></span> Not synced';
+                setSafe(weatherUpdateStatus, '<span class="status-icon status-error"></span> Not synced', 'innerHTML');
             }
 
             // Update other weather-related info
-            el('moon_status').textContent = data.moon_icon_index !== undefined ? getMoonPhaseName(data.moon_icon_index) : '-';
-            el('latitude').textContent = data.latitude || '-';
-            el('longitude').textContent = data.longitude || '-';
-            el('timezone_val').textContent = data.timezone || '-';
+            setSafe(el('moon_status'), data.moon_icon_index !== undefined ? getMoonPhaseName(data.moon_icon_index) : '-');
+            setSafe(el('latitude'), data.latitude || '-');
+            setSafe(el('longitude'), data.longitude || '-');
+            setSafe(el('timezone_val'), data.timezone || '-');
 
             // Update system information
-            el('app').textContent = data.app || '-';
-            el('version').textContent = data.version || '-';
-            el('fwversion').textContent = data.fwversion || '-';
-            el('poh').textContent = data.poh !== undefined ? formatPOH(data.poh) : '-';
-            el('mac_address').textContent = data.mac_address || '-';
-            el('ip_address').textContent = data.ip_address || '-';
-            el('chip_revision').textContent = data.chip_revision || '-';
-            el('flash_size').textContent = data.flash_size ? formatBytes(data.flash_size) : '-';
-            el('cpu_freq').textContent = data.cpu_freq ? `${(data.cpu_freq / 1000000)} MHz` : '-';
-            el('compile_time').textContent = data.compile_time || '-';
-            el('free_heap').textContent = data.free_heap ? formatBytes(data.free_heap) : '-';
-            el('min_free_heap').textContent = data.min_free_heap ? formatBytes(data.min_free_heap) : '-';
+            setSafe(el('app'), data.app || '-');
+            setSafe(el('version'), data.version || '-');
+            setSafe(el('fwversion'), data.fwversion || '-');
+            setSafe(el('poh'), data.poh !== undefined ? formatPOH(data.poh) : '-');
+            setSafe(el('mac_address'), data.mac_address || '-');
+            setSafe(el('ip_address'), data.ip_address || '-');
+            setSafe(el('chip_revision'), data.chip_revision || '-');
+            setSafe(el('flash_size'), data.flash_size ? formatBytes(data.flash_size) : '-');
+            setSafe(el('cpu_freq'), data.cpu_freq ? `${(data.cpu_freq / 1000000)} MHz` : '-');
+            setSafe(el('compile_time'), data.compile_time || '-');
+            setSafe(el('free_heap'), data.free_heap ? formatBytes(data.free_heap) : '-');
+            setSafe(el('min_free_heap'), data.min_free_heap ? formatBytes(data.min_free_heap) : '-');
 
             // Update sensor data
-            el('lux').textContent = data.lux !== undefined ? data.lux.toFixed(1) : '-';
-            if (data.uptime !== undefined) {
-                el('uptime').textContent = formatUptime(data.uptime);
-            } else {
-                el('uptime').textContent = '-';
-            }
+            setSafe(el('lux'), data.lux !== undefined ? data.lux.toFixed(1) : '-');
+            setSafe(el('uptime'), data.uptime !== undefined ? formatUptime(data.uptime) : '-');
 
             // Update system logs
             const logsTextarea = el('system_logs');
-            if (data.system_logs && Array.isArray(data.system_logs)) {
-                logsTextarea.value = data.system_logs.join('\n');
-            } else {
-                logsTextarea.value = 'No logs available';
-            }
+            const logs = (data.system_logs && Array.isArray(data.system_logs)) ? data.system_logs.join('\n') : 'No logs available';
+            setSafe(logsTextarea, logs, 'value');
 
             // Update HA Status textarea
-            if (data.ha_tokens && Array.isArray(data.ha_tokens)) {
-                el('ha_status_textarea').value = data.ha_tokens.join('\n');
-            } else {
-                el('ha_status_textarea').value = 'No Integrations active';
-            }
+            const haStatusTextarea = el('ha_status_textarea');
+            const haStatus = (data.ha_tokens && Array.isArray(data.ha_tokens)) ? data.ha_tokens.join('\n') : 'No Integrations active';
+            setSafe(haStatusTextarea, haStatus, 'value');
 
             return data; // Return the data for other functions to use
         })
@@ -2024,27 +2034,15 @@ function formatBytes(bytes, decimals = 2) {
     
     const k = 1024;
     const dm = decimals < 0 ? 0 : decimals;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + BYTE_SIZES[i];
 }
 
 function getMoonPhaseName(index) {
-    const phases = [
-        'New Moon',
-        'Waxing Crescent',
-        'First Quarter',
-        'Waxing Gibbous',
-        'Full Moon',
-        'Waning Gibbous',
-        'Last Quarter',
-        'Waning Crescent'
-    ];
-    
-    if (index >= 0 && index < phases.length) {
-        return phases[index];
+    if (index >= 0 && index < MOON_PHASES.length) {
+        return MOON_PHASES[index];
     } else {
         return 'Unknown (' + index + ')';
     }
