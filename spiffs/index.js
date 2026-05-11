@@ -16,6 +16,28 @@ const LANGUAGE_NAMES = {
 // Helper for element selection
 const el = (id) => document.getElementById(id);
 
+// Bolt Optimization: Global constants to avoid redundant allocations in high-frequency functions
+const BYTE_SIZES = ['Bytes', 'KB', 'MB', 'GB'];
+const LOG_1024 = Math.log(1024);
+const MOON_PHASES = [
+    'New Moon',
+    'Waxing Crescent',
+    'First Quarter',
+    'Waxing Gibbous',
+    'Full Moon',
+    'Waning Gibbous',
+    'Last Quarter',
+    'Waning Crescent'
+];
+
+// Bolt Optimization: Generic dirty-checking helper to minimize layout thrashing
+function setSafe(element, value, property = 'textContent') {
+    if (!element) return;
+    if (element[property] !== value) {
+        element[property] = value;
+    }
+}
+
 // Helper to highlight an element (visual feedback for programmatic updates)
 function highlightElement(element) {
     if (!element) return;
@@ -431,13 +453,17 @@ async function translate(lang) {
         }
     });
 
+    // Bolt Optimization: Hoist translation lookups to avoid repeated calls in loops
+    const showLabel = getNestedTranslation(trans, 'common.show_password');
+    const hideLabel = getNestedTranslation(trans, 'common.hide_password');
+    const insertLabel = getNestedTranslation(trans, 'common.insert') || 'Insert';
+
     // Update password toggle ARIA labels for accessibility after language change
     document.querySelectorAll('.password-toggle').forEach(button => {
         const input = button.previousElementSibling;
         if (input) {
             const isPassword = input.type === 'password';
-            const actionKey = isPassword ? 'common.show_password' : 'common.hide_password';
-            const translation = getNestedTranslation(trans, actionKey);
+            const translation = isPassword ? showLabel : hideLabel;
             if (translation) {
                 button.setAttribute('aria-label', translation);
             }
@@ -446,7 +472,6 @@ async function translate(lang) {
 
     // Update token ARIA labels after language change
     document.querySelectorAll('.token-code').forEach(token => {
-        const insertLabel = getNestedTranslation(trans, 'common.insert') || 'Insert';
         token.setAttribute('aria-label', `${insertLabel} ${token.textContent}`);
     });
 
@@ -707,15 +732,12 @@ document.addEventListener('DOMContentLoaded', function() {
         refreshSensorButton.addEventListener('click', function() {
             fetchStatus(false)
                 .then(data => {
-                    // Update sensor data
-                    el('lux').textContent = data.lux !== undefined ? data.lux.toFixed(1) : '-';
-                    el('lux_sensitivity_val').textContent = data.lux_sensitivity !== undefined ? `${data.lux_sensitivity} lux` : '-';
-                    el('lux_threshold_val').textContent = data.lux_threshold !== undefined ? `${data.lux_threshold} lux` : '-';
-                    if (data.uptime !== undefined) {
-                        el('uptime').textContent = formatUptime(data.uptime);
-                    } else {
-                        el('uptime').textContent = '-';
-                    }
+                    // Bolt Optimization: Use setSafe dirty-checking to minimize layout thrashing
+                    setSafe(el('lux'), data.lux !== undefined ? data.lux.toFixed(1) : '-');
+                    setSafe(el('lux_sensitivity_val'), data.lux_sensitivity !== undefined ? `${data.lux_sensitivity} lux` : '-');
+                    setSafe(el('lux_threshold_val'), data.lux_threshold !== undefined ? `${data.lux_threshold} lux` : '-');
+                    setSafe(el('uptime'), data.uptime !== undefined ? formatUptime(data.uptime) : '-');
+
                     showStatus(getMessage('sensor_data_refreshed'), 'success');
                 })
                 .catch(error => {
@@ -1963,68 +1985,53 @@ function fetchStatus(includeLogs = false) {
     return fetch(url)
         .then(response => response.json())
         .then(data => {
-            // Update time & weather status
-            const timeUpdateStatus = el('time_update_status');
-            const weatherUpdateStatus = el('weather_update_status');
+            // Bolt Optimization: Use setSafe dirty-checking to minimize layout thrashing
 
             // Update time status
+            const timeUpdateStatus = el('time_update_status');
             if (data.time_status) {
                 const timestamp = new Date(data.last_time_update * 1000).toLocaleString();
-                timeUpdateStatus.innerHTML = `<span class="status-icon status-success"></span> ${timestamp}`;
+                setSafe(timeUpdateStatus, `<span class="status-icon status-success"></span> ${timestamp}`, 'innerHTML');
             } else {
-                timeUpdateStatus.innerHTML = '<span class="status-icon status-error"></span> Not synced';
+                setSafe(timeUpdateStatus, '<span class="status-icon status-error"></span> Not synced', 'innerHTML');
             }
 
             // Update weather status
+            const weatherUpdateStatus = el('weather_update_status');
             if (data.weather_status) {
                 const timestamp = new Date(data.last_weather_update * 1000).toLocaleString();
-                weatherUpdateStatus.innerHTML = `<span class="status-icon status-success"></span> ${timestamp}`;
+                setSafe(weatherUpdateStatus, `<span class="status-icon status-success"></span> ${timestamp}`, 'innerHTML');
             } else {
-                weatherUpdateStatus.innerHTML = '<span class="status-icon status-error"></span> Not synced';
+                setSafe(weatherUpdateStatus, '<span class="status-icon status-error"></span> Not synced', 'innerHTML');
             }
 
             // Update other weather-related info
-            el('moon_status').textContent = data.moon_icon_index !== undefined ? getMoonPhaseName(data.moon_icon_index) : '-';
-            el('latitude').textContent = data.latitude || '-';
-            el('longitude').textContent = data.longitude || '-';
-            el('timezone_val').textContent = data.timezone || '-';
+            setSafe(el('moon_status'), data.moon_icon_index !== undefined ? getMoonPhaseName(data.moon_icon_index) : '-');
+            setSafe(el('latitude'), data.latitude || '-');
+            setSafe(el('longitude'), data.longitude || '-');
+            setSafe(el('timezone_val'), data.timezone || '-');
 
             // Update system information
-            el('app').textContent = data.app || '-';
-            el('version').textContent = data.version || '-';
-            el('fwversion').textContent = data.fwversion || '-';
-            el('poh').textContent = data.poh !== undefined ? formatPOH(data.poh) : '-';
-            el('mac_address').textContent = data.mac_address || '-';
-            el('ip_address').textContent = data.ip_address || '-';
-            el('chip_revision').textContent = data.chip_revision || '-';
-            el('flash_size').textContent = data.flash_size ? formatBytes(data.flash_size) : '-';
-            el('cpu_freq').textContent = data.cpu_freq ? `${(data.cpu_freq / 1000000)} MHz` : '-';
-            el('compile_time').textContent = data.compile_time || '-';
-            el('free_heap').textContent = data.free_heap ? formatBytes(data.free_heap) : '-';
-            el('min_free_heap').textContent = data.min_free_heap ? formatBytes(data.min_free_heap) : '-';
+            setSafe(el('app'), data.app || '-');
+            setSafe(el('version'), data.version || '-');
+            setSafe(el('fwversion'), data.fwversion || '-');
+            setSafe(el('poh'), data.poh !== undefined ? formatPOH(data.poh) : '-');
+            setSafe(el('mac_address'), data.mac_address || '-');
+            setSafe(el('ip_address'), data.ip_address || '-');
+            setSafe(el('chip_revision'), data.chip_revision || '-');
+            setSafe(el('flash_size'), data.flash_size ? formatBytes(data.flash_size) : '-');
+            setSafe(el('cpu_freq'), data.cpu_freq ? `${(data.cpu_freq / 1000000)} MHz` : '-');
+            setSafe(el('compile_time'), data.compile_time || '-');
+            setSafe(el('free_heap'), data.free_heap ? formatBytes(data.free_heap) : '-');
+            setSafe(el('min_free_heap'), data.min_free_heap ? formatBytes(data.min_free_heap) : '-');
 
             // Update sensor data
-            el('lux').textContent = data.lux !== undefined ? data.lux.toFixed(1) : '-';
-            if (data.uptime !== undefined) {
-                el('uptime').textContent = formatUptime(data.uptime);
-            } else {
-                el('uptime').textContent = '-';
-            }
+            setSafe(el('lux'), data.lux !== undefined ? data.lux.toFixed(1) : '-');
+            setSafe(el('uptime'), data.uptime !== undefined ? formatUptime(data.uptime) : '-');
 
-            // Update system logs
-            const logsTextarea = el('system_logs');
-            if (data.system_logs && Array.isArray(data.system_logs)) {
-                logsTextarea.value = data.system_logs.join('\n');
-            } else {
-                logsTextarea.value = 'No logs available';
-            }
-
-            // Update HA Status textarea
-            if (data.ha_tokens && Array.isArray(data.ha_tokens)) {
-                el('ha_status_textarea').value = data.ha_tokens.join('\n');
-            } else {
-                el('ha_status_textarea').value = 'No Integrations active';
-            }
+            // Update textareas
+            setSafe(el('system_logs'), (data.system_logs && Array.isArray(data.system_logs)) ? data.system_logs.join('\n') : 'No logs available', 'value');
+            setSafe(el('ha_status_textarea'), (data.ha_tokens && Array.isArray(data.ha_tokens)) ? data.ha_tokens.join('\n') : 'No Integrations active', 'value');
 
             return data; // Return the data for other functions to use
         })
@@ -2041,29 +2048,15 @@ function fetchStatus(includeLogs = false) {
 function formatBytes(bytes, decimals = 2) {
     if (!bytes) return '0 Bytes';
     
-    const k = 1024;
     const dm = decimals < 0 ? 0 : decimals;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / LOG_1024);
     
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+    return parseFloat((bytes / Math.pow(1024, i)).toFixed(dm)) + ' ' + BYTE_SIZES[i];
 }
 
 function getMoonPhaseName(index) {
-    const phases = [
-        'New Moon',
-        'Waxing Crescent',
-        'First Quarter',
-        'Waxing Gibbous',
-        'Full Moon',
-        'Waning Gibbous',
-        'Last Quarter',
-        'Waning Crescent'
-    ];
-    
-    if (index >= 0 && index < phases.length) {
-        return phases[index];
+    if (index >= 0 && index < MOON_PHASES.length) {
+        return MOON_PHASES[index];
     } else {
         return 'Unknown (' + index + ')';
     }
