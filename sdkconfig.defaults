@@ -18,3 +18,6 @@ CONFIG_LV_BUILD_EXAMPLES=n
 CONFIG_LV_USE_FS_POSIX=y
 CONFIG_LV_FS_POSIX_LETTER=83
 CONFIG_LV_FS_POSIX_PATH="/spiffs"
+
+# JPEG decoder required for sprite sheet display (digits, icons stored as .jpg on SPIFFS)
+CONFIG_LV_USE_TJPGD=y
