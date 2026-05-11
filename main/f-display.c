@@ -107,6 +107,7 @@ lv_obj_t *img_digits_sprite = NULL,
          *img_mgdl = NULL; // all the images on screen - ok, digits is off-screen
 
 lv_obj_t *label_msg = NULL;
+static lv_obj_t *label_degree = NULL;
 
 // Define digit width & height (adjust based on actual sprite sheet)
 #define DIGIT_WIDTH 18          // Width of each digit in the sprite sheet
@@ -527,6 +528,11 @@ void startup_display(void)
   img_wifi = lv_image_create(lv_scr_act());
   img_mgdl = lv_image_create(lv_scr_act());
   img_ampm = lv_image_create(lv_scr_act()); // AMPM indicator
+  label_degree = lv_label_create(lv_scr_act());
+  lv_label_set_text(label_degree, "\xc2\xb0"); // UTF-8 degree symbol
+  lv_obj_set_style_text_color(label_degree, lv_color_hex(0xFFFFFF), 0);
+  lv_obj_set_style_text_font(label_degree, &frixos_11, 0);
+  lv_obj_add_flag(label_degree, LV_OBJ_FLAG_HIDDEN);
   for (int i = 0; i < 4; i++)
   {
     digit_objs[i] = lv_image_create(lv_scr_act());
@@ -1279,6 +1285,7 @@ static void update_display_content(time_t now)
     lv_obj_align(digit_objs[2], LV_ALIGN_TOP_LEFT, x2, y_digits);
     lv_obj_align(digit_objs[3], LV_ALIGN_TOP_LEFT, x3, y_digits);
     show_object(img_ampm, false);
+    show_object(label_degree, false);
 
     show_object(dots[0], true);
     show_object(dots[1], false);
@@ -1292,6 +1299,7 @@ static void update_display_content(time_t now)
     lv_obj_align(digit_objs[2], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 2 * 18 + 6, y_digits);
     lv_obj_align(digit_objs[3], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 3 * 18 + 6, y_digits);
     show_object(img_ampm, false);
+    show_object(label_degree, false);
 
     show_object(dots[0], show_dots);
     show_object(dots[1], show_dots);
@@ -1304,6 +1312,8 @@ static void update_display_content(time_t now)
     lv_obj_align(digit_objs[1], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 1 * 18 + 6, y_digits);
     lv_obj_align(digit_objs[2], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 2 * 18 + 6, y_digits);
     lv_obj_align(digit_objs[3], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 3 * 18 + 6, y_digits);
+    lv_obj_align(label_degree, LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 3 * 18 + 6 + DIGIT_WIDTH + 1, y_digits);
+    show_object(label_degree, true);
     show_object(img_ampm, false);
     show_object(dots[0], false);
     show_object(dots[1], false);
@@ -1315,6 +1325,7 @@ static void update_display_content(time_t now)
     lv_obj_align(digit_objs[2], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 2 * 18 + 6, y_digits);
     lv_obj_align(digit_objs[3], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 3 * 18 + 6, y_digits);
     show_object(img_ampm, eeprom_12hour && time_valid);
+    show_object(label_degree, false);
 
     show_object(dots[0], show_dots);
     show_object(dots[1], show_dots);

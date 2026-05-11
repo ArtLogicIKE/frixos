@@ -529,11 +529,11 @@ static uint64_t calculate_include_mask(const char *group, const char *params)
         }
         else if (strcmp(group, "integrations") == 0)
         {
-            // p25-p33, p44, p45, p48, p49, p51-p54
+            // p25-p33, p44, p45, p48, p49, p51-p55
             for (int i = 25; i <= 33; i++) mask |= (1ULL << i);
             mask |= (1ULL << 44) | (1ULL << 45) | (1ULL << 48) |
                     (1ULL << 49) | (1ULL << 51) | (1ULL << 52) |
-                    (1ULL << 53) | (1ULL << 54);
+                    (1ULL << 53) | (1ULL << 54) | (1ULL << 55);
         }
     }
 
