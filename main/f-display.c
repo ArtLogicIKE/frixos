@@ -430,10 +430,19 @@ void set_scroll_message(const char *msg)
     font = &frixos_8; // Use default font
   }
 
+  // Optimization: Only update DOM if content actually changed to avoid layout thrashing
+  // This avoids redundant text parsing, coordinate recalculation, and layout invalidation in LVGL.
+  lvgl_port_lock(0);
+  const char *current_text = lv_label_get_text(label_msg);
+  if (current_text != NULL && strcmp(current_text, msg) == 0)
+  {
+    lvgl_port_unlock();
+    return;
+  }
+
   // Create a temporary buffer to measure text size
   lv_point_t size;
 
-  lvgl_port_lock(0);
   // Use LVGL's safe text setting function
   lv_label_set_text(label_msg, msg);
   lv_text_get_size(&size, msg, font, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
