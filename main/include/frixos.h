@@ -120,6 +120,7 @@ extern uint8_t eeprom_dexcom_region;  // 0=disabled, 1=US, 2=Japan, 3=Rest of Wo
 extern uint16_t eeprom_glucose_high;   // High glucose threshold in mg/dL
 extern uint32_t eeprom_pwm_frequency;  // PWM frequency in Hz (range 10-78000)
 extern uint16_t eeprom_max_power;      // Max power (range 1-1023)
+extern uint8_t eeprom_board_rev;       // Board revision read from NVS (0=rev A-F, 1=rev H)
 
 // LibreLinkUp settings
 extern uint8_t eeprom_libre_region;    // 0=disabled, 1=US, 2=Japan, 3=Rest of World

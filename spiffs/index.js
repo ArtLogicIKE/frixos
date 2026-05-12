@@ -16,6 +16,14 @@ const LANGUAGE_NAMES = {
 // Helper for element selection
 const el = (id) => document.getElementById(id);
 
+// Helper to highlight an element (visual feedback for programmatic updates)
+function highlightElement(element) {
+    if (!element) return;
+    element.classList.remove('input-highlight');
+    void element.offsetWidth; // Force reflow
+    element.classList.add('input-highlight');
+}
+
 // Helper for toggling button loading state
 function toggleLoading(btn, isLoading) {
     if (!btn) return;
@@ -66,7 +74,10 @@ const translations = {
                 scanning: 'Scanning for networks...',
                 scan_button: 'Scan available networks',
                 no_scan_message: 'Click "Scan available networks" to see WiFi networks',
-                no_networks: 'No networks found'
+                no_networks: 'No networks found',
+                signal: 'Signal strength',
+                secure: 'Secure',
+                open: 'Open'
             }
         },
         advanced: {
@@ -375,7 +386,7 @@ function updateCgmExclusivity() {
 }
 
 // Current language (will be loaded from NVS)
-let currentLanguage = 'en';
+let currentLanguage = '';
 
 // Translation function - now async to support lazy-loading
 // Optimization: Persistent early return and DOM mutation diffing to minimize overhead
@@ -442,6 +453,13 @@ async function translate(lang) {
     const nameElement = el('current-language-name');
     if (nameElement) nameElement.textContent = LANGUAGE_NAMES[effectiveLang] || LANGUAGE_NAMES['en'];
 
+    // Update language selection state in dropdown
+    document.querySelectorAll('.language-option').forEach(option => {
+        const isSelected = option.getAttribute('data-lang') === effectiveLang;
+        option.classList.toggle('is-active', isSelected);
+        option.setAttribute('aria-selected', isSelected.toString());
+    });
+
     const hash = window.location.hash.substring(1);
     if (hash && hash !== 'settings') {
         const sectionName = hash.charAt(0).toUpperCase() + hash.slice(1);
@@ -482,23 +500,35 @@ function setupLanguageSelector() {
     // Toggle dropdown on button click
     languageToggle.addEventListener('click', function(e) {
         e.stopPropagation();
-        languageDropdown.style.display = languageDropdown.style.display === 'none' ? 'block' : 'none';
+        const isExpanded = languageDropdown.style.display !== 'none';
+        languageDropdown.style.display = isExpanded ? 'none' : 'block';
+        languageToggle.setAttribute('aria-expanded', (!isExpanded).toString());
     });
     
     // Close dropdown when clicking outside
     document.addEventListener('click', function(e) {
         if (!languageToggle.contains(e.target) && !languageDropdown.contains(e.target)) {
             languageDropdown.style.display = 'none';
+            languageToggle.setAttribute('aria-expanded', 'false');
         }
     });
     
     // Handle language selection
     document.querySelectorAll('.language-option').forEach(option => {
-        option.addEventListener('click', function() {
-            const selectedLang = this.getAttribute('data-lang');
+        const select = function() {
+            const selectedLang = option.getAttribute('data-lang');
             changeLanguage(selectedLang);
             languageDropdown.style.display = 'none';
+            languageToggle.setAttribute('aria-expanded', 'false');
             languageToggle.focus();
+        };
+
+        option.addEventListener('click', select);
+        option.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                select();
+            }
         });
     });
 }
@@ -558,6 +588,11 @@ window.settingsLoaded = {
     advanced: false,   // p01-p24, p42, p43 for advanced section
     integrations: false // p25-p33 for integrations section
 };
+
+// Global navigation state to optimize section switching (avoiding O(N) DOM lookups)
+let activeSection = null;
+let activeMenuItem = null;
+const menuItemsMap = new Map();
 
 // Function to fetch minimal parameters for theme and language
 async function fetchThemeParams() {
@@ -765,11 +800,14 @@ function setupNavigation() {
     // Get all menu items
     const menuItems = document.querySelectorAll('.menu-item');
     
-    // Add click event listeners to menu items
+    // Add click event listeners to menu items and cache them in Map for O(1) access
     menuItems.forEach(item => {
+        const href = item.getAttribute('href');
+        menuItemsMap.set(href, item);
+
         item.addEventListener('click', function(e) {
             e.preventDefault();
-            const sectionId = this.getAttribute('href').substring(1);
+            const sectionId = href.substring(1);
             window.location.hash = sectionId;
         });
     });
@@ -788,32 +826,38 @@ function navigateToSection() {
         window.location.hash = hash;
     }
     
-    // Get all page sections
-    const sections = document.querySelectorAll('.page-section');
-    
-    // Hide all sections first
-    sections.forEach(section => {
-        section.style.display = 'none';
-    });
+    // Optimization: Hide only the previously active section instead of O(N) iteration
+    if (activeSection) {
+        activeSection.style.display = 'none';
+    } else {
+        // Fallback for first load if state isn't set yet (still faster than global query)
+        document.querySelectorAll('.page-section').forEach(s => s.style.display = 'none');
+    }
     
     // Show the selected section
     const currentSection = el(hash + '-section');
     if (currentSection) {
         currentSection.style.display = 'block';
+        activeSection = currentSection;
         
         // Update page title
         const sectionName = hash.charAt(0).toUpperCase() + hash.slice(1);
         el('page-title').textContent = 'Frixos - ' + sectionName;
         document.title = 'Frixos - ' + sectionName;
         
-        // Update active menu item
-        document.querySelectorAll('.menu-item').forEach(item => {
-            if (item.getAttribute('href') === '#' + hash) {
-                item.classList.add('active');
-            } else {
-                item.classList.remove('active');
-            }
-        });
+        // Optimization: Update only previous and current menu items instead of O(N) iteration
+        if (activeMenuItem) {
+            activeMenuItem.classList.remove('active');
+        } else {
+            // Fallback for first load to ensure no other item is active
+            document.querySelectorAll('.menu-item').forEach(item => item.classList.remove('active'));
+        }
+
+        const nextMenuItem = menuItemsMap.get('#' + hash);
+        if (nextMenuItem) {
+            nextMenuItem.classList.add('active');
+            activeMenuItem = nextMenuItem;
+        }
         
         // Load parameters for the section if not already loaded
         if (hash === 'settings' && !window.sectionsInitialized.settings) {
@@ -1780,11 +1824,29 @@ function displayNetworks(networks) {
         return;
     }
 
+    // Pre-calculate localized labels for the ARIA labels
+    const trans = translations[currentLanguage] || translations.en;
+    const signalLabel = getNestedTranslation(trans, 'settings.wifi.signal') || 'Signal strength';
+    const secureLabel = getNestedTranslation(trans, 'settings.wifi.secure') || 'Secure';
+    const openLabel = getNestedTranslation(trans, 'settings.wifi.open') || 'Open';
+
     // Add each network to the list
     networks.forEach(network => {
         const networkItem = document.createElement('div');
         networkItem.className = 'network-item';
+        networkItem.setAttribute('role', 'button');
+        networkItem.setAttribute('tabindex', '0');
+
+        const securityStatus = network.requires_password ? secureLabel : openLabel;
+        networkItem.setAttribute('aria-label', `${network.ssid}, ${signalLabel} ${network.signal_strength}%, ${securityStatus}`);
+
         networkItem.onclick = () => selectNetwork(network.ssid);
+        networkItem.onkeydown = (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                selectNetwork(network.ssid);
+            }
+        };
 
         // Create network name element
         const nameSpan = document.createElement('span');
@@ -1821,8 +1883,13 @@ function displayNetworks(networks) {
 }
 
 function selectNetwork(ssid) {
-    el('wifi_ssid').value = ssid;
-    el('wifi_pass').focus();
+    const ssidInput = el('wifi_ssid');
+    const passInput = el('wifi_pass');
+
+    ssidInput.value = ssid;
+    highlightElement(ssidInput);
+    highlightElement(passInput);
+    passInput.focus();
 }
 
 function showNetworkError(message) {

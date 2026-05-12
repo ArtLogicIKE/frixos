@@ -9,7 +9,7 @@
 #include <stdlib.h>
 
 #define TAG "DnsServer"
-#define DNS_SERVER_TASK_STACK_SIZE 4096
+#define DNS_SERVER_TASK_STACK_SIZE 3584
 #define DNS_SERVER_TASK_PRIORITY 5
 #define DNS_MAX_NAME_LENGTH 256
 

@@ -172,6 +172,11 @@ h1 {
     border-color: var(--primary-color);
 }
 
+.language-toggle:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--primary-color);
+}
+
 #current-language-name {
     font-weight: 500;
     font-size: 0.9rem;
@@ -207,6 +212,12 @@ h1 {
     background-color: var(--section-content-bg);
 }
 
+.language-option.is-active {
+    border-left: 3px solid var(--primary-color);
+    padding-left: 12px;
+    background-color: var(--section-content-bg);
+}
+
 .language-option .lang-name {
     font-size: 0.9rem;
 }
@@ -228,6 +239,11 @@ h1 {
 
 .theme-toggle:hover {
     background-color: rgba(128, 128, 128, 0.1);
+}
+
+.theme-toggle:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--primary-color);
 }
 
 .light-theme .sun-icon,
@@ -353,6 +369,13 @@ h1 {
 }
 
 .password-toggle:hover {
+    opacity: 1;
+}
+
+.password-toggle:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--primary-color);
+    border-radius: 4px;
     opacity: 1;
 }
 
@@ -859,6 +882,22 @@ textarea[aria-invalid="true"] {
 
 .info-text.error {
     color: var(--error-color);
+}
+
+/* Input highlight animation for programmatic updates */
+.input-highlight {
+    animation: input-highlight 1.5s ease-out;
+}
+
+@keyframes input-highlight {
+    0% {
+        background-color: rgba(0, 170, 255, 0.4);
+        box-shadow: 0 0 0 2px var(--primary-color);
+    }
+    100% {
+        background-color: var(--input-bg);
+        box-shadow: none;
+    }
 }
 
 /* File input styling */

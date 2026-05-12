@@ -22,6 +22,7 @@
 #include <string.h>
 #include <strings.h>
 #include "esp_http_client.h"
+#include "esp_tls.h"
 #include "cJSON.h"
 #include "esp_system.h"
 #include "esp_err.h"
@@ -1402,6 +1403,13 @@ static int metno_process_buffer(char *buf, int buf_used, bool final)
  */
 bool wifi_get_metno_sunrise(void)
 {
+    size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+    if (free_heap < 20000)
+    {
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Sunrise: low heap %d (need ~20K), skipping", free_heap);
+        return false;
+    }
+
     if (!validate_coordinate(my_lat, true) || !validate_coordinate(my_lon, false))
     {
         ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Sunrise: invalid coordinates, skipping");
@@ -1456,6 +1464,7 @@ bool wifi_get_metno_sunrise(void)
         .timeout_ms = 8000,
         .crt_bundle_attach = custom_crt_bundle_attach,
         .transport_type = HTTP_TRANSPORT_OVER_SSL,
+        .tls_version = ESP_TLS_VER_TLS_1_2,
         .user_agent = WEATHER_USER_AGENT,
     };
     esp_http_client_handle_t client = esp_http_client_init(&config);
@@ -1541,6 +1550,13 @@ bool wifi_get_metno_sunrise(void)
  */
 bool wifi_get_metno_weather(void)
 {
+    size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+    if (free_heap < 20000)
+    {
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Met.no: low heap %d (need ~20K), skipping", free_heap);
+        return false;
+    }
+
     if (!validate_coordinate(my_lat, true) || !validate_coordinate(my_lon, false))
     {
         ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Met.no: invalid coordinates '%s','%s'", my_lat, my_lon);
@@ -1610,6 +1626,7 @@ bool wifi_get_metno_weather(void)
         .timeout_ms = 10000,
         .crt_bundle_attach = custom_crt_bundle_attach,
         .transport_type = HTTP_TRANSPORT_OVER_SSL,
+        .tls_version = ESP_TLS_VER_TLS_1_2,
         .user_agent = WEATHER_USER_AGENT,
     };
     esp_http_client_handle_t client = esp_http_client_init(&config);
