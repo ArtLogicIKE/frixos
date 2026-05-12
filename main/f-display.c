@@ -1174,9 +1174,10 @@ update_check:
     last_showing_weather = showing_weather;
     last_showing_ha      = showing_ha;
 
-    /* Update scroll message: show slot name while HA slot is active, else restore */
-    if (showing_ha && display_schedule_count > 0
-        && display_schedule[current_slot_idx].name[0] != '\0')
+    /* Update scroll message: show slot name while named slot is active, else restore */
+    bool slot_has_name = display_schedule_count > 0
+                         && display_schedule[current_slot_idx].name[0] != '\0';
+    if ((showing_ha || showing_weather) && slot_has_name)
     {
       set_scroll_message(display_schedule[current_slot_idx].name);
     }
@@ -1205,10 +1206,10 @@ static void update_display_content(time_t now)
 
   if (weather_has_updated || (timeinfo.tm_min == 1))
   {
-    /* Don't overwrite the HA slot name while it's active in the scroll ticker */
-    bool ha_name_active = showing_ha && display_schedule_count > 0
-                          && display_schedule[current_slot_idx].name[0] != '\0';
-    if (!ha_name_active)
+    /* Don't overwrite a named slot's scroll message while it is active */
+    bool named_slot_active = (showing_ha || showing_weather) && display_schedule_count > 0
+                              && display_schedule[current_slot_idx].name[0] != '\0';
+    if (!named_slot_active)
       update_weather_msg();
     weather_has_updated = false;
   }
@@ -1342,12 +1343,18 @@ static void update_display_content(time_t now)
   }
   else if (showing_weather && alternate_display_active)
   {
-    lv_obj_align(digit_objs[0], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 0, y_digits);
-    lv_obj_align(digit_objs[1], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 1 * 18 + 6, y_digits);
-    lv_obj_align(digit_objs[2], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 2 * 18 + 6, y_digits);
-    lv_obj_align(digit_objs[3], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 3 * 18 + 6, y_digits);
+    int n_sig = (digit2 >= 0) ? 3 : (digit3 >= 0) ? 2 : 1;
+    int content_w = n_sig * DIGIT_WIDTH + 10; /* 10px for degree symbol */
+    int x_start = (LCD_H_RES - content_w) / 2;
+
+    lv_obj_align(digit_objs[0], LV_ALIGN_TOP_LEFT, 0, y_digits);
+    lv_obj_align(digit_objs[1], LV_ALIGN_TOP_LEFT, (n_sig >= 3) ? x_start : 0, y_digits);
+    lv_obj_align(digit_objs[2], LV_ALIGN_TOP_LEFT,
+                 (n_sig == 3) ? x_start + DIGIT_WIDTH : (n_sig == 2) ? x_start : 0, y_digits);
+    lv_obj_align(digit_objs[3], LV_ALIGN_TOP_LEFT, x_start + (n_sig - 1) * DIGIT_WIDTH, y_digits);
+
     lv_label_set_text(label_degree, "\xc2\xb0");
-    lv_obj_align(label_degree, LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 3 * 18 + 6 + DIGIT_WIDTH + 1, y_digits);
+    lv_obj_align(label_degree, LV_ALIGN_TOP_LEFT, x_start + n_sig * DIGIT_WIDTH + 1, y_digits);
     show_object(label_degree, true);
     show_object(img_ampm, false);
     show_object(dots[0], false);

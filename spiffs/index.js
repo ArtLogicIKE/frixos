@@ -2375,17 +2375,19 @@ function buildSlotRow(slot) {
 
     const nameInput = document.createElement('input');
     nameInput.type = 'text';
-    nameInput.placeholder = 'name (e.g. Bedroom Temp)';
+    nameInput.placeholder = 'name (e.g. Outside Temp)';
     nameInput.maxLength = 31;
     nameInput.value = slot.n || '';
     nameInput.style.cssText = 'flex:1 1 120px;min-width:100px;';
-    nameInput.style.display = (slot.t === 3) ? '' : 'none';
+    nameInput.style.display = (slot.t === 2 || slot.t === 3) ? '' : 'none';
 
     typeSelect.addEventListener('change', () => {
-        const isHA = (parseInt(typeSelect.value) === 3);
+        const t = parseInt(typeSelect.value);
+        const isHA = (t === 3);
+        const hasName = (t === 2 || t === 3);
         entityInput.style.display = isHA ? '' : 'none';
         unitInput.style.display   = isHA ? '' : 'none';
-        nameInput.style.display   = isHA ? '' : 'none';
+        nameInput.style.display   = hasName ? '' : 'none';
     });
 
     const removeBtn = document.createElement('button');
@@ -2448,6 +2450,8 @@ function serializeDisplaySchedule() {
         if (t === 3) {
             if (entEl  && entEl.value.trim())  slot.e = entEl.value.trim();
             if (unitEl && unitEl.value.trim()) slot.l = unitEl.value.trim();
+            if (nameEl && nameEl.value.trim()) slot.n = nameEl.value.trim();
+        } else if (t === 2) {
             if (nameEl && nameEl.value.trim()) slot.n = nameEl.value.trim();
         }
         if (t !== 3 || slot.e) slots.push(slot);
