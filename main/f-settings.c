@@ -98,6 +98,101 @@
 // Tag for logging
 static const char *TAG = "f-settings";
 
+/* ---- Display schedule helpers ---- */
+
+void parse_display_schedule(const char *json)
+{
+    display_schedule_count = 0;
+    if (!json || json[0] == '\0') return;
+
+    cJSON *arr = cJSON_Parse(json);
+    if (!arr || !cJSON_IsArray(arr)) { cJSON_Delete(arr); return; }
+
+    int count = cJSON_GetArraySize(arr);
+    if (count > MAX_DISPLAY_SLOTS) count = MAX_DISPLAY_SLOTS;
+
+    for (int i = 0; i < count; i++)
+    {
+        cJSON *slot = cJSON_GetArrayItem(arr, i);
+        if (!slot) continue;
+        cJSON *t = cJSON_GetObjectItem(slot, "t");
+        cJSON *d = cJSON_GetObjectItem(slot, "d");
+        if (!cJSON_IsNumber(t) || !cJSON_IsNumber(d)) continue;
+
+        int type = t->valueint;
+        if (type < SLOT_TYPE_TIME || type > SLOT_TYPE_HA) continue;
+        int dur = d->valueint;
+        if (dur <= 0 || dur > 3600) continue;
+
+        display_slot_t *s = &display_schedule[display_schedule_count];
+        s->type     = (slot_type_t)type;
+        s->duration = (uint16_t)dur;
+        s->entity[0] = '\0';
+
+        if (type == SLOT_TYPE_HA)
+        {
+            cJSON *e = cJSON_GetObjectItem(slot, "e");
+            if (cJSON_IsString(e) && e->valuestring[0] != '\0')
+            {
+                strncpy(s->entity, e->valuestring, SLOT_ENTITY_LEN - 1);
+                s->entity[SLOT_ENTITY_LEN - 1] = '\0';
+            }
+            else continue; /* HA slot with no entity is useless */
+        }
+        display_schedule_count++;
+    }
+    cJSON_Delete(arr);
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Display schedule: %d slots", display_schedule_count);
+}
+
+void migrate_schedule_from_legacy(void)
+{
+    display_schedule_count = 0;
+
+    /* Always start with a time slot; use sec_time if set, else default 30s */
+    display_schedule[display_schedule_count].type     = SLOT_TYPE_TIME;
+    display_schedule[display_schedule_count].duration = eeprom_sec_time > 0 ? eeprom_sec_time : 30;
+    display_schedule[display_schedule_count].entity[0] = '\0';
+    display_schedule_count++;
+
+    if (eeprom_sec_cgm > 0)
+    {
+        display_schedule[display_schedule_count].type     = SLOT_TYPE_CGM;
+        display_schedule[display_schedule_count].duration = eeprom_sec_cgm;
+        display_schedule[display_schedule_count].entity[0] = '\0';
+        display_schedule_count++;
+    }
+    if (eeprom_sec_weather > 0)
+    {
+        display_schedule[display_schedule_count].type     = SLOT_TYPE_WEATHER_TEMP;
+        display_schedule[display_schedule_count].duration = eeprom_sec_weather;
+        display_schedule[display_schedule_count].entity[0] = '\0';
+        display_schedule_count++;
+    }
+
+    /* Serialise into eeprom_disp_sched so it persists on next boot */
+    cJSON *arr = cJSON_CreateArray();
+    for (int i = 0; i < display_schedule_count; i++)
+    {
+        cJSON *slot = cJSON_CreateObject();
+        cJSON_AddNumberToObject(slot, "t", display_schedule[i].type);
+        cJSON_AddNumberToObject(slot, "d", display_schedule[i].duration);
+        if (display_schedule[i].type == SLOT_TYPE_HA)
+            cJSON_AddStringToObject(slot, "e", display_schedule[i].entity);
+        cJSON_AddItemToArray(arr, slot);
+    }
+    char *out = cJSON_PrintUnformatted(arr);
+    cJSON_Delete(arr);
+    if (out)
+    {
+        strncpy(eeprom_disp_sched, out, sizeof(eeprom_disp_sched) - 1);
+        eeprom_disp_sched[sizeof(eeprom_disp_sched) - 1] = '\0';
+        free(out);
+        write_nvs_parameters();
+    }
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Migrated legacy schedule: %d slots", display_schedule_count);
+}
+
 // HTTP server handle
 static httpd_handle_t server = NULL;
 
@@ -529,11 +624,11 @@ static uint64_t calculate_include_mask(const char *group, const char *params)
         }
         else if (strcmp(group, "integrations") == 0)
         {
-            // p25-p33, p44, p45, p48, p49, p51-p55
+            // p25-p33, p44, p45, p48, p49, p51-p56
             for (int i = 25; i <= 33; i++) mask |= (1ULL << i);
             mask |= (1ULL << 44) | (1ULL << 45) | (1ULL << 48) |
                     (1ULL << 49) | (1ULL << 51) | (1ULL << 52) |
-                    (1ULL << 53) | (1ULL << 54) | (1ULL << 55);
+                    (1ULL << 53) | (1ULL << 54) | (1ULL << 55) | (1ULL << 56);
         }
     }
 
@@ -667,6 +762,7 @@ esp_err_t send_json_settings(httpd_req_t *req)
     if (mask & (1ULL << 48)) cJSON_AddNumberToObject(root, "p48", eeprom_sec_time);
     if (mask & (1ULL << 49)) cJSON_AddNumberToObject(root, "p49", eeprom_sec_cgm);
     if (mask & (1ULL << 55)) cJSON_AddNumberToObject(root, "p55", eeprom_sec_weather);
+    if (mask & (1ULL << 56)) cJSON_AddStringToObject(root, "p56", eeprom_disp_sched);
 
     // Add Libre settings (region only - other fields are internal and set by API responses)
     if (mask & (1ULL << 44)) cJSON_AddNumberToObject(root, "p44", eeprom_libre_region);
@@ -1775,6 +1871,20 @@ esp_err_t settings_post_handler(httpd_req_t *req)
         else
         {
             ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Invalid glucose_unit value: %d, must be 0 or 1", unit_value);
+        }
+    }
+
+    // p56: display schedule JSON
+    if (cJSON_HasObjectItem(root, "p56"))
+    {
+        cJSON *p56 = cJSON_GetObjectItem(root, "p56");
+        const char *sched_json = cJSON_IsString(p56) ? p56->valuestring : NULL;
+        if (sched_json && strlen(sched_json) < sizeof(eeprom_disp_sched))
+        {
+            strncpy(eeprom_disp_sched, sched_json, sizeof(eeprom_disp_sched) - 1);
+            eeprom_disp_sched[sizeof(eeprom_disp_sched) - 1] = '\0';
+            parse_display_schedule(eeprom_disp_sched);
+            parse_integrations(); // re-register any new HA entities from the schedule
         }
     }
 

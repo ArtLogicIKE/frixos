@@ -1517,18 +1517,8 @@ function handleFormSubmit(e, formId) {
             changedCount++;
         }
 
-        const secTimeInput = getFieldInForm('eeprom_sec_time');
-        if (secTimeInput && addIfChanged(formData, 'p48', parseInt(secTimeInput.value) || 0, window.settings.p48)) {
-            changedCount++;
-        }
-
-        const secCgmInput = getFieldInForm('eeprom_sec_cgm');
-        if (secCgmInput && addIfChanged(formData, 'p49', parseInt(secCgmInput.value) || 0, window.settings.p49)) {
-            changedCount++;
-        }
-
-        const secWeatherInput = getFieldInForm('eeprom_sec_weather');
-        if (secWeatherInput && addIfChanged(formData, 'p55', parseInt(secWeatherInput.value) || 0, window.settings.p55)) {
+        const newSched = serializeDisplaySchedule();
+        if (addIfChanged(formData, 'p56', newSched, window.settings.p56)) {
             changedCount++;
         }
 
@@ -2332,6 +2322,111 @@ function updateMmolLabels() {
     }
 }
 
+/* ---- Display Schedule UI ---- */
+
+const SLOT_TYPES = [
+    { value: 0, label: 'Time' },
+    { value: 1, label: 'CGM (glucose)' },
+    { value: 2, label: 'Outside Temperature' },
+    { value: 3, label: 'Home Assistant entity' },
+];
+
+function buildSlotRow(slot) {
+    const row = document.createElement('div');
+    row.className = 'schedule-slot-row';
+    row.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;';
+
+    const typeSelect = document.createElement('select');
+    typeSelect.style.cssText = 'flex:0 0 auto;';
+    SLOT_TYPES.forEach(opt => {
+        const o = document.createElement('option');
+        o.value = opt.value;
+        o.textContent = opt.label;
+        if (slot.t === opt.value) o.selected = true;
+        typeSelect.appendChild(o);
+    });
+
+    const durInput = document.createElement('input');
+    durInput.type = 'number';
+    durInput.min = 1;
+    durInput.max = 3600;
+    durInput.value = slot.d || 30;
+    durInput.style.cssText = 'width:70px;flex:0 0 auto;';
+    durInput.title = 'Duration (seconds)';
+
+    const durLabel = document.createElement('span');
+    durLabel.textContent = 'sec';
+    durLabel.style.cssText = 'flex:0 0 auto;color:#999;font-size:0.9em;';
+
+    const entityInput = document.createElement('input');
+    entityInput.type = 'text';
+    entityInput.placeholder = 'entity_id (e.g. sensor.temp)';
+    entityInput.value = slot.e || '';
+    entityInput.style.cssText = 'flex:1 1 160px;min-width:120px;';
+    entityInput.style.display = (slot.t === 3) ? '' : 'none';
+
+    typeSelect.addEventListener('change', () => {
+        entityInput.style.display = (parseInt(typeSelect.value) === 3) ? '' : 'none';
+    });
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.textContent = '✕';
+    removeBtn.style.cssText = 'flex:0 0 auto;cursor:pointer;padding:2px 8px;';
+    removeBtn.addEventListener('click', () => row.remove());
+
+    row.appendChild(typeSelect);
+    row.appendChild(durInput);
+    row.appendChild(durLabel);
+    row.appendChild(entityInput);
+    row.appendChild(removeBtn);
+    return row;
+}
+
+function renderDisplaySchedule() {
+    const list = el('display-schedule-list');
+    if (!list) return;
+    list.innerHTML = '';
+
+    let slots = [];
+    if (typeof window.settings.p56 === 'string' && window.settings.p56.trim().startsWith('[')) {
+        try { slots = JSON.parse(window.settings.p56); } catch(e) { slots = []; }
+    }
+    if (!Array.isArray(slots) || slots.length === 0) {
+        // Migrate from legacy p48/p49/p55 defaults so the UI isn't blank
+        if ((window.settings.p48 || 0) > 0) slots.push({t:0, d: window.settings.p48});
+        if ((window.settings.p49 || 0) > 0) slots.push({t:1, d: window.settings.p49});
+        if ((window.settings.p55 || 0) > 0) slots.push({t:2, d: window.settings.p55});
+        if (slots.length === 0) slots.push({t:0, d:30});
+    }
+    slots.forEach(s => list.appendChild(buildSlotRow(s)));
+
+    const addBtn = el('add-schedule-slot');
+    if (addBtn && !addBtn._listenerSet) {
+        addBtn._listenerSet = true;
+        addBtn.addEventListener('click', () => {
+            list.appendChild(buildSlotRow({t:0, d:30}));
+        });
+    }
+}
+
+function serializeDisplaySchedule() {
+    const list = el('display-schedule-list');
+    if (!list) return '[]';
+    const slots = [];
+    list.querySelectorAll('.schedule-slot-row').forEach(row => {
+        const typeEl  = row.querySelector('select');
+        const durEl   = row.querySelectorAll('input[type="number"]')[0];
+        const entEl   = row.querySelector('input[type="text"]');
+        const t = parseInt(typeEl ? typeEl.value : 0);
+        const d = parseInt(durEl  ? durEl.value  : 30) || 1;
+        const slot = {t, d};
+        if (t === 3 && entEl && entEl.value.trim()) slot.e = entEl.value.trim();
+        if (t !== 3 || slot.e) slots.push(slot);
+    });
+    return JSON.stringify(slots);
+}
+
 function setupIntegrationsSection() {
     const form = el('integrationsForm');
     const haUrlInput = el('eeprom_ha_url');
@@ -2475,20 +2570,7 @@ function setupIntegrationsSection() {
             glucoseValidity.value = window.settings.p45 || 30;
         }
 
-        const secTime = el('eeprom_sec_time');
-        if (secTime && typeof window.settings.p48 !== 'undefined') {
-            secTime.value = window.settings.p48 || 0;
-        }
-
-        const secCgm = el('eeprom_sec_cgm');
-        if (secCgm && typeof window.settings.p49 !== 'undefined') {
-            secCgm.value = window.settings.p49 || 0;
-        }
-
-        const secWeather = el('eeprom_sec_weather');
-        if (secWeather && typeof window.settings.p55 !== 'undefined') {
-            secWeather.value = window.settings.p55 || 0;
-        }
+        renderDisplaySchedule();
 
         // Load shared username (p31)
         if (glucoseUsername && typeof window.settings.p31 !== 'undefined') {

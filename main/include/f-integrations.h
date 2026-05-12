@@ -37,6 +37,7 @@ esp_err_t custom_crt_bundle_attach(void *conf);
 void parse_HA_entities(const char *input);
 void parse_stock_entities(const char *input);
 void parse_integrations(void);
+void add_display_schedule_ha_entities(void);
 void startup_integrations(void);
 void force_integration_update(void);
 cJSON *get_nested_json_value(cJSON *json, const char *path);
