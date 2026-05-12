@@ -1316,9 +1316,9 @@ void display_task(void *pvParameters)
     loop_counter++;
     if (loop_counter % 1000 == 1)
     {
-      UBaseType_t stack_high_water = uxTaskGetStackHighWaterMark(NULL);
-      ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Display loop %lu, stack %lu", loop_counter, stack_high_water);
-      if (stack_high_water < 1024) ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Low stack: %lu bytes", stack_high_water);
+      size_t stack_free_bytes = uxTaskGetStackHighWaterMark(NULL) * sizeof(StackType_t);
+      ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Display loop %lu, stack %u bytes", loop_counter, (unsigned)stack_free_bytes);
+      if (stack_free_bytes < 1024) ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Low stack: %u bytes", (unsigned)stack_free_bytes);
     }
 
     time(&now);

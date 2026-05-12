@@ -46,9 +46,9 @@ static int rescue_mode_this_boot = 0; // Set by check_boot_fail_count() when 3 c
 
 // versioning variables
 const char app[10] = "Frixos";
-const char version[10] = "2.24b";
+const char version[10] = "2.25";
 static const char *TAG = "frixos main"; // in case we use ESP_LOGE -rror/W-arning/I-info (also D-ebug/V-erbose)
-const int fwversion = 64;
+const int fwversion = 65;
 const int rescuemode = 0; // 0 = normal, 1 = rescue mode
 const char revision[] = "E";
 
@@ -249,6 +249,11 @@ uint16_t eeprom_glucose_low = 70;     // Default low threshold in mg/dL
 uint8_t eeprom_glucose_unit = 0;      // Glucose display unit: 0=mg/dL, 1=mmol/L
 uint32_t eeprom_pwm_frequency = 200;  // Default PWM frequency in Hz (range 10-78000)
 uint16_t eeprom_max_power = MAX_DUTY; // Default max power (range 1-1023)
+// Board revision read-only key in NVS:
+// versions A, B, C, D, E, F and G are revision 0; version H is revision 1.
+// in rev 1 board, PWM has an analog filter and can go beyond the 5k frequency limit.
+// to make the LED inaudible
+uint8_t eeprom_board_rev = 0;
 
 // LibreLinkUp settings
 uint8_t eeprom_libre_region = 0; // 0=disabled, 1=US, 2=Japan, 3=Rest of World
@@ -490,7 +495,8 @@ void ESP_LOG_WEB(esp_log_level_t level, const char *tag, const char *format, ...
 
 void ESP_LOGI_STACK(const char *tag, const char *msg)
 {
-  ESP_LOG_WEB(ESP_LOG_INFO, tag, "%s heap %lu stack %u", msg, esp_get_free_heap_size(), uxTaskGetStackHighWaterMark(NULL));
+  size_t stack_free_bytes = uxTaskGetStackHighWaterMark(NULL) * sizeof(StackType_t);
+  ESP_LOG_WEB(ESP_LOG_INFO, tag, "%s heap %lu stack %u bytes", msg, esp_get_free_heap_size(), (unsigned)stack_free_bytes);
 }
 
 void startup_diags(void)
@@ -607,6 +613,12 @@ void startup_read_eeprom(void)
   }
   else
   {
+    err = nvs_get_u8(nvs_handle, "board_rev", &eeprom_board_rev);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+    {
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error eeprom_board_rev: %s", esp_err_to_name(err));
+    }
+
     for (int i = 0; i < SETTINGS_COUNT; i++)
     {
       const nvs_setting_t *s = &settings_table[i];
@@ -649,10 +661,12 @@ void startup_read_eeprom(void)
     strcpy(my_lon, eeprom_lon);
     strcpy(my_timezone, eeprom_timezone);
 
-    if (eeprom_max_power == 850) // reduce all 850 limit to 750
+    if (eeprom_board_rev == 1)
     {
-      eeprom_max_power = MAX_DUTY;
-      ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Reduced max_power from 850 to %u", eeprom_max_power);
+      if (eeprom_pwm_frequency == 200)
+        eeprom_pwm_frequency = 33333;
+      if (eeprom_max_power == 750)
+        eeprom_max_power = 900;
     }
 
     // Initialize current POH counter and last save time
@@ -681,7 +695,7 @@ void startup_read_eeprom(void)
                 "  Dexcom:      region=%u, refresh=%u, high=%u, low=%u\n"
                 "  Libre:       region=%u, ns_url=%s\n"
                 "  CGM:         username=%s, validity=%u, sec_time=%u, sec_cgm=%u, unit=%u (password redacted)\n"
-                "  PWM:         freq=%u, max_power=%u, poh=%u",
+                "  PWM:         freq=%u, max_power=%u, board_rev=%u, poh=%u",
                 eeprom_hostname, eeprom_wifi_ssid, eeprom_wifi_start, eeprom_wifi_end,
                 eeprom_lat, eeprom_lon, eeprom_timezone,
                 eeprom_font[0], eeprom_font[1],
@@ -703,7 +717,7 @@ void startup_read_eeprom(void)
                 eeprom_dexcom_region, eeprom_glucose_refresh, eeprom_glucose_high, eeprom_glucose_low,
                 eeprom_libre_region, eeprom_ns_url,
                 eeprom_glucose_username, glucose_validity_duration, eeprom_sec_time, eeprom_sec_cgm, eeprom_glucose_unit,
-                eeprom_pwm_frequency, eeprom_max_power, eeprom_poh);
+                eeprom_pwm_frequency, eeprom_max_power, eeprom_board_rev, eeprom_poh);
   }
 
 } // end startup_read_eeprom
@@ -901,7 +915,7 @@ void startup_threads()
   xTaskCreatePinnedToCore(
       display_task,   /* Task function. */
       "display_task", /* name of task, from f-display.c */
-      8192 + 2048,    /* Stack size of task */
+      8960,           /* Stack size of task (reduced proportionally) */
       NULL,           /* parameter of the task */
       3,              /* priority of the task */
       NULL,           /* Task handle to keep track of created task */
@@ -913,7 +927,7 @@ void startup_threads()
   xTaskCreatePinnedToCore(
       wifi_task,
       "wifi_task",
-      8192,
+      7168,
       NULL,
       3,
       NULL,

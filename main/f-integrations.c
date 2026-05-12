@@ -227,19 +227,18 @@ esp_err_t custom_crt_bundle_attach(void *conf)
 // Function to check stack usage
 static void check_stack_usage(void)
 {
-    UBaseType_t watermark = uxTaskGetStackHighWaterMark(NULL);
-    UBaseType_t free_stack = watermark;
+    size_t free_stack_bytes = uxTaskGetStackHighWaterMark(NULL) * sizeof(StackType_t);
     size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_8BIT);
 
     // Display the stack usage for the current task and task name
-    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Task %s FREE: Stack %d, heap %d",
+    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Task %s FREE: Stack %u bytes, heap %u",
                 pcTaskGetName(NULL),
-                free_stack,
-                free_heap);
+                (unsigned)free_stack_bytes,
+                (unsigned)free_heap);
 
-    if (free_stack < STACK_WARNING_THRESHOLD)
+    if (free_stack_bytes < STACK_WARNING_THRESHOLD)
     {
-        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Low stack: %d bytes", free_stack);
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Low stack: %u bytes", (unsigned)free_stack_bytes);
     }
 }
 
@@ -944,8 +943,8 @@ void startup_integrations(void)
     // parse for any active integrations
     parse_integrations();
 
-    // Create the integration update task with increased stack size
-    // Increased to 10KB to handle SSL connections and HTTP buffers when multiple integrations run
+    // Create the integration update task with reduced stack size
+    // Sized to keep SSL/integration headroom while reclaiming heap for runtime TLS.
     // Pin to APP_CPU (core 1). WiFi/lwIP/httpd run on PRO_CPU (core 0) and
     // heavy mbedtls handshakes here would otherwise starve them — observable
     // as multi-second ping latency or "destination host unreachable" while a
@@ -953,7 +952,7 @@ void startup_integrations(void)
     BaseType_t task_created = xTaskCreatePinnedToCore(
         integration_update_task,         // Task function
         "integration_update_task",       // Task name
-        8192 + 2048,                     // 10KB stack for multiple SSL connections
+        8960,                            // Reduced proportionally from 10240 words
         NULL,                            // Task parameters
         3,                               // Task priority (reduced from 5 to 3)
         &integration_update_task_handle, // Task handle
