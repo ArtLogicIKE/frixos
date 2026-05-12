@@ -164,8 +164,10 @@ typedef enum {
 
 typedef struct {
     slot_type_t type;
-    uint16_t    duration;              /* seconds to show this slot */
+    uint16_t    duration;                /* seconds to show this slot */
     char        entity[SLOT_ENTITY_LEN]; /* HA entity ID (SLOT_TYPE_HA only) */
+    char        label[8];               /* short unit shown next to digits, e.g. "°F", "W" */
+    char        name[32];               /* display name shown in scroll message while active */
 } display_slot_t;
 
 extern display_slot_t display_schedule[MAX_DISPLAY_SLOTS];

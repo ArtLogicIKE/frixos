@@ -2365,8 +2365,27 @@ function buildSlotRow(slot) {
     entityInput.style.cssText = 'flex:1 1 160px;min-width:120px;';
     entityInput.style.display = (slot.t === 3) ? '' : 'none';
 
+    const unitInput = document.createElement('input');
+    unitInput.type = 'text';
+    unitInput.placeholder = 'unit (e.g. °F)';
+    unitInput.maxLength = 7;
+    unitInput.value = slot.l || '';
+    unitInput.style.cssText = 'width:70px;flex:0 0 auto;';
+    unitInput.style.display = (slot.t === 3) ? '' : 'none';
+
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.placeholder = 'name (e.g. Bedroom Temp)';
+    nameInput.maxLength = 31;
+    nameInput.value = slot.n || '';
+    nameInput.style.cssText = 'flex:1 1 120px;min-width:100px;';
+    nameInput.style.display = (slot.t === 3) ? '' : 'none';
+
     typeSelect.addEventListener('change', () => {
-        entityInput.style.display = (parseInt(typeSelect.value) === 3) ? '' : 'none';
+        const isHA = (parseInt(typeSelect.value) === 3);
+        entityInput.style.display = isHA ? '' : 'none';
+        unitInput.style.display   = isHA ? '' : 'none';
+        nameInput.style.display   = isHA ? '' : 'none';
     });
 
     const removeBtn = document.createElement('button');
@@ -2379,6 +2398,8 @@ function buildSlotRow(slot) {
     row.appendChild(durInput);
     row.appendChild(durLabel);
     row.appendChild(entityInput);
+    row.appendChild(unitInput);
+    row.appendChild(nameInput);
     row.appendChild(removeBtn);
     return row;
 }
@@ -2415,13 +2436,20 @@ function serializeDisplaySchedule() {
     if (!list) return '[]';
     const slots = [];
     list.querySelectorAll('.schedule-slot-row').forEach(row => {
-        const typeEl  = row.querySelector('select');
-        const durEl   = row.querySelectorAll('input[type="number"]')[0];
-        const entEl   = row.querySelector('input[type="text"]');
+        const typeEl    = row.querySelector('select');
+        const durEl     = row.querySelectorAll('input[type="number"]')[0];
+        const textInputs = row.querySelectorAll('input[type="text"]');
+        const entEl     = textInputs[0];
+        const unitEl    = textInputs[1];
+        const nameEl    = textInputs[2];
         const t = parseInt(typeEl ? typeEl.value : 0);
         const d = parseInt(durEl  ? durEl.value  : 30) || 1;
         const slot = {t, d};
-        if (t === 3 && entEl && entEl.value.trim()) slot.e = entEl.value.trim();
+        if (t === 3) {
+            if (entEl  && entEl.value.trim())  slot.e = entEl.value.trim();
+            if (unitEl && unitEl.value.trim()) slot.l = unitEl.value.trim();
+            if (nameEl && nameEl.value.trim()) slot.n = nameEl.value.trim();
+        }
         if (t !== 3 || slot.e) slots.push(slot);
     });
     return JSON.stringify(slots);

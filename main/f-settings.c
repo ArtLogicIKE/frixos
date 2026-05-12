@@ -125,9 +125,11 @@ void parse_display_schedule(const char *json)
         if (dur <= 0 || dur > 3600) continue;
 
         display_slot_t *s = &display_schedule[display_schedule_count];
-        s->type     = (slot_type_t)type;
-        s->duration = (uint16_t)dur;
+        s->type      = (slot_type_t)type;
+        s->duration  = (uint16_t)dur;
         s->entity[0] = '\0';
+        s->label[0]  = '\0';
+        s->name[0]   = '\0';
 
         if (type == SLOT_TYPE_HA)
         {
@@ -138,6 +140,19 @@ void parse_display_schedule(const char *json)
                 s->entity[SLOT_ENTITY_LEN - 1] = '\0';
             }
             else continue; /* HA slot with no entity is useless */
+        }
+
+        cJSON *l = cJSON_GetObjectItem(slot, "l");
+        if (cJSON_IsString(l) && l->valuestring[0] != '\0')
+        {
+            strncpy(s->label, l->valuestring, sizeof(s->label) - 1);
+            s->label[sizeof(s->label) - 1] = '\0';
+        }
+        cJSON *n = cJSON_GetObjectItem(slot, "n");
+        if (cJSON_IsString(n) && n->valuestring[0] != '\0')
+        {
+            strncpy(s->name, n->valuestring, sizeof(s->name) - 1);
+            s->name[sizeof(s->name) - 1] = '\0';
         }
         display_schedule_count++;
     }
@@ -179,6 +194,10 @@ void migrate_schedule_from_legacy(void)
         cJSON_AddNumberToObject(slot, "d", display_schedule[i].duration);
         if (display_schedule[i].type == SLOT_TYPE_HA)
             cJSON_AddStringToObject(slot, "e", display_schedule[i].entity);
+        if (display_schedule[i].label[0] != '\0')
+            cJSON_AddStringToObject(slot, "l", display_schedule[i].label);
+        if (display_schedule[i].name[0] != '\0')
+            cJSON_AddStringToObject(slot, "n", display_schedule[i].name);
         cJSON_AddItemToArray(arr, slot);
     }
     char *out = cJSON_PrintUnformatted(arr);

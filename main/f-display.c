@@ -1173,6 +1173,17 @@ update_check:
     last_showing_glucose = showing_glucose;
     last_showing_weather = showing_weather;
     last_showing_ha      = showing_ha;
+
+    /* Update scroll message: show slot name while HA slot is active, else restore */
+    if (showing_ha && display_schedule_count > 0
+        && display_schedule[current_slot_idx].name[0] != '\0')
+    {
+      set_scroll_message(display_schedule[current_slot_idx].name);
+    }
+    else if (mode_changed)
+    {
+      update_weather_msg();
+    }
   }
   else if (!showing_glucose && !showing_weather && !showing_ha)
   {
@@ -1194,7 +1205,11 @@ static void update_display_content(time_t now)
 
   if (weather_has_updated || (timeinfo.tm_min == 1))
   {
-    update_weather_msg();
+    /* Don't overwrite the HA slot name while it's active in the scroll ticker */
+    bool ha_name_active = showing_ha && display_schedule_count > 0
+                          && display_schedule[current_slot_idx].name[0] != '\0';
+    if (!ha_name_active)
+      update_weather_msg();
     weather_has_updated = false;
   }
 
@@ -1331,6 +1346,7 @@ static void update_display_content(time_t now)
     lv_obj_align(digit_objs[1], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 1 * 18 + 6, y_digits);
     lv_obj_align(digit_objs[2], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 2 * 18 + 6, y_digits);
     lv_obj_align(digit_objs[3], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 3 * 18 + 6, y_digits);
+    lv_label_set_text(label_degree, "\xc2\xb0");
     lv_obj_align(label_degree, LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 3 * 18 + 6 + DIGIT_WIDTH + 1, y_digits);
     show_object(label_degree, true);
     show_object(img_ampm, false);
@@ -1339,11 +1355,32 @@ static void update_display_content(time_t now)
   }
   else if (showing_ha && alternate_display_active)
   {
-    lv_obj_align(digit_objs[0], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 0, y_digits);
-    lv_obj_align(digit_objs[1], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 1 * 18 + 6, y_digits);
-    lv_obj_align(digit_objs[2], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 2 * 18 + 6, y_digits);
-    lv_obj_align(digit_objs[3], LV_ALIGN_TOP_LEFT, eeprom_ofs_x + 3 * 18 + 6, y_digits);
-    show_object(label_degree, false);
+    const char *ha_label = (display_schedule_count > 0)
+                         ? display_schedule[current_slot_idx].label : "";
+    /* Count significant digits to center the display */
+    int n_sig = (digit2 >= 0) ? 3 : (digit3 >= 0) ? 2 : 1;
+    /* Rough per-char width for frixos_11; keeps label_w simple */
+    int label_w = (ha_label[0] != '\0') ? (int)(strlen(ha_label) * 8 + 2) : 0;
+    int content_w = n_sig * DIGIT_WIDTH + label_w;
+    int x_start = (LCD_H_RES - content_w) / 2;
+
+    /* Park invisible digit objects at 0 (they show transparent via digit=-1) */
+    lv_obj_align(digit_objs[0], LV_ALIGN_TOP_LEFT, 0, y_digits);
+    lv_obj_align(digit_objs[1], LV_ALIGN_TOP_LEFT, (n_sig >= 3) ? x_start : 0, y_digits);
+    lv_obj_align(digit_objs[2], LV_ALIGN_TOP_LEFT,
+                 (n_sig == 3) ? x_start + DIGIT_WIDTH : (n_sig == 2) ? x_start : 0, y_digits);
+    lv_obj_align(digit_objs[3], LV_ALIGN_TOP_LEFT, x_start + (n_sig - 1) * DIGIT_WIDTH, y_digits);
+
+    if (ha_label[0] != '\0')
+    {
+      lv_label_set_text(label_degree, ha_label);
+      lv_obj_align(label_degree, LV_ALIGN_TOP_LEFT, x_start + n_sig * DIGIT_WIDTH + 1, y_digits);
+      show_object(label_degree, true);
+    }
+    else
+    {
+      show_object(label_degree, false);
+    }
     show_object(img_ampm, false);
     show_object(dots[0], false);
     show_object(dots[1], false);
