@@ -848,14 +848,19 @@ function navigateToSection() {
         // Optimization: Update only previous and current menu items instead of O(N) iteration
         if (activeMenuItem) {
             activeMenuItem.classList.remove('active');
+            activeMenuItem.removeAttribute('aria-current');
         } else {
             // Fallback for first load to ensure no other item is active
-            document.querySelectorAll('.menu-item').forEach(item => item.classList.remove('active'));
+            document.querySelectorAll('.menu-item').forEach(item => {
+                item.classList.remove('active');
+                item.removeAttribute('aria-current');
+            });
         }
 
         const nextMenuItem = menuItemsMap.get('#' + hash);
         if (nextMenuItem) {
             nextMenuItem.classList.add('active');
+            nextMenuItem.setAttribute('aria-current', 'page');
             activeMenuItem = nextMenuItem;
         }
         
