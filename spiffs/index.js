@@ -589,6 +589,11 @@ window.settingsLoaded = {
     integrations: false // p25-p33 for integrations section
 };
 
+// Global navigation state to optimize section switching (avoiding O(N) DOM lookups)
+let activeSection = null;
+let activeMenuItem = null;
+const menuItemsMap = new Map();
+
 // Function to fetch minimal parameters for theme and language
 async function fetchThemeParams() {
     if (window.settingsLoaded.theme) {
@@ -795,11 +800,14 @@ function setupNavigation() {
     // Get all menu items
     const menuItems = document.querySelectorAll('.menu-item');
     
-    // Add click event listeners to menu items
+    // Add click event listeners to menu items and cache them in Map for O(1) access
     menuItems.forEach(item => {
+        const href = item.getAttribute('href');
+        menuItemsMap.set(href, item);
+
         item.addEventListener('click', function(e) {
             e.preventDefault();
-            const sectionId = this.getAttribute('href').substring(1);
+            const sectionId = href.substring(1);
             window.location.hash = sectionId;
         });
     });
@@ -818,32 +826,38 @@ function navigateToSection() {
         window.location.hash = hash;
     }
     
-    // Get all page sections
-    const sections = document.querySelectorAll('.page-section');
-    
-    // Hide all sections first
-    sections.forEach(section => {
-        section.style.display = 'none';
-    });
+    // Optimization: Hide only the previously active section instead of O(N) iteration
+    if (activeSection) {
+        activeSection.style.display = 'none';
+    } else {
+        // Fallback for first load if state isn't set yet (still faster than global query)
+        document.querySelectorAll('.page-section').forEach(s => s.style.display = 'none');
+    }
     
     // Show the selected section
     const currentSection = el(hash + '-section');
     if (currentSection) {
         currentSection.style.display = 'block';
+        activeSection = currentSection;
         
         // Update page title
         const sectionName = hash.charAt(0).toUpperCase() + hash.slice(1);
         el('page-title').textContent = 'Frixos - ' + sectionName;
         document.title = 'Frixos - ' + sectionName;
         
-        // Update active menu item
-        document.querySelectorAll('.menu-item').forEach(item => {
-            if (item.getAttribute('href') === '#' + hash) {
-                item.classList.add('active');
-            } else {
-                item.classList.remove('active');
-            }
-        });
+        // Optimization: Update only previous and current menu items instead of O(N) iteration
+        if (activeMenuItem) {
+            activeMenuItem.classList.remove('active');
+        } else {
+            // Fallback for first load to ensure no other item is active
+            document.querySelectorAll('.menu-item').forEach(item => item.classList.remove('active'));
+        }
+
+        const nextMenuItem = menuItemsMap.get('#' + hash);
+        if (nextMenuItem) {
+            nextMenuItem.classList.add('active');
+            activeMenuItem = nextMenuItem;
+        }
         
         // Load parameters for the section if not already loaded
         if (hash === 'settings' && !window.sectionsInitialized.settings) {
