@@ -594,6 +594,19 @@ let activeSection = null;
 let activeMenuItem = null;
 const menuItemsMap = new Map();
 
+// Global DOM cache for frequently accessed elements (Status page, notifications)
+// Optimization: O(1) lookup avoids repetitive document.getElementById calls in high-frequency/large-payload paths
+const domCache = new Map();
+
+// Static list of IDs for status fields to optimize allocation in fetchStatus
+const STATUS_FIELD_IDS = [
+    'refreshButton', 'time_update_status', 'weather_update_status', 'moon_status',
+    'latitude', 'longitude', 'timezone_val', 'app', 'version', 'fwversion',
+    'poh', 'mac_address', 'ip_address', 'chip_revision', 'flash_size',
+    'cpu_freq', 'compile_time', 'free_heap', 'min_free_heap', 'lux', 'uptime',
+    'system_logs', 'ha_status_textarea'
+];
+
 // Function to fetch minimal parameters for theme and language
 async function fetchThemeParams() {
     if (window.settingsLoaded.theme) {
@@ -917,7 +930,13 @@ function navigateToSection() {
 
 // Function to show status messages
 function showStatus(message, type) {
-    const statusElem = el('status-message');
+    // Optimization: Use cached reference to avoid O(N) global DOM query
+    let statusElem = domCache.get('status-message');
+    if (!statusElem) {
+        statusElem = el('status-message');
+        if (statusElem) domCache.set('status-message', statusElem);
+    }
+
     if (!statusElem) {
         console.error('Status message element not found!');
         return;
@@ -1976,73 +1995,96 @@ function setupSupportButtons() {
 
 function fetchStatus(includeLogs = false) {
     const url = includeLogs ? '/api/status?logs=1' : '/api/status';
-    const refreshBtn = el('refreshButton');
+
+    // Optimization: Cache status elements to avoid O(N) global DOM queries on every refresh
+    const elements = {};
+    STATUS_FIELD_IDS.forEach(id => {
+        let element = domCache.get(id);
+        if (!element) {
+            element = el(id);
+            if (element) domCache.set(id, element);
+        }
+        elements[id] = element;
+    });
+
+    const refreshBtn = elements['refreshButton'];
     if (includeLogs) toggleLoading(refreshBtn, true);
 
     return fetch(url)
         .then(response => response.json())
         .then(data => {
             // Update time & weather status
-            const timeUpdateStatus = el('time_update_status');
-            const weatherUpdateStatus = el('weather_update_status');
+            const timeUpdateStatus = elements['time_update_status'];
+            const weatherUpdateStatus = elements['weather_update_status'];
 
             // Update time status
-            if (data.time_status) {
-                const timestamp = new Date(data.last_time_update * 1000).toLocaleString();
-                timeUpdateStatus.innerHTML = `<span class="status-icon status-success"></span> ${timestamp}`;
-            } else {
-                timeUpdateStatus.innerHTML = '<span class="status-icon status-error"></span> Not synced';
+            if (timeUpdateStatus) {
+                if (data.time_status) {
+                    const timestamp = new Date(data.last_time_update * 1000).toLocaleString();
+                    timeUpdateStatus.innerHTML = `<span class="status-icon status-success"></span> ${timestamp}`;
+                } else {
+                    timeUpdateStatus.innerHTML = '<span class="status-icon status-error"></span> Not synced';
+                }
             }
 
             // Update weather status
-            if (data.weather_status) {
-                const timestamp = new Date(data.last_weather_update * 1000).toLocaleString();
-                weatherUpdateStatus.innerHTML = `<span class="status-icon status-success"></span> ${timestamp}`;
-            } else {
-                weatherUpdateStatus.innerHTML = '<span class="status-icon status-error"></span> Not synced';
+            if (weatherUpdateStatus) {
+                if (data.weather_status) {
+                    const timestamp = new Date(data.last_weather_update * 1000).toLocaleString();
+                    weatherUpdateStatus.innerHTML = `<span class="status-icon status-success"></span> ${timestamp}`;
+                } else {
+                    weatherUpdateStatus.innerHTML = '<span class="status-icon status-error"></span> Not synced';
+                }
             }
 
             // Update other weather-related info
-            el('moon_status').textContent = data.moon_icon_index !== undefined ? getMoonPhaseName(data.moon_icon_index) : '-';
-            el('latitude').textContent = data.latitude || '-';
-            el('longitude').textContent = data.longitude || '-';
-            el('timezone_val').textContent = data.timezone || '-';
+            if (elements['moon_status']) elements['moon_status'].textContent = data.moon_icon_index !== undefined ? getMoonPhaseName(data.moon_icon_index) : '-';
+            if (elements['latitude']) elements['latitude'].textContent = data.latitude || '-';
+            if (elements['longitude']) elements['longitude'].textContent = data.longitude || '-';
+            if (elements['timezone_val']) elements['timezone_val'].textContent = data.timezone || '-';
 
             // Update system information
-            el('app').textContent = data.app || '-';
-            el('version').textContent = data.version || '-';
-            el('fwversion').textContent = data.fwversion || '-';
-            el('poh').textContent = data.poh !== undefined ? formatPOH(data.poh) : '-';
-            el('mac_address').textContent = data.mac_address || '-';
-            el('ip_address').textContent = data.ip_address || '-';
-            el('chip_revision').textContent = data.chip_revision || '-';
-            el('flash_size').textContent = data.flash_size ? formatBytes(data.flash_size) : '-';
-            el('cpu_freq').textContent = data.cpu_freq ? `${(data.cpu_freq / 1000000)} MHz` : '-';
-            el('compile_time').textContent = data.compile_time || '-';
-            el('free_heap').textContent = data.free_heap ? formatBytes(data.free_heap) : '-';
-            el('min_free_heap').textContent = data.min_free_heap ? formatBytes(data.min_free_heap) : '-';
+            if (elements['app']) elements['app'].textContent = data.app || '-';
+            if (elements['version']) elements['version'].textContent = data.version || '-';
+            if (elements['fwversion']) elements['fwversion'].textContent = data.fwversion || '-';
+            if (elements['poh']) elements['poh'].textContent = data.poh !== undefined ? formatPOH(data.poh) : '-';
+            if (elements['mac_address']) elements['mac_address'].textContent = data.mac_address || '-';
+            if (elements['ip_address']) elements['ip_address'].textContent = data.ip_address || '-';
+            if (elements['chip_revision']) elements['chip_revision'].textContent = data.chip_revision || '-';
+            if (elements['flash_size']) elements['flash_size'].textContent = data.flash_size ? formatBytes(data.flash_size) : '-';
+            if (elements['cpu_freq']) elements['cpu_freq'].textContent = data.cpu_freq ? `${(data.cpu_freq / 1000000)} MHz` : '-';
+            if (elements['compile_time']) elements['compile_time'].textContent = data.compile_time || '-';
+            if (elements['free_heap']) elements['free_heap'].textContent = data.free_heap ? formatBytes(data.free_heap) : '-';
+            if (elements['min_free_heap']) elements['min_free_heap'].textContent = data.min_free_heap ? formatBytes(data.min_free_heap) : '-';
 
             // Update sensor data
-            el('lux').textContent = data.lux !== undefined ? data.lux.toFixed(1) : '-';
-            if (data.uptime !== undefined) {
-                el('uptime').textContent = formatUptime(data.uptime);
-            } else {
-                el('uptime').textContent = '-';
+            if (elements['lux']) elements['lux'].textContent = data.lux !== undefined ? data.lux.toFixed(1) : '-';
+            if (elements['uptime']) {
+                if (data.uptime !== undefined) {
+                    elements['uptime'].textContent = formatUptime(data.uptime);
+                } else {
+                    elements['uptime'].textContent = '-';
+                }
             }
 
             // Update system logs
-            const logsTextarea = el('system_logs');
-            if (data.system_logs && Array.isArray(data.system_logs)) {
-                logsTextarea.value = data.system_logs.join('\n');
-            } else {
-                logsTextarea.value = 'No logs available';
+            const logsTextarea = elements['system_logs'];
+            if (logsTextarea) {
+                if (data.system_logs && Array.isArray(data.system_logs)) {
+                    logsTextarea.value = data.system_logs.join('\n');
+                } else {
+                    logsTextarea.value = 'No logs available';
+                }
             }
 
             // Update HA Status textarea
-            if (data.ha_tokens && Array.isArray(data.ha_tokens)) {
-                el('ha_status_textarea').value = data.ha_tokens.join('\n');
-            } else {
-                el('ha_status_textarea').value = 'No Integrations active';
+            const haStatusTextarea = elements['ha_status_textarea'];
+            if (haStatusTextarea) {
+                if (data.ha_tokens && Array.isArray(data.ha_tokens)) {
+                    haStatusTextarea.value = data.ha_tokens.join('\n');
+                } else {
+                    haStatusTextarea.value = 'No Integrations active';
+                }
             }
 
             return data; // Return the data for other functions to use

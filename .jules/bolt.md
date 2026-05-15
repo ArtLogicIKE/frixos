@@ -29,3 +29,7 @@
 ## 2026-05-12 - Optimized SPA Navigation Logic
 **Learning:** The navigation logic in the SPIFFS interface was performing O(N) DOM operations (queries and iterations) on every section switch to hide all page sections and deactivate all menu items. While manageable for a few sections, this pattern causes unnecessary layout recalculations and script execution time on low-power devices.
 **Action:** Implement module-level state tracking (e.g., `activeSection`, `activeMenuItem`) and cache DOM references in a Map during initialization. Use these references to perform O(1) surgical updates during navigation. Ensure a robust fallback (e.g., query-based cleanup) is implemented for the initial navigation event when state variables are not yet populated.
+
+## 2024-05-15 - Optimized DOM Access in High-Frequency Status Polling
+**Learning:** Repetitive calls to `document.getElementById` (O(N) global query, though optimized by browsers) in functions that update numerous UI fields (e.g., status refreshes with ~23 fields) can contribute to UI jank and script execution overhead on low-power devices. Additionally, direct DOM access without safety checks can lead to runtime errors if elements are absent during navigation transitions.
+**Action:** Implement a persistent `domCache` (Map) to store element references. Use a static constant array for field IDs to avoid redundant memory allocations inside polling loops. Always perform null checks on cached elements to ensure stability in Single Page Application environments where DOM sections may be conditionally visible.
