@@ -15,3 +15,7 @@
 ## 2025-05-15 - [Credential UX vs Security]
 **Learning:** While `autocomplete` attributes like `current-password` and `username` greatly improve UX for WiFi and user accounts, they should be omitted for API tokens and integration keys to prevent password managers from incorrectly identifying them as primary site credentials.
 **Action:** Selectively apply `autocomplete` only to standard user/password fields and avoid them for technical tokens or machine keys.
+
+## 2025-05-16 - [Dynamic Counter Feedback]
+**Learning:** For inputs with strict character limits (like ESP32 message buffers), providing multi-stage visual feedback (warning color at 90%, error/bold at 100%) significantly reduces submission errors. Using `aria-live="polite"` with `aria-atomic="true"` ensures screen readers announce the full updated state (e.g., "450 / 511") rather than just the changed digit.
+**Action:** Implement a standard `updateCharCounter` pattern with centralized constants and ARIA live regions for all length-constrained text fields.

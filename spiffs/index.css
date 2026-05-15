@@ -1076,6 +1076,17 @@ textarea[aria-invalid="true"] {
     margin-top: 4px;
 }
 
+.message-counter.near-limit {
+    color: var(--warning-color);
+    transition: color 0.2s;
+}
+
+.message-counter.at-limit {
+    color: var(--error-color);
+    font-weight: bold;
+    transition: color 0.2s;
+}
+
 .token-code { cursor: pointer; padding: 2px 4px; border-radius: 4px; background-color: var(--section-header-bg); transition: all 0.2s; display: inline-block; border: 1px solid var(--border-color); }
 .token-code:hover { background-color: var(--primary-color); color: white; }
 .token-code:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
