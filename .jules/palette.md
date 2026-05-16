@@ -15,3 +15,11 @@
 ## 2025-05-15 - [Credential UX vs Security]
 **Learning:** While `autocomplete` attributes like `current-password` and `username` greatly improve UX for WiFi and user accounts, they should be omitted for API tokens and integration keys to prevent password managers from incorrectly identifying them as primary site credentials.
 **Action:** Selectively apply `autocomplete` only to standard user/password fields and avoid them for technical tokens or machine keys.
+
+## 2025-05-15 - [Visual Counter Feedback Pattern]
+**Learning:** Character counters in resource-constrained environments (like ESP32 web UIs) benefit from clear visual states (`.near-limit`, `.at-limit`) to provide immediate feedback without expensive layout recalculations. Transitioning colors and font weights provides a "premium" feel with minimal CSS.
+**Action:** Use a centralized `updateCharCounter` function that manages CSS classes based on thresholds to ensure consistent feedback across initial load, user input, and programmatic updates (like token insertion).
+
+## 2025-05-15 - [Refactoring for SPA Stability]
+**Learning:** In a Single Page Application (SPA) where section setup and data population happen asynchronously or in different blocks, scoping DOM element lookups to the function level prevents redundant O(N) `document.getElementById` calls and avoids redeclaration errors (`SyntaxError: Identifier 'x' has already been declared`) when code is executed multiple times or across different initialization paths.
+**Action:** Always scope frequently used DOM references to the top of the initialization function and share them across event listeners and population logic.
