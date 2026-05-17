@@ -13,6 +13,10 @@ const LANGUAGE_NAMES = {
     'es': 'Español'
 };
 
+// Character counter constants
+const MAX_MESSAGE_LENGTH = 511;
+const NEAR_LIMIT_THRESHOLD = 450;
+
 // Helper for element selection
 const el = (id) => document.getElementById(id);
 
@@ -36,6 +40,16 @@ function toggleLoading(btn, isLoading) {
         btn.disabled = false;
         btn.removeAttribute('aria-busy');
     }
+}
+
+// Helper to update character counter with visual states
+function updateCharCounter(input, counter) {
+    if (!input || !counter) return;
+    const length = input.value.length;
+    counter.textContent = `${length} / ${MAX_MESSAGE_LENGTH}`;
+
+    counter.classList.toggle('near-limit', length >= NEAR_LIMIT_THRESHOLD && length < MAX_MESSAGE_LENGTH);
+    counter.classList.toggle('at-limit', length >= MAX_MESSAGE_LENGTH);
 }
 
 // Translations object
@@ -2310,7 +2324,8 @@ function setupAdvancedSection() {
         // Setup message character counter and interactive tokens
         const messageInput = el('message');
         if (messageInput) {
-            messageInput.addEventListener('input', () => el('message-counter').textContent = `${messageInput.value.length} / 511`);
+            const messageCounter = el('message-counter');
+            messageInput.addEventListener('input', () => updateCharCounter(messageInput, messageCounter));
             document.querySelectorAll('.token-code').forEach(t => {
                 const insert = () => {
                     const s = messageInput.selectionStart, e = messageInput.selectionEnd, v = messageInput.value, text = t.textContent;
@@ -2333,7 +2348,7 @@ function setupAdvancedSection() {
         const messageCounter = el('message-counter');
         if (messageInput && messageCounter && window.settings.p16 !== undefined) {
             messageInput.value = window.settings.p16 || '';
-            messageCounter.textContent = `${messageInput.value.length} / 511`;
+            updateCharCounter(messageInput, messageCounter);
         }
         
         if (el('ofs_x') && window.settings.p01 !== undefined) el('ofs_x').value = window.settings.p01 || 0;
