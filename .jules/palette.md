@@ -15,3 +15,6 @@
 ## 2025-05-15 - [Credential UX vs Security]
 **Learning:** While `autocomplete` attributes like `current-password` and `username` greatly improve UX for WiFi and user accounts, they should be omitted for API tokens and integration keys to prevent password managers from incorrectly identifying them as primary site credentials.
 **Action:** Selectively apply `autocomplete` only to standard user/password fields and avoid them for technical tokens or machine keys.
+## 2025-05-14 - Sticky Header Rejected for Micro-UX
+**Learning:** Major layout changes, even for navigation accessibility, are considered beyond "micro-UX" scope in this project and require explicit design approval.
+**Action:** Focus only on localized component enhancements (colors, states, feedback) for micro-UX tasks.
