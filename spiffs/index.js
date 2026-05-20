@@ -16,12 +16,30 @@ const LANGUAGE_NAMES = {
 // Helper for element selection
 const el = (id) => document.getElementById(id);
 
+// Constants for message length
+const MAX_MESSAGE_LENGTH = 511;
+const NEAR_LIMIT_THRESHOLD = 450;
+
 // Helper to highlight an element (visual feedback for programmatic updates)
 function highlightElement(element) {
     if (!element) return;
     element.classList.remove('input-highlight');
     void element.offsetWidth; // Force reflow
     element.classList.add('input-highlight');
+}
+
+/**
+ * Updates the character counter for an input element
+ * @param {HTMLInputElement|HTMLTextAreaElement} input The input element
+ * @param {HTMLElement} counter The counter element
+ */
+function updateCharCounter(input, counter) {
+    if (!input || !counter) return;
+    const len = input.value.length;
+    counter.textContent = `${len} / ${MAX_MESSAGE_LENGTH}`;
+
+    counter.classList.toggle('near-limit', len >= NEAR_LIMIT_THRESHOLD && len < MAX_MESSAGE_LENGTH);
+    counter.classList.toggle('at-limit', len >= MAX_MESSAGE_LENGTH);
 }
 
 // Helper for toggling button loading state
@@ -2297,6 +2315,9 @@ function resetDevice() {
 
 // Advanced settings section functionality
 function setupAdvancedSection() {
+    const messageInput = el('message');
+    const messageCounter = el('message-counter');
+
     // Setup event listeners only once
     if (!window.advancedEventListenersSet) {
         window.advancedEventListenersSet = true;
@@ -2308,14 +2329,15 @@ function setupAdvancedSection() {
         }
 
         // Setup message character counter and interactive tokens
-        const messageInput = el('message');
-        if (messageInput) {
-            messageInput.addEventListener('input', () => el('message-counter').textContent = `${messageInput.value.length} / 511`);
+        if (messageInput && messageCounter) {
+            messageInput.addEventListener('input', () => updateCharCounter(messageInput, messageCounter));
             document.querySelectorAll('.token-code').forEach(t => {
                 const insert = () => {
                     const s = messageInput.selectionStart, e = messageInput.selectionEnd, v = messageInput.value, text = t.textContent;
                     messageInput.value = v.slice(0, s) + text + v.slice(e);
                     messageInput.setSelectionRange(s + text.length, s + text.length);
+                    updateCharCounter(messageInput, messageCounter);
+                    highlightElement(messageInput);
                     messageInput.dispatchEvent(new Event('input', { bubbles: true }));
                     messageInput.focus();
                 };
@@ -2329,11 +2351,9 @@ function setupAdvancedSection() {
 
     // Populate fields if settings are loaded
     if (window.settings && window.settingsLoaded.advanced) {
-        const messageInput = el('message');
-        const messageCounter = el('message-counter');
         if (messageInput && messageCounter && window.settings.p16 !== undefined) {
             messageInput.value = window.settings.p16 || '';
-            messageCounter.textContent = `${messageInput.value.length} / 511`;
+            updateCharCounter(messageInput, messageCounter);
         }
         
         if (el('ofs_x') && window.settings.p01 !== undefined) el('ofs_x').value = window.settings.p01 || 0;
