@@ -16,6 +16,20 @@ const LANGUAGE_NAMES = {
 // Helper for element selection
 const el = (id) => document.getElementById(id);
 
+// Translation element caches to minimize global DOM queries during language switches
+let i18nElementsCache = null;
+let passwordTogglesCache = null;
+let tokenCodesCache = null;
+let languageOptionsCache = null;
+
+// Helper to invalidate I18n element caches when dynamic content is added or replaced
+function invalidateI18nCache() {
+    i18nElementsCache = null;
+    passwordTogglesCache = null;
+    tokenCodesCache = null;
+    languageOptionsCache = null;
+}
+
 // Helper to highlight an element (visual feedback for programmatic updates)
 function highlightElement(element) {
     if (!element) return;
@@ -401,8 +415,11 @@ async function translate(lang) {
     currentLanguage = effectiveLang;
     const trans = translations[effectiveLang];
 
-    // Querying on every call to support dynamic elements while using dataset for readability
-    document.querySelectorAll('[data-i18n], [data-i18n-placeholder], [data-i18n-aria-label]').forEach(element => {
+    // Optimization: Use cached elements if available, otherwise query and cache them
+    if (!i18nElementsCache) {
+        i18nElementsCache = document.querySelectorAll('[data-i18n], [data-i18n-placeholder], [data-i18n-aria-label]');
+    }
+    i18nElementsCache.forEach(element => {
         const i18nKey = element.dataset.i18n;
         const i18nPlaceholderKey = element.dataset.i18nPlaceholder;
         const i18nAriaLabelKey = element.dataset.i18nAriaLabel;
@@ -432,7 +449,10 @@ async function translate(lang) {
     });
 
     // Update password toggle ARIA labels for accessibility after language change
-    document.querySelectorAll('.password-toggle').forEach(button => {
+    if (!passwordTogglesCache) {
+        passwordTogglesCache = document.querySelectorAll('.password-toggle');
+    }
+    passwordTogglesCache.forEach(button => {
         const input = button.previousElementSibling;
         if (input) {
             const isPassword = input.type === 'password';
@@ -445,7 +465,10 @@ async function translate(lang) {
     });
 
     // Update token ARIA labels after language change
-    document.querySelectorAll('.token-code').forEach(token => {
+    if (!tokenCodesCache) {
+        tokenCodesCache = document.querySelectorAll('.token-code');
+    }
+    tokenCodesCache.forEach(token => {
         const insertLabel = getNestedTranslation(trans, 'common.insert') || 'Insert';
         token.setAttribute('aria-label', `${insertLabel} ${token.textContent}`);
     });
@@ -454,7 +477,10 @@ async function translate(lang) {
     if (nameElement) nameElement.textContent = LANGUAGE_NAMES[effectiveLang] || LANGUAGE_NAMES['en'];
 
     // Update language selection state in dropdown
-    document.querySelectorAll('.language-option').forEach(option => {
+    if (!languageOptionsCache) {
+        languageOptionsCache = document.querySelectorAll('.language-option');
+    }
+    languageOptionsCache.forEach(option => {
         const isSelected = option.getAttribute('data-lang') === effectiveLang;
         option.classList.toggle('is-active', isSelected);
         option.setAttribute('aria-selected', isSelected.toString());
@@ -1801,6 +1827,7 @@ function pollScanResults() {
 }
 
 function displayNetworks(networks) {
+    invalidateI18nCache();
     const networkList = el('network-list');
     const loadingSpinner = el('loading-spinner');
     const loadingText = el('loading-text');
@@ -1942,6 +1969,7 @@ function setupStatusSection() {
 
 // Setup support buttons (send email and copy to clipboard)
 function setupSupportButtons() {
+    invalidateI18nCache();
     const sendToSupportButton = el('sendToSupportButton');
     const copyToClipboardButton = el('copyToClipboardButton');
     
