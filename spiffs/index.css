@@ -1074,6 +1074,16 @@ textarea[aria-invalid="true"] {
     font-size: 0.8rem;
     color: var(--text-secondary);
     margin-top: 4px;
+    transition: color 0.2s;
+}
+
+.message-counter.near-limit {
+    color: var(--warning-color);
+}
+
+.message-counter.at-limit {
+    color: var(--error-color);
+    font-weight: bold;
 }
 
 .token-code { cursor: pointer; padding: 2px 4px; border-radius: 4px; background-color: var(--section-header-bg); transition: all 0.2s; display: inline-block; border: 1px solid var(--border-color); }
