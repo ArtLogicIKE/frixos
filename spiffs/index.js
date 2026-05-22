@@ -36,6 +36,7 @@ let i18nElementsCache = null;
 let passwordTogglesCache = null;
 let tokenCodesCache = null;
 let languageOptionsCache = null;
+let fontSamplesCache = null;
 
 // Helper to invalidate I18n element caches when dynamic content is added or replaced
 function invalidateI18nCache() {
@@ -43,6 +44,7 @@ function invalidateI18nCache() {
     passwordTogglesCache = null;
     tokenCodesCache = null;
     languageOptionsCache = null;
+    fontSamplesCache = null;
 }
 
 // Helper to highlight an element (visual feedback for programmatic updates)
@@ -497,6 +499,16 @@ async function translate(lang) {
     tokenCodesCache.forEach(token => {
         const insertLabel = getNestedTranslation(trans, 'common.insert') || 'Insert';
         token.setAttribute('aria-label', `${insertLabel} ${token.textContent}`);
+    });
+
+    // Update font sample ARIA labels after language change
+    if (!fontSamplesCache) {
+        fontSamplesCache = document.querySelectorAll('.font-sample-box');
+    }
+    fontSamplesCache.forEach(box => {
+        const fontName = box.querySelector('.font-sample-name').textContent;
+        const insertLabel = getNestedTranslation(trans, 'common.insert') || 'Insert';
+        box.setAttribute('aria-label', `${insertLabel} ${fontName}`);
     });
 
     const nameElement = el('current-language-name');
@@ -984,10 +996,15 @@ function showStatus(message, type) {
         clearTimeout(window.statusTimeout);
     }
 
-    // Hide the message after 5 seconds (increased from 3 seconds)
-    window.statusTimeout = setTimeout(function () {
+    // One-time click listener for immediate dismissal
+    const dismiss = () => {
         statusElem.style.display = 'none';
-    }, 5000);
+        if (window.statusTimeout) clearTimeout(window.statusTimeout);
+    };
+    statusElem.onclick = dismiss;
+
+    // Hide the message after 5 seconds (increased from 3 seconds)
+    window.statusTimeout = setTimeout(dismiss, 5000);
 }
 
 // Function to toggle collapsible sections
@@ -2362,6 +2379,26 @@ function setupAdvancedSection() {
         if (advancedForm) {
             advancedForm.addEventListener('submit', (e) => handleFormSubmit(e, 'advancedForm'));
         }
+
+        // Setup font sample selection
+        document.querySelectorAll('.font-sample-box').forEach(box => {
+            const fontName = box.querySelector('.font-sample-name').textContent.toLowerCase();
+            const selectFont = () => {
+                const dayfont = el('dayfont');
+                const nightfont = el('nightfont');
+                if (dayfont) {
+                    dayfont.value = fontName;
+                    highlightElement(dayfont);
+                }
+                if (nightfont) {
+                    nightfont.value = fontName;
+                    highlightElement(nightfont);
+                    nightfont.focus();
+                }
+            };
+            box.onclick = selectFont;
+            box.onkeydown = (e) => ['Enter', ' '].includes(e.key) && (e.preventDefault(), selectFont());
+        });
 
         // Setup message character counter and interactive tokens
         const messageInput = el('message');
