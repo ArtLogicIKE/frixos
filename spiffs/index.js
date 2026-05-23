@@ -441,51 +441,53 @@ async function translate(lang) {
     currentLanguage = effectiveLang;
     const trans = translations[effectiveLang];
 
-    // Optimization: Use cached elements if available, otherwise query and cache them
+    // Optimization: Use cached elements with pre-parsed keys to minimize dataset/attribute overhead
     if (!i18nElementsCache) {
-        i18nElementsCache = document.querySelectorAll('[data-i18n], [data-i18n-placeholder], [data-i18n-aria-label]');
+        i18nElementsCache = [];
+        document.querySelectorAll('[data-i18n], [data-i18n-placeholder], [data-i18n-aria-label]').forEach(el => {
+            i18nElementsCache.push({
+                el,
+                k: el.getAttribute('data-i18n'),
+                p: el.getAttribute('data-i18n-placeholder'),
+                a: el.getAttribute('data-i18n-aria-label')
+            });
+        });
     }
-    i18nElementsCache.forEach(element => {
-        const i18nKey = element.dataset.i18n;
-        const i18nPlaceholderKey = element.dataset.i18nPlaceholder;
-        const i18nAriaLabelKey = element.dataset.i18nAriaLabel;
 
-        if (i18nKey) {
-            const translation = getNestedTranslation(trans, i18nKey);
-            // Optimization: Only update DOM if content actually changed to avoid layout thrashing
-            if (translation && element.innerHTML !== translation) {
-                element.innerHTML = translation;
-            }
+    i18nElementsCache.forEach(item => {
+        const { el, k, p, a } = item;
+        if (k) {
+            const translation = getNestedTranslation(trans, k);
+            if (translation && el.innerHTML !== translation) el.innerHTML = translation;
         }
-
-        if (i18nPlaceholderKey) {
-            const translation = getNestedTranslation(trans, i18nPlaceholderKey);
-            // Optimization: Only update DOM if placeholder actually changed
-            if (translation && element.placeholder !== translation) {
-                element.placeholder = translation;
-            }
+        if (p) {
+            const translation = getNestedTranslation(trans, p);
+            if (translation && el.placeholder !== translation) el.placeholder = translation;
         }
-
-        if (i18nAriaLabelKey) {
-            const translation = getNestedTranslation(trans, i18nAriaLabelKey);
-            if (translation && element.getAttribute('aria-label') !== translation) {
-                element.setAttribute('aria-label', translation);
+        if (a) {
+            const translation = getNestedTranslation(trans, a);
+            if (translation && el.getAttribute('aria-label') !== translation) {
+                el.setAttribute('aria-label', translation);
             }
         }
     });
 
     // Update password toggle ARIA labels for accessibility after language change
     if (!passwordTogglesCache) {
-        passwordTogglesCache = document.querySelectorAll('.password-toggle');
+        passwordTogglesCache = [];
+        document.querySelectorAll('.password-toggle').forEach(el => {
+            passwordTogglesCache.push({ el, input: el.previousElementSibling });
+        });
     }
-    passwordTogglesCache.forEach(button => {
-        const input = button.previousElementSibling;
+
+    const showPass = getNestedTranslation(trans, 'common.show_password');
+    const hidePass = getNestedTranslation(trans, 'common.hide_password');
+    passwordTogglesCache.forEach(item => {
+        const { el, input } = item;
         if (input) {
-            const isPassword = input.type === 'password';
-            const actionKey = isPassword ? 'common.show_password' : 'common.hide_password';
-            const translation = getNestedTranslation(trans, actionKey);
-            if (translation) {
-                button.setAttribute('aria-label', translation);
+            const translation = input.type === 'password' ? showPass : hidePass;
+            if (translation && el.getAttribute('aria-label') !== translation) {
+                el.setAttribute('aria-label', translation);
             }
         }
     });
@@ -494,9 +496,12 @@ async function translate(lang) {
     if (!tokenCodesCache) {
         tokenCodesCache = document.querySelectorAll('.token-code');
     }
+    const insertLabel = getNestedTranslation(trans, 'common.insert') || 'Insert';
     tokenCodesCache.forEach(token => {
-        const insertLabel = getNestedTranslation(trans, 'common.insert') || 'Insert';
-        token.setAttribute('aria-label', `${insertLabel} ${token.textContent}`);
+        const newAria = `${insertLabel} ${token.textContent}`;
+        if (token.getAttribute('aria-label') !== newAria) {
+            token.setAttribute('aria-label', newAria);
+        }
     });
 
     const nameElement = el('current-language-name');
@@ -504,12 +509,19 @@ async function translate(lang) {
 
     // Update language selection state in dropdown
     if (!languageOptionsCache) {
-        languageOptionsCache = document.querySelectorAll('.language-option');
+        languageOptionsCache = [];
+        document.querySelectorAll('.language-option').forEach(el => {
+            languageOptionsCache.push({ el, lang: el.getAttribute('data-lang') });
+        });
     }
-    languageOptionsCache.forEach(option => {
-        const isSelected = option.getAttribute('data-lang') === effectiveLang;
-        option.classList.toggle('is-active', isSelected);
-        option.setAttribute('aria-selected', isSelected.toString());
+    languageOptionsCache.forEach(item => {
+        const { el, lang } = item;
+        const isSelected = lang === effectiveLang;
+        el.classList.toggle('is-active', isSelected);
+        const newSelected = isSelected.toString();
+        if (el.getAttribute('aria-selected') !== newSelected) {
+            el.setAttribute('aria-selected', newSelected);
+        }
     });
 
     const hash = window.location.hash.substring(1);
