@@ -36,6 +36,7 @@ let i18nElementsCache = null;
 let passwordTogglesCache = null;
 let tokenCodesCache = null;
 let languageOptionsCache = null;
+let fontSamplesCache = null;
 
 // Helper to invalidate I18n element caches when dynamic content is added or replaced
 function invalidateI18nCache() {
@@ -43,6 +44,7 @@ function invalidateI18nCache() {
     passwordTogglesCache = null;
     tokenCodesCache = null;
     languageOptionsCache = null;
+    fontSamplesCache = null;
 }
 
 // Helper to highlight an element (visual feedback for programmatic updates)
@@ -497,6 +499,16 @@ async function translate(lang) {
     tokenCodesCache.forEach(token => {
         const insertLabel = getNestedTranslation(trans, 'common.insert') || 'Insert';
         token.setAttribute('aria-label', `${insertLabel} ${token.textContent}`);
+    });
+
+    // Update font sample ARIA labels after language change
+    if (!fontSamplesCache) {
+        fontSamplesCache = document.querySelectorAll('.font-sample-box');
+    }
+    fontSamplesCache.forEach(box => {
+        const selectLabel = getNestedTranslation(trans, 'common.select') || 'Select';
+        const fontName = box.querySelector('.font-sample-name').textContent;
+        box.setAttribute('aria-label', `${selectLabel} ${fontName}`);
     });
 
     const nameElement = el('current-language-name');
@@ -2383,6 +2395,27 @@ function setupAdvancedSection() {
                 updateA11y();
             });
         }
+
+        // Setup interactive font samples
+        document.querySelectorAll('.font-sample-box').forEach(box => {
+            const selectFont = () => {
+                const font = box.dataset.font;
+                const dayFontSelect = el('dayfont');
+                const nightFontSelect = el('nightfont');
+                if (dayFontSelect) {
+                    dayFontSelect.value = font;
+                    highlightElement(dayFontSelect);
+                }
+                if (nightFontSelect) {
+                    nightFontSelect.value = font;
+                    highlightElement(nightFontSelect);
+                }
+                box.classList.add('is-selected');
+                setTimeout(() => box.classList.remove('is-selected'), 500);
+            };
+            box.onclick = selectFont;
+            box.onkeydown = (e) => ['Enter', ' '].includes(e.key) && (e.preventDefault(), selectFont());
+        });
     }
 
     // Populate fields if settings are loaded

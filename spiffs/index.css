@@ -1139,6 +1139,32 @@ textarea[aria-invalid="true"] {
     box-shadow: var(--box-shadow);
     border: 1px solid var(--border-color);
     min-height: 120px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.font-sample-box:hover {
+    background-color: var(--card-bg-color);
+    border-color: var(--primary-color);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.font-sample-box:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.font-sample-box:active,
+.font-sample-box.is-selected {
+    transform: scale(0.95);
+    background-color: var(--primary-color);
+}
+
+.font-sample-box:active .font-sample-name,
+.font-sample-box.is-selected .font-sample-name {
+    color: white;
 }
 
 .font-sample-name {
