@@ -36,6 +36,7 @@ let i18nElementsCache = null;
 let passwordTogglesCache = null;
 let tokenCodesCache = null;
 let languageOptionsCache = null;
+let fontSamplesCache = null;
 
 // Helper to invalidate I18n element caches when dynamic content is added or replaced
 function invalidateI18nCache() {
@@ -43,6 +44,7 @@ function invalidateI18nCache() {
     passwordTogglesCache = null;
     tokenCodesCache = null;
     languageOptionsCache = null;
+    fontSamplesCache = null;
 }
 
 // Helper to highlight an element (visual feedback for programmatic updates)
@@ -96,7 +98,8 @@ const translations = {
             hide_password: 'Hide password',
             change_language: 'Change language',
             toggle_theme: 'Toggle theme',
-            insert: 'Insert'
+            insert: 'Insert',
+            select: 'Select'
         },
         settings: {
             connection: {
@@ -497,6 +500,16 @@ async function translate(lang) {
     tokenCodesCache.forEach(token => {
         const insertLabel = getNestedTranslation(trans, 'common.insert') || 'Insert';
         token.setAttribute('aria-label', `${insertLabel} ${token.textContent}`);
+    });
+
+    // Update font sample ARIA labels after language change
+    if (!fontSamplesCache) {
+        fontSamplesCache = document.querySelectorAll('.font-sample-box');
+    }
+    fontSamplesCache.forEach(box => {
+        const selectLabel = getNestedTranslation(trans, 'common.select') || 'Select';
+        const fontName = box.querySelector('.font-sample-name').textContent;
+        box.setAttribute('aria-label', `${selectLabel} ${fontName}`);
     });
 
     const nameElement = el('current-language-name');
@@ -2362,6 +2375,35 @@ function setupAdvancedSection() {
         if (advancedForm) {
             advancedForm.addEventListener('submit', (e) => handleFormSubmit(e, 'advancedForm'));
         }
+
+        // Setup font sample selection
+        document.querySelectorAll('.font-sample-box').forEach(box => {
+            const font = box.dataset.font;
+            const selectFont = () => {
+                const dayFont = el('dayfont');
+                const nightFont = el('nightfont');
+                if (dayFont) {
+                    dayFont.value = font;
+                    highlightElement(dayFont);
+                }
+                if (nightFont) {
+                    nightFont.value = font;
+                    highlightElement(nightFont);
+                }
+                highlightElement(box);
+            };
+            box.addEventListener('click', selectFont);
+            box.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    selectFont();
+                }
+            });
+            const trans = translations[currentLanguage] || translations.en;
+            const selectLabel = getNestedTranslation(trans, 'common.select') || 'Select';
+            const fontName = box.querySelector('.font-sample-name').textContent;
+            box.setAttribute('aria-label', `${selectLabel} ${fontName}`);
+        });
 
         // Setup message character counter and interactive tokens
         const messageInput = el('message');
