@@ -15,3 +15,7 @@
 ## 2025-05-15 - [Credential UX vs Security]
 **Learning:** While `autocomplete` attributes like `current-password` and `username` greatly improve UX for WiFi and user accounts, they should be omitted for API tokens and integration keys to prevent password managers from incorrectly identifying them as primary site credentials.
 **Action:** Selectively apply `autocomplete` only to standard user/password fields and avoid them for technical tokens or machine keys.
+
+## 2025-05-16 - [Interactive Preview Pattern]
+**Learning:** Visual previews (like font samples) that are merely static images are a missed opportunity for intuitive interaction. In a settings-heavy interface, allowing users to click a preview to apply the configuration (e.g., selecting a font) provides immediate, direct manipulation feedback that feels modern and helpful. Combining this with keyboard accessibility (`role="button"`, `tabindex="0"`) and localized ARIA labels ensures the delight is accessible to all.
+**Action:** Identify static previews of configuration options and transform them into interactive "quick-apply" buttons. Always pair with visual feedback (highlighting) and status confirmation.
