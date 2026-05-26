@@ -1139,7 +1139,12 @@ textarea[aria-invalid="true"] {
     box-shadow: var(--box-shadow);
     border: 1px solid var(--border-color);
     min-height: 120px;
+    cursor: pointer; transition: all 0.2s;
 }
+
+.font-sample-box:hover { background-color: rgba(128, 128, 128, 0.1); border-color: var(--primary-color); transform: translateY(-2px); }
+.font-sample-box:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--primary-color); }
+.font-sample-box:active { transform: translateY(0); }
 
 .font-sample-name {
     font-size: 1rem;

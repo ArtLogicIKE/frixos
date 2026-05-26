@@ -96,7 +96,8 @@ const translations = {
             hide_password: 'Hide password',
             change_language: 'Change language',
             toggle_theme: 'Toggle theme',
-            insert: 'Insert'
+            insert: 'Insert',
+            select: 'Select'
         },
         settings: {
             connection: {
@@ -497,6 +498,11 @@ async function translate(lang) {
     tokenCodesCache.forEach(token => {
         const insertLabel = getNestedTranslation(trans, 'common.insert') || 'Insert';
         token.setAttribute('aria-label', `${insertLabel} ${token.textContent}`);
+    });
+
+    document.querySelectorAll('.font-sample-box').forEach(b => {
+        const n = b.querySelector('.font-sample-name')?.textContent || '';
+        b.setAttribute('aria-label', `${getNestedTranslation(trans, 'common.select') || 'Select'} ${n}`);
     });
 
     const nameElement = el('current-language-name');
@@ -2362,6 +2368,18 @@ function setupAdvancedSection() {
         if (advancedForm) {
             advancedForm.addEventListener('submit', (e) => handleFormSubmit(e, 'advancedForm'));
         }
+
+        document.querySelectorAll('.font-sample-box').forEach(b => {
+            b.role = 'button'; b.tabIndex = 0;
+            const f = () => {
+                const s = b.querySelector('.font-sample-name')?.textContent?.toLowerCase();
+                if (s && el('dayfont') && el('nightfont')) {
+                    el('dayfont').value = el('nightfont').value = s;
+                    highlightElement(el('dayfont')); highlightElement(el('nightfont'));
+                }
+            };
+            b.onclick = f; b.onkeydown = (e) => ['Enter', ' '].includes(e.key) && (e.preventDefault(), f());
+        });
 
         // Setup message character counter and interactive tokens
         const messageInput = el('message');
