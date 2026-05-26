@@ -443,31 +443,36 @@ async function translate(lang) {
 
     // Optimization: Use cached elements if available, otherwise query and cache them
     if (!i18nElementsCache) {
-        i18nElementsCache = document.querySelectorAll('[data-i18n], [data-i18n-placeholder], [data-i18n-aria-label]');
+        i18nElementsCache = [];
+        document.querySelectorAll('[data-i18n], [data-i18n-placeholder], [data-i18n-aria-label]').forEach(element => {
+            i18nElementsCache.push({
+                el: element,
+                key: element.dataset.i18n,
+                pKey: element.dataset.i18nPlaceholder,
+                aKey: element.dataset.i18nAriaLabel
+            });
+        });
     }
-    i18nElementsCache.forEach(element => {
-        const i18nKey = element.dataset.i18n;
-        const i18nPlaceholderKey = element.dataset.i18nPlaceholder;
-        const i18nAriaLabelKey = element.dataset.i18nAriaLabel;
-
-        if (i18nKey) {
-            const translation = getNestedTranslation(trans, i18nKey);
+    i18nElementsCache.forEach(item => {
+        const element = item.el;
+        if (item.key) {
+            const translation = getNestedTranslation(trans, item.key);
             // Optimization: Only update DOM if content actually changed to avoid layout thrashing
             if (translation && element.innerHTML !== translation) {
                 element.innerHTML = translation;
             }
         }
 
-        if (i18nPlaceholderKey) {
-            const translation = getNestedTranslation(trans, i18nPlaceholderKey);
+        if (item.pKey) {
+            const translation = getNestedTranslation(trans, item.pKey);
             // Optimization: Only update DOM if placeholder actually changed
             if (translation && element.placeholder !== translation) {
                 element.placeholder = translation;
             }
         }
 
-        if (i18nAriaLabelKey) {
-            const translation = getNestedTranslation(trans, i18nAriaLabelKey);
+        if (item.aKey) {
+            const translation = getNestedTranslation(trans, item.aKey);
             if (translation && element.getAttribute('aria-label') !== translation) {
                 element.setAttribute('aria-label', translation);
             }
@@ -476,15 +481,24 @@ async function translate(lang) {
 
     // Update password toggle ARIA labels for accessibility after language change
     if (!passwordTogglesCache) {
-        passwordTogglesCache = document.querySelectorAll('.password-toggle');
+        passwordTogglesCache = [];
+        document.querySelectorAll('.password-toggle').forEach(button => {
+            passwordTogglesCache.push({
+                el: button,
+                input: button.previousElementSibling
+            });
+        });
     }
-    passwordTogglesCache.forEach(button => {
-        const input = button.previousElementSibling;
+    // Hoist loop-invariant translations
+    const showPasswordLabel = getNestedTranslation(trans, 'common.show_password');
+    const hidePasswordLabel = getNestedTranslation(trans, 'common.hide_password');
+    passwordTogglesCache.forEach(item => {
+        const button = item.el;
+        const input = item.input;
         if (input) {
             const isPassword = input.type === 'password';
-            const actionKey = isPassword ? 'common.show_password' : 'common.hide_password';
-            const translation = getNestedTranslation(trans, actionKey);
-            if (translation) {
+            const translation = isPassword ? showPasswordLabel : hidePasswordLabel;
+            if (translation && button.getAttribute('aria-label') !== translation) {
                 button.setAttribute('aria-label', translation);
             }
         }
@@ -492,24 +506,45 @@ async function translate(lang) {
 
     // Update token ARIA labels after language change
     if (!tokenCodesCache) {
-        tokenCodesCache = document.querySelectorAll('.token-code');
+        tokenCodesCache = [];
+        document.querySelectorAll('.token-code').forEach(token => {
+            tokenCodesCache.push({
+                el: token,
+                text: token.textContent
+            });
+        });
     }
-    tokenCodesCache.forEach(token => {
-        const insertLabel = getNestedTranslation(trans, 'common.insert') || 'Insert';
-        token.setAttribute('aria-label', `${insertLabel} ${token.textContent}`);
+    const insertLabel = getNestedTranslation(trans, 'common.insert') || 'Insert';
+    tokenCodesCache.forEach(item => {
+        const newAriaLabel = `${insertLabel} ${item.text}`;
+        if (item.el.getAttribute('aria-label') !== newAriaLabel) {
+            item.el.setAttribute('aria-label', newAriaLabel);
+        }
     });
 
     const nameElement = el('current-language-name');
-    if (nameElement) nameElement.textContent = LANGUAGE_NAMES[effectiveLang] || LANGUAGE_NAMES['en'];
+    const newLanguageName = LANGUAGE_NAMES[effectiveLang] || LANGUAGE_NAMES['en'];
+    if (nameElement && nameElement.textContent !== newLanguageName) {
+        nameElement.textContent = newLanguageName;
+    }
 
     // Update language selection state in dropdown
     if (!languageOptionsCache) {
-        languageOptionsCache = document.querySelectorAll('.language-option');
+        languageOptionsCache = [];
+        document.querySelectorAll('.language-option').forEach(option => {
+            languageOptionsCache.push({
+                el: option,
+                lang: option.getAttribute('data-lang')
+            });
+        });
     }
-    languageOptionsCache.forEach(option => {
-        const isSelected = option.getAttribute('data-lang') === effectiveLang;
-        option.classList.toggle('is-active', isSelected);
-        option.setAttribute('aria-selected', isSelected.toString());
+    languageOptionsCache.forEach(item => {
+        const isSelected = item.lang === effectiveLang;
+        const isSelectedStr = isSelected.toString();
+        if (item.el.getAttribute('aria-selected') !== isSelectedStr) {
+            item.el.classList.toggle('is-active', isSelected);
+            item.el.setAttribute('aria-selected', isSelectedStr);
+        }
     });
 
     const hash = window.location.hash.substring(1);
@@ -517,7 +552,10 @@ async function translate(lang) {
         const sectionName = hash.charAt(0).toUpperCase() + hash.slice(1);
         const translatedSection = getNestedTranslation(trans, `menu.${hash}`) || sectionName;
         const pageTitleElement = el('page-title');
-        if (pageTitleElement) pageTitleElement.textContent = 'Frixos - ' + translatedSection;
+        const newPageTitle = 'Frixos - ' + translatedSection;
+        if (pageTitleElement && pageTitleElement.textContent !== newPageTitle) {
+            pageTitleElement.textContent = newPageTitle;
+        }
     }
 }
 
