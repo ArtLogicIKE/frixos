@@ -9,7 +9,7 @@
   },
   "common": {
     "save_settings": "Enregistrer les paramètres",
-    "cancel": "Annuler"
+    "cancel": "Annuler", "select": "Sélectionner"
   },
   "settings": {
     "connection": {

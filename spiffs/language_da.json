@@ -9,7 +9,7 @@
   },
   "common": {
     "save_settings": "Gem indstillinger",
-    "cancel": "Annuller"
+    "cancel": "Annuller", "select": "Vælg"
   },
   "settings": {
     "connection": {

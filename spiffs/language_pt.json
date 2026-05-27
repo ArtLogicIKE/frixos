@@ -9,7 +9,7 @@
   },
   "common": {
     "save_settings": "Guardar definições",
-    "cancel": "Cancelar"
+    "cancel": "Cancelar", "select": "Selecionar"
   },
   "settings": {
     "connection": {

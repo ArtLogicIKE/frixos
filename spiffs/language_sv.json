@@ -9,7 +9,7 @@
   },
   "common": {
     "save_settings": "Spara inställningar",
-    "cancel": "Avbryt"
+    "cancel": "Avbryt", "select": "Välj"
   },
   "settings": {
     "connection": {
