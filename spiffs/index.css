@@ -1139,6 +1139,26 @@ textarea[aria-invalid="true"] {
     box-shadow: var(--box-shadow);
     border: 1px solid var(--border-color);
     min-height: 120px;
+    cursor: pointer;
+    transition: all var(--transition-speed);
+}
+
+.font-sample-box:hover {
+    background-color: var(--section-header-bg);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+    border-color: var(--primary-color);
+}
+
+.font-sample-box:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.font-sample-box:active {
+    transform: translateY(0);
+    box-shadow: var(--box-shadow);
 }
 
 .font-sample-name {
