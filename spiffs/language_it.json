@@ -9,7 +9,9 @@
   },
   "common": {
     "save_settings": "Salva impostazioni",
-    "cancel": "Annulla"
+    "cancel": "Annulla",
+    "insert": "Inserisci",
+    "select": "Seleziona"
   },
   "settings": {
     "connection": {

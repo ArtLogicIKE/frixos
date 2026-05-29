@@ -9,7 +9,9 @@
   },
   "common": {
     "save_settings": "Spara inställningar",
-    "cancel": "Avbryt"
+    "cancel": "Avbryt",
+    "insert": "Infoga",
+    "select": "Välj"
   },
   "settings": {
     "connection": {

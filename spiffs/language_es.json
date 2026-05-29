@@ -13,7 +13,9 @@
     "show_password": "Mostrar contraseña",
     "hide_password": "Ocultar contraseña",
     "change_language": "Cambiar idioma",
-    "toggle_theme": "Alternar tema"
+    "toggle_theme": "Alternar tema",
+    "insert": "Insertar",
+    "select": "Seleccionar"
   },
   "settings": {
     "connection": {
