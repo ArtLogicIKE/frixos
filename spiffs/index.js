@@ -443,73 +443,89 @@ async function translate(lang) {
 
     // Optimization: Use cached elements if available, otherwise query and cache them
     if (!i18nElementsCache) {
-        i18nElementsCache = document.querySelectorAll('[data-i18n], [data-i18n-placeholder], [data-i18n-aria-label]');
+        i18nElementsCache = Array.from(document.querySelectorAll('[data-i18n], [data-i18n-placeholder], [data-i18n-aria-label]')).map(el => ({
+            el,
+            key: el.dataset.i18n,
+            pKey: el.dataset.i18nPlaceholder,
+            aKey: el.dataset.i18nAriaLabel
+        }));
     }
-    i18nElementsCache.forEach(element => {
-        const i18nKey = element.dataset.i18n;
-        const i18nPlaceholderKey = element.dataset.i18nPlaceholder;
-        const i18nAriaLabelKey = element.dataset.i18nAriaLabel;
+    i18nElementsCache.forEach(item => {
+        const { el, key, pKey, aKey } = item;
 
-        if (i18nKey) {
-            const translation = getNestedTranslation(trans, i18nKey);
+        if (key) {
+            const translation = getNestedTranslation(trans, key);
             // Optimization: Only update DOM if content actually changed to avoid layout thrashing
-            if (translation && element.innerHTML !== translation) {
-                element.innerHTML = translation;
+            if (translation && el.innerHTML !== translation) {
+                el.innerHTML = translation;
             }
         }
 
-        if (i18nPlaceholderKey) {
-            const translation = getNestedTranslation(trans, i18nPlaceholderKey);
+        if (pKey) {
+            const translation = getNestedTranslation(trans, pKey);
             // Optimization: Only update DOM if placeholder actually changed
-            if (translation && element.placeholder !== translation) {
-                element.placeholder = translation;
+            if (translation && el.placeholder !== translation) {
+                el.placeholder = translation;
             }
         }
 
-        if (i18nAriaLabelKey) {
-            const translation = getNestedTranslation(trans, i18nAriaLabelKey);
-            if (translation && element.getAttribute('aria-label') !== translation) {
-                element.setAttribute('aria-label', translation);
+        if (aKey) {
+            const translation = getNestedTranslation(trans, aKey);
+            if (translation && el.getAttribute('aria-label') !== translation) {
+                el.setAttribute('aria-label', translation);
             }
         }
     });
 
     // Update password toggle ARIA labels for accessibility after language change
     if (!passwordTogglesCache) {
-        passwordTogglesCache = document.querySelectorAll('.password-toggle');
+        passwordTogglesCache = Array.from(document.querySelectorAll('.password-toggle')).map(btn => ({
+            btn,
+            input: btn.previousElementSibling
+        }));
     }
-    passwordTogglesCache.forEach(button => {
-        const input = button.previousElementSibling;
+    const showPassTrans = getNestedTranslation(trans, 'common.show_password');
+    const hidePassTrans = getNestedTranslation(trans, 'common.hide_password');
+    passwordTogglesCache.forEach(item => {
+        const { btn, input } = item;
         if (input) {
             const isPassword = input.type === 'password';
-            const actionKey = isPassword ? 'common.show_password' : 'common.hide_password';
-            const translation = getNestedTranslation(trans, actionKey);
-            if (translation) {
-                button.setAttribute('aria-label', translation);
+            const translation = isPassword ? showPassTrans : hidePassTrans;
+            if (translation && btn.getAttribute('aria-label') !== translation) {
+                btn.setAttribute('aria-label', translation);
             }
         }
     });
 
     // Update token ARIA labels after language change
     if (!tokenCodesCache) {
-        tokenCodesCache = document.querySelectorAll('.token-code');
+        tokenCodesCache = Array.from(document.querySelectorAll('.token-code'));
     }
-    tokenCodesCache.forEach(token => {
-        const insertLabel = getNestedTranslation(trans, 'common.insert') || 'Insert';
-        token.setAttribute('aria-label', `${insertLabel} ${token.textContent}`);
+    const insertLabel = getNestedTranslation(trans, 'common.insert') || 'Insert';
+    tokenCodesCache.forEach(el => {
+        const newAriaLabel = `${insertLabel} ${el.textContent}`;
+        if (el.getAttribute('aria-label') !== newAriaLabel) {
+            el.setAttribute('aria-label', newAriaLabel);
+        }
     });
 
     const nameElement = el('current-language-name');
-    if (nameElement) nameElement.textContent = LANGUAGE_NAMES[effectiveLang] || LANGUAGE_NAMES['en'];
+    const newLangName = LANGUAGE_NAMES[effectiveLang] || LANGUAGE_NAMES['en'];
+    if (nameElement && nameElement.textContent !== newLangName) {
+        nameElement.textContent = newLangName;
+    }
 
     // Update language selection state in dropdown
     if (!languageOptionsCache) {
-        languageOptionsCache = document.querySelectorAll('.language-option');
+        languageOptionsCache = Array.from(document.querySelectorAll('.language-option')).map(opt => ({
+            el: opt,
+            lang: opt.getAttribute('data-lang')
+        }));
     }
-    languageOptionsCache.forEach(option => {
-        const isSelected = option.getAttribute('data-lang') === effectiveLang;
-        option.classList.toggle('is-active', isSelected);
-        option.setAttribute('aria-selected', isSelected.toString());
+    languageOptionsCache.forEach(item => {
+        const isSelected = item.lang === effectiveLang;
+        item.el.classList.toggle('is-active', isSelected);
+        item.el.setAttribute('aria-selected', isSelected.toString());
     });
 
     const hash = window.location.hash.substring(1);
@@ -517,7 +533,10 @@ async function translate(lang) {
         const sectionName = hash.charAt(0).toUpperCase() + hash.slice(1);
         const translatedSection = getNestedTranslation(trans, `menu.${hash}`) || sectionName;
         const pageTitleElement = el('page-title');
-        if (pageTitleElement) pageTitleElement.textContent = 'Frixos - ' + translatedSection;
+        const newTitle = 'Frixos - ' + translatedSection;
+        if (pageTitleElement && pageTitleElement.textContent !== newTitle) {
+            pageTitleElement.textContent = newTitle;
+        }
     }
 }
 
@@ -658,9 +677,7 @@ async function fetchThemeParams() {
         const data = await response.json();
         
         // Store theme-related parameters
-        Object.keys(data).forEach(key => {
-            window.settings[key] = data[key];
-        });
+        Object.assign(window.settings, data);
         window.settingsLoaded.theme = true;
 
         // Initialize theme using the settings data
@@ -702,9 +719,7 @@ function fetchSectionParams(sectionName) {
         .then(response => response.json())
         .then(data => {
             // Merge fetched parameters into window.settings
-            Object.keys(data).forEach(key => {
-                window.settings[key] = data[key];
-            });
+            Object.assign(window.settings, data);
             window.settingsLoaded[mappedSection] = true;
             return data;
         })
