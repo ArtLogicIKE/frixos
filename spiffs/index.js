@@ -36,6 +36,7 @@ let i18nElementsCache = null;
 let passwordTogglesCache = null;
 let tokenCodesCache = null;
 let languageOptionsCache = null;
+let fontSamplesCache = null;
 
 // Helper to invalidate I18n element caches when dynamic content is added or replaced
 function invalidateI18nCache() {
@@ -43,6 +44,7 @@ function invalidateI18nCache() {
     passwordTogglesCache = null;
     tokenCodesCache = null;
     languageOptionsCache = null;
+    fontSamplesCache = null;
 }
 
 // Helper to highlight an element (visual feedback for programmatic updates)
@@ -96,7 +98,8 @@ const translations = {
             hide_password: 'Hide password',
             change_language: 'Change language',
             toggle_theme: 'Toggle theme',
-            insert: 'Insert'
+            insert: 'Insert',
+            select_font: 'Select {name} font'
         },
         settings: {
             connection: {
@@ -510,6 +513,19 @@ async function translate(lang) {
         const isSelected = option.getAttribute('data-lang') === effectiveLang;
         option.classList.toggle('is-active', isSelected);
         option.setAttribute('aria-selected', isSelected.toString());
+    });
+
+    // Update font sample ARIA labels after language change
+    if (!fontSamplesCache) {
+        fontSamplesCache = document.querySelectorAll('.font-sample-box');
+    }
+    fontSamplesCache.forEach(box => {
+        const nameElement = box.querySelector('.font-sample-name');
+        if (nameElement) {
+            const fontName = nameElement.textContent;
+            const selectLabel = getNestedTranslation(trans, 'common.select_font') || 'Select {name} font';
+            box.setAttribute('aria-label', selectLabel.replace('{name}', fontName));
+        }
     });
 
     const hash = window.location.hash.substring(1);
@@ -2368,6 +2384,29 @@ function setupAdvancedSection() {
         const messageCounter = el('message-counter');
         if (messageInput && messageCounter) {
             messageInput.addEventListener('input', () => updateCharCounter(messageInput, messageCounter));
+
+            // Font sample selection logic
+            document.querySelectorAll('.font-sample-box').forEach(box => {
+                const selectFont = () => {
+                    const nameElement = box.querySelector('.font-sample-name');
+                    if (!nameElement) return;
+                    const fontName = nameElement.textContent.toLowerCase();
+                    const dayFontSelect = el('dayfont');
+                    const nightFontSelect = el('nightfont');
+
+                    if (dayFontSelect) {
+                        dayFontSelect.value = fontName;
+                        highlightElement(dayFontSelect);
+                    }
+                    if (nightFontSelect) {
+                        nightFontSelect.value = fontName;
+                        highlightElement(nightFontSelect);
+                    }
+                };
+                box.onclick = selectFont;
+                box.onkeydown = (e) => ['Enter', ' '].includes(e.key) && (e.preventDefault(), selectFont());
+            });
+
             document.querySelectorAll('.token-code').forEach(t => {
                 const insert = () => {
                     const s = messageInput.selectionStart, e = messageInput.selectionEnd, v = messageInput.value, text = t.textContent;
