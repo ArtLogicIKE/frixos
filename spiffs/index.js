@@ -32,10 +32,11 @@ const el = (id) => {
 };
 
 // Translation element caches to minimize global DOM queries during language switches
-let i18nElementsCache = null;
-let passwordTogglesCache = null;
-let tokenCodesCache = null;
-let languageOptionsCache = null;
+// Optimized caches store DOM references and pre-parsed attributes
+let i18nElementsCache = null; // Array of { el, text, placeholder, aria }
+let passwordTogglesCache = null; // Array of { button, input }
+let tokenCodesCache = null; // Array of el
+let languageOptionsCache = null; // Array of { el, lang }
 
 // Helper to invalidate I18n element caches when dynamic content is added or replaced
 function invalidateI18nCache() {
@@ -441,50 +442,61 @@ async function translate(lang) {
     currentLanguage = effectiveLang;
     const trans = translations[effectiveLang];
 
-    // Optimization: Use cached elements if available, otherwise query and cache them
+    // Optimization: Use cached elements with pre-parsed attributes to minimize overhead
     if (!i18nElementsCache) {
-        i18nElementsCache = document.querySelectorAll('[data-i18n], [data-i18n-placeholder], [data-i18n-aria-label]');
+        const elements = document.querySelectorAll('[data-i18n], [data-i18n-placeholder], [data-i18n-aria-label]');
+        i18nElementsCache = Array.from(elements).map(el => ({
+            el,
+            text: el.dataset.i18n,
+            placeholder: el.dataset.i18nPlaceholder,
+            aria: el.dataset.i18nAriaLabel
+        }));
     }
-    i18nElementsCache.forEach(element => {
-        const i18nKey = element.dataset.i18n;
-        const i18nPlaceholderKey = element.dataset.i18nPlaceholder;
-        const i18nAriaLabelKey = element.dataset.i18nAriaLabel;
 
-        if (i18nKey) {
-            const translation = getNestedTranslation(trans, i18nKey);
+    i18nElementsCache.forEach(item => {
+        const { el, text, placeholder, aria } = item;
+
+        if (text) {
+            const translation = getNestedTranslation(trans, text);
             // Optimization: Only update DOM if content actually changed to avoid layout thrashing
-            if (translation && element.innerHTML !== translation) {
-                element.innerHTML = translation;
+            if (translation && el.innerHTML !== translation) {
+                el.innerHTML = translation;
             }
         }
 
-        if (i18nPlaceholderKey) {
-            const translation = getNestedTranslation(trans, i18nPlaceholderKey);
+        if (placeholder) {
+            const translation = getNestedTranslation(trans, placeholder);
             // Optimization: Only update DOM if placeholder actually changed
-            if (translation && element.placeholder !== translation) {
-                element.placeholder = translation;
+            if (translation && el.placeholder !== translation) {
+                el.placeholder = translation;
             }
         }
 
-        if (i18nAriaLabelKey) {
-            const translation = getNestedTranslation(trans, i18nAriaLabelKey);
-            if (translation && element.getAttribute('aria-label') !== translation) {
-                element.setAttribute('aria-label', translation);
+        if (aria) {
+            const translation = getNestedTranslation(trans, aria);
+            if (translation && el.getAttribute('aria-label') !== translation) {
+                el.setAttribute('aria-label', translation);
             }
         }
     });
 
     // Update password toggle ARIA labels for accessibility after language change
     if (!passwordTogglesCache) {
-        passwordTogglesCache = document.querySelectorAll('.password-toggle');
+        const elements = document.querySelectorAll('.password-toggle');
+        passwordTogglesCache = Array.from(elements).map(button => ({
+            button,
+            input: button.previousElementSibling
+        }));
     }
-    passwordTogglesCache.forEach(button => {
-        const input = button.previousElementSibling;
+
+    // Hoist common translations outside the loop
+    const showPassTxt = getNestedTranslation(trans, 'common.show_password');
+    const hidePassTxt = getNestedTranslation(trans, 'common.hide_password');
+
+    passwordTogglesCache.forEach(({ button, input }) => {
         if (input) {
-            const isPassword = input.type === 'password';
-            const actionKey = isPassword ? 'common.show_password' : 'common.hide_password';
-            const translation = getNestedTranslation(trans, actionKey);
-            if (translation) {
+            const translation = input.type === 'password' ? showPassTxt : hidePassTxt;
+            if (translation && button.getAttribute('aria-label') !== translation) {
                 button.setAttribute('aria-label', translation);
             }
         }
@@ -492,24 +504,34 @@ async function translate(lang) {
 
     // Update token ARIA labels after language change
     if (!tokenCodesCache) {
-        tokenCodesCache = document.querySelectorAll('.token-code');
+        tokenCodesCache = Array.from(document.querySelectorAll('.token-code'));
     }
+    const insertLabel = getNestedTranslation(trans, 'common.insert') || 'Insert';
     tokenCodesCache.forEach(token => {
-        const insertLabel = getNestedTranslation(trans, 'common.insert') || 'Insert';
-        token.setAttribute('aria-label', `${insertLabel} ${token.textContent}`);
+        const newAria = `${insertLabel} ${token.textContent}`;
+        if (token.getAttribute('aria-label') !== newAria) {
+            token.setAttribute('aria-label', newAria);
+        }
     });
 
     const nameElement = el('current-language-name');
-    if (nameElement) nameElement.textContent = LANGUAGE_NAMES[effectiveLang] || LANGUAGE_NAMES['en'];
+    const newLangName = LANGUAGE_NAMES[effectiveLang] || LANGUAGE_NAMES['en'];
+    if (nameElement && nameElement.textContent !== newLangName) {
+        nameElement.textContent = newLangName;
+    }
 
     // Update language selection state in dropdown
     if (!languageOptionsCache) {
-        languageOptionsCache = document.querySelectorAll('.language-option');
+        const options = document.querySelectorAll('.language-option');
+        languageOptionsCache = Array.from(options).map(el => ({
+            el,
+            lang: el.getAttribute('data-lang')
+        }));
     }
-    languageOptionsCache.forEach(option => {
-        const isSelected = option.getAttribute('data-lang') === effectiveLang;
-        option.classList.toggle('is-active', isSelected);
-        option.setAttribute('aria-selected', isSelected.toString());
+    languageOptionsCache.forEach(({ el, lang }) => {
+        const isSelected = lang === effectiveLang;
+        el.classList.toggle('is-active', isSelected);
+        el.setAttribute('aria-selected', isSelected.toString());
     });
 
     const hash = window.location.hash.substring(1);
@@ -517,7 +539,10 @@ async function translate(lang) {
         const sectionName = hash.charAt(0).toUpperCase() + hash.slice(1);
         const translatedSection = getNestedTranslation(trans, `menu.${hash}`) || sectionName;
         const pageTitleElement = el('page-title');
-        if (pageTitleElement) pageTitleElement.textContent = 'Frixos - ' + translatedSection;
+        const newTitle = 'Frixos - ' + translatedSection;
+        if (pageTitleElement && pageTitleElement.textContent !== newTitle) {
+            pageTitleElement.textContent = newTitle;
+        }
     }
 }
 
@@ -658,9 +683,7 @@ async function fetchThemeParams() {
         const data = await response.json();
         
         // Store theme-related parameters
-        Object.keys(data).forEach(key => {
-            window.settings[key] = data[key];
-        });
+        Object.assign(window.settings, data);
         window.settingsLoaded.theme = true;
 
         // Initialize theme using the settings data
@@ -702,9 +725,7 @@ function fetchSectionParams(sectionName) {
         .then(response => response.json())
         .then(data => {
             // Merge fetched parameters into window.settings
-            Object.keys(data).forEach(key => {
-                window.settings[key] = data[key];
-            });
+            Object.assign(window.settings, data);
             window.settingsLoaded[mappedSection] = true;
             return data;
         })
