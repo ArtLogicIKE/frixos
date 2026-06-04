@@ -442,13 +442,17 @@ async function translate(lang) {
     const trans = translations[effectiveLang];
 
     // Optimization: Use cached elements if available, otherwise query and cache them
+    // Pre-parsing keys into objects avoids ~600 redundant attribute lookups per switch
     if (!i18nElementsCache) {
-        i18nElementsCache = document.querySelectorAll('[data-i18n], [data-i18n-placeholder], [data-i18n-aria-label]');
+        i18nElementsCache = Array.from(document.querySelectorAll('[data-i18n], [data-i18n-placeholder], [data-i18n-aria-label]')).map(el => ({
+            el,
+            key: el.dataset.i18n,
+            placeholderKey: el.dataset.i18nPlaceholder,
+            ariaLabelKey: el.dataset.i18nAriaLabel
+        }));
     }
-    i18nElementsCache.forEach(element => {
-        const i18nKey = element.dataset.i18n;
-        const i18nPlaceholderKey = element.dataset.i18nPlaceholder;
-        const i18nAriaLabelKey = element.dataset.i18nAriaLabel;
+    i18nElementsCache.forEach(item => {
+        const { el: element, key: i18nKey, placeholderKey: i18nPlaceholderKey, ariaLabelKey: i18nAriaLabelKey } = item;
 
         if (i18nKey) {
             const translation = getNestedTranslation(trans, i18nKey);
@@ -476,15 +480,20 @@ async function translate(lang) {
 
     // Update password toggle ARIA labels for accessibility after language change
     if (!passwordTogglesCache) {
-        passwordTogglesCache = document.querySelectorAll('.password-toggle');
+        passwordTogglesCache = Array.from(document.querySelectorAll('.password-toggle')).map(btn => ({
+            btn,
+            input: btn.previousElementSibling
+        }));
     }
-    passwordTogglesCache.forEach(button => {
-        const input = button.previousElementSibling;
+    // Optimization: Hoist translation lookups outside of the loop
+    const showPassTrans = getNestedTranslation(trans, 'common.show_password');
+    const hidePassTrans = getNestedTranslation(trans, 'common.hide_password');
+    passwordTogglesCache.forEach(item => {
+        const { btn: button, input } = item;
         if (input) {
             const isPassword = input.type === 'password';
-            const actionKey = isPassword ? 'common.show_password' : 'common.hide_password';
-            const translation = getNestedTranslation(trans, actionKey);
-            if (translation) {
+            const translation = isPassword ? showPassTrans : hidePassTrans;
+            if (translation && button.getAttribute('aria-label') !== translation) {
                 button.setAttribute('aria-label', translation);
             }
         }
@@ -494,22 +503,33 @@ async function translate(lang) {
     if (!tokenCodesCache) {
         tokenCodesCache = document.querySelectorAll('.token-code');
     }
+    const insertLabel = getNestedTranslation(trans, 'common.insert') || 'Insert';
     tokenCodesCache.forEach(token => {
-        const insertLabel = getNestedTranslation(trans, 'common.insert') || 'Insert';
-        token.setAttribute('aria-label', `${insertLabel} ${token.textContent}`);
+        const label = `${insertLabel} ${token.textContent}`;
+        if (token.getAttribute('aria-label') !== label) {
+            token.setAttribute('aria-label', label);
+        }
     });
 
     const nameElement = el('current-language-name');
-    if (nameElement) nameElement.textContent = LANGUAGE_NAMES[effectiveLang] || LANGUAGE_NAMES['en'];
+    if (nameElement) {
+        const newName = LANGUAGE_NAMES[effectiveLang] || LANGUAGE_NAMES['en'];
+        if (nameElement.textContent !== newName) {
+            nameElement.textContent = newName;
+        }
+    }
 
     // Update language selection state in dropdown
     if (!languageOptionsCache) {
-        languageOptionsCache = document.querySelectorAll('.language-option');
+        languageOptionsCache = Array.from(document.querySelectorAll('.language-option')).map(opt => ({
+            el: opt,
+            lang: opt.getAttribute('data-lang')
+        }));
     }
-    languageOptionsCache.forEach(option => {
-        const isSelected = option.getAttribute('data-lang') === effectiveLang;
-        option.classList.toggle('is-active', isSelected);
-        option.setAttribute('aria-selected', isSelected.toString());
+    languageOptionsCache.forEach(item => {
+        const isSelected = item.lang === effectiveLang;
+        item.el.classList.toggle('is-active', isSelected);
+        item.el.setAttribute('aria-selected', isSelected.toString());
     });
 
     const hash = window.location.hash.substring(1);
@@ -517,7 +537,12 @@ async function translate(lang) {
         const sectionName = hash.charAt(0).toUpperCase() + hash.slice(1);
         const translatedSection = getNestedTranslation(trans, `menu.${hash}`) || sectionName;
         const pageTitleElement = el('page-title');
-        if (pageTitleElement) pageTitleElement.textContent = 'Frixos - ' + translatedSection;
+        if (pageTitleElement) {
+            const newTitle = 'Frixos - ' + translatedSection;
+            if (pageTitleElement.textContent !== newTitle) {
+                pageTitleElement.textContent = newTitle;
+            }
+        }
     }
 }
 
@@ -658,9 +683,7 @@ async function fetchThemeParams() {
         const data = await response.json();
         
         // Store theme-related parameters
-        Object.keys(data).forEach(key => {
-            window.settings[key] = data[key];
-        });
+        Object.assign(window.settings, data);
         window.settingsLoaded.theme = true;
 
         // Initialize theme using the settings data
@@ -702,9 +725,7 @@ function fetchSectionParams(sectionName) {
         .then(response => response.json())
         .then(data => {
             // Merge fetched parameters into window.settings
-            Object.keys(data).forEach(key => {
-                window.settings[key] = data[key];
-            });
+            Object.assign(window.settings, data);
             window.settingsLoaded[mappedSection] = true;
             return data;
         })
