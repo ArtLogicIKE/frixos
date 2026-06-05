@@ -15,3 +15,7 @@
 ## 2025-05-15 - [Credential UX vs Security]
 **Learning:** While `autocomplete` attributes like `current-password` and `username` greatly improve UX for WiFi and user accounts, they should be omitted for API tokens and integration keys to prevent password managers from incorrectly identifying them as primary site credentials.
 **Action:** Selectively apply `autocomplete` only to standard user/password fields and avoid them for technical tokens or machine keys.
+
+## 2025-05-16 - [Interactive Visual Samples]
+**Learning:** Interactive "previews" (like font samples) that serve as shortcuts for configuration settings significantly reduce cognitive load and form-filling friction. By making these samples accessible (`role="button"`, `tabindex="0"`) and providing localized instructions via `aria-label`, we create a delightful "click-to-apply" pattern that bridges the gap between visual choice and technical configuration.
+**Action:** Identify static visual examples in configuration UIs that can be upgraded to accessible, interactive controls that programmatically populate their associated input fields.

@@ -9,7 +9,8 @@
   },
   "common": {
     "save_settings": "Enregistrer les paramètres",
-    "cancel": "Annuler"
+    "cancel": "Annuler",
+    "select_font": "Sélectionner la police {name}"
   },
   "settings": {
     "connection": {

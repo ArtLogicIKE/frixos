@@ -17,6 +17,17 @@ const LANGUAGE_NAMES = {
 const domCache = new Map();
 
 /**
+ * Common translation strings that are repeated or require special handling
+ * Optimization: Cache these to avoid redundant lookups in the main translation loop
+ */
+const COMMON_STRINGS = {
+    insert: '',
+    show_password: '',
+    hide_password: '',
+    select_font: ''
+};
+
+/**
  * Helper for element selection with O(1) caching
  * @param {string} id - The ID of the element to retrieve
  * @returns {HTMLElement|null}
@@ -36,6 +47,7 @@ let i18nElementsCache = null;
 let passwordTogglesCache = null;
 let tokenCodesCache = null;
 let languageOptionsCache = null;
+let fontSampleBoxesCache = null;
 
 // Helper to invalidate I18n element caches when dynamic content is added or replaced
 function invalidateI18nCache() {
@@ -43,6 +55,7 @@ function invalidateI18nCache() {
     passwordTogglesCache = null;
     tokenCodesCache = null;
     languageOptionsCache = null;
+    fontSampleBoxesCache = null;
 }
 
 // Helper to highlight an element (visual feedback for programmatic updates)
@@ -97,7 +110,8 @@ const translations = {
             hide_password: 'Hide password',
             change_language: 'Change language',
             toggle_theme: 'Toggle theme',
-            insert: 'Insert'
+            insert: 'Insert',
+            select_font: 'Select {name} font'
         },
         settings: {
             connection: {
@@ -465,6 +479,12 @@ async function translate(lang) {
     currentLanguage = effectiveLang;
     const trans = translations[effectiveLang];
 
+    // Optimization: Cache frequently used common translations to avoid repeated deep lookups
+    COMMON_STRINGS.insert = getNestedTranslation(trans, 'common.insert') || 'Insert';
+    COMMON_STRINGS.show_password = getNestedTranslation(trans, 'common.show_password') || 'Show password';
+    COMMON_STRINGS.hide_password = getNestedTranslation(trans, 'common.hide_password') || 'Hide password';
+    COMMON_STRINGS.select_font = getNestedTranslation(trans, 'common.select_font') || 'Select {name} font';
+
     // Optimization: Use cached elements if available, otherwise query and cache them
     if (!i18nElementsCache) {
         i18nElementsCache = document.querySelectorAll('[data-i18n], [data-i18n-placeholder], [data-i18n-aria-label]');
@@ -519,8 +539,19 @@ async function translate(lang) {
         tokenCodesCache = document.querySelectorAll('.token-code');
     }
     tokenCodesCache.forEach(token => {
-        const insertLabel = getNestedTranslation(trans, 'common.insert') || 'Insert';
-        token.setAttribute('aria-label', `${insertLabel} ${token.textContent}`);
+        token.setAttribute('aria-label', `${COMMON_STRINGS.insert} ${token.textContent}`);
+    });
+
+    // Update font sample ARIA labels
+    if (!fontSampleBoxesCache) {
+        fontSampleBoxesCache = document.querySelectorAll('.font-sample-box');
+    }
+    fontSampleBoxesCache.forEach(box => {
+        const nameEl = box.querySelector('.font-sample-name');
+        if (nameEl) {
+            const fontName = nameEl.textContent;
+            box.setAttribute('aria-label', COMMON_STRINGS.select_font.replace('{name}', fontName));
+        }
     });
 
     const nameElement = el('current-language-name');
@@ -776,6 +807,7 @@ document.addEventListener('DOMContentLoaded', function() {
             initA11y();
 
             setupAdvancedSection();
+            setupFontSamples();
             setupStatusSection();
             setupFilesSection();
             setupUpdateSection();
@@ -2694,6 +2726,42 @@ function resetDevice() {
 }
 
 // Advanced settings section functionality
+// Setup font sample interaction
+function setupFontSamples() {
+    const boxes = document.querySelectorAll('.font-sample-box');
+    const dayfont = el('dayfont');
+    const nightfont = el('nightfont');
+
+    if (!boxes.length || !dayfont || !nightfont) return;
+
+    boxes.forEach(box => {
+        const nameEl = box.querySelector('.font-sample-name');
+        if (!nameEl) return;
+
+        const fontValue = nameEl.textContent.toLowerCase();
+
+        const activate = () => {
+            dayfont.value = fontValue;
+            nightfont.value = fontValue;
+
+            // Trigger change events for both dropdowns
+            dayfont.dispatchEvent(new Event('change', { bubbles: true }));
+            nightfont.dispatchEvent(new Event('change', { bubbles: true }));
+
+            highlightElement(dayfont);
+            highlightElement(nightfont);
+        };
+
+        box.addEventListener('click', activate);
+        box.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                activate();
+            }
+        });
+    });
+}
+
 function setupAdvancedSection() {
     // Setup event listeners only once
     if (!window.advancedEventListenersSet) {

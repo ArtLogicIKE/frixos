@@ -9,7 +9,8 @@
   },
   "common": {
     "save_settings": "Guardar definições",
-    "cancel": "Cancelar"
+    "cancel": "Cancelar",
+    "select_font": "Selecionar fonte {name}"
   },
   "settings": {
     "connection": {
