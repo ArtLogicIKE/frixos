@@ -13,8 +13,37 @@ const LANGUAGE_NAMES = {
     'es': 'Español'
 };
 
-// Helper for element selection
-const el = (id) => document.getElementById(id);
+// DOM Element Cache to minimize redundant lookups
+const domCache = new Map();
+
+/**
+ * Helper for element selection with O(1) caching
+ * @param {string} id - The ID of the element to retrieve
+ * @returns {HTMLElement|null}
+ */
+const el = (id) => {
+    if (!id) return null;
+    let element = domCache.get(id);
+    if (!element || !element.isConnected) {
+        element = document.getElementById(id);
+        if (element) domCache.set(id, element);
+    }
+    return element;
+};
+
+// Translation element caches to minimize global DOM queries during language switches
+let i18nElementsCache = null;
+let passwordTogglesCache = null;
+let tokenCodesCache = null;
+let languageOptionsCache = null;
+
+// Helper to invalidate I18n element caches when dynamic content is added or replaced
+function invalidateI18nCache() {
+    i18nElementsCache = null;
+    passwordTogglesCache = null;
+    tokenCodesCache = null;
+    languageOptionsCache = null;
+}
 
 // Helper to highlight an element (visual feedback for programmatic updates)
 function highlightElement(element) {
@@ -22,6 +51,17 @@ function highlightElement(element) {
     element.classList.remove('input-highlight');
     void element.offsetWidth; // Force reflow
     element.classList.add('input-highlight');
+}
+
+// Helper for updating character counter visual state
+function updateCharCounter(input, counter) {
+    if (!input || !counter) return;
+    const length = input.value.length;
+    const maxLength = input.getAttribute('maxlength') || 511;
+    counter.textContent = `${length} / ${maxLength}`;
+
+    counter.classList.toggle('near-limit', length >= 450 && length < maxLength);
+    counter.classList.toggle('at-limit', length >= maxLength);
 }
 
 // Helper for toggling button loading state
@@ -425,8 +465,11 @@ async function translate(lang) {
     currentLanguage = effectiveLang;
     const trans = translations[effectiveLang];
 
-    // Querying on every call to support dynamic elements while using dataset for readability
-    document.querySelectorAll('[data-i18n], [data-i18n-placeholder], [data-i18n-aria-label]').forEach(element => {
+    // Optimization: Use cached elements if available, otherwise query and cache them
+    if (!i18nElementsCache) {
+        i18nElementsCache = document.querySelectorAll('[data-i18n], [data-i18n-placeholder], [data-i18n-aria-label]');
+    }
+    i18nElementsCache.forEach(element => {
         const i18nKey = element.dataset.i18n;
         const i18nPlaceholderKey = element.dataset.i18nPlaceholder;
         const i18nAriaLabelKey = element.dataset.i18nAriaLabel;
@@ -456,7 +499,10 @@ async function translate(lang) {
     });
 
     // Update password toggle ARIA labels for accessibility after language change
-    document.querySelectorAll('.password-toggle').forEach(button => {
+    if (!passwordTogglesCache) {
+        passwordTogglesCache = document.querySelectorAll('.password-toggle');
+    }
+    passwordTogglesCache.forEach(button => {
         const input = button.previousElementSibling;
         if (input) {
             const isPassword = input.type === 'password';
@@ -469,7 +515,10 @@ async function translate(lang) {
     });
 
     // Update token ARIA labels after language change
-    document.querySelectorAll('.token-code').forEach(token => {
+    if (!tokenCodesCache) {
+        tokenCodesCache = document.querySelectorAll('.token-code');
+    }
+    tokenCodesCache.forEach(token => {
         const insertLabel = getNestedTranslation(trans, 'common.insert') || 'Insert';
         token.setAttribute('aria-label', `${insertLabel} ${token.textContent}`);
     });
@@ -478,7 +527,10 @@ async function translate(lang) {
     if (nameElement) nameElement.textContent = LANGUAGE_NAMES[effectiveLang] || LANGUAGE_NAMES['en'];
 
     // Update language selection state in dropdown
-    document.querySelectorAll('.language-option').forEach(option => {
+    if (!languageOptionsCache) {
+        languageOptionsCache = document.querySelectorAll('.language-option');
+    }
+    languageOptionsCache.forEach(option => {
         const isSelected = option.getAttribute('data-lang') === effectiveLang;
         option.classList.toggle('is-active', isSelected);
         option.setAttribute('aria-selected', isSelected.toString());
@@ -1836,6 +1888,7 @@ function pollScanResults() {
 }
 
 function displayNetworks(networks) {
+    invalidateI18nCache();
     const networkList = el('network-list');
     const loadingSpinner = el('loading-spinner');
     const loadingText = el('loading-text');
@@ -1977,6 +2030,7 @@ function setupStatusSection() {
 
 // Setup support buttons (send email and copy to clipboard)
 function setupSupportButtons() {
+    invalidateI18nCache();
     const sendToSupportButton = el('sendToSupportButton');
     const copyToClipboardButton = el('copyToClipboardButton');
     
@@ -1984,6 +2038,7 @@ function setupSupportButtons() {
         // Remove any existing listeners by cloning the button
         const newButton = sendToSupportButton.cloneNode(true);
         sendToSupportButton.parentNode.replaceChild(newButton, sendToSupportButton);
+        domCache.delete('sendToSupportButton');
         
         newButton.addEventListener('click', function(e) {
             e.preventDefault();
@@ -1998,6 +2053,7 @@ function setupSupportButtons() {
         // Remove any existing listeners by cloning the button
         const newButton = copyToClipboardButton.cloneNode(true);
         copyToClipboardButton.parentNode.replaceChild(newButton, copyToClipboardButton);
+        domCache.delete('copyToClipboardButton');
         
         newButton.addEventListener('click', function(e) {
             e.preventDefault();
@@ -2651,14 +2707,16 @@ function setupAdvancedSection() {
 
         // Setup message character counter and interactive tokens
         const messageInput = el('message');
-        if (messageInput) {
-            messageInput.addEventListener('input', () => el('message-counter').textContent = `${messageInput.value.length} / 511`);
+        const messageCounter = el('message-counter');
+        if (messageInput && messageCounter) {
+            messageInput.addEventListener('input', () => updateCharCounter(messageInput, messageCounter));
             document.querySelectorAll('.token-code').forEach(t => {
                 const insert = () => {
                     const s = messageInput.selectionStart, e = messageInput.selectionEnd, v = messageInput.value, text = t.textContent;
                     messageInput.value = v.slice(0, s) + text + v.slice(e);
                     messageInput.setSelectionRange(s + text.length, s + text.length);
                     messageInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    highlightElement(messageInput);
                     messageInput.focus();
                 };
                 t.onclick = insert;
@@ -2675,7 +2733,7 @@ function setupAdvancedSection() {
         const messageCounter = el('message-counter');
         if (messageInput && messageCounter && window.settings.p16 !== undefined) {
             messageInput.value = window.settings.p16 || '';
-            messageCounter.textContent = `${messageInput.value.length} / 511`;
+            updateCharCounter(messageInput, messageCounter);
         }
         
         if (el('ofs_x') && window.settings.p01 !== undefined) el('ofs_x').value = window.settings.p01 || 0;
