@@ -1139,6 +1139,18 @@ textarea[aria-invalid="true"] {
     box-shadow: var(--box-shadow);
     border: 1px solid var(--border-color);
     min-height: 120px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.font-sample-box:hover {
+    background-color: var(--section-header-bg);
+    transform: translateY(-1px);
+}
+
+.font-sample-box:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--primary-color);
 }
 
 .font-sample-name {

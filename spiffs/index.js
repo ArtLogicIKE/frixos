@@ -36,6 +36,7 @@ let i18nElementsCache = null;
 let passwordTogglesCache = null;
 let tokenCodesCache = null;
 let languageOptionsCache = null;
+let fontSampleBoxesCache = null;
 
 // Helper to invalidate I18n element caches when dynamic content is added or replaced
 function invalidateI18nCache() {
@@ -43,6 +44,7 @@ function invalidateI18nCache() {
     passwordTogglesCache = null;
     tokenCodesCache = null;
     languageOptionsCache = null;
+    fontSampleBoxesCache = null;
 }
 
 // Helper to highlight an element (visual feedback for programmatic updates)
@@ -96,7 +98,8 @@ const translations = {
             hide_password: 'Hide password',
             change_language: 'Change language',
             toggle_theme: 'Toggle theme',
-            insert: 'Insert'
+            insert: 'Insert',
+            select_font: 'Select {name} font'
         },
         settings: {
             connection: {
@@ -497,6 +500,13 @@ async function translate(lang) {
     tokenCodesCache.forEach(token => {
         const insertLabel = getNestedTranslation(trans, 'common.insert') || 'Insert';
         token.setAttribute('aria-label', `${insertLabel} ${token.textContent}`);
+    });
+
+    // Update font sample ARIA labels
+    if (!fontSampleBoxesCache) fontSampleBoxesCache = document.querySelectorAll('.font-sample-box');
+    fontSampleBoxesCache.forEach(box => {
+        const n = box.querySelector('.font-sample-name');
+        if (n) box.setAttribute('aria-label', (getNestedTranslation(trans, 'common.select_font') || 'Select {name} font').replace('{name}', n.textContent));
     });
 
     const nameElement = el('current-language-name');
@@ -2362,6 +2372,20 @@ function setupAdvancedSection() {
         if (advancedForm) {
             advancedForm.addEventListener('submit', (e) => handleFormSubmit(e, 'advancedForm'));
         }
+
+        // Setup interactive font samples
+        document.querySelectorAll('.font-sample-box').forEach(box => {
+            const n = box.querySelector('.font-sample-name');
+            if (!n) return;
+            box.setAttribute('role', 'button'); box.setAttribute('tabindex', '0');
+            const select = () => {
+                const f = n.textContent.toLowerCase(), df = el('dayfont'), nf = el('nightfont');
+                if (df) { df.value = f; highlightElement(df); }
+                if (nf) { nf.value = f; highlightElement(nf); }
+            };
+            box.onclick = select;
+            box.onkeydown = (e) => ['Enter', ' '].includes(e.key) && (e.preventDefault(), select());
+        });
 
         // Setup message character counter and interactive tokens
         const messageInput = el('message');

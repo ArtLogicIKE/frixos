@@ -15,3 +15,7 @@
 ## 2025-05-15 - [Credential UX vs Security]
 **Learning:** While `autocomplete` attributes like `current-password` and `username` greatly improve UX for WiFi and user accounts, they should be omitted for API tokens and integration keys to prevent password managers from incorrectly identifying them as primary site credentials.
 **Action:** Selectively apply `autocomplete` only to standard user/password fields and avoid them for technical tokens or machine keys.
+
+## 2025-05-15 - [Interactivity in On-Demand Sections]
+**Learning:** In Single Page Applications (SPA) where sections are initialized or populated on demand (lazy-loaded), attaching event listeners to static HTML elements within those sections must be done carefully to ensure they are available when the section becomes active, but also to avoid duplicate listeners if the initialization logic runs multiple times.
+**Action:** Use a "listeners set" guard flag within the section's setup function to ensure interactivity is established exactly once, regardless of when or how often the section is navigated to.
