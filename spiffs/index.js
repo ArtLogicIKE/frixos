@@ -465,75 +465,88 @@ async function translate(lang) {
     currentLanguage = effectiveLang;
     const trans = translations[effectiveLang];
 
-    // Optimization: Use cached elements if available, otherwise query and cache them
+    // Optimization: Use refined object-based caches to eliminate ~600 redundant attribute lookups and traversals
     if (!i18nElementsCache) {
-        i18nElementsCache = document.querySelectorAll('[data-i18n], [data-i18n-placeholder], [data-i18n-aria-label]');
+        i18nElementsCache = Array.from(document.querySelectorAll('[data-i18n], [data-i18n-placeholder], [data-i18n-aria-label]')).map(element => ({
+            el: element,
+            key: element.dataset.i18n,
+            placeholderKey: element.dataset.i18nPlaceholder,
+            ariaLabelKey: element.dataset.i18nAriaLabel
+        }));
     }
-    i18nElementsCache.forEach(element => {
-        const i18nKey = element.dataset.i18n;
-        const i18nPlaceholderKey = element.dataset.i18nPlaceholder;
-        const i18nAriaLabelKey = element.dataset.i18nAriaLabel;
 
-        if (i18nKey) {
-            const translation = getNestedTranslation(trans, i18nKey);
+    i18nElementsCache.forEach(item => {
+        const element = item.el;
+        if (item.key) {
+            const translation = getNestedTranslation(trans, item.key);
             // Optimization: Only update DOM if content actually changed to avoid layout thrashing
             if (translation && element.innerHTML !== translation) {
                 element.innerHTML = translation;
             }
         }
 
-        if (i18nPlaceholderKey) {
-            const translation = getNestedTranslation(trans, i18nPlaceholderKey);
-            // Optimization: Only update DOM if placeholder actually changed
+        if (item.placeholderKey) {
+            const translation = getNestedTranslation(trans, item.placeholderKey);
             if (translation && element.placeholder !== translation) {
                 element.placeholder = translation;
             }
         }
 
-        if (i18nAriaLabelKey) {
-            const translation = getNestedTranslation(trans, i18nAriaLabelKey);
+        if (item.ariaLabelKey) {
+            const translation = getNestedTranslation(trans, item.ariaLabelKey);
             if (translation && element.getAttribute('aria-label') !== translation) {
                 element.setAttribute('aria-label', translation);
             }
         }
     });
 
-    // Update password toggle ARIA labels for accessibility after language change
+    // Update password toggle ARIA labels - Optimization: Use cached references and hoisted keys
     if (!passwordTogglesCache) {
-        passwordTogglesCache = document.querySelectorAll('.password-toggle');
+        passwordTogglesCache = Array.from(document.querySelectorAll('.password-toggle')).map(button => ({
+            btn: button,
+            input: button.previousElementSibling
+        }));
     }
-    passwordTogglesCache.forEach(button => {
-        const input = button.previousElementSibling;
-        if (input) {
-            const isPassword = input.type === 'password';
-            const actionKey = isPassword ? 'common.show_password' : 'common.hide_password';
-            const translation = getNestedTranslation(trans, actionKey);
-            if (translation) {
-                button.setAttribute('aria-label', translation);
+    const showPasswordLabel = getNestedTranslation(trans, 'common.show_password');
+    const hidePasswordLabel = getNestedTranslation(trans, 'common.hide_password');
+    passwordTogglesCache.forEach(item => {
+        if (item.input) {
+            const translation = item.input.type === 'password' ? showPasswordLabel : hidePasswordLabel;
+            if (translation && item.btn.getAttribute('aria-label') !== translation) {
+                item.btn.setAttribute('aria-label', translation);
             }
         }
     });
 
-    // Update token ARIA labels after language change
+    // Update token ARIA labels - Optimization: Hoist invariant translation lookup
     if (!tokenCodesCache) {
         tokenCodesCache = document.querySelectorAll('.token-code');
     }
+    const insertLabel = getNestedTranslation(trans, 'common.insert') || 'Insert';
     tokenCodesCache.forEach(token => {
-        const insertLabel = getNestedTranslation(trans, 'common.insert') || 'Insert';
-        token.setAttribute('aria-label', `${insertLabel} ${token.textContent}`);
+        const newAriaLabel = `${insertLabel} ${token.textContent}`;
+        if (token.getAttribute('aria-label') !== newAriaLabel) {
+            token.setAttribute('aria-label', newAriaLabel);
+        }
     });
 
     const nameElement = el('current-language-name');
-    if (nameElement) nameElement.textContent = LANGUAGE_NAMES[effectiveLang] || LANGUAGE_NAMES['en'];
-
-    // Update language selection state in dropdown
-    if (!languageOptionsCache) {
-        languageOptionsCache = document.querySelectorAll('.language-option');
+    const newLanguageName = LANGUAGE_NAMES[effectiveLang] || LANGUAGE_NAMES['en'];
+    if (nameElement && nameElement.textContent !== newLanguageName) {
+        nameElement.textContent = newLanguageName;
     }
-    languageOptionsCache.forEach(option => {
-        const isSelected = option.getAttribute('data-lang') === effectiveLang;
-        option.classList.toggle('is-active', isSelected);
-        option.setAttribute('aria-selected', isSelected.toString());
+
+    // Update language selection state - Optimization: Use cached attributes
+    if (!languageOptionsCache) {
+        languageOptionsCache = Array.from(document.querySelectorAll('.language-option')).map(option => ({
+            el: option,
+            lang: option.getAttribute('data-lang')
+        }));
+    }
+    languageOptionsCache.forEach(item => {
+        const isSelected = item.lang === effectiveLang;
+        item.el.classList.toggle('is-active', isSelected);
+        item.el.setAttribute('aria-selected', isSelected.toString());
     });
 
     const hash = window.location.hash.substring(1);
@@ -541,7 +554,10 @@ async function translate(lang) {
         const sectionName = hash.charAt(0).toUpperCase() + hash.slice(1);
         const translatedSection = getNestedTranslation(trans, `menu.${hash}`) || sectionName;
         const pageTitleElement = el('page-title');
-        if (pageTitleElement) pageTitleElement.textContent = 'Frixos - ' + translatedSection;
+        const newPageTitle = 'Frixos - ' + translatedSection;
+        if (pageTitleElement && pageTitleElement.textContent !== newPageTitle) {
+            pageTitleElement.textContent = newPageTitle;
+        }
     }
 }
 
@@ -688,9 +704,7 @@ async function fetchThemeParams() {
         const data = await response.json();
         
         // Store theme-related parameters
-        Object.keys(data).forEach(key => {
-            window.settings[key] = data[key];
-        });
+        Object.assign(window.settings, data);
         window.settingsLoaded.theme = true;
 
         // Initialize theme using the settings data
@@ -732,9 +746,7 @@ function fetchSectionParams(sectionName) {
         .then(response => response.json())
         .then(data => {
             // Merge fetched parameters into window.settings
-            Object.keys(data).forEach(key => {
-                window.settings[key] = data[key];
-            });
+            Object.assign(window.settings, data);
             window.settingsLoaded[mappedSection] = true;
             return data;
         })
@@ -2695,6 +2707,9 @@ function resetDevice() {
 
 // Advanced settings section functionality
 function setupAdvancedSection() {
+    const messageInput = el('message');
+    const messageCounter = el('message-counter');
+
     // Setup event listeners only once
     if (!window.advancedEventListenersSet) {
         window.advancedEventListenersSet = true;
@@ -2706,8 +2721,6 @@ function setupAdvancedSection() {
         }
 
         // Setup message character counter and interactive tokens
-        const messageInput = el('message');
-        const messageCounter = el('message-counter');
         if (messageInput && messageCounter) {
             messageInput.addEventListener('input', () => updateCharCounter(messageInput, messageCounter));
             document.querySelectorAll('.token-code').forEach(t => {
@@ -2729,8 +2742,6 @@ function setupAdvancedSection() {
 
     // Populate fields if settings are loaded
     if (window.settings && window.settingsLoaded.advanced) {
-        const messageInput = el('message');
-        const messageCounter = el('message-counter');
         if (messageInput && messageCounter && window.settings.p16 !== undefined) {
             messageInput.value = window.settings.p16 || '';
             updateCharCounter(messageInput, messageCounter);
