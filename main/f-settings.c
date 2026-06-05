@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <math.h>
+#include <dirent.h>
 #include <sys/param.h>
 #include <sys/stat.h>
 #include <errno.h>
@@ -74,7 +75,7 @@
  * - p23 = brightness_LED (LED brightness array)
  * - p24 = show_leading_zero (Show leading zero)
  * - p50 = dots_breathe (Disable breathing time dots)
- * - p42 = pwm_frequency (PWM frequency in Hz, range 10-78000)
+ * - p42 = pwm_frequency (PWM frequency in Hz, range 10-300000)
  * - p43 = max_power (Max power, range 1-1023)
  *
  * Integration Settings (shortened):
@@ -1002,7 +1003,7 @@ static bool validate_json_params(cJSON *root, char *err_buf, size_t err_size)
 
     /* p42 pwm_frequency */
     if ((item = cJSON_GetObjectItem(root, "p42")) && cJSON_IsNumber(item))
-        CHECK_RANGE("pwm_frequency", item->valueint, 10, 78000);
+        CHECK_RANGE("pwm_frequency", item->valueint, 10, PWM_MAX_FREQUENCY_HZ);
 
     /* p43 max_power */
     if ((item = cJSON_GetObjectItem(root, "p43")) && cJSON_IsNumber(item))
@@ -1166,6 +1167,7 @@ esp_err_t settings_post_handler(httpd_req_t *req)
     char orig_lon[12];
     char orig_timezone[TZ_LENGTH];
     char orig_message[SCROLL_MSG_LENGTH]; // Add this line
+    uint32_t orig_pwm_frequency = eeprom_pwm_frequency;
 
     // Copy original values
     strncpy(orig_hostname, eeprom_hostname, sizeof(orig_hostname));
@@ -1509,8 +1511,8 @@ esp_err_t settings_post_handler(httpd_req_t *req)
     if (cJSON_IsNumber(pwm_frequency))
     {
         int freq_value = (int)pwm_frequency->valueint;
-        // Validate range 10-78000
-        if (freq_value >= 10 && freq_value <= 78000)
+        // Validate range 10-300000
+        if (freq_value >= 10 && freq_value <= PWM_MAX_FREQUENCY_HZ)
         {
             eeprom_pwm_frequency = (uint32_t)freq_value;
             pwm_frequency_changed = true;
@@ -1518,7 +1520,7 @@ esp_err_t settings_post_handler(httpd_req_t *req)
         }
         else
         {
-            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "PWM frequency out of range (10-78000): %d, keeping current value", freq_value);
+            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "PWM frequency out of range (10-%u): %d, keeping current value", PWM_MAX_FREQUENCY_HZ, freq_value);
         }
     }
 
@@ -1768,6 +1770,15 @@ esp_err_t settings_post_handler(httpd_req_t *req)
 
     cJSON_Delete(root);
 
+    // Reconfigure PWM frequency before saving so unsupported values do not get persisted.
+    if (pwm_frequency_changed && reconfigure_led_pwm_frequency() != ESP_OK)
+    {
+        eeprom_pwm_frequency = orig_pwm_frequency;
+        reconfigure_led_pwm_frequency();
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to reconfigure PWM frequency");
+        goto cleanup;
+    }
+
     // Save settings to NVS
     esp_err_t err = write_nvs_parameters();
     if (err != ESP_OK)
@@ -1777,11 +1788,6 @@ esp_err_t settings_post_handler(httpd_req_t *req)
         goto cleanup;
     }
 
-    // Reconfigure PWM frequency if it was changed
-    if (pwm_frequency_changed)
-    {
-        reconfigure_led_pwm_frequency();
-    }
     set_led_pwm_brightness(eeprom_brightness_LED[font_index]); // set the brightness again, in case something changed
 
     // Check if critical settings have changed
@@ -2787,6 +2793,253 @@ static esp_err_t http_mutex_wrapper(httpd_req_t *req, esp_err_t (*handler)(httpd
     return result;
 }
 
+static bool is_valid_spiffs_filename(const char *filename)
+{
+    if (!filename || filename[0] == '\0' || strlen(filename) > 110)
+    {
+        return false;
+    }
+
+    if (strstr(filename, "..") || strchr(filename, '/') || strchr(filename, '\\'))
+    {
+        return false;
+    }
+
+    for (const char *p = filename; *p; p++)
+    {
+        if ((unsigned char)*p < 0x20)
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+static void make_spiffs_path(char *out, size_t out_len, const char *filename)
+{
+    snprintf(out, out_len, "/spiffs/%.110s", filename);
+}
+
+static esp_err_t read_json_body(httpd_req_t *req, cJSON **root_out)
+{
+    if (!root_out || req->content_len <= 0 || req->content_len > HTTP_SERVER_MAX_REQ_SIZE)
+    {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid request body");
+        return ESP_FAIL;
+    }
+
+    char *body = malloc(req->content_len + 1);
+    if (!body)
+    {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
+        return ESP_FAIL;
+    }
+
+    int received = 0;
+    while (received < req->content_len)
+    {
+        int ret = httpd_req_recv(req, body + received, req->content_len - received);
+        if (ret <= 0)
+        {
+            free(body);
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to read request body");
+            return ESP_FAIL;
+        }
+        received += ret;
+    }
+    body[received] = '\0';
+
+    cJSON *root = cJSON_Parse(body);
+    free(body);
+
+    if (!root)
+    {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
+        return ESP_FAIL;
+    }
+
+    *root_out = root;
+    return ESP_OK;
+}
+
+esp_err_t files_list_handler(httpd_req_t *req)
+{
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "SPIFFS files list request received");
+
+    DIR *dir = opendir("/spiffs");
+    if (!dir)
+    {
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to open SPIFFS directory: %s", strerror(errno));
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to open SPIFFS directory");
+        return ESP_FAIL;
+    }
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-cache");
+    httpd_resp_send_chunk(req, "{\"files\":[", HTTPD_RESP_USE_STRLEN);
+
+    struct dirent *ent;
+    bool first = true;
+    int count = 0;
+    char chunk[256];
+
+    while ((ent = readdir(dir)) != NULL)
+    {
+        const char *name = ent->d_name;
+        if (strncmp(name, "/spiffs/", 8) == 0)
+        {
+            name += 8;
+        }
+        else if (name[0] == '/')
+        {
+            name++;
+        }
+
+        if (name[0] == '\0')
+        {
+            continue;
+        }
+
+        char filepath[128];
+        make_spiffs_path(filepath, sizeof(filepath), name);
+
+        struct stat st;
+        size_t size = 0;
+        if (stat(filepath, &st) == 0)
+        {
+            size = st.st_size;
+        }
+
+        char escaped_name[160];
+        format_json_string(escaped_name, sizeof(escaped_name), name);
+        snprintf(chunk, sizeof(chunk), "%s{\"name\":%s,\"size\":%u}",
+                 first ? "" : ",",
+                 escaped_name,
+                 (unsigned int)size);
+        httpd_resp_send_chunk(req, chunk, HTTPD_RESP_USE_STRLEN);
+        first = false;
+        count++;
+    }
+
+    closedir(dir);
+    snprintf(chunk, sizeof(chunk), "],\"count\":%d}", count);
+    httpd_resp_send_chunk(req, chunk, HTTPD_RESP_USE_STRLEN);
+    httpd_resp_send_chunk(req, NULL, 0);
+    return ESP_OK;
+}
+
+esp_err_t files_delete_handler(httpd_req_t *req)
+{
+    cJSON *root = NULL;
+    if (read_json_body(req, &root) != ESP_OK)
+    {
+        return ESP_FAIL;
+    }
+
+    cJSON *files = cJSON_GetObjectItem(root, "files");
+    if (!cJSON_IsArray(files) || cJSON_GetArraySize(files) == 0)
+    {
+        cJSON_Delete(root);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "No files specified");
+        return ESP_FAIL;
+    }
+
+    int deleted = 0;
+    int failed = 0;
+    cJSON *item = NULL;
+    cJSON_ArrayForEach(item, files)
+    {
+        if (!cJSON_IsString(item) || !is_valid_spiffs_filename(item->valuestring))
+        {
+            failed++;
+            continue;
+        }
+
+        char filepath[128];
+        make_spiffs_path(filepath, sizeof(filepath), item->valuestring);
+        if (remove(filepath) == 0)
+        {
+            deleted++;
+        }
+        else
+        {
+            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Failed to delete SPIFFS file %s: %s", filepath, strerror(errno));
+            failed++;
+        }
+    }
+
+    cJSON_Delete(root);
+    display_changed();
+
+    char response[128];
+    httpd_resp_set_type(req, "application/json");
+    snprintf(response, sizeof(response),
+             "{\"status\":\"%s\",\"deleted\":%d,\"failed\":%d}",
+             failed == 0 ? "ok" : "error",
+             deleted,
+             failed);
+    httpd_resp_send(req, response, HTTPD_RESP_USE_STRLEN);
+    return failed == 0 ? ESP_OK : ESP_FAIL;
+}
+
+esp_err_t files_rename_handler(httpd_req_t *req)
+{
+    cJSON *root = NULL;
+    if (read_json_body(req, &root) != ESP_OK)
+    {
+        return ESP_FAIL;
+    }
+
+    cJSON *old_name = cJSON_GetObjectItem(root, "oldName");
+    cJSON *new_name = cJSON_GetObjectItem(root, "newName");
+    if (!cJSON_IsString(old_name) || !cJSON_IsString(new_name) ||
+        !is_valid_spiffs_filename(old_name->valuestring) ||
+        !is_valid_spiffs_filename(new_name->valuestring))
+    {
+        cJSON_Delete(root);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid filename");
+        return ESP_FAIL;
+    }
+
+    char old_path[128];
+    char new_path[128];
+    make_spiffs_path(old_path, sizeof(old_path), old_name->valuestring);
+    make_spiffs_path(new_path, sizeof(new_path), new_name->valuestring);
+
+    struct stat st;
+    if (stat(old_path, &st) != 0)
+    {
+        cJSON_Delete(root);
+        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "Source file not found");
+        return ESP_FAIL;
+    }
+
+    if (stat(new_path, &st) == 0)
+    {
+        cJSON_Delete(root);
+        httpd_resp_set_status(req, "409 Conflict");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_send(req, "{\"status\":\"error\",\"message\":\"Target file already exists\"}", HTTPD_RESP_USE_STRLEN);
+        return ESP_FAIL;
+    }
+
+    if (rename(old_path, new_path) != 0)
+    {
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to rename %s to %s: %s", old_path, new_path, strerror(errno));
+        cJSON_Delete(root);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Rename failed");
+        return ESP_FAIL;
+    }
+
+    cJSON_Delete(root);
+    display_changed();
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_send(req, "{\"status\":\"ok\",\"message\":\"File renamed\"}", HTTPD_RESP_USE_STRLEN);
+    return ESP_OK;
+}
+
 // Status handler wrapper with validation
 static esp_err_t status_handler_wrapper(httpd_req_t *req)
 {
@@ -2840,6 +3093,21 @@ static esp_err_t wifi_scan_start_wrapper(httpd_req_t *req)
 static esp_err_t wifi_scan_status_wrapper(httpd_req_t *req)
 {
     return http_mutex_wrapper(req, wifi_scan_status_handler);
+}
+
+static esp_err_t files_list_wrapper(httpd_req_t *req)
+{
+    return http_mutex_wrapper(req, files_list_handler);
+}
+
+static esp_err_t files_delete_wrapper(httpd_req_t *req)
+{
+    return http_mutex_wrapper(req, files_delete_handler);
+}
+
+static esp_err_t files_rename_wrapper(httpd_req_t *req)
+{
+    return http_mutex_wrapper(req, files_rename_handler);
 }
 
 // Wrapper for generic file handler
@@ -3008,6 +3276,39 @@ esp_err_t start_webserver()
     if (ret != ESP_OK)
     {
         ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to register WiFi status handler");
+        return ret;
+    }
+
+    uri_handler.uri = "/api/files";
+    uri_handler.method = HTTP_GET;
+    uri_handler.handler = files_list_wrapper;
+    uri_handler.user_ctx = NULL;
+    ret = httpd_register_uri_handler(server, &uri_handler);
+    if (ret != ESP_OK)
+    {
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to register files list handler");
+        return ret;
+    }
+
+    uri_handler.uri = "/api/files/delete";
+    uri_handler.method = HTTP_POST;
+    uri_handler.handler = files_delete_wrapper;
+    uri_handler.user_ctx = NULL;
+    ret = httpd_register_uri_handler(server, &uri_handler);
+    if (ret != ESP_OK)
+    {
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to register files delete handler");
+        return ret;
+    }
+
+    uri_handler.uri = "/api/files/rename";
+    uri_handler.method = HTTP_POST;
+    uri_handler.handler = files_rename_wrapper;
+    uri_handler.user_ctx = NULL;
+    ret = httpd_register_uri_handler(server, &uri_handler);
+    if (ret != ESP_OK)
+    {
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to register files rename handler");
         return ret;
     }
 

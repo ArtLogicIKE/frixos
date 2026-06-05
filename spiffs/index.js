@@ -46,6 +46,7 @@ const translations = {
             advanced: 'Advanced',
             integrations: 'Integrations',
             status: 'Status',
+            files: 'Files',
             update: 'Update',
             restart: 'Restart'
         },
@@ -270,6 +271,24 @@ const translations = {
             file_step3: 'Wait for the upload to complete. Do not power off or disconnect the device during the upload.',
             file_step4: 'You can now upload another file or close this window.'
         },
+        files: {
+            title: 'SPIFFS Files',
+            description: 'Manage files stored on the device SPIFFS filesystem.',
+            refresh: 'Refresh',
+            rename: 'Rename',
+            delete: 'Delete Selected',
+            filename: 'Filename',
+            size: 'Size',
+            not_loaded: 'Open this tab to load files.',
+            loading: 'Loading files...',
+            empty: 'No files found',
+            count: ' files',
+            selected: ' selected',
+            select_all: 'Select all files',
+            rename_prompt: 'Enter a new filename for ',
+            delete_confirm: 'Delete selected files?',
+            only_one_rename: 'Select exactly one file to rename'
+        },
         restart: {
             title: 'Device Reset',
             description: 'Use this option to restart your Frixos device.',
@@ -315,7 +334,12 @@ const translations = {
             cgm_only_one: 'Only one CGM source (Dexcom, FreeStyle Libre, or Nightscout URL) can be enabled at a time.',
             error_preparing_info: 'Error preparing system information: ',
             info_copied_clipboard: 'System information copied to clipboard',
-            failed_copy_clipboard: 'Failed to copy to clipboard'
+            failed_copy_clipboard: 'Failed to copy to clipboard',
+            failed_fetch_files: 'Failed to fetch files',
+            files_deleted: 'Files deleted',
+            failed_delete_files: 'Failed to delete files: ',
+            file_renamed: 'File renamed',
+            failed_rename_file: 'Failed to rename file: '
         }
     }
 };
@@ -577,9 +601,15 @@ window.sectionsInitialized = {
     advanced: false,
     integrations: false,
     status: false,
+    files: false,
     update: false,
     restart: false
 };
+
+window.filesLoaded = false;
+window.spiffsFiles = [];
+window.selectedFiles = new Set();
+window.filesSort = { key: 'name', direction: 'asc' };
 
 window.settings = {}; // Will be populated as sections are loaded
 window.settingsLoaded = {
@@ -695,6 +725,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             setupAdvancedSection();
             setupStatusSection();
+            setupFilesSection();
             setupUpdateSection();
             setupRestartSection();
             setupIntegrationsSection();
@@ -899,6 +930,10 @@ function navigateToSection() {
             // Status section uses /api/status, not /api/settings
             fetchStatus(true);
             window.sectionsInitialized.status = true;
+        } else if (hash === 'files') {
+            setupFilesSection();
+            fetchFiles();
+            window.sectionsInitialized.files = true;
         } else if (hash === 'settings' && window.sectionsInitialized.settings) {
             // Re-initialize with already loaded data
             setupSettingsSection();
@@ -1024,11 +1059,11 @@ function setupFieldValidations() {
             return null; // Valid
         },
         
-        // PWM Frequency: 10-78000 integer
+        // PWM Frequency: 10-300000 integer
         pwmFrequencyValidator: function(value) {
             const num = parseInt(value);
             if (isNaN(num)) return "Must be a whole number";
-            if (num < 10 || num > 78000) return "Must be between 10 and 78000";
+            if (num < 10 || num > 300000) return "Must be between 10 and 300000";
             return null; // Valid
         },
         
@@ -1285,7 +1320,7 @@ function addIfChanged(formData, key, newValue, oldValue) {
  * - p22 = dim_disable (Maintain full brightness)
  * - p23 = brightness_LED (LED brightness array)
  * - p24 = show_leading_zero (Show leading zero)
- * - p42 = pwm_frequency (PWM frequency in Hz, range 10-78000)
+ * - p42 = pwm_frequency (PWM frequency in Hz, range 10-300000)
  * - p43 = max_power (Max power, range 1-1023)
  * - p46 = wifi_start (WiFi Active Hours Start, 0-23)
  * - p47 = wifi_end (WiFi Active Hours End, 0-23)
@@ -2086,6 +2121,313 @@ function getMoonPhaseName(index) {
     } else {
         return 'Unknown (' + index + ')';
     }
+}
+
+// Files section functionality
+function setupFilesSection() {
+    if (window.filesEventListenersSet) return;
+    window.filesEventListenersSet = true;
+
+    const refreshButton = el('refreshFilesButton');
+    const deleteButton = el('deleteFilesButton');
+    const renameButton = el('renameFileButton');
+    const selectAll = el('selectAllFiles');
+    const sortButtons = document.querySelectorAll('#files-section .table-sort-button');
+
+    if (refreshButton) {
+        refreshButton.addEventListener('click', fetchFiles);
+    }
+
+    if (deleteButton) {
+        deleteButton.addEventListener('click', deleteSelectedFiles);
+    }
+
+    if (renameButton) {
+        renameButton.addEventListener('click', renameSelectedFile);
+    }
+
+    if (selectAll) {
+        const trans = translations[currentLanguage] || translations.en;
+        selectAll.setAttribute('aria-label', getNestedTranslation(trans, 'files.select_all') || 'Select all files');
+        selectAll.addEventListener('change', function() {
+            window.selectedFiles.clear();
+            if (selectAll.checked) {
+                window.spiffsFiles.forEach(file => window.selectedFiles.add(file.name));
+            }
+            renderFilesTable(window.spiffsFiles);
+        });
+    }
+
+    sortButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const sortKey = button.dataset.sortKey;
+            if (!sortKey) return;
+
+            if (window.filesSort.key === sortKey) {
+                window.filesSort.direction = window.filesSort.direction === 'asc' ? 'desc' : 'asc';
+            } else {
+                window.filesSort.key = sortKey;
+                window.filesSort.direction = 'asc';
+            }
+
+            renderFilesTable(window.spiffsFiles);
+        });
+    });
+
+    updateFilesSortHeaders();
+}
+
+function fetchFiles() {
+    const refreshButton = el('refreshFilesButton');
+    toggleLoading(refreshButton, true);
+    renderFilesLoading();
+
+    return fetch('/api/files')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(response.statusText || response.status);
+            }
+            return response.json();
+        })
+        .then(data => {
+            window.spiffsFiles = Array.isArray(data.files) ? data.files : [];
+            window.selectedFiles.clear();
+            window.filesLoaded = true;
+            renderFilesTable(window.spiffsFiles);
+            return data;
+        })
+        .catch(error => {
+            console.error('Error fetching files:', error);
+            showStatus(getMessage('failed_fetch_files'), 'error');
+            renderFilesError();
+        })
+        .finally(() => {
+            toggleLoading(refreshButton, false);
+        });
+}
+
+function renderFilesLoading() {
+    const tbody = el('filesTableBody');
+    if (!tbody) return;
+    const trans = translations[currentLanguage] || translations.en;
+    tbody.innerHTML = '';
+    const row = document.createElement('tr');
+    const cell = document.createElement('td');
+    cell.colSpan = 3;
+    cell.className = 'files-empty';
+    cell.textContent = getNestedTranslation(trans, 'files.loading') || 'Loading files...';
+    row.appendChild(cell);
+    tbody.appendChild(row);
+}
+
+function renderFilesError() {
+    const tbody = el('filesTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    const row = document.createElement('tr');
+    const cell = document.createElement('td');
+    cell.colSpan = 3;
+    cell.className = 'files-empty error';
+    cell.textContent = getMessage('failed_fetch_files');
+    row.appendChild(cell);
+    tbody.appendChild(row);
+    updateFilesActions();
+}
+
+function renderFilesTable(files) {
+    const tbody = el('filesTableBody');
+    const summary = el('files-summary');
+    const selectAll = el('selectAllFiles');
+    if (!tbody) return;
+
+    const trans = translations[currentLanguage] || translations.en;
+    const sortedFiles = getSortedFiles(files || []);
+    tbody.innerHTML = '';
+
+    if (sortedFiles.length === 0) {
+        const row = document.createElement('tr');
+        const cell = document.createElement('td');
+        cell.colSpan = 3;
+        cell.className = 'files-empty';
+        cell.textContent = getNestedTranslation(trans, 'files.empty') || 'No files found';
+        row.appendChild(cell);
+        tbody.appendChild(row);
+    } else {
+        sortedFiles.forEach(file => {
+            const row = document.createElement('tr');
+            const selected = window.selectedFiles.has(file.name);
+            row.className = selected ? 'is-selected' : '';
+
+            const selectCell = document.createElement('td');
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.checked = selected;
+            checkbox.setAttribute('aria-label', file.name);
+            checkbox.addEventListener('change', function() {
+                if (checkbox.checked) {
+                    window.selectedFiles.add(file.name);
+                } else {
+                    window.selectedFiles.delete(file.name);
+                }
+                renderFilesTable(window.spiffsFiles);
+            });
+            selectCell.appendChild(checkbox);
+
+            const nameCell = document.createElement('td');
+            const nameLink = document.createElement('a');
+            nameLink.href = '/' + encodeURIComponent(file.name || '');
+            nameLink.download = file.name || '';
+            nameLink.textContent = file.name || '';
+            nameCell.appendChild(nameLink);
+
+            const sizeCell = document.createElement('td');
+            sizeCell.textContent = formatBytes(file.size || 0);
+
+            row.appendChild(selectCell);
+            row.appendChild(nameCell);
+            row.appendChild(sizeCell);
+            tbody.appendChild(row);
+        });
+    }
+
+    if (summary) {
+        const countLabel = getNestedTranslation(trans, 'files.count') || ' files';
+        const selectedLabel = getNestedTranslation(trans, 'files.selected') || ' selected';
+        summary.textContent = `${sortedFiles.length}${countLabel}, ${window.selectedFiles.size}${selectedLabel}`;
+    }
+
+    if (selectAll) {
+        selectAll.checked = sortedFiles.length > 0 && window.selectedFiles.size === sortedFiles.length;
+        selectAll.indeterminate = window.selectedFiles.size > 0 && window.selectedFiles.size < sortedFiles.length;
+    }
+
+    updateFilesSortHeaders();
+    updateFilesActions();
+}
+
+function getSortedFiles(files) {
+    const direction = window.filesSort.direction === 'desc' ? -1 : 1;
+    const key = window.filesSort.key;
+
+    return [...files].sort((a, b) => {
+        if (key === 'size') {
+            return (((a.size || 0) - (b.size || 0)) * direction) ||
+                String(a.name || '').localeCompare(String(b.name || ''));
+        }
+
+        return String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' }) * direction;
+    });
+}
+
+function updateFilesSortHeaders() {
+    const headers = {
+        name: el('filesNameHeader'),
+        size: el('filesSizeHeader')
+    };
+    const buttons = document.querySelectorAll('#files-section .table-sort-button');
+
+    Object.keys(headers).forEach(key => {
+        const header = headers[key];
+        if (!header) return;
+        const isActive = window.filesSort.key === key;
+        header.setAttribute('aria-sort', isActive ? (window.filesSort.direction === 'asc' ? 'ascending' : 'descending') : 'none');
+    });
+
+    buttons.forEach(button => {
+        const isActive = button.dataset.sortKey === window.filesSort.key;
+        button.classList.toggle('is-active', isActive);
+        button.dataset.sortDirection = isActive ? window.filesSort.direction : '';
+    });
+}
+
+function updateFilesActions() {
+    const selectedCount = window.selectedFiles.size;
+    const deleteButton = el('deleteFilesButton');
+    const renameButton = el('renameFileButton');
+    if (deleteButton) deleteButton.disabled = selectedCount === 0;
+    if (renameButton) renameButton.disabled = selectedCount !== 1;
+}
+
+function deleteSelectedFiles() {
+    const selected = Array.from(window.selectedFiles);
+    if (selected.length === 0) return;
+
+    const trans = translations[currentLanguage] || translations.en;
+    const confirmMessage = getNestedTranslation(trans, 'files.delete_confirm') || 'Delete selected files?';
+    if (!window.confirm(`${confirmMessage}\n\n${selected.join('\n')}`)) {
+        return;
+    }
+
+    const deleteButton = el('deleteFilesButton');
+    toggleLoading(deleteButton, true);
+
+    fetch('/api/files/delete', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ files: selected })
+    })
+    .then(response => response.json().then(data => ({ ok: response.ok, data })))
+    .then(({ ok, data }) => {
+        if (!ok || !data || data.status !== 'ok') {
+            throw new Error(data && data.message ? data.message : 'Delete failed');
+        }
+        showStatus(getMessage('files_deleted'), 'success');
+        return fetchFiles();
+    })
+    .catch(error => {
+        console.error('Error deleting files:', error);
+        showStatus(getMessage('failed_delete_files') + error.message, 'error');
+    })
+    .finally(() => {
+        toggleLoading(deleteButton, false);
+        updateFilesActions();
+    });
+}
+
+function renameSelectedFile() {
+    const selected = Array.from(window.selectedFiles);
+    if (selected.length !== 1) {
+        const trans = translations[currentLanguage] || translations.en;
+        showStatus(getNestedTranslation(trans, 'files.only_one_rename') || 'Select exactly one file to rename', 'error');
+        return;
+    }
+
+    const oldName = selected[0];
+    const trans = translations[currentLanguage] || translations.en;
+    const promptText = getNestedTranslation(trans, 'files.rename_prompt') || 'Enter a new filename for ';
+    const newName = window.prompt(promptText + oldName, oldName);
+    if (!newName || newName === oldName) {
+        return;
+    }
+
+    const renameButton = el('renameFileButton');
+    toggleLoading(renameButton, true);
+
+    fetch('/api/files/rename', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ oldName, newName: newName.trim() })
+    })
+    .then(response => response.json().then(data => ({ ok: response.ok, data })))
+    .then(({ ok, data }) => {
+        if (!ok || !data || data.status !== 'ok') {
+            throw new Error(data && data.message ? data.message : 'Rename failed');
+        }
+        showStatus(getMessage('file_renamed'), 'success');
+        return fetchFiles();
+    })
+    .catch(error => {
+        console.error('Error renaming file:', error);
+        showStatus(getMessage('failed_rename_file') + error.message, 'error');
+    })
+    .finally(() => {
+        toggleLoading(renameButton, false);
+        updateFilesActions();
+    });
 }
 
 // Update (OTA) section functionality

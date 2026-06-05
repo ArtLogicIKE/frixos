@@ -46,9 +46,9 @@ static int rescue_mode_this_boot = 0; // Set by check_boot_fail_count() when 3 c
 
 // versioning variables
 const char app[10] = "Frixos";
-const char version[10] = "2.25";
+const char version[10] = "2.30";
 static const char *TAG = "frixos main"; // in case we use ESP_LOGE -rror/W-arning/I-info (also D-ebug/V-erbose)
-const int fwversion = 65;
+const int fwversion = 66;
 const int rescuemode = 0; // 0 = normal, 1 = rescue mode
 const char revision[] = "E";
 
@@ -247,7 +247,7 @@ uint8_t eeprom_dexcom_region = 0;     // 0=disabled, 1=US, 2=Japan, 3=Rest of Wo
 uint16_t eeprom_glucose_high = 175;   // Default high threshold in mg/dL
 uint16_t eeprom_glucose_low = 70;     // Default low threshold in mg/dL
 uint8_t eeprom_glucose_unit = 0;      // Glucose display unit: 0=mg/dL, 1=mmol/L
-uint32_t eeprom_pwm_frequency = 200;  // Default PWM frequency in Hz (range 10-78000)
+uint32_t eeprom_pwm_frequency = 200;  // Default PWM frequency in Hz (range 10-300000)
 uint16_t eeprom_max_power = MAX_DUTY; // Default max power (range 1-1023)
 // Board revision read-only key in NVS:
 // versions A, B, C, D, E, F and G are revision 0; version H is revision 1.
@@ -663,10 +663,15 @@ void startup_read_eeprom(void)
 
     if (eeprom_board_rev == 1)
     {
-      if (eeprom_pwm_frequency == 200)
-        eeprom_pwm_frequency = 33333;
+      // 33333 is a dud; revert to 200 (used to be the other way around)
+      if (eeprom_pwm_frequency == 33333)
+        eeprom_pwm_frequency = 200;
+
       if (eeprom_max_power == 750)
-        eeprom_max_power = 900;
+        eeprom_max_power = 850;
+
+      if (eeprom_max_power == 900)
+        eeprom_max_power = 850;
     }
 
     // Initialize current POH counter and last save time

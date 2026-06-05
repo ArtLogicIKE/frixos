@@ -703,6 +703,91 @@ textarea[aria-invalid="true"] {
     vertical-align: middle;
 }
 
+/* Files page */
+.file-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 15px 0;
+}
+
+.files-table-wrapper {
+    width: 100%;
+    overflow-x: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+}
+
+.files-table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: var(--section-content-bg);
+}
+
+.files-table th,
+.files-table td {
+    padding: 10px;
+    border-bottom: 1px solid var(--border-color);
+    text-align: left;
+}
+
+.files-table th {
+    color: var(--text-secondary);
+    font-weight: 600;
+    background-color: var(--section-header-bg);
+}
+
+.table-sort-button {
+    appearance: none;
+    border: none;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    font: inherit;
+    font-weight: inherit;
+    padding: 0;
+}
+
+.table-sort-button:hover,
+.table-sort-button:focus-visible {
+    color: var(--primary-color);
+}
+
+.table-sort-button::after {
+    content: "";
+    display: inline-block;
+    margin-left: 6px;
+    color: var(--primary-color);
+}
+
+.table-sort-button.is-active[data-sort-direction="asc"]::after {
+    content: "^";
+}
+
+.table-sort-button.is-active[data-sort-direction="desc"]::after {
+    content: "v";
+}
+
+.files-table th:first-child,
+.files-table td:first-child {
+    width: 44px;
+    text-align: center;
+}
+
+.files-table tbody tr:hover,
+.files-table tbody tr.is-selected {
+    background-color: rgba(0, 170, 255, 0.08);
+}
+
+.files-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.files-empty {
+    color: var(--text-secondary);
+    text-align: center !important;
+}
+
 /* OTA update page specific */
 .progress-container {
     margin-top: 20px;

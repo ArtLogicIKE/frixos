@@ -5,7 +5,7 @@
 // - Display initialization and management
 // - Time display with digit sprites
 // - Weather and moon phase display
-// - Message scrolling and centering (messages shorter than 88 pixels are centered, optimized to only recalculate when needed)
+// - Message scrolling and centering (messages that fit in the centered area are static, otherwise scroll)
 // - Display brightness control based on ambient light
 // - Integration status display (Dexcom glucose, etc.)
 
@@ -121,6 +121,7 @@ lv_obj_t *label_msg = NULL;
 #define label_msg_ofs_y (25 + 25 + 14) // y offset for the message label
 #define MSG_WIDTH 105                  // width of the message area
 #define MSG_EXTRA_WIDTH 7            // extra width for the message area, useful for scolling but bad for centering
+#define MSG_CENTER_WIDTH (MSG_WIDTH - MSG_EXTRA_WIDTH) // visible width when message is centered
 #define FADE_STEPS 14
 #define FADE_INTERVAL 200       // Time between steps in ms
 #define MAX_TOKEN_COUNT 100     // Maximum number of tokens to prevent memory issues
@@ -154,6 +155,7 @@ static bool fading_in = true;                // Flag to track direction
 static esp_timer_handle_t fade_timer = NULL; // ESP timer handle
 static bool fade_update_needed = false;      // Flag to indicate fade update is needed
 static int label_size = 0;
+static char last_scroll_msg[SCROLL_MSG_LENGTH];
 
 LV_FONT_DECLARE(frixos_8);
 LV_FONT_DECLARE(frixos_9);
@@ -433,12 +435,17 @@ void set_scroll_message(const char *msg)
   // Create a temporary buffer to measure text size
   lv_point_t size;
 
+  strncpy(last_scroll_msg, msg, sizeof(last_scroll_msg) - 1);
+  last_scroll_msg[sizeof(last_scroll_msg) - 1] = '\0';
+
   lvgl_port_lock(0);
+  lv_obj_set_style_text_font(label_msg, font, 0);
   // Use LVGL's safe text setting function
   lv_label_set_text(label_msg, msg);
   lv_text_get_size(&size, msg, font, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
   label_size = size.x;
-  if (label_size > MSG_WIDTH)
+  label_scroll_pos = 0;
+  if (label_size > MSG_CENTER_WIDTH)
   { // scrolling, left aligned
     lv_obj_set_style_text_align(label_msg, LV_TEXT_ALIGN_LEFT, 0);
     lv_obj_set_width(label_msg, LV_SIZE_CONTENT);
@@ -447,7 +454,7 @@ void set_scroll_message(const char *msg)
   }
   else
   { // centered
-    const int centered_label_width = MSG_WIDTH - MSG_EXTRA_WIDTH;
+    const int centered_label_width = MSG_CENTER_WIDTH;
     int dot_w = MMOL_DOT_WIDTH_FALLBACK_PX;
     if (dots[0] != NULL)
     {
@@ -781,9 +788,6 @@ void display_changed(void)
   lv_obj_set_height(label_msg, LV_SIZE_CONTENT);
   lv_obj_set_pos(label_msg, eeprom_ofs_x, eeprom_ofs_y + label_msg_ofs_y);
 
-  // display_changed invalidates tokens, so it causes a set_scroll_message from the main thread anyways
-  // set_scroll_message(msg_scrolling);
-
   show_object(img_ampm, eeprom_12hour && time_valid);                                  // show AM/PM indicator if 12 hour time AND we have valid time
   show_object(img_weather, eeprom_quiet_weather && last_weather_update && time_valid); // show weather forecast icon if weather data is valid
   show_object(img_moon, eeprom_quiet_weather && time_valid);                           // show moon icon if we have valid time
@@ -816,6 +820,12 @@ void display_changed(void)
   }
 
   ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Display changed");
+
+  // Font or layout changed; remeasure message width for scroll vs centered mode.
+  if (last_scroll_msg[0] != '\0')
+  {
+    set_scroll_message(last_scroll_msg);
+  }
 }
 
 // allow -1 to display nothing
@@ -1403,7 +1413,7 @@ void display_task(void *pvParameters)
       }
     }
 
-    if (label_size > MSG_WIDTH)
+    if (label_size > MSG_CENTER_WIDTH)
     { // scrolling, left aligned
       // ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Label pos %d, max %d", label_scroll_pos, label_max_pos);
       label_scroll_pos++;

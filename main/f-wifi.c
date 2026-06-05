@@ -106,6 +106,10 @@ static char   metno_pending_lm[64] = {0};   // Last-Modified seen during in-flig
 static char   metno_last_modified[64] = {0};// Last-Modified saved from previous successful response
 static int    metno_last_sunrise_yday = -1;
 static int    metno_last_sunrise_year = -1;
+static char   metno_measurement_time[32] = {0}; // ISO-8601 time of closest-to-now entry
+static time_t metno_ref_time = 0;               // snapshot of now for closest-entry pick
+static time_t metno_closest_diff = 0;
+static bool   metno_have_closest = false;
 
 // NTP server functionality removed - using default servers only
 
@@ -1234,8 +1238,8 @@ int map_metno_symbol(const char *symbol)
 {
     if (!symbol || !*symbol) return -1;
     if (strstr(symbol, "thunder") != NULL) return 5;
-    if (strstr(symbol, "snow") != NULL || strstr(symbol, "sleet") != NULL) return 6;
-    if (strstr(symbol, "rain") != NULL) return 4;
+    if (strstr(symbol, "snow") != NULL || strstr(symbol, "sleet") != NULL) return 6;    
+    if (strstr(symbol, "rain") != NULL) return 4; // rainshowers day also included
     if (strncmp(symbol, "fog", 3) == 0) return 7;
     if (strncmp(symbol, "cloudy", 6) == 0) return 3;
     if (strncmp(symbol, "partlycloudy", 12) == 0) return 2;
@@ -1261,35 +1265,16 @@ static int metno_day_bucket(time_t et)
     return -1;
 }
 
-// Pull a fresh value out of a single met.no timeseries entry's text. The
-// JSON parser uses strstr("\"key\""), so a partial-name key like "wind_speed"
-// will not match "wind_speed_of_gust" — substrings are guarded by the quotes.
-// idx is the entry's 0-based position in the timeseries array.
-static void process_one_metno_entry(const char *entry, int idx)
+// Apply current-conditions fields from a single met.no timeseries entry.
+static void metno_apply_entry_weather(const char *entry, const char *time_str)
 {
     char val[64];
 
-    // time → day bucket (used for high/low across today + 2 days)
-    get_value_from_JSON_string(entry, "time", val, sizeof(val), NULL);
-    time_t et = (val[0] && strcmp(val, "-") != 0) ? metno_parse_iso8601(val) : 0;
-    int day = metno_day_bucket(et);
+    if (time_str[0] && strcmp(time_str, "-") != 0)
+        strlcpy(metno_measurement_time, time_str, sizeof(metno_measurement_time));
 
-    // air_temperature → bucket high/low; first entry also drives weather_temp
     get_value_from_JSON_string(entry, "air_temperature", val, sizeof(val), NULL);
-    if (strcmp(val, "-") != 0)
-    {
-        double t = strtod(val, NULL);
-        if (day >= 0)
-        {
-            if (t > metno_day_hi[day]) metno_day_hi[day] = t;
-            if (t < metno_day_lo[day]) metno_day_lo[day] = t;
-        }
-        if (idx == 0) weather_temp = t;
-    }
-
-    // First entry also carries the current humidity / wind / pressure / icon
-    // / precipitation / UV. Later entries are temperature-only for high/low.
-    if (idx != 0) return;
+    if (strcmp(val, "-") != 0) weather_temp = strtod(val, NULL);
 
     get_value_from_JSON_string(entry, "relative_humidity", val, sizeof(val), NULL);
     if (strcmp(val, "-") != 0) weather_humidity = strtod(val, NULL);
@@ -1347,6 +1332,46 @@ static void process_one_metno_entry(const char *entry, int idx)
     if (strcmp(val, "-") == 0)
         get_value_from_JSON_string(entry, "ultraviolet_index_clear_sky_max", val, sizeof(val), NULL);
     weather_uv = (strcmp(val, "-") != 0) ? strtod(val, NULL) : 0.0;
+}
+
+// Pull a fresh value out of a single met.no timeseries entry's text. The
+// JSON parser uses strstr("\"key\""), so a partial-name key like "wind_speed"
+// will not match "wind_speed_of_gust" — substrings are guarded by the quotes.
+static void process_one_metno_entry(const char *entry, int idx)
+{
+    char val[64];
+    char time_str[64];
+
+    (void)idx;
+
+    // time → day bucket (used for high/low across today + 2 days)
+    get_value_from_JSON_string(entry, "time", time_str, sizeof(time_str), NULL);
+    time_t et = (time_str[0] && strcmp(time_str, "-") != 0) ? metno_parse_iso8601(time_str) : 0;
+    int day = metno_day_bucket(et);
+
+    // air_temperature → bucket high/low for today + next 2 days
+    get_value_from_JSON_string(entry, "air_temperature", val, sizeof(val), NULL);
+    if (strcmp(val, "-") != 0)
+    {
+        double t = strtod(val, NULL);
+        if (day >= 0)
+        {
+            if (t > metno_day_hi[day]) metno_day_hi[day] = t;
+            if (t < metno_day_lo[day]) metno_day_lo[day] = t;
+        }
+    }
+
+    // Current conditions come from the entry whose time is closest to now.
+    if (et > 0)
+    {
+        time_t diff = (et >= metno_ref_time) ? (et - metno_ref_time) : (metno_ref_time - et);
+        if (!metno_have_closest || diff < metno_closest_diff)
+        {
+            metno_have_closest = true;
+            metno_closest_diff = diff;
+            metno_apply_entry_weather(entry, time_str);
+        }
+    }
 }
 
 // Drain wifi_http_buffer up to the last fully-contained timeseries entry.
@@ -1570,6 +1595,7 @@ bool wifi_get_metno_weather(void)
     localtime_r(&now_t, &tnow);
     metno_today_yday = tnow.tm_yday;
     metno_today_year = tnow.tm_year;
+    metno_ref_time = now_t;
 
     // Refresh sunrise/sunset on the first call of a new local day (or first run).
     // After the sunrise TLS connection is torn down, give mbedTLS / lwIP a brief
@@ -1595,11 +1621,13 @@ bool wifi_get_metno_weather(void)
     snprintf(url, sizeof(url),
              "https://api.met.no/weatherapi/locationforecast/2.0/complete?lat=%s&lon=%s",
              lat_4, lon_4);
-    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Fetching met.no weather: %.50s...", url);
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Fetching met.no weather: %s...", url);
 
     // Reset streaming state. Day buckets use sentinels that the final
     // assignment below converts to skip-if-empty.
     metno_entry_idx = 0;
+    metno_measurement_time[0] = '\0';
+    metno_have_closest = false;
     for (int i = 0; i < 3; i++) { metno_day_hi[i] = -1000.0; metno_day_lo[i] = 1000.0; }
     metno_pending_lm[0] = '\0';
 
@@ -1682,14 +1710,15 @@ bool wifi_get_metno_weather(void)
             }
 
             ESP_LOG_WEB(ESP_LOG_INFO, TAG,
-                        "Met.no: T=%.1f°C H=%.0f%% W=%.1fm/s@%d° G=%.1f P=%.0fhPa(t%d) PR=%.1fmm/%.0f%% UV=%.1f Hi/Lo=%.1f/%.1f 3d=%.1f/%.1f",
+                        "Met.no: T=%.1f°C H=%.0f%% W=%.1fm/s@%d° G=%.1f P=%.0fhPa(t%d) PR=%.1fmm/%.0f%% UV=%.1f Hi/Lo=%.1f/%.1f 3d=%.1f/%.1f time=%s",
                         weather_temp, weather_humidity,
                         weather_wind_speed_mps, weather_wind_dir_deg,
                         weather_gust_mps,
                         weather_pressure_hpa, weather_pressure_trend,
                         weather_precip_mm, weather_precip_prob, weather_uv,
                         weather_high, weather_low,
-                        weather_3day_high, weather_3day_low);
+                        weather_3day_high, weather_3day_low,
+                        metno_measurement_time[0] ? metno_measurement_time : "?");
 
             time(&last_weather_update);
             weather_valid = true;

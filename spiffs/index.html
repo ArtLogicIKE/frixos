@@ -28,6 +28,7 @@
                 <a href="#integrations" class="menu-item" data-section="integrations-section"
                     data-i18n="menu.integrations">Integrations</a>
                 <a href="#status" class="menu-item" data-section="status-section" data-i18n="menu.status">Status</a>
+                <a href="#files" class="menu-item" data-section="files-section" data-i18n="menu.files">Files</a>
                 <a href="#update" class="menu-item" data-section="update-section" data-i18n="menu.update">Update</a>
                 <a href="#restart" class="menu-item" data-section="restart-section" data-i18n="menu.restart">Restart</a>
             </div>
@@ -394,7 +395,7 @@
                         <div class="form-group">
                             <label for="pwm_frequency" data-i18n="advanced.brightness.pwm_frequency">PWM
                                 Frequency</label>
-                            <input type="number" id="pwm_frequency" name="pwm_frequency" min="10" max="78000"
+                            <input type="number" id="pwm_frequency" name="pwm_frequency" min="10" max="300000"
                                 value="133">
                             <span id="pwm_frequency-error" class="input-error"></span>
                         </div>
@@ -839,6 +840,44 @@
                     <button type="submit" class="button" data-i18n="common.save_settings">Save Settings</button>
                 </div>
             </form>
+        </div>
+
+        <!-- Files Section -->
+        <div id="files-section" class="page-section" style="display: none;">
+            <div class="section">
+                <h2 data-i18n="files.title">SPIFFS Files</h2>
+                <p data-i18n="files.description">Manage files stored on the device SPIFFS filesystem.</p>
+
+                <div class="file-actions">
+                    <button id="refreshFilesButton" class="button" data-i18n="files.refresh">Refresh</button>
+                    <button id="renameFileButton" class="button" disabled data-i18n="files.rename">Rename</button>
+                    <button id="deleteFilesButton" class="button danger" disabled data-i18n="files.delete">Delete Selected</button>
+                </div>
+
+                <div class="files-table-wrapper">
+                    <table class="files-table" aria-describedby="files-summary">
+                        <thead>
+                            <tr>
+                                <th scope="col">
+                                    <input type="checkbox" id="selectAllFiles" aria-label="Select all files">
+                                </th>
+                                <th scope="col" id="filesNameHeader" aria-sort="ascending">
+                                    <button type="button" class="table-sort-button" data-sort-key="name" data-i18n="files.filename">Filename</button>
+                                </th>
+                                <th scope="col" id="filesSizeHeader" aria-sort="none">
+                                    <button type="button" class="table-sort-button" data-sort-key="size" data-i18n="files.size">Size</button>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody id="filesTableBody">
+                            <tr>
+                                <td colspan="3" class="files-empty" data-i18n="files.not_loaded">Open this tab to load files.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p id="files-summary" class="info-text"></p>
+            </div>
         </div>
 
         <!-- Update (OTA) Section -->
