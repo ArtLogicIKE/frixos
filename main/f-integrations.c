@@ -861,6 +861,50 @@ void parse_HA_entities(const char *input)
                 integration_active_tokens_count[INTEGRATION_HA]);
 }
 
+/* Append any display-schedule HA entities that aren't already in the token list. */
+void add_display_schedule_ha_entities(void)
+{
+    for (int i = 0; i < display_schedule_count; i++)
+    {
+        if (display_schedule[i].type != SLOT_TYPE_HA) continue;
+        const char *entity = display_schedule[i].entity;
+        if (entity[0] == '\0') continue;
+
+        /* Check if already present */
+        bool found = false;
+        for (int j = 0; j < integration_active_tokens_count[INTEGRATION_HA]; j++)
+        {
+            if (integration_active_tokens[INTEGRATION_HA][j].entity &&
+                strcmp(integration_active_tokens[INTEGRATION_HA][j].entity, entity) == 0)
+            {
+                found = true;
+                break;
+            }
+        }
+        if (found) continue;
+
+        /* Grow the token array by one */
+        int old_count = integration_active_tokens_count[INTEGRATION_HA];
+        integration_token_t *new_arr = realloc(
+            integration_active_tokens[INTEGRATION_HA],
+            (old_count + 1) * sizeof(integration_token_t));
+        if (!new_arr)
+        {
+            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "add_display_schedule_ha_entities: realloc failed");
+            continue;
+        }
+        integration_active_tokens[INTEGRATION_HA] = new_arr;
+        memset(&new_arr[old_count], 0, sizeof(integration_token_t));
+        if (!init_integration_token(&new_arr[old_count], entity, entity, "state"))
+        {
+            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "add_display_schedule_ha_entities: init failed for %s", entity);
+            continue;
+        }
+        integration_active_tokens_count[INTEGRATION_HA]++;
+        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Registered display-schedule HA entity: %s", entity);
+    }
+}
+
 void build_integration_message_corpus(char *out, size_t out_size)
 {
     if (!out || out_size == 0)
@@ -945,6 +989,7 @@ void parse_integrations(void)
     if (integration_active[INTEGRATION_HA])
     {
         parse_HA_entities(message_corpus);
+        add_display_schedule_ha_entities();
     }
 
     if (integration_active[INTEGRATION_STOCK])

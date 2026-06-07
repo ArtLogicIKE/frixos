@@ -20,6 +20,7 @@
 
 #include "time.h"
 #include "math.h"
+#include <stdlib.h>
 #include "esp_timer.h"
 #include "esp_system.h"
 #include "esp_lcd_st7735.h"
@@ -109,6 +110,7 @@ lv_obj_t *img_digits_sprite = NULL,
 
 lv_obj_t *label_msg = NULL;
 lv_obj_t *label_static[SCREEN_STATIC_TEXT_COUNT] = {NULL};
+static lv_obj_t *label_degree = NULL; // Unit/degree label for weather & HA slots
 
 // Define digit width & height (adjust based on actual sprite sheet)
 #define DIGIT_WIDTH 18          // Width of each digit in the sprite sheet
@@ -152,10 +154,13 @@ time_t ota_start_time = 0; // Track when OTA update started
 time_t now;
 struct tm timeinfo;
 
-// Alternate time/CGM display state
-bool alternate_display_active = false; // True if alternating display is enabled
-bool showing_glucose = false;          // True if currently showing glucose, false if showing time
-time_t alternate_display_start = 0;    // When the current display mode started
+// Alternate display state — driven by display_schedule[]
+bool alternate_display_active = false; // True when schedule has >1 usable slot
+bool showing_glucose = false;          // Derived: current slot is SLOT_TYPE_CGM
+bool showing_weather = false;          // Derived: current slot is SLOT_TYPE_WEATHER_TEMP
+bool showing_ha      = false;          // Derived: current slot is SLOT_TYPE_HA
+static int    current_slot_idx  = 0;   // Index into display_schedule[]
+static time_t slot_start_time   = 0;   // Wall time when current slot started
 
 // fader stuff
 static int fade_step = 0;
@@ -167,6 +172,7 @@ static char last_scroll_msg[SCROLL_MSG_LENGTH];
 
 LV_FONT_DECLARE(frixos_8);
 LV_FONT_DECLARE(frixos_10);
+LV_FONT_DECLARE(frixos_11);
 LV_FONT_DECLARE(frixos_12);
 LV_FONT_DECLARE(frixos_14);
 LV_FONT_DECLARE(frixos_16);
@@ -637,6 +643,11 @@ void startup_display(void)
   img_mgdl = lv_image_create(lv_scr_act());
   img_mgdl_glucose = lv_image_create(lv_scr_act());
   img_ampm = lv_image_create(lv_scr_act()); // AMPM indicator
+  label_degree = lv_label_create(lv_scr_act());
+  lv_label_set_text(label_degree, "\xc2\xb0"); // UTF-8 degree symbol
+  lv_obj_set_style_text_color(label_degree, lv_color_hex(0xFFFFFF), 0);
+  lv_obj_set_style_text_font(label_degree, &frixos_11, 0);
+  lv_obj_add_flag(label_degree, LV_OBJ_FLAG_HIDDEN);
   for (int i = 0; i < 4; i++)
   {
     digit_objs[i] = lv_image_create(lv_scr_act());
@@ -798,15 +809,61 @@ static bool is_glucose_fresh()
   return is_fresh;
 }
 
+/* Return cached HA value string for the given entity, or NULL if not available. */
+static const char *get_ha_slot_value(const char *entity)
+{
+  if (!entity || entity[0] == '\0') return NULL;
+  for (int i = 0; i < integration_active_tokens_count[INTEGRATION_HA]; i++)
+  {
+    integration_token_t *tok = &integration_active_tokens[INTEGRATION_HA][i];
+    if (tok->entity && strcmp(tok->entity, entity) == 0)
+      return (strcmp(tok->value, "-") != 0 && tok->value[0] != '\0') ? tok->value : NULL;
+  }
+  return NULL;
+}
+
+/* Return true if the given slot currently has data available to display. */
+static bool slot_is_available(const display_slot_t *s)
+{
+  switch (s->type)
+  {
+    case SLOT_TYPE_TIME:         return true;
+    case SLOT_TYPE_CGM:          return is_glucose_on() && is_glucose_fresh();
+    case SLOT_TYPE_WEATHER_TEMP: return last_weather_update > 0;
+    case SLOT_TYPE_HA:           return get_ha_slot_value(s->entity) != NULL;
+    default:                     return false;
+  }
+}
+
 static bool layout_glucose_widget_enabled(const screen_layout_profile_t *layout)
 {
   return layout->widget[SCREEN_ELEM_GLUCOSE].enabled;
+}
+
+static bool layout_show_weather_on_time(const screen_layout_profile_t *layout)
+{
+  const screen_widget_t *w_time = &layout->widget[SCREEN_ELEM_TIME];
+  return w_time->enabled && time_valid && alternate_display_active &&
+         showing_weather && last_weather_update > 0;
+}
+
+static bool layout_show_ha_on_time(const screen_layout_profile_t *layout)
+{
+  const screen_widget_t *w_time = &layout->widget[SCREEN_ELEM_TIME];
+  if (!(w_time->enabled && time_valid && alternate_display_active && showing_ha))
+    return false;
+  if (display_schedule_count == 0)
+    return false;
+  return get_ha_slot_value(display_schedule[current_slot_idx].entity) != NULL;
 }
 
 static bool layout_show_time_digits(const screen_layout_profile_t *layout)
 {
   const screen_widget_t *w_time = &layout->widget[SCREEN_ELEM_TIME];
   if (!w_time->enabled || !time_valid)
+    return false;
+  /* Weather / HA slots take over the time digits regardless of the glucose widget. */
+  if (alternate_display_active && (showing_weather || showing_ha))
     return false;
   if (layout_glucose_widget_enabled(layout))
     return true;
@@ -955,6 +1012,48 @@ static void fill_time_digits(digit_display_t *out, struct tm *ti)
   (void)is_pm;
 }
 
+/* Fill a digit_display_t with an integer value (0..999), right-aligned into digit[1..3],
+ * leaving digit[0] blank. Used for weather temperature and HA entity readouts. */
+static void fill_integer_digits(digit_display_t *out, int value)
+{
+  out->show_dots = false;
+  out->is_mmol = false;
+  for (int i = 0; i < 4; i++)
+    out->digit[i] = -1;
+
+  if (value < 0) value = 0;
+  if (value > 999) value = 999;
+
+  if (value >= 100)
+  {
+    out->digit[1] = value / 100;
+    out->digit[2] = (value / 10) % 10;
+    out->digit[3] = value % 10;
+  }
+  else if (value >= 10)
+  {
+    out->digit[2] = value / 10;
+    out->digit[3] = value % 10;
+  }
+  else
+  {
+    out->digit[3] = value;
+  }
+}
+
+static void fill_weather_digits(digit_display_t *out)
+{
+  double display_temp = eeprom_fahrenheit ? ((weather_temp * 9.0 / 5.0) + 32.0) : weather_temp;
+  int temp_val = (int)round(display_temp < 0 ? -display_temp : display_temp);
+  fill_integer_digits(out, temp_val);
+}
+
+static void fill_ha_digits(digit_display_t *out, const char *ha_val)
+{
+  int ha_int = ha_val ? (int)round(fabs(atof(ha_val))) : 0;
+  fill_integer_digits(out, ha_int);
+}
+
 static void set_digit_sprite(lv_obj_t *objs[NUM_DIGITS], int position, int digit)
 {
   if (digit < -1 || digit > 9)
@@ -1016,6 +1115,41 @@ static void align_glucose_digits(lv_obj_t *objs[NUM_DIGITS], lv_obj_t *dot_objs[
     align_glucose_mmol_digits(objs, dot_objs, ox, y, dd);
   else
     align_glucose_mgdl_digits(objs, dot_objs, ox, y, dd);
+}
+
+/* Lay out the significant digits of a weather/HA value left-to-right starting at ox,
+ * followed by an optional unit label (degree symbol or HA unit). Anchored to the time
+ * widget so it follows the user's layout. */
+static void align_value_with_label_digits(lv_obj_t *objs[NUM_DIGITS], lv_obj_t *dot_objs[2],
+                                          int ox, int y, const digit_display_t *dd,
+                                          const char *unit, lv_obj_t *unit_label)
+{
+  int n_sig = (dd->digit[1] >= 0) ? 3 : (dd->digit[2] >= 0) ? 2 : 1;
+  int first = NUM_DIGITS - n_sig; /* index of first significant digit */
+
+  for (int i = 0; i < NUM_DIGITS; i++)
+  {
+    int rel = i - first;
+    int x = ox + (rel > 0 ? rel : 0) * DIGIT_WIDTH;
+    lv_obj_align(objs[i], LV_ALIGN_TOP_LEFT, x, y);
+  }
+
+  show_object(dot_objs[0], false);
+  show_object(dot_objs[1], false);
+
+  if (unit_label)
+  {
+    if (unit && unit[0] != '\0')
+    {
+      lv_label_set_text(unit_label, unit);
+      lv_obj_align(unit_label, LV_ALIGN_TOP_LEFT, ox + n_sig * DIGIT_WIDTH + 1, y);
+      show_object(unit_label, true);
+    }
+    else
+    {
+      show_object(unit_label, false);
+    }
+  }
 }
 
 static void align_glucose_widget_mgdl_digits(lv_obj_t *objs[NUM_DIGITS], lv_obj_t *dot_objs[2],
@@ -1102,19 +1236,27 @@ static void apply_widget_visibility(const screen_layout_profile_t *layout)
 
   const bool show_time_digits = layout_show_time_digits(layout);
   const bool show_glucose_on_time = layout_show_glucose_on_time(layout);
+  const bool show_weather_on_time = layout_show_weather_on_time(layout);
+  const bool show_ha_on_time = layout_show_ha_on_time(layout);
   const bool show_glucose_widget = layout_show_glucose_widget(layout);
-  const bool show_time_slot_digits = show_time_digits || show_glucose_on_time;
+  const bool show_time_slot_digits = show_time_digits || show_glucose_on_time ||
+                                     show_weather_on_time || show_ha_on_time;
 
   for (int i = 0; i < 4; i++)
     show_object(digit_objs[i], show_time_slot_digits);
-  show_object(dots[0], show_time_slot_digits);
-  show_object(dots[1], show_time_slot_digits);
+  show_object(dots[0], show_time_digits || show_glucose_on_time);
+  show_object(dots[1], show_time_digits || show_glucose_on_time);
   for (int i = 0; i < 4; i++)
     show_object(glucose_digit_objs[i], show_glucose_widget);
   update_glucose_widget_dots_visibility(show_glucose_widget, NULL);
   show_object(img_ampm, show_time_digits && eeprom_12hour);
   show_object(img_mgdl, show_glucose_on_time);
   show_object(img_mgdl_glucose, show_glucose_widget);
+  /* Degree/unit label: shown for weather, and for HA only when a unit label is set */
+  bool degree_visible = show_weather_on_time ||
+                        (show_ha_on_time && display_schedule_count > 0 &&
+                         display_schedule[current_slot_idx].label[0] != '\0');
+  show_object(label_degree, degree_visible);
 
   show_object(img_weather, w_weather->enabled && weather_valid && time_valid);
   show_object(img_moon, w_moon->enabled && time_valid);
@@ -1174,6 +1316,7 @@ static void screen_layout_collect_elem_objects(screen_element_id_t id, lv_obj_t 
     screen_layout_push_obj(dots[0], objs, count, 12);
     screen_layout_push_obj(dots[1], objs, count, 12);
     screen_layout_push_obj(img_mgdl, objs, count, 12);
+    screen_layout_push_obj(label_degree, objs, count, 12);
     break;
   case SCREEN_ELEM_GLUCOSE:
     for (int i = 0; i < NUM_DIGITS; i++)
@@ -1289,8 +1432,11 @@ void display_changed(void)
   /* Task lock */
 
   // Reset alternate display state to force update
-  alternate_display_start = 0;
-  showing_glucose = false;
+  slot_start_time  = 0;
+  current_slot_idx = 0;
+  showing_glucose  = false;
+  showing_weather  = false;
+  showing_ha       = false;
 
 
   lvgl_port_lock(0);
@@ -1672,74 +1818,93 @@ static void handle_integration_and_messages(void)
 
 static void handle_alternate_mode_switching(time_t now, uint32_t loop_counter, bool *should_update_display)
 {
-  if (loop_counter % 20 == 1)
+  if (loop_counter % 20 != 1) return;
+
+  static bool last_showing_glucose = false;
+  static bool last_showing_weather = false;
+  static bool last_showing_ha      = false;
+  static time_t last_minute_slot   = 0;
+  time_t current_minute_slot = now / 60;
+  bool minute_changed = (current_minute_slot != last_minute_slot);
+  bool mode_changed   = false;
+
+  alternate_display_active = (display_schedule_count > 1);
+
+  if (!time_valid || display_schedule_count == 0)
   {
-    bool mode_changed = false;
-    static bool last_showing_glucose = false;
-    static time_t last_minute_slot = 0;
-    time_t current_minute_slot = now / 60;
-    bool minute_changed = (current_minute_slot != last_minute_slot);
+    if (showing_glucose || showing_weather || showing_ha) mode_changed = true;
+    showing_glucose = showing_weather = showing_ha = false;
+    current_slot_idx = 0;
+    slot_start_time  = 0;
+    goto update_check;
+  }
 
-    /* Alternate on the time slot only when a dedicated glucose widget is not enabled. */
-    const screen_layout_profile_t *layout = &eeprom_screen_layout.profile[font_index];
-    const bool can_alternate = !layout_glucose_widget_enabled(layout);
-    alternate_display_active = can_alternate && (eeprom_sec_time > 0 && eeprom_sec_cgm > 0);
-
-    static time_t last_alternate_display_start = 0;
-    if (alternate_display_start == 0 && last_alternate_display_start != 0)
+  /* Initialise slot timer on first tick */
+  if (slot_start_time == 0)
+  {
+    current_slot_idx = 0;
+    slot_start_time  = now;
+    mode_changed     = true;
+  }
+  else if (display_schedule_count > 1)
+  {
+    display_slot_t *cur = &display_schedule[current_slot_idx];
+    if ((now - slot_start_time) >= cur->duration)
     {
-      mode_changed = true;
-      last_showing_glucose = false;
-    }
-    last_alternate_display_start = alternate_display_start;
-
-    if (alternate_display_active && time_valid)
-    {
-      if (alternate_display_start == 0)
+      /* Advance to next available slot, skipping unavailable ones */
+      int next  = (current_slot_idx + 1) % display_schedule_count;
+      int tries = display_schedule_count;
+      while (tries-- > 0)
       {
-        showing_glucose = false; /* always start with time, then switch to CGM after sec_time */
-        alternate_display_start = now;
-        mode_changed = true;
-      }
-      else
-      {
-        time_t elapsed = now - alternate_display_start;
-        bool should_switch = false;
-        if (showing_glucose)
+        if (slot_is_available(&display_schedule[next]))
         {
-          if (eeprom_sec_cgm > 0 && elapsed >= eeprom_sec_cgm && eeprom_sec_time > 0)
-            should_switch = true;
+          current_slot_idx = next;
+          slot_start_time  = now;
+          mode_changed     = true;
+          break;
         }
-        else
-        {
-          if (eeprom_sec_time > 0 && elapsed >= eeprom_sec_time && is_glucose_fresh())
-            should_switch = true;
-        }
-        if (should_switch)
-        {
-          showing_glucose = !showing_glucose;
-          alternate_display_start = now;
-          mode_changed = true;
-        }
+        next = (next + 1) % display_schedule_count;
       }
     }
-    else
-    {
-      if (showing_glucose != false) mode_changed = true;
-      showing_glucose = false;
-      alternate_display_start = 0;
-    }
+  }
 
-    if (mode_changed || (showing_glucose != last_showing_glucose))
+  /* Derive show-flags from current slot */
+  {
+    slot_type_t st = (display_schedule_count > 0)
+                   ? display_schedule[current_slot_idx].type
+                   : SLOT_TYPE_TIME;
+    showing_glucose = (st == SLOT_TYPE_CGM);
+    showing_weather = (st == SLOT_TYPE_WEATHER_TEMP);
+    showing_ha      = (st == SLOT_TYPE_HA);
+  }
+
+update_check:
+  if (mode_changed
+      || showing_glucose != last_showing_glucose
+      || showing_weather != last_showing_weather
+      || showing_ha      != last_showing_ha)
+  {
+    *should_update_display = true;
+    last_showing_glucose = showing_glucose;
+    last_showing_weather = showing_weather;
+    last_showing_ha      = showing_ha;
+
+    /* Update scroll message: show slot name while a named slot is active, else restore */
+    bool slot_has_name = display_schedule_count > 0
+                         && display_schedule[current_slot_idx].name[0] != '\0';
+    if ((showing_ha || showing_weather) && slot_has_name)
     {
-      *should_update_display = true;
-      last_showing_glucose = showing_glucose;
+      set_scroll_message(display_schedule[current_slot_idx].name);
     }
-    else if (!showing_glucose)
+    else if (mode_changed)
     {
-      *should_update_display = ((minute_changed || (now % 60 == 0) || (time_just_validated == 1) || weather_has_updated) && time_valid && (now - lastrun > 3));
-      last_minute_slot = current_minute_slot;
+      update_weather_msg();
     }
+  }
+  else if (!showing_glucose && !showing_weather && !showing_ha)
+  {
+    *should_update_display = ((minute_changed || (now % 60 == 0) || (time_just_validated == 1) || weather_has_updated) && time_valid && (now - lastrun > 3));
+    last_minute_slot = current_minute_slot;
   }
 }
 
@@ -1754,22 +1919,42 @@ static void update_display_content(time_t now)
     ESP_LOGI_STACK(TAG, buf);
   }
 
-  if (weather_has_updated || (timeinfo.tm_min == 1))
+  const screen_layout_profile_t *layout = &eeprom_screen_layout.profile[font_index];
+  const bool show_time_digits = layout_show_time_digits(layout);
+  const bool show_glucose_on_time = layout_show_glucose_on_time(layout);
+  const bool show_weather_on_time = layout_show_weather_on_time(layout);
+  const bool show_ha_on_time = layout_show_ha_on_time(layout);
+  const bool show_glucose_widget = layout_show_glucose_widget(layout);
+
+  /* Don't overwrite a named slot's scroll message while it is active */
+  const bool named_slot_active = (show_weather_on_time || show_ha_on_time) &&
+                                 display_schedule_count > 0 &&
+                                 display_schedule[current_slot_idx].name[0] != '\0';
+  if ((weather_has_updated || (timeinfo.tm_min == 1)) && !named_slot_active)
   {
     update_weather_msg();
     weather_has_updated = false;
   }
 
-  const screen_layout_profile_t *layout = &eeprom_screen_layout.profile[font_index];
-  const bool show_time_digits = layout_show_time_digits(layout);
-  const bool show_glucose_on_time = layout_show_glucose_on_time(layout);
-  const bool show_glucose_widget = layout_show_glucose_widget(layout);
   digit_display_t time_digits = {0};
   digit_display_t glucose_digits = {0};
+  digit_display_t value_digits = {0};
+  const char *value_unit = "";
   bool show_ampm = false;
 
   if (show_glucose_on_time)
     fill_glucose_digits(&glucose_digits, true);
+  else if (show_weather_on_time)
+  {
+    fill_weather_digits(&value_digits);
+    value_unit = "\xc2\xb0"; /* degree symbol */
+  }
+  else if (show_ha_on_time)
+  {
+    const char *ha_val = get_ha_slot_value(display_schedule[current_slot_idx].entity);
+    fill_ha_digits(&value_digits, ha_val);
+    value_unit = display_schedule[current_slot_idx].label;
+  }
   else if (show_time_digits)
   {
     struct tm local = timeinfo;
@@ -1794,6 +1979,8 @@ static void update_display_content(time_t now)
   lvgl_port_lock(0);
   if (show_glucose_on_time)
     render_digit_group(digit_objs, &glucose_digits);
+  else if (show_weather_on_time || show_ha_on_time)
+    render_digit_group(digit_objs, &value_digits);
   else if (show_time_digits)
     render_digit_group(digit_objs, &time_digits);
 
@@ -1809,6 +1996,8 @@ static void update_display_content(time_t now)
 
     if (show_glucose_on_time)
       align_glucose_digits(digit_objs, dots, ox, y_digits, &glucose_digits);
+    else if (show_weather_on_time || show_ha_on_time)
+      align_value_with_label_digits(digit_objs, dots, ox, y_digits, &value_digits, value_unit, label_degree);
     else if (show_time_digits)
       align_time_style_digits(digit_objs, dots, ox, y_digits, &time_digits, true);
 
@@ -1823,12 +2012,16 @@ static void update_display_content(time_t now)
     show_object(img_ampm, show_time_digits && eeprom_12hour);
   }
 
-  const bool show_time_slot_digits = show_time_digits || show_glucose_on_time;
+  const bool show_time_slot_digits = show_time_digits || show_glucose_on_time ||
+                                     show_weather_on_time || show_ha_on_time;
   for (int i = 0; i < 4; i++)
     show_object(digit_objs[i], show_time_slot_digits);
   for (int i = 0; i < 4; i++)
     show_object(glucose_digit_objs[i], show_glucose_widget && glucose_digits.digit[i] >= 0);
   update_glucose_widget_dots_visibility(show_glucose_widget, &glucose_digits);
+  /* Degree/unit label: shown for weather, and for HA only when a unit label is set */
+  show_object(label_degree, show_weather_on_time ||
+              (show_ha_on_time && value_unit[0] != '\0'));
 
   lv_image_set_offset_x(img_weather, -weather_icon_index * 32);
   lv_image_set_offset_x(img_moon, -moon_icon_index * 14);
@@ -1891,8 +2084,11 @@ void display_task(void *pvParameters)
     if (settings_updated)
     {
       ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Settings updated");
-      alternate_display_start = 0;
-      showing_glucose = false;
+      slot_start_time  = 0;
+      current_slot_idx = 0;
+      showing_glucose  = false;
+      showing_weather  = false;
+      showing_ha       = false;
       display_changed();
       update_display_content(now);
       settings_updated = false;

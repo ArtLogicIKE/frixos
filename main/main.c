@@ -183,6 +183,8 @@ static const nvs_setting_t settings_table[] = {
     {"cgm_validity", SETTING_TYPE_U16, &glucose_validity_duration, 0},
     {"sec_time", SETTING_TYPE_U8, &eeprom_sec_time, 0},
     {"sec_cgm", SETTING_TYPE_U8, &eeprom_sec_cgm, 0},
+    {"sec_weather", SETTING_TYPE_U8, &eeprom_sec_weather, 0},
+    {"disp_sched", SETTING_TYPE_STR, eeprom_disp_sched, sizeof(eeprom_disp_sched)},
     {"cgm_unit", SETTING_TYPE_U8, &eeprom_glucose_unit, 0},
     {"pwm_frequency", SETTING_TYPE_U32, &eeprom_pwm_frequency, 0},
     {"max_power", SETTING_TYPE_U16, &eeprom_max_power, 0},
@@ -269,8 +271,14 @@ char eeprom_glucose_username[64] = {0};
 char eeprom_glucose_password[64] = {0};
 uint8_t eeprom_glucose_refresh = 5;      // Default to 5 minutes
 uint16_t glucose_validity_duration = 60; // Default to 60 minutes
-uint8_t eeprom_sec_time = 25;            // Alternate time display duration (0-120 seconds)
-uint8_t eeprom_sec_cgm = 5;              // Alternate CGM display duration (0-120 seconds)
+uint8_t eeprom_sec_time = 25;            // Alternate time display duration (0-120 seconds) — legacy, used for migration
+uint8_t eeprom_sec_cgm = 5;              // Alternate CGM display duration (0-120 seconds) — legacy, used for migration
+uint8_t eeprom_sec_weather = 0;          // Alternate weather temperature display duration — legacy, used for migration
+char eeprom_disp_sched[512] = {0};       // Display schedule JSON (p58)
+
+/* Display schedule parsed from eeprom_disp_sched */
+display_slot_t display_schedule[MAX_DISPLAY_SLOTS];
+int            display_schedule_count = 0;
 char eeprom_libre_patient_id[64] = {0};
 char eeprom_libre_token[512] = {0};
 char libre_account_id[64] = {0};
@@ -696,6 +704,12 @@ void startup_read_eeprom(void)
     // Initialize current POH counter and last save time
     current_poh = eeprom_poh;
     last_poh_save = time(NULL);
+
+    // Load display schedule from JSON; migrate from legacy params if absent
+    if (eeprom_disp_sched[0] != '\0')
+        parse_display_schedule(eeprom_disp_sched);
+    else
+        migrate_schedule_from_legacy();
 
     // Close NVS
     nvs_close(nvs_handle);

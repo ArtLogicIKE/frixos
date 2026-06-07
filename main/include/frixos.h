@@ -157,6 +157,34 @@ extern uint8_t eeprom_glucose_unit;  // Glucose display unit: 0=mg/dL, 1=mmol/L
 extern uint16_t glucose_validity_duration;
 extern uint8_t eeprom_sec_time;
 extern uint8_t eeprom_sec_cgm;
+extern uint8_t eeprom_sec_weather;
+extern char    eeprom_disp_sched[512];
+
+/* --- Display schedule --- */
+typedef enum {
+    SLOT_TYPE_TIME         = 0,
+    SLOT_TYPE_CGM          = 1,
+    SLOT_TYPE_WEATHER_TEMP = 2,
+    SLOT_TYPE_HA           = 3,
+} slot_type_t;
+
+#define MAX_DISPLAY_SLOTS  8
+#define SLOT_ENTITY_LEN    64
+
+typedef struct {
+    slot_type_t type;
+    uint16_t    duration;                /* seconds to show this slot */
+    char        entity[SLOT_ENTITY_LEN]; /* HA entity ID (SLOT_TYPE_HA only) */
+    char        label[8];               /* short unit shown next to digits, e.g. "°F", "W" */
+    char        name[32];               /* display name shown in scroll message while active */
+} display_slot_t;
+
+extern display_slot_t display_schedule[MAX_DISPLAY_SLOTS];
+extern int            display_schedule_count;
+
+void parse_display_schedule(const char *json);
+void migrate_schedule_from_legacy(void);
+
 extern char eeprom_libre_patient_id[64];
 extern char eeprom_libre_token[512];
 extern char libre_account_id[64];

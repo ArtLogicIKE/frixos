@@ -1466,8 +1466,10 @@ function addIfChanged(formData, key, newValue, oldValue) {
  * - p44 = eeprom_libre_region (Libre region)
  * - p54 = eeprom_ns_url (Nightscout URL, max 100 chars)
  * - p45 = glucose_validity_duration (Glucose data validity duration in minutes)
- * - p48 = eeprom_sec_time (Alternate time display duration in seconds)
- * - p49 = eeprom_sec_cgm (Alternate CGM display duration in seconds)
+ * - p48 = eeprom_sec_time (Alternate time display duration in seconds — legacy, migration only)
+ * - p49 = eeprom_sec_cgm (Alternate CGM display duration in seconds — legacy, migration only)
+ * - p57 = eeprom_sec_weather (Alternate weather temperature display duration — legacy, migration only)
+ * - p58 = eeprom_disp_sched (Display schedule JSON)
  * - p51 = eeprom_glucose_high (High glucose threshold in mg/dL)
  * - p52 = eeprom_glucose_low (Low glucose threshold in mg/dL)
  * - p53 = cgm_unit (Glucose display unit: 0=mg/dL, 1=mmol/L)
@@ -1694,13 +1696,8 @@ function handleFormSubmit(e, formId) {
             changedCount++;
         }
 
-        const secTimeInput = getFieldInForm('eeprom_sec_time');
-        if (secTimeInput && addIfChanged(formData, 'p48', parseInt(secTimeInput.value) || 0, window.settings.p48)) {
-            changedCount++;
-        }
-
-        const secCgmInput = getFieldInForm('eeprom_sec_cgm');
-        if (secCgmInput && addIfChanged(formData, 'p49', parseInt(secCgmInput.value) || 0, window.settings.p49)) {
+        const newSched = serializeDisplaySchedule();
+        if (addIfChanged(formData, 'p58', newSched, window.settings.p58)) {
             changedCount++;
         }
 
@@ -4616,6 +4613,143 @@ function updateMmolLabels() {
     }
 }
 
+/* ---- Display Schedule UI ---- */
+
+const SLOT_TYPES = [
+    { value: 0, label: 'Time' },
+    { value: 1, label: 'CGM (glucose)' },
+    { value: 2, label: 'Outside Temperature' },
+    { value: 3, label: 'Home Assistant entity' },
+];
+
+function buildSlotRow(slot) {
+    const row = document.createElement('div');
+    row.className = 'schedule-slot-row';
+    row.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;';
+
+    const typeSelect = document.createElement('select');
+    typeSelect.style.cssText = 'flex:0 0 auto;';
+    SLOT_TYPES.forEach(opt => {
+        const o = document.createElement('option');
+        o.value = opt.value;
+        o.textContent = opt.label;
+        if (slot.t === opt.value) o.selected = true;
+        typeSelect.appendChild(o);
+    });
+
+    const durInput = document.createElement('input');
+    durInput.type = 'number';
+    durInput.min = 1;
+    durInput.max = 3600;
+    durInput.value = slot.d || 30;
+    durInput.style.cssText = 'width:70px;flex:0 0 auto;';
+    durInput.title = 'Duration (seconds)';
+
+    const durLabel = document.createElement('span');
+    durLabel.textContent = 'sec';
+    durLabel.style.cssText = 'flex:0 0 auto;color:#999;font-size:0.9em;';
+
+    const entityInput = document.createElement('input');
+    entityInput.type = 'text';
+    entityInput.placeholder = 'entity_id (e.g. sensor.temp)';
+    entityInput.value = slot.e || '';
+    entityInput.style.cssText = 'flex:1 1 160px;min-width:120px;';
+    entityInput.style.display = (slot.t === 3) ? '' : 'none';
+
+    const unitInput = document.createElement('input');
+    unitInput.type = 'text';
+    unitInput.placeholder = 'unit (e.g. °F)';
+    unitInput.maxLength = 7;
+    unitInput.value = slot.l || '';
+    unitInput.style.cssText = 'width:70px;flex:0 0 auto;';
+    unitInput.style.display = (slot.t === 3) ? '' : 'none';
+
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.placeholder = 'name (e.g. Outside Temp)';
+    nameInput.maxLength = 31;
+    nameInput.value = slot.n || '';
+    nameInput.style.cssText = 'flex:1 1 120px;min-width:100px;';
+    nameInput.style.display = (slot.t === 2 || slot.t === 3) ? '' : 'none';
+
+    typeSelect.addEventListener('change', () => {
+        const t = parseInt(typeSelect.value);
+        const isHA = (t === 3);
+        const hasName = (t === 2 || t === 3);
+        entityInput.style.display = isHA ? '' : 'none';
+        unitInput.style.display   = isHA ? '' : 'none';
+        nameInput.style.display   = hasName ? '' : 'none';
+    });
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.textContent = '✕';
+    removeBtn.style.cssText = 'flex:0 0 auto;cursor:pointer;padding:2px 8px;';
+    removeBtn.addEventListener('click', () => row.remove());
+
+    row.appendChild(typeSelect);
+    row.appendChild(durInput);
+    row.appendChild(durLabel);
+    row.appendChild(entityInput);
+    row.appendChild(unitInput);
+    row.appendChild(nameInput);
+    row.appendChild(removeBtn);
+    return row;
+}
+
+function renderDisplaySchedule() {
+    const list = el('display-schedule-list');
+    if (!list) return;
+    list.innerHTML = '';
+
+    let slots = [];
+    if (typeof window.settings.p58 === 'string' && window.settings.p58.trim().startsWith('[')) {
+        try { slots = JSON.parse(window.settings.p58); } catch(e) { slots = []; }
+    }
+    if (!Array.isArray(slots) || slots.length === 0) {
+        // Migrate from legacy p48/p49/p57 defaults so the UI isn't blank
+        if ((window.settings.p48 || 0) > 0) slots.push({t:0, d: window.settings.p48});
+        if ((window.settings.p49 || 0) > 0) slots.push({t:1, d: window.settings.p49});
+        if ((window.settings.p57 || 0) > 0) slots.push({t:2, d: window.settings.p57});
+        if (slots.length === 0) slots.push({t:0, d:30});
+    }
+    slots.forEach(s => list.appendChild(buildSlotRow(s)));
+
+    const addBtn = el('add-schedule-slot');
+    if (addBtn && !addBtn._listenerSet) {
+        addBtn._listenerSet = true;
+        addBtn.addEventListener('click', () => {
+            list.appendChild(buildSlotRow({t:0, d:30}));
+        });
+    }
+}
+
+function serializeDisplaySchedule() {
+    const list = el('display-schedule-list');
+    if (!list) return '[]';
+    const slots = [];
+    list.querySelectorAll('.schedule-slot-row').forEach(row => {
+        const typeEl    = row.querySelector('select');
+        const durEl     = row.querySelectorAll('input[type="number"]')[0];
+        const textInputs = row.querySelectorAll('input[type="text"]');
+        const entEl     = textInputs[0];
+        const unitEl    = textInputs[1];
+        const nameEl    = textInputs[2];
+        const t = parseInt(typeEl ? typeEl.value : 0);
+        const d = parseInt(durEl  ? durEl.value  : 30) || 1;
+        const slot = {t, d};
+        if (t === 3) {
+            if (entEl  && entEl.value.trim())  slot.e = entEl.value.trim();
+            if (unitEl && unitEl.value.trim()) slot.l = unitEl.value.trim();
+            if (nameEl && nameEl.value.trim()) slot.n = nameEl.value.trim();
+        } else if (t === 2) {
+            if (nameEl && nameEl.value.trim()) slot.n = nameEl.value.trim();
+        }
+        if (t !== 3 || slot.e) slots.push(slot);
+    });
+    return JSON.stringify(slots);
+}
+
 function setupIntegrationsSection() {
     const form = el('integrationsForm');
     const haUrlInput = el('eeprom_ha_url');
@@ -4759,15 +4893,7 @@ function setupIntegrationsSection() {
             glucoseValidity.value = window.settings.p45 || 30;
         }
 
-        const secTime = el('eeprom_sec_time');
-        if (secTime && typeof window.settings.p48 !== 'undefined') {
-            secTime.value = window.settings.p48 || 0;
-        }
-
-        const secCgm = el('eeprom_sec_cgm');
-        if (secCgm && typeof window.settings.p49 !== 'undefined') {
-            secCgm.value = window.settings.p49 || 0;
-        }
+        renderDisplaySchedule();
 
         // Load shared username (p31)
         if (glucoseUsername && typeof window.settings.p31 !== 'undefined') {

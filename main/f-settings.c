@@ -95,12 +95,134 @@
  * - p45 = glucose_validity_duration (Glucose data validity duration in minutes)
  * - p48 = eeprom_sec_time (Alternate time display duration in seconds)
  * - p49 = eeprom_sec_cgm (Alternate CGM display duration in seconds)
+ * - p57 = eeprom_sec_weather (Alternate weather temperature display duration in seconds)
+ * - p58 = eeprom_disp_sched (Display schedule JSON)
  * - p44 = eeprom_libre_region (Libre region)
  * - p54 = eeprom_ns_url (Nightscout URL, max 100 chars)
  */
 
 // Tag for logging
 static const char *TAG = "f-settings";
+
+/* ---- Display schedule helpers ---- */
+
+void parse_display_schedule(const char *json)
+{
+    display_schedule_count = 0;
+    if (!json || json[0] == '\0') return;
+
+    cJSON *arr = cJSON_Parse(json);
+    if (!arr || !cJSON_IsArray(arr)) { cJSON_Delete(arr); return; }
+
+    int count = cJSON_GetArraySize(arr);
+    if (count > MAX_DISPLAY_SLOTS) count = MAX_DISPLAY_SLOTS;
+
+    for (int i = 0; i < count; i++)
+    {
+        cJSON *slot = cJSON_GetArrayItem(arr, i);
+        if (!slot) continue;
+        cJSON *t = cJSON_GetObjectItem(slot, "t");
+        cJSON *d = cJSON_GetObjectItem(slot, "d");
+        if (!cJSON_IsNumber(t) || !cJSON_IsNumber(d)) continue;
+
+        int type = t->valueint;
+        if (type < SLOT_TYPE_TIME || type > SLOT_TYPE_HA) continue;
+        int dur = d->valueint;
+        if (dur <= 0 || dur > 3600) continue;
+
+        display_slot_t *s = &display_schedule[display_schedule_count];
+        s->type      = (slot_type_t)type;
+        s->duration  = (uint16_t)dur;
+        s->entity[0] = '\0';
+        s->label[0]  = '\0';
+        s->name[0]   = '\0';
+
+        if (type == SLOT_TYPE_HA)
+        {
+            cJSON *e = cJSON_GetObjectItem(slot, "e");
+            if (cJSON_IsString(e) && e->valuestring[0] != '\0')
+            {
+                strncpy(s->entity, e->valuestring, SLOT_ENTITY_LEN - 1);
+                s->entity[SLOT_ENTITY_LEN - 1] = '\0';
+            }
+            else continue; /* HA slot with no entity is useless */
+        }
+
+        cJSON *l = cJSON_GetObjectItem(slot, "l");
+        if (cJSON_IsString(l) && l->valuestring[0] != '\0')
+        {
+            strncpy(s->label, l->valuestring, sizeof(s->label) - 1);
+            s->label[sizeof(s->label) - 1] = '\0';
+        }
+        cJSON *n = cJSON_GetObjectItem(slot, "n");
+        if (cJSON_IsString(n) && n->valuestring[0] != '\0')
+        {
+            strncpy(s->name, n->valuestring, sizeof(s->name) - 1);
+            s->name[sizeof(s->name) - 1] = '\0';
+        }
+        display_schedule_count++;
+    }
+    cJSON_Delete(arr);
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Display schedule: %d slots", display_schedule_count);
+}
+
+void migrate_schedule_from_legacy(void)
+{
+    display_schedule_count = 0;
+
+    /* Always start with a time slot; use sec_time if set, else default 30s */
+    display_schedule[display_schedule_count].type     = SLOT_TYPE_TIME;
+    display_schedule[display_schedule_count].duration = eeprom_sec_time > 0 ? eeprom_sec_time : 30;
+    display_schedule[display_schedule_count].entity[0] = '\0';
+    display_schedule[display_schedule_count].label[0]  = '\0';
+    display_schedule[display_schedule_count].name[0]   = '\0';
+    display_schedule_count++;
+
+    if (eeprom_sec_cgm > 0)
+    {
+        display_schedule[display_schedule_count].type     = SLOT_TYPE_CGM;
+        display_schedule[display_schedule_count].duration = eeprom_sec_cgm;
+        display_schedule[display_schedule_count].entity[0] = '\0';
+        display_schedule[display_schedule_count].label[0]  = '\0';
+        display_schedule[display_schedule_count].name[0]   = '\0';
+        display_schedule_count++;
+    }
+    if (eeprom_sec_weather > 0)
+    {
+        display_schedule[display_schedule_count].type     = SLOT_TYPE_WEATHER_TEMP;
+        display_schedule[display_schedule_count].duration = eeprom_sec_weather;
+        display_schedule[display_schedule_count].entity[0] = '\0';
+        display_schedule[display_schedule_count].label[0]  = '\0';
+        display_schedule[display_schedule_count].name[0]   = '\0';
+        display_schedule_count++;
+    }
+
+    /* Serialise into eeprom_disp_sched so it persists on next boot */
+    cJSON *arr = cJSON_CreateArray();
+    for (int i = 0; i < display_schedule_count; i++)
+    {
+        cJSON *slot = cJSON_CreateObject();
+        cJSON_AddNumberToObject(slot, "t", display_schedule[i].type);
+        cJSON_AddNumberToObject(slot, "d", display_schedule[i].duration);
+        if (display_schedule[i].type == SLOT_TYPE_HA)
+            cJSON_AddStringToObject(slot, "e", display_schedule[i].entity);
+        if (display_schedule[i].label[0] != '\0')
+            cJSON_AddStringToObject(slot, "l", display_schedule[i].label);
+        if (display_schedule[i].name[0] != '\0')
+            cJSON_AddStringToObject(slot, "n", display_schedule[i].name);
+        cJSON_AddItemToArray(arr, slot);
+    }
+    char *out = cJSON_PrintUnformatted(arr);
+    cJSON_Delete(arr);
+    if (out)
+    {
+        strncpy(eeprom_disp_sched, out, sizeof(eeprom_disp_sched) - 1);
+        eeprom_disp_sched[sizeof(eeprom_disp_sched) - 1] = '\0';
+        free(out);
+        write_nvs_parameters();
+    }
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Migrated legacy schedule: %d slots", display_schedule_count);
+}
 
 // HTTP server handle
 static httpd_handle_t server = NULL;
@@ -533,11 +655,11 @@ static uint64_t calculate_include_mask(const char *group, const char *params)
         }
         else if (strcmp(group, "integrations") == 0)
         {
-            // p25-p33, p44, p45, p48, p49, p51-p54
+            // p25-p33, p44, p45, p48, p49, p51-p54, p57, p58
             for (int i = 25; i <= 33; i++) mask |= (1ULL << i);
             mask |= (1ULL << 44) | (1ULL << 45) | (1ULL << 48) |
                     (1ULL << 49) | (1ULL << 51) | (1ULL << 52) |
-                    (1ULL << 53) | (1ULL << 54);
+                    (1ULL << 53) | (1ULL << 54) | (1ULL << 57) | (1ULL << 58);
         }
     }
 
@@ -672,6 +794,8 @@ esp_err_t send_json_settings(httpd_req_t *req)
     if (mask & (1ULL << 45)) cJSON_AddNumberToObject(root, "p45", glucose_validity_duration);
     if (mask & (1ULL << 48)) cJSON_AddNumberToObject(root, "p48", eeprom_sec_time);
     if (mask & (1ULL << 49)) cJSON_AddNumberToObject(root, "p49", eeprom_sec_cgm);
+    if (mask & (1ULL << 57)) cJSON_AddNumberToObject(root, "p57", eeprom_sec_weather);
+    if (mask & (1ULL << 58)) cJSON_AddStringToObject(root, "p58", eeprom_disp_sched);
 
     // Add Libre settings (region only - other fields are internal and set by API responses)
     if (mask & (1ULL << 44)) cJSON_AddNumberToObject(root, "p44", eeprom_libre_region);
@@ -1061,11 +1185,13 @@ static bool validate_json_params(cJSON *root, char *err_buf, size_t err_size)
     if ((item = cJSON_GetObjectItem(root, "p45")) && cJSON_IsNumber(item))
         CHECK_RANGE("glucose_validity_duration", item->valueint, 10, 360);
 
-    /* p48 sec_time, p49 sec_cgm */
+    /* p48 sec_time, p49 sec_cgm, p57 sec_weather */
     if ((item = cJSON_GetObjectItem(root, "p48")) && cJSON_IsNumber(item))
         CHECK_RANGE("sec_time", item->valueint, 0, 120);
     if ((item = cJSON_GetObjectItem(root, "p49")) && cJSON_IsNumber(item))
         CHECK_RANGE("sec_cgm", item->valueint, 0, 120);
+    if ((item = cJSON_GetObjectItem(root, "p57")) && cJSON_IsNumber(item))
+        CHECK_RANGE("sec_weather", item->valueint, 0, 120);
 
     /* p44 libre_region */
     if ((item = cJSON_GetObjectItem(root, "p44")) && cJSON_IsNumber(item))
@@ -2132,6 +2258,14 @@ esp_err_t settings_post_handler(httpd_req_t *req)
             eeprom_sec_cgm = (uint8_t)sec_cgm;
         }
     }
+    if (cJSON_HasObjectItem(root, "p57"))
+    {
+        int sec_weather = cJSON_GetObjectItem(root, "p57")->valueint;
+        if (sec_weather >= 0 && sec_weather <= 120)
+        {
+            eeprom_sec_weather = (uint8_t)sec_weather;
+        }
+    }
 
     // Libre settings (region only - credentials use shared glucose variables via p31, p32, p33)
     // Other Libre fields (patient_id, token, account_id, region_url) are internal and set by API responses, not via web interface
@@ -2199,6 +2333,22 @@ esp_err_t settings_post_handler(httpd_req_t *req)
         else
         {
             ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Invalid glucose_unit value: %d, must be 0 or 1", unit_value);
+        }
+    }
+
+    // p58: display schedule JSON
+    if (cJSON_HasObjectItem(root, "p58"))
+    {
+        cJSON *p58 = cJSON_GetObjectItem(root, "p58");
+        const char *sched_json = cJSON_IsString(p58) ? p58->valuestring : NULL;
+        if (sched_json && strlen(sched_json) < sizeof(eeprom_disp_sched))
+        {
+            strncpy(eeprom_disp_sched, sched_json, sizeof(eeprom_disp_sched) - 1);
+            eeprom_disp_sched[sizeof(eeprom_disp_sched) - 1] = '\0';
+            parse_display_schedule(eeprom_disp_sched);
+            // Re-register any new HA entities from the schedule via the consolidated
+            // parse_integrations() call below.
+            integration_settings_changed = true;
         }
     }
 
@@ -2725,6 +2875,7 @@ esp_err_t ota_post_handler(httpd_req_t *req)
     char filename[128] = "firmware.bin"; // Default filename
     int recv_len = 0, total_received = 0, remaining = req->content_len;
     bool is_multipart = false, filename_found = false;
+    char end_marker[136] = {0}; // "\r\n--{boundary}" used to trim trailing boundary from file chunks
     esp_err_t err = ESP_OK;
 
     ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Upload request received with content length: %d", req->content_len);
@@ -2745,6 +2896,22 @@ esp_err_t ota_post_handler(httpd_req_t *req)
         httpd_req_get_hdr_value_str(req, "Content-Type", content_type, content_type_len + 1);
         is_multipart = (strstr(content_type, "multipart/form-data") != NULL);
         ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Content-Type: %s, multipart: %d", content_type, is_multipart);
+        if (is_multipart)
+        {
+            char *b = strstr(content_type, "boundary=");
+            if (b)
+            {
+                b += 9;
+                char boundary[128] = {0};
+                int i = 0;
+                while (b[i] && b[i] != ';' && b[i] != '\r' && b[i] != '\n' && i < (int)sizeof(boundary) - 1)
+                {
+                    boundary[i] = b[i];
+                    i++;
+                }
+                snprintf(end_marker, sizeof(end_marker), "\r\n--%s", boundary);
+            }
+        }
     }
 
     // Check if filename is provided in headers
@@ -2998,22 +3165,24 @@ esp_err_t ota_post_handler(httpd_req_t *req)
             break;
         }
 
-        // For multipart data, check for boundaries
-        if (is_multipart)
+        // For multipart data, search for the end boundary within this chunk and trim if found
+        int write_len = recv_len;
+        bool boundary_found = false;
+        if (is_multipart && end_marker[0])
         {
-            // Simple check for ending boundary (--boundary--)
-            if (recv_len >= 6 && memcmp(buf, "--", 2) == 0 &&
-                (strstr(buf, "--\r\n") != NULL || strstr(buf, "--\r\n\r\n") != NULL))
+            void *pos = memmem(buf, recv_len, end_marker, strlen(end_marker));
+            if (pos)
             {
-                ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Final boundary detected, ending upload");
-                break;
+                write_len = (char *)pos - buf;
+                boundary_found = true;
+                ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Final boundary detected, trimming chunk to %d bytes", write_len);
             }
         }
 
         // Process received data
         if (is_firmware)
         {
-            err = esp_ota_write(ota_handle, buf, recv_len);
+            err = esp_ota_write(ota_handle, buf, write_len);
             if (err != ESP_OK)
             {
                 ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "OTA write error: %s", esp_err_to_name(err));
@@ -3024,15 +3193,21 @@ esp_err_t ota_post_handler(httpd_req_t *req)
         }
         else
         {
-            size_t written = fwrite(buf, 1, recv_len, file);
-            if (written != recv_len)
+            if (write_len > 0)
             {
-                ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "File write error: %d of %d bytes written", written, recv_len);
-                fclose(file);
-                httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "File write error");
-                return ESP_FAIL;
+                size_t written = fwrite(buf, 1, write_len, file);
+                if ((int)written != write_len)
+                {
+                    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "File write error: %d of %d bytes written", written, write_len);
+                    fclose(file);
+                    httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "File write error");
+                    return ESP_FAIL;
+                }
             }
         }
+
+        if (boundary_found)
+            break;
 
         // Update progress counters
         total_received += recv_len;
