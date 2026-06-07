@@ -1,0 +1,71 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - '**'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Wait for build workflow
+        run: |
+          for i in $(seq 1 60); do
+            result=$(gh run list --repo ${{ github.repository }} --commit ${{ github.sha }} \
+              --workflow build.yml --json status,conclusion --jq '.[0] // empty')
+            if [ -z "$result" ]; then
+              echo "No build run found yet, waiting..."
+              sleep 30; continue
+            fi
+            status=$(echo "$result" | jq -r '.status')
+            conclusion=$(echo "$result" | jq -r '.conclusion')
+            if [ "$status" = "completed" ]; then
+              [ "$conclusion" = "success" ] && exit 0
+              echo "Build $conclusion"; exit 1
+            fi
+            echo "Build status: $status, waiting..."
+            sleep 30
+          done
+          echo "Timed out waiting for build"; exit 1
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Download firmware artifacts
+        uses: dawidd6/action-download-artifact@v9
+        with:
+          workflow: build.yml
+          commit: ${{ github.sha }}
+          name: firmware
+          path: firmware
+
+      - name: Package release zip
+        run: |
+          TAG=${{ github.ref_name }}
+          mkdir -p staging
+          cp firmware/frixos.bin                        staging/
+          cp firmware/bootloader/bootloader.bin         staging/
+          cp firmware/partition_table/partition-table.bin staging/
+          cp firmware/spiffs.bin                        staging/
+          cp firmware/flasher_args.json                 staging/
+          cp docs/FLASH.md                                    staging/
+          cd staging && zip -j "../frixos-firmware-${TAG}.zip" ./*
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          append_body: true
+          body: |
+
+            ---
+            ## Flashing
+
+            Download `frixos-firmware-${{ github.ref_name }}.zip` and see [FLASH.md](https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/docs/FLASH.md) for instructions.
+          files: frixos-firmware-${{ github.ref_name }}.zip
