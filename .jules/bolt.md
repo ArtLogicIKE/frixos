@@ -33,3 +33,7 @@
 ## 2026-05-19 - Lazy Element Caching for Translation System
 **Learning:** The `translate()` function was performing multiple global `document.querySelectorAll` calls (for `[data-i18n]`, `.password-toggle`, `.token-code`, and `.language-option`) on every language switch. In a ~130KB single-page application with hundreds of translatable elements, these redundant DOM queries add significant script execution overhead.
 **Action:** Implement lazy-initialized module-level caches for these `NodeList` results. Populating the cache on first use and reusing it reduces `translate()` execution time by ~10%. Crucially, implement and call an `invalidateI18nCache()` helper in functions that dynamically inject or replace translatable DOM elements (e.g., WiFi network lists or support buttons) to prevent functional regressions and ensure new elements are correctly translated.
+
+## 2026-06-08 - Optimized Translation Loop and DOM Caching
+**Learning:** Hoisting loop-invariant `getNestedTranslation` lookups and implementing persistent `NodeList` caches for translatable elements (e.g., `.token-code`, `.password-toggle`) significantly reduces script execution time during language switches. Using nullish coalescing (`??`) ensures safe fallbacks without incorrectly triggering for empty translation strings.
+**Action:** Always hoist translation lookups outside of loops. Utilize persistent element caches for high-frequency DOM updates, ensuring they are correctly cleared via `invalidateI18nCache()` when dynamic content is injected.
