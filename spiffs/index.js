@@ -572,12 +572,12 @@ async function translate(lang) {
     if (!passwordTogglesCache) {
         passwordTogglesCache = document.querySelectorAll('.password-toggle');
     }
+    const showPasswordLabel = getNestedTranslation(trans, 'common.show_password');
+    const hidePasswordLabel = getNestedTranslation(trans, 'common.hide_password');
     passwordTogglesCache.forEach(button => {
         const input = button.previousElementSibling;
         if (input) {
-            const isPassword = input.type === 'password';
-            const actionKey = isPassword ? 'common.show_password' : 'common.hide_password';
-            const translation = getNestedTranslation(trans, actionKey);
+            const translation = input.type === 'password' ? showPasswordLabel : hidePasswordLabel;
             if (translation) {
                 button.setAttribute('aria-label', translation);
             }
@@ -585,8 +585,11 @@ async function translate(lang) {
     });
 
     // Update token tooltips and ARIA labels after language change
-    tokenCodesCache = null;
-    document.querySelectorAll('.token-code').forEach(token => updateTokenButtonTooltip(token));
+    if (!tokenCodesCache) {
+        tokenCodesCache = document.querySelectorAll('.token-code');
+    }
+    const insertLabel = getNestedTranslation(trans, 'common.insert') ?? 'Insert';
+    tokenCodesCache.forEach(token => updateTokenButtonTooltip(token, insertLabel));
 
     // Update font sample ARIA labels after language change
     if (!fontSamplesCache) {
@@ -2862,12 +2865,12 @@ function getTokenCode(btn) {
     return btn.dataset.token || btn.querySelector('.token-code-label')?.textContent || btn.textContent.trim();
 }
 
-function updateTokenButtonTooltip(btn) {
+function updateTokenButtonTooltip(btn, insertLabel) {
     const code = getTokenCode(btn);
     const meta = TOKEN_HELP[code];
     const trans = translations[currentLanguage] || translations.en;
-    const insertLabel = getNestedTranslation(trans, 'common.insert') || 'Insert';
-    btn.setAttribute('aria-label', `${insertLabel} ${code}`);
+    const effectiveInsertLabel = insertLabel ?? getNestedTranslation(trans, 'common.insert') ?? 'Insert';
+    btn.setAttribute('aria-label', `${effectiveInsertLabel} ${code}`);
     if (!meta) return;
     const description = getNestedTranslation(trans, meta.i18nKey) || '';
     const exampleEl = btn.querySelector('.token-tooltip-example');
