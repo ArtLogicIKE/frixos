@@ -4662,9 +4662,17 @@ function renderScreenOptions() {
                 if (isScreenStaticTextElement(e.id)) renderScreenPalette();
             });
         }
+        const counter = document.createElement('div');
+        counter.className = 'message-counter';
+        counter.id = e.id + '-counter';
+        textArea.setAttribute('aria-describedby', counter.id);
+        textArea.addEventListener('input', () => updateCharCounter(textArea, counter));
+
         textRow.appendChild(textLabel);
         textRow.appendChild(textArea);
+        textRow.appendChild(counter);
         setupTokenHighlightTextarea(textArea);
+        updateCharCounter(textArea, counter);
         opt.appendChild(textRow);
         appendScreenTokenButtons(opt, textArea);
     }
@@ -4843,16 +4851,6 @@ function setupAdvancedSection() {
             dimModeSelect.addEventListener('change', updateDimmingModeSections);
         }
 
-        // Setup message character counter and interactive tokens
-        const messageInput = el('message');
-        const messageCounter = el('message-counter');
-        if (messageInput && messageCounter) {
-            messageInput.addEventListener('input', () => updateCharCounter(messageInput, messageCounter));
-            document.querySelectorAll('.token-code').forEach(t => {
-                decorateTokenButton(t, getTokenCode(t));
-                bindTokenInsert(t, messageInput, () => highlightElement(messageInput));
-            });
-        }
 
         // Setup interactive font samples
         document.querySelectorAll('.font-sample-box').forEach(box => {
