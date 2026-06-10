@@ -3321,6 +3321,14 @@ const SCREEN_PALETTE_TEXT_DEF = {
     dynamicHeight: true
 };
 
+// Optimization: O(1) lookups for hot-path screen layout operations
+const SCREEN_ELEMENT_DEFS_MAP = new Map(SCREEN_ELEMENT_DEFS.map(d => [d.id, d]));
+SCREEN_ELEMENT_DEFS_MAP.set(SCREEN_PALETTE_TEXT_DEF.id, SCREEN_PALETTE_TEXT_DEF);
+
+const SCREEN_STATIC_TEXT_IDS = new Set(SCREEN_TEXT_SLOT_IDS);
+const SCREEN_DIGIT_LABEL_IDS = new Set(['digit_label', 'digit_label_aux']);
+const SCREEN_ALL_TEXT_IDS = new Set(['message', ...SCREEN_TEXT_SLOT_IDS, ...SCREEN_DIGIT_LABEL_IDS]);
+
 function getPaletteNewTextIconLabel() {
     return getScreenTranslation('screen.palette_text_icon', 'Text');
 }
@@ -3386,19 +3394,19 @@ function resolvePaletteElementId(paletteId, profile) {
 }
 
 function isScreenDigitLabelElement(id) {
-    return id === 'digit_label' || id === 'digit_label_aux';
+    return SCREEN_DIGIT_LABEL_IDS.has(id);
 }
 
 function isScreenTextElement(id) {
-    return id === 'message' || /^text_[1-8]$/.test(id) || isScreenDigitLabelElement(id);
+    return SCREEN_ALL_TEXT_IDS.has(id);
 }
 
 function isScreenStaticTextElement(id) {
-    return /^text_[1-8]$/.test(id);
+    return SCREEN_STATIC_TEXT_IDS.has(id);
 }
 
 function isScreenClippedTextElement(id) {
-    return isScreenStaticTextElement(id) || isScreenDigitLabelElement(id);
+    return SCREEN_STATIC_TEXT_IDS.has(id) || SCREEN_DIGIT_LABEL_IDS.has(id);
 }
 
 function getDigitLabelTextKey(id) {
@@ -3492,8 +3500,7 @@ function getProfileObj(mode) {
 }
 
 function findElementDef(id) {
-    if (id === 'text') return SCREEN_PALETTE_TEXT_DEF;
-    return SCREEN_ELEMENT_DEFS.find(d => d.id === id) || null;
+    return SCREEN_ELEMENT_DEFS_MAP.get(id) || null;
 }
 
 function evenPx(value) {
