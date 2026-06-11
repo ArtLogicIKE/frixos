@@ -19,3 +19,7 @@
 ## 2025-05-16 - [Visual Samples as Interactive Controls]
 **Learning:** When visual samples (such as fonts) correspond to underlying configuration settings, they should be implemented as accessible, interactive controls. This reduces cognitive load by allowing users to directly interact with what they see, rather than translating a visual preference into a dropdown selection.
 **Action:** Implement `role="button"`, `tabindex="0"`, and localized `aria-label` for all visual sample boxes to ensure they are discoverable and usable as primary input mechanisms.
+
+## 2025-06-11 - [Dynamic Character Limit Feedback]
+**Learning:** Hardcoded warning thresholds for character counters (e.g., "show warning at 450 chars") fail when applied to inputs with significantly different length constraints (e.g., 511 vs 96 chars). A relative threshold, such as 90% of `maxlength`, ensures consistent and meaningful "near-limit" feedback across all localized inputs.
+**Action:** Always utilize relative percentages or dynamic calculations based on `maxlength` when implementing "near-limit" states for character counters to maintain UI consistency.

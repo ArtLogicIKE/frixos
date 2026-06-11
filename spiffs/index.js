@@ -59,10 +59,12 @@ function highlightElement(element) {
 function updateCharCounter(input, counter) {
     if (!input || !counter) return;
     const length = input.value.length;
-    const maxLength = input.getAttribute('maxlength') || 511;
+    const maxLength = parseInt(input.getAttribute('maxlength') || 511);
     counter.textContent = `${length} / ${maxLength}`;
 
-    counter.classList.toggle('near-limit', length >= 450 && length < maxLength);
+    // Show warning when 90% full
+    const threshold = Math.floor(maxLength * 0.9);
+    counter.classList.toggle('near-limit', length >= threshold && length < maxLength);
     counter.classList.toggle('at-limit', length >= maxLength);
 }
 
@@ -4643,10 +4645,12 @@ function renderScreenOptions() {
         const textLabel = document.createElement('label');
         textLabel.textContent = getNestedTranslation(trans, 'screen.message_text') || 'Text';
         const textArea = document.createElement('textarea');
+        textArea.id = e.id;
         const maxLen = e.id === 'message' ? 511 : 96;
         textArea.maxLength = maxLen;
         textArea.rows = e.id === 'message' ? 3 : 2;
         if (e.id === 'message') {
+            textArea.placeholder = getNestedTranslation(trans, 'advanced.message.message_placeholder') || 'Enter your message';
             textArea.value = profile.scroll_text || '';
             textArea.addEventListener('input', () => {
                 profile.scroll_text = textArea.value;
@@ -4662,8 +4666,20 @@ function renderScreenOptions() {
                 if (isScreenStaticTextElement(e.id)) renderScreenPalette();
             });
         }
+
+        const counter = document.createElement('div');
+        counter.className = 'message-counter';
+        counter.id = e.id + '-counter';
+        textArea.setAttribute('aria-describedby', counter.id);
+
+        const updateCounter = () => updateCharCounter(textArea, counter);
+        textArea.addEventListener('input', updateCounter);
+
         textRow.appendChild(textLabel);
         textRow.appendChild(textArea);
+        textRow.appendChild(counter);
+        updateCounter();
+
         setupTokenHighlightTextarea(textArea);
         opt.appendChild(textRow);
         appendScreenTokenButtons(opt, textArea);
