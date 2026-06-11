@@ -3321,6 +3321,9 @@ const SCREEN_PALETTE_TEXT_DEF = {
     dynamicHeight: true
 };
 
+// Optimization: O(1) lookup map for Screen Layout editor elements
+const SCREEN_ELEMENT_DEFS_MAP = new Map(SCREEN_ELEMENT_DEFS.map(def => [def.id, def]));
+
 function getPaletteNewTextIconLabel() {
     return getScreenTranslation('screen.palette_text_icon', 'Text');
 }
@@ -3493,7 +3496,7 @@ function getProfileObj(mode) {
 
 function findElementDef(id) {
     if (id === 'text') return SCREEN_PALETTE_TEXT_DEF;
-    return SCREEN_ELEMENT_DEFS.find(d => d.id === id) || null;
+    return SCREEN_ELEMENT_DEFS_MAP.get(id) || null;
 }
 
 function evenPx(value) {
