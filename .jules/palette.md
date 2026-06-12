@@ -19,3 +19,7 @@
 ## 2025-05-16 - [Visual Samples as Interactive Controls]
 **Learning:** When visual samples (such as fonts) correspond to underlying configuration settings, they should be implemented as accessible, interactive controls. This reduces cognitive load by allowing users to directly interact with what they see, rather than translating a visual preference into a dropdown selection.
 **Action:** Implement `role="button"`, `tabindex="0"`, and localized `aria-label` for all visual sample boxes to ensure they are discoverable and usable as primary input mechanisms.
+
+## 2025-05-18 - [Dynamic Feedback Thresholds]
+**Learning:** Hardcoded thresholds for UX feedback (like character counter "near-limit" warnings) fail to scale when applied to inputs with vastly different constraints (e.g., 96 vs 511 characters). Using a percentage-based threshold (e.g., 90%) ensures consistent user expectations across the entire application.
+**Action:** Always derive feedback thresholds from the underlying constraints (like `maxlength`) to provide a uniform experience for inputs of all sizes.
