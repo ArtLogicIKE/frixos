@@ -2994,28 +2994,47 @@ function formatTextWithTokenHighlights(text) {
 }
 
 function syncTokenHighlightMetrics(textarea, highlight) {
+    // Optimization: getComputedStyle is expensive, only call when necessary
     const cs = getComputedStyle(textarea);
-    highlight.style.fontFamily = cs.fontFamily;
-    highlight.style.fontSize = cs.fontSize;
-    highlight.style.fontWeight = cs.fontWeight;
-    highlight.style.lineHeight = cs.lineHeight;
-    highlight.style.letterSpacing = cs.letterSpacing;
-    highlight.style.wordSpacing = cs.wordSpacing;
-    highlight.style.padding = cs.padding;
-    highlight.style.borderWidth = cs.borderWidth;
-    highlight.style.borderStyle = 'solid';
-    highlight.style.borderColor = 'transparent';
-    highlight.style.boxSizing = cs.boxSizing;
-    highlight.style.tabSize = cs.tabSize;
+    const s = highlight.style;
+    s.fontFamily = cs.fontFamily;
+    s.fontSize = cs.fontSize;
+    s.fontWeight = cs.fontWeight;
+    s.lineHeight = cs.lineHeight;
+    s.letterSpacing = cs.letterSpacing;
+    s.wordSpacing = cs.wordSpacing;
+    s.padding = cs.padding;
+    s.borderWidth = cs.borderWidth;
+    s.borderStyle = 'solid';
+    s.borderColor = 'transparent';
+    s.boxSizing = cs.boxSizing;
+    s.tabSize = cs.tabSize;
 }
 
 function updateTokenHighlightTextarea(textarea) {
-    const wrap = textarea.closest('.textarea-token-wrap');
-    if (!wrap) return;
-    const highlight = wrap.querySelector('.textarea-token-highlight');
-    if (!highlight) return;
-    syncTokenHighlightMetrics(textarea, highlight);
-    highlight.innerHTML = formatTextWithTokenHighlights(textarea.value);
+    // Optimization: Cache references and skip processing if content hasn't changed
+    const val = textarea.value;
+    if (textarea._lastVal === val) {
+        // Even if value is same, scroll position might have changed (e.g. during typing)
+        if (textarea._highlight) {
+            textarea._highlight.scrollTop = textarea.scrollTop;
+            textarea._highlight.scrollLeft = textarea.scrollLeft;
+        }
+        return;
+    }
+    textarea._lastVal = val;
+
+    let highlight = textarea._highlight;
+    if (!highlight) {
+        const wrap = textarea.closest('.textarea-token-wrap');
+        if (!wrap) return;
+        highlight = wrap.querySelector('.textarea-token-highlight');
+        if (!highlight) return;
+        textarea._highlight = highlight;
+        syncTokenHighlightMetrics(textarea, highlight);
+    }
+
+    highlight.innerHTML = formatTextWithTokenHighlights(val);
     highlight.scrollTop = textarea.scrollTop;
     highlight.scrollLeft = textarea.scrollLeft;
 }
@@ -3035,6 +3054,10 @@ function setupTokenHighlightTextarea(textarea) {
     wrap.insertBefore(highlight, textarea);
 
     textarea.classList.add('textarea-token-input');
+    textarea._highlight = highlight;
+    textarea._lastVal = null;
+
+    syncTokenHighlightMetrics(textarea, highlight);
 
     const refresh = () => updateTokenHighlightTextarea(textarea);
     const syncScroll = () => {
@@ -3043,8 +3066,13 @@ function setupTokenHighlightTextarea(textarea) {
     };
     textarea.addEventListener('input', refresh);
     textarea.addEventListener('scroll', syncScroll);
+
+    // Optimization: Only sync metrics on resize, not on every keystroke
     if (typeof ResizeObserver !== 'undefined') {
-        const ro = new ResizeObserver(refresh);
+        const ro = new ResizeObserver(() => {
+            syncTokenHighlightMetrics(textarea, highlight);
+            refresh();
+        });
         ro.observe(textarea);
     }
     refresh();
@@ -3311,6 +3339,9 @@ const SCREEN_ELEMENT_DEFS = [
     { id: 'text_8', label: 'Text 8', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.text_8 }
 ];
 
+// Map for O(1) element definition lookups to optimize screen rendering and dragging
+const SCREEN_ELEMENT_DEFS_MAP = new Map(SCREEN_ELEMENT_DEFS.map(def => [def.id, def]));
+
 const SCREEN_TEXT_SLOT_IDS = ['text_1', 'text_2', 'text_3', 'text_4', 'text_5', 'text_6', 'text_7', 'text_8'];
 
 const SCREEN_PALETTE_TEXT_DEF = {
@@ -3493,7 +3524,7 @@ function getProfileObj(mode) {
 
 function findElementDef(id) {
     if (id === 'text') return SCREEN_PALETTE_TEXT_DEF;
-    return SCREEN_ELEMENT_DEFS.find(d => d.id === id) || null;
+    return SCREEN_ELEMENT_DEFS_MAP.get(id) || null;
 }
 
 function evenPx(value) {
@@ -4643,6 +4674,7 @@ function renderScreenOptions() {
         const textLabel = document.createElement('label');
         textLabel.textContent = getNestedTranslation(trans, 'screen.message_text') || 'Text';
         const textArea = document.createElement('textarea');
+        if (e.id === 'message') textArea.id = 'message';
         const maxLen = e.id === 'message' ? 511 : 96;
         textArea.maxLength = maxLen;
         textArea.rows = e.id === 'message' ? 3 : 2;
