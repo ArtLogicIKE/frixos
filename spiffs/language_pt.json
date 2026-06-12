@@ -21,7 +21,15 @@
       "fahrenheit": "Unidades americanas (F, mph, ...)",
       "hour12": "Hora no formato de 12 horas",
       "auto_update": "Verificar automaticamente atualizações de firmware",
-      "restart_note": "* Alterar as definições de ligação irá reiniciar o dispositivo."
+      "restart_note": "* Alterar as definições de ligação irá reiniciar o dispositivo.",
+      "static_ip_toggle": "Usar IP estático",
+      "static_ip": "Endereço IP",
+      "static_gw": "Gateway",
+      "static_nm": "Máscara de sub-rede",
+      "static_dns1": "Servidor DNS 1",
+      "static_dns2": "Servidor DNS 2",
+      "optional": "(opcional)",
+      "static_dns_label": "Servidores DNS"
     },
     "wifi": {
       "available_networks": "Redes WiFi disponíveis",
@@ -29,6 +37,12 @@
       "scan_button": "Procurar redes disponíveis",
       "no_scan_message": "Clique em \"Procurar redes disponíveis\" para ver as redes WiFi",
       "no_networks": "Nenhuma rede encontrada"
+    },
+    "regional": {
+      "title": "Configurações regionais"
+    },
+    "autoupdate": {
+      "title": "Atualização automática"
     }
   },
   "screen": {

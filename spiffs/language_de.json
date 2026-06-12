@@ -25,7 +25,15 @@
       "fahrenheit": "US-Einheiten (F, mph, ...)",
       "hour12": "Zeit im 12-Stunden-Format",
       "auto_update": "Automatisch nach Firmware-Updates suchen",
-      "restart_note": "* Änderungen der Verbindungseinstellungen starten das Gerät neu."
+      "restart_note": "* Änderungen der Verbindungseinstellungen starten das Gerät neu.",
+      "static_ip_toggle": "Statische IP verwenden",
+      "static_ip": "IP-Adresse",
+      "static_gw": "Gateway",
+      "static_nm": "Subnetzmaske",
+      "static_dns1": "DNS-Server 1",
+      "static_dns2": "DNS-Server 2",
+      "optional": "(optional)",
+      "static_dns_label": "DNS-Server"
     },
     "wifi": {
       "available_networks": "Verfügbare WiFi-Netzwerke",
@@ -36,6 +44,12 @@
       "signal": "Signalstärke",
       "secure": "Gesichert",
       "open": "Offen"
+    },
+    "regional": {
+      "title": "Regionale Einstellungen"
+    },
+    "autoupdate": {
+      "title": "Automatisches Update"
     }
   },
   "screen": {

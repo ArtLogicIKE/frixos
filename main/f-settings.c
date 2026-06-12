@@ -36,6 +36,7 @@
 #include "freertos/event_groups.h"
 #include "esp_wifi.h"
 #include "unistd.h"
+#include "lwip/ip_addr.h"
 
 /*
  * Field Name Mappings (pXX format to reduce HTTP header size):
@@ -100,6 +101,12 @@
  * - p59 = eeprom_disp_sched_aux (Aux digit display schedule JSON)
  * - p44 = eeprom_libre_region (Libre region)
  * - p54 = eeprom_ns_url (Nightscout URL, max 100 chars)
+ *
+ * Network / Static IP Settings:
+ * - p60 = static_ip (Static IP address, empty = DHCP)
+ * - p61 = static_gw (Default gateway)
+ * - p62 = static_nm (Subnet mask, default 255.255.255.0)
+ * - p63 = static_dns (DNS servers, comma-separated e.g. "8.8.8.8,8.8.4.4")
  */
 
 // Tag for logging
@@ -654,9 +661,10 @@ static uint64_t calculate_include_mask(const char *group, const char *params)
         }
         else if (strcmp(group, "settings") == 0)
         {
-            // p00, p34, p35, p36, p37, p39
+            // p00, p34-p37, p39, p60-p63
             mask |= (1ULL << 0) | (1ULL << 34) | (1ULL << 35) |
-                    (1ULL << 36) | (1ULL << 37) | (1ULL << 39);
+                    (1ULL << 36) | (1ULL << 37) | (1ULL << 39) |
+                    (1ULL << 60) | (1ULL << 61) | (1ULL << 62) | (1ULL << 63);
         }
         else if (strcmp(group, "advanced") == 0)
         {
@@ -723,6 +731,10 @@ esp_err_t send_json_settings(httpd_req_t *req)
     if (mask & (1ULL << 0)) cJSON_AddStringToObject(root, "p00", eeprom_hostname);
     if (mask & (1ULL << 34)) cJSON_AddStringToObject(root, "p34", eeprom_wifi_ssid);
     if (mask & (1ULL << 35)) cJSON_AddStringToObject(root, "p35", eeprom_wifi_pass);
+    if (mask & (1ULL << 60)) cJSON_AddStringToObject(root, "p60", eeprom_static_ip);
+    if (mask & (1ULL << 61)) cJSON_AddStringToObject(root, "p61", eeprom_static_gw);
+    if (mask & (1ULL << 62)) cJSON_AddStringToObject(root, "p62", eeprom_static_nm);
+    if (mask & (1ULL << 63)) cJSON_AddStringToObject(root, "p63", eeprom_static_dns);
     if (mask & (1ULL << 17)) cJSON_AddStringToObject(root, "p17", eeprom_lat);
     if (mask & (1ULL << 18)) cJSON_AddStringToObject(root, "p18", eeprom_lon);
     if (mask & (1ULL << 19)) cJSON_AddStringToObject(root, "p19", eeprom_timezone);
@@ -929,6 +941,52 @@ static bool validate_json_params(cJSON *root, char *err_buf, size_t err_size)
     /* p35 wifi_pass */
     if ((item = cJSON_GetObjectItem(root, "p35")) && cJSON_IsString(item))
         CHECK_STR_LEN("wifi_pass", item->valuestring, sizeof(eeprom_wifi_pass) - 1);
+
+    /* p60-p63 static IP settings — validate IPv4 format when non-empty */
+    {
+        static const char *static_ip_params[] = {"p60", "p61", "p62", "p63"};
+        static const size_t static_ip_max_lens[] = {
+            sizeof(eeprom_static_ip) - 1, sizeof(eeprom_static_gw) - 1,
+            sizeof(eeprom_static_nm) - 1, sizeof(eeprom_static_dns) - 1
+        };
+        static const char *static_ip_names[] = {"static_ip", "static_gw", "static_nm", "static_dns"};
+
+        for (int _si = 0; _si < 4; _si++) {
+            item = cJSON_GetObjectItem(root, static_ip_params[_si]);
+            if (!item || !cJSON_IsString(item)) continue;
+            sval = item->valuestring;
+            len = strlen(sval);
+            if (len == 0) continue; /* empty = DHCP / default */
+            if (len > static_ip_max_lens[_si]) {
+                snprintf(err_buf, err_size, "Invalid %s: too long", static_ip_names[_si]);
+                return false;
+            }
+            /* p63 may contain a comma-separated pair — validate each part */
+            if (_si == 3) {
+                char tmp63[40];
+                strncpy(tmp63, sval, sizeof(tmp63) - 1);
+                tmp63[sizeof(tmp63) - 1] = '\0';
+                char *part2 = strchr(tmp63, ',');
+                if (part2) { *part2 = '\0'; part2++; }
+                if (ipaddr_addr(tmp63) == IPADDR_NONE) {
+                    snprintf(err_buf, err_size, "Invalid static_dns: bad DNS1 address");
+                    return false;
+                }
+                if (part2 && part2[0] != '\0' && ipaddr_addr(part2) == IPADDR_NONE) {
+                    snprintf(err_buf, err_size, "Invalid static_dns: bad DNS2 address");
+                    return false;
+                }
+            } else {
+                char tmp_ip[16];
+                strncpy(tmp_ip, sval, sizeof(tmp_ip) - 1);
+                tmp_ip[sizeof(tmp_ip) - 1] = '\0';
+                if (ipaddr_addr(tmp_ip) == IPADDR_NONE) {
+                    snprintf(err_buf, err_size, "Invalid %s: not a valid IPv4 address", static_ip_names[_si]);
+                    return false;
+                }
+            }
+        }
+    }
 
     /* p36 fahrenheit */
     if ((item = cJSON_GetObjectItem(root, "p36")) && cJSON_IsNumber(item))
@@ -1753,6 +1811,7 @@ esp_err_t settings_post_handler(httpd_req_t *req)
     char orig_hostname[33];
     char orig_wifi_ssid[33];
     char orig_wifi_pass[64];
+    char orig_static_ip[16];
     char orig_lat[12];
     char orig_lon[12];
     char orig_timezone[TZ_LENGTH];
@@ -1763,6 +1822,7 @@ esp_err_t settings_post_handler(httpd_req_t *req)
     strncpy(orig_hostname, eeprom_hostname, sizeof(orig_hostname));
     strncpy(orig_wifi_ssid, eeprom_wifi_ssid, sizeof(orig_wifi_ssid));
     strncpy(orig_wifi_pass, eeprom_wifi_pass, sizeof(orig_wifi_pass));
+    strncpy(orig_static_ip, eeprom_static_ip, sizeof(orig_static_ip));
     strncpy(orig_lat, eeprom_lat, sizeof(orig_lat));
     strncpy(orig_lon, eeprom_lon, sizeof(orig_lon));
     strncpy(orig_timezone, eeprom_timezone, sizeof(orig_timezone));
@@ -1822,6 +1882,32 @@ esp_err_t settings_post_handler(httpd_req_t *req)
     if (cJSON_IsString(wifi_pass))
     {
         strncpy(eeprom_wifi_pass, wifi_pass->valuestring, sizeof(eeprom_wifi_pass) - 1);
+    }
+
+    // Static IP settings (p60-p63) — empty string clears setting (reverts to DHCP)
+    cJSON *static_ip_item = cJSON_GetObjectItem(root, "p60");
+    if (cJSON_IsString(static_ip_item))
+    {
+        strncpy(eeprom_static_ip, static_ip_item->valuestring, sizeof(eeprom_static_ip) - 1);
+        eeprom_static_ip[sizeof(eeprom_static_ip) - 1] = '\0';
+    }
+    cJSON *static_gw_item = cJSON_GetObjectItem(root, "p61");
+    if (cJSON_IsString(static_gw_item))
+    {
+        strncpy(eeprom_static_gw, static_gw_item->valuestring, sizeof(eeprom_static_gw) - 1);
+        eeprom_static_gw[sizeof(eeprom_static_gw) - 1] = '\0';
+    }
+    cJSON *static_nm_item = cJSON_GetObjectItem(root, "p62");
+    if (cJSON_IsString(static_nm_item))
+    {
+        strncpy(eeprom_static_nm, static_nm_item->valuestring, sizeof(eeprom_static_nm) - 1);
+        eeprom_static_nm[sizeof(eeprom_static_nm) - 1] = '\0';
+    }
+    cJSON *static_dns_item = cJSON_GetObjectItem(root, "p63");
+    if (cJSON_IsString(static_dns_item))
+    {
+        strncpy(eeprom_static_dns, static_dns_item->valuestring, sizeof(eeprom_static_dns) - 1);
+        eeprom_static_dns[sizeof(eeprom_static_dns) - 1] = '\0';
     }
 
     // Process display format settings
@@ -2448,7 +2534,8 @@ esp_err_t settings_post_handler(httpd_req_t *req)
     // Check if network settings changed
     if (strcmp(orig_wifi_ssid, eeprom_wifi_ssid) != 0 ||
         strcmp(orig_wifi_pass, eeprom_wifi_pass) != 0 ||
-        strcmp(orig_hostname, eeprom_hostname) != 0)
+        strcmp(orig_hostname, eeprom_hostname) != 0 ||
+        strcmp(orig_static_ip, eeprom_static_ip) != 0)
     {
         critical_settings_changed = true;
         ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Network settings changed, device will restart");
@@ -2666,9 +2753,29 @@ esp_err_t status_api_handler(httpd_req_t *req)
     esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
     if (netif && esp_netif_get_ip_info(netif, &ip_info) == ESP_OK)
     {
-        char ip_str[16];
+        char ip_str[16], gw_str[16], nm_str[16];
         snprintf(ip_str, sizeof(ip_str), IPSTR, IP2STR(&ip_info.ip));
+        snprintf(gw_str, sizeof(gw_str), IPSTR, IP2STR(&ip_info.gw));
+        snprintf(nm_str, sizeof(nm_str), IPSTR, IP2STR(&ip_info.netmask));
         cJSON_AddStringToObject(root, "ip_address", ip_str);
+        cJSON_AddStringToObject(root, "ip_gw", gw_str);
+        cJSON_AddStringToObject(root, "ip_nm", nm_str);
+
+        // DNS servers
+        esp_netif_dns_info_t dns_main = {0}, dns_backup = {0};
+        char dns1_str[16] = "", dns2_str[16] = "";
+        if (esp_netif_get_dns_info(netif, ESP_NETIF_DNS_MAIN, &dns_main) == ESP_OK &&
+            dns_main.ip.u_addr.ip4.addr != 0)
+        {
+            snprintf(dns1_str, sizeof(dns1_str), IPSTR, IP2STR(&dns_main.ip.u_addr.ip4));
+        }
+        if (esp_netif_get_dns_info(netif, ESP_NETIF_DNS_BACKUP, &dns_backup) == ESP_OK &&
+            dns_backup.ip.u_addr.ip4.addr != 0)
+        {
+            snprintf(dns2_str, sizeof(dns2_str), IPSTR, IP2STR(&dns_backup.ip.u_addr.ip4));
+        }
+        cJSON_AddStringToObject(root, "ip_dns1", dns1_str);
+        cJSON_AddStringToObject(root, "ip_dns2", dns2_str);
     }
 
     // Add memory status

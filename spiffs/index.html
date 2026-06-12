@@ -83,23 +83,82 @@
                     <div class="section-header">
                         <h2 data-i18n="settings.connection.title">Connection Settings *</h2>
                     </div>
-                    <div class="section-content">
-                        <div class="form-group">
-                            <label for="wifi_ssid" data-i18n="settings.connection.wifi_ssid">WiFi SSID</label>
-                            <input type="text" id="wifi_ssid" name="wifi_ssid" autocomplete="username">
-                        </div>
-                        <div class="form-group">
-                            <label for="wifi_pass" data-i18n="settings.connection.wifi_password">WiFi Password</label>
-                            <div class="password-input-wrapper">
-                                <input type="password" id="wifi_pass" name="wifi_pass" autocomplete="current-password">
-                                <button type="button" class="password-toggle" aria-label="Toggle password visibility">👁️</button>
+                        <div class="section-content">
+                            <div class="connection-layout">
+                                <div class="connection-left">
+                                    <div class="form-group">
+                                        <label for="wifi_ssid" data-i18n="settings.connection.wifi_ssid">WiFi SSID</label>
+                                        <input type="text" id="wifi_ssid" name="wifi_ssid" autocomplete="username">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="wifi_pass" data-i18n="settings.connection.wifi_password">WiFi Password</label>
+                                        <div class="password-input-wrapper">
+                                            <input type="password" id="wifi_pass" name="wifi_pass" autocomplete="current-password">
+                                            <button type="button" class="password-toggle" aria-label="Toggle password visibility">👁️</button>
+                                        </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="hostname" data-i18n="settings.connection.hostname">Hostname</label>
+                                        <input type="text" id="hostname" name="hostname" required aria-required="true">
+                                        <span id="hostname-error" class="input-error"></span>
+                                    </div>
+                                </div>
+                                <div class="connection-right">
+                                        <span data-i18n="settings.wifi.available_networks">Available WiFi Networks</span>
+                                        <div class="network-list" id="network-list">
+                                            <div class="loading-spinner" id="loading-spinner" style="display: none;"></div>
+                                            <div class="loading-text" id="loading-text" style="display: none;"
+                                                data-i18n="settings.wifi.scanning">Scanning for networks...</div>
+                                        </div>
+                                        <button type="button" id="scan-btn" class="scan-btn"
+                                            data-i18n="settings.wifi.scan_button">Scan available networks</button>
+                                </div>
                             </div>
+
+                            <!-- Static IP collapsible section -->
+                            <div class="static-ip-section">
+                                <div class="checkbox-container static-ip-toggle">
+                                    <input type="checkbox" id="use_static_ip" name="use_static_ip">
+                                    <label for="use_static_ip" data-i18n="settings.connection.static_ip_toggle">Use Static IP</label>
+                            </div>
+                            <div id="static-ip-fields" class="static-ip-panel" style="display:none">
+                                <div class="form-group">
+                                    <label for="static_ip" data-i18n="settings.connection.static_ip">IP Address</label>
+                                    <input type="text" id="static_ip" name="static_ip" placeholder="e.g. 192.168.1.100" inputmode="decimal">
+                                    <span id="static-ip-error" class="input-error"></span>
+                                </div>
+                                <div class="form-group">
+                                    <label for="static_gw" data-i18n="settings.connection.static_gw">Gateway</label>
+                                    <input type="text" id="static_gw" name="static_gw" placeholder="e.g. 192.168.1.1" inputmode="decimal">
+                                </div>
+                                <div class="form-group">
+                                    <label for="static_nm" data-i18n="settings.connection.static_nm">Subnet Mask</label>
+                                    <input type="text" id="static_nm" name="static_nm" placeholder="255.255.255.0" inputmode="decimal">
+                                </div>
+                                <div class="form-group">
+                                    <label data-i18n="settings.connection.static_dns_label">DNS Servers <span class="label-optional" data-i18n="settings.connection.optional">(optional)</span></label>
+                                    <div class="sip-dns-pair">
+                                        <div class="sip-dns-field">
+                                            <span class="sip-dns-badge">1</span>
+                                            <input type="text" id="static_dns1" name="static_dns1" placeholder="8.8.8.8" inputmode="decimal">
+                                        </div>
+                                        <div class="sip-dns-field">
+                                            <span class="sip-dns-badge">2</span>
+                                            <input type="text" id="static_dns2" name="static_dns2" placeholder="8.8.4.4" inputmode="decimal">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <p data-i18n="settings.connection.restart_note">* Changing connection settings will restart the device.</p>
                         </div>
-                        <div class="form-group">
-                            <label for="hostname" data-i18n="settings.connection.hostname">Hostname</label>
-                            <input type="text" id="hostname" name="hostname" required aria-required="true">
-                            <span id="hostname-error" class="input-error"></span>
-                        </div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <div class="section-header">
+                        <h2 data-i18n="settings.regional.title">Regional Settings</h2>
+                    </div>
+                    <div class="section-content">
                         <div class="checkbox-container">
                             <input type="checkbox" id="fahrenheit" name="fahrenheit">
                             <label for="fahrenheit" data-i18n="settings.connection.fahrenheit">US units (F, mph, ...)</label>
@@ -108,27 +167,24 @@
                             <input type="checkbox" id="hour12" name="hour12">
                             <label for="hour12" data-i18n="settings.connection.hour12">Time in 12-hour format</label>
                         </div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <div class="section-header">
+                        <h2 data-i18n="settings.autoupdate.title">Automatic Update</h2>
+                    </div>
+                    <div class="section-content">
                         <div class="checkbox-container">
                             <input type="checkbox" id="update_firmware" name="update_firmware">
                             <label for="update_firmware" data-i18n="settings.connection.auto_update">Automatically check
                                 for firmware updates</label>
                         </div>
-                        <button type="submit" class="button" data-i18n="common.save_settings">Save Settings</button>
-                        <p data-i18n="settings.connection.restart_note">* Changing connection settings will restart the
-                            device.</p>
-
-                        <div class="network-section">
-                            <h3 data-i18n="settings.wifi.available_networks">Available WiFi Networks</h3>
-                            <div class="network-list" id="network-list">
-                                <div class="loading-spinner" id="loading-spinner" style="display: none;"></div>
-                                <div class="loading-text" id="loading-text" style="display: none;"
-                                    data-i18n="settings.wifi.scanning">Scanning for
-                                    networks...</div>
-                            </div>
-                            <button type="button" id="scan-btn" class="scan-btn"
-                                data-i18n="settings.wifi.scan_button">Scan available networks</button>
-                        </div>
                     </div>
+                </div>
+
+                <div class="section">
+                    <button type="submit" class="button" data-i18n="common.save_settings">Save Settings</button>
                 </div>
 
             </form>

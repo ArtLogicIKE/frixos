@@ -86,6 +86,10 @@ LV_FONT_DECLARE(lv_font_montserrat_12);
 char eeprom_hostname[33] = "frixos";
 char eeprom_wifi_ssid[33] = "";
 char eeprom_wifi_pass[64] = "";
+char eeprom_static_ip[16]  = "";             // p60: Static IP (empty = DHCP)
+char eeprom_static_gw[16]  = "";             // p61: Default gateway
+char eeprom_static_nm[16]  = "255.255.255.0"; // p62: Subnet mask
+char eeprom_static_dns[40] = "";             // p63: DNS servers, comma-separated
 uint8_t eeprom_wifi_start = 0;                                     // WiFi Active Hours Start (0-23), default 0
 uint8_t eeprom_wifi_end = 0;                                       // WiFi Active Hours End (0-23), default 0
 uint8_t eeprom_dim_start = 0;                                      // Time-of-day dimming start (0-23), default 0
@@ -191,6 +195,10 @@ static const nvs_setting_t settings_table[] = {
     {"pwm_frequency", SETTING_TYPE_U32, &eeprom_pwm_frequency, 0},
     {"max_power", SETTING_TYPE_U16, &eeprom_max_power, 0},
     {"poh", SETTING_TYPE_U32, &eeprom_poh, 0},
+    {"static_ip",  SETTING_TYPE_STR, eeprom_static_ip,  sizeof(eeprom_static_ip)},
+    {"static_gw",  SETTING_TYPE_STR, eeprom_static_gw,  sizeof(eeprom_static_gw)},
+    {"static_nm",  SETTING_TYPE_STR, eeprom_static_nm,  sizeof(eeprom_static_nm)},
+    {"static_dns", SETTING_TYPE_STR, eeprom_static_dns, sizeof(eeprom_static_dns)},
 };
 #define SETTINGS_COUNT (sizeof(settings_table) / sizeof(settings_table[0]))
 
