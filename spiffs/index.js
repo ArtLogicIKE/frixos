@@ -59,10 +59,11 @@ function highlightElement(element) {
 function updateCharCounter(input, counter) {
     if (!input || !counter) return;
     const length = input.value.length;
-    const maxLength = input.getAttribute('maxlength') || 511;
+    const maxLength = parseInt(input.getAttribute('maxlength') || 511, 10);
     counter.textContent = `${length} / ${maxLength}`;
 
-    counter.classList.toggle('near-limit', length >= 450 && length < maxLength);
+    const nearLimit = Math.floor(maxLength * 0.9);
+    counter.classList.toggle('near-limit', length >= nearLimit && length < maxLength);
     counter.classList.toggle('at-limit', length >= maxLength);
 }
 
@@ -1134,7 +1135,7 @@ function toggleSection(header) {
 // Function to initialize accessibility attributes
 function initA11y() {
     // Link inputs to error labels, counters, and token masks via aria-describedby
-    const selectors = '.input-error, #message-counter, .token-mask, [data-i18n="advanced.message.scroll_delay_help"]';
+    const selectors = '.input-error, .message-counter, #message-counter, .token-mask, [data-i18n="advanced.message.scroll_delay_help"]';
     document.querySelectorAll(selectors).forEach(el_desc => {
         let inputId = el_desc.id ? el_desc.id.replace(/-(error|counter|mask|help)/, '') : '';
         if (el_desc.dataset.i18n === 'advanced.message.scroll_delay_help') inputId = 'scroll_delay';
@@ -5127,7 +5128,24 @@ function setupIntegrationsSection() {
     if (!window.integrationsEventListenersSet) {
         window.integrationsEventListenersSet = true;
 
-        // Add input event listeners for token masking
+        // Add input event listeners for integration character counters
+        const integrationFields = [
+            { id: 'eeprom_ha_url', p: 'p25' },
+            { id: 'eeprom_ha_token', p: 'p26' },
+            { id: 'eeprom_stock_key', p: 'p28' },
+            { id: 'eeprom_glucose_username', p: 'p31' },
+            { id: 'eeprom_glucose_password', p: 'p32' },
+            { id: 'eeprom_ns_url', p: 'p54' }
+        ];
+
+        integrationFields.forEach(f => {
+            const input = el(f.id);
+            const counter = el(f.id + '-counter');
+            if (input && counter) {
+                input.addEventListener('input', () => updateCharCounter(input, counter));
+            }
+        });
+
         if (haTokenInput && haTokenMask) {
             haTokenInput.addEventListener('input', function() {
                 updateTokenMask(this.value, haTokenMask);
@@ -5180,6 +5198,15 @@ function setupIntegrationsSection() {
             haTokenInput.value = window.settings.p26;
             updateTokenMask(window.settings.p26, haTokenMask);
         }
+
+        // Use the fields defined above to initialize counters
+        integrationFields.forEach(f => {
+            const input = el(f.id);
+            const counter = el(f.id + '-counter');
+            if (input && counter) {
+                updateCharCounter(input, counter);
+            }
+        });
         const haRefreshMins = el('eeprom_ha_refresh_mins');
         if (haRefreshMins && typeof window.settings.p27 !== 'undefined') {
             haRefreshMins.value = window.settings.p27 || 5;
