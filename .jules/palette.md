@@ -19,3 +19,7 @@
 ## 2025-05-16 - [Visual Samples as Interactive Controls]
 **Learning:** When visual samples (such as fonts) correspond to underlying configuration settings, they should be implemented as accessible, interactive controls. This reduces cognitive load by allowing users to directly interact with what they see, rather than translating a visual preference into a dropdown selection.
 **Action:** Implement `role="button"`, `tabindex="0"`, and localized `aria-label` for all visual sample boxes to ensure they are discoverable and usable as primary input mechanisms.
+
+## 2025-05-17 - [Dynamic Input Validation Feedback]
+**Learning:** Character counters are essential for long configuration strings (tokens/URLs) on resource-constrained devices where backend truncation might occur silently. A hardcoded 'near-limit' threshold is insufficient for varying field lengths; dynamic calculation (e.g., 90% of `maxlength`) provides consistent UX across all input types.
+**Action:** Ensure all interactive text inputs with a `maxlength` attribute include a visible character counter that uses dynamic threshold calculation for its warning states. Link these counters to inputs via `aria-describedby` for accessibility.
