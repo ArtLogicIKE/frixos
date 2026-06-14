@@ -1563,6 +1563,38 @@ function handleFormSubmit(e, formId) {
         if (updateFirmwareEl && addIfChanged(formData, 'p39', updateFirmwareEl.checked ? 1 : 0, window.settings.p39)) {
             changedCount++;
         }
+
+        // Static IP settings (p60-p63)
+        const useStaticIpEl = getFieldInForm('use_static_ip');
+        if (useStaticIpEl) {
+            if (useStaticIpEl.checked) {
+                // User wants static IP — collect field values
+                const staticIpEl  = getFieldInForm('static_ip');
+                const staticGwEl  = getFieldInForm('static_gw');
+                const staticNmEl  = getFieldInForm('static_nm');
+                const staticDns1El = getFieldInForm('static_dns1');
+                const staticDns2El = getFieldInForm('static_dns2');
+                const newIp  = staticIpEl  ? staticIpEl.value.trim()  : '';
+                const newGw  = staticGwEl  ? staticGwEl.value.trim()  : '';
+                const newNm  = staticNmEl  ? staticNmEl.value.trim()  : '255.255.255.0';
+                const dns1   = staticDns1El ? staticDns1El.value.trim() : '';
+                const dns2   = staticDns2El ? staticDns2El.value.trim() : '';
+                const newDns = [dns1, dns2].filter(Boolean).join(',');
+                if (addIfChanged(formData, 'p60', newIp,  window.settings.p60)) changedCount++;
+                if (addIfChanged(formData, 'p61', newGw,  window.settings.p61)) changedCount++;
+                if (addIfChanged(formData, 'p62', newNm,  window.settings.p62)) changedCount++;
+                if (addIfChanged(formData, 'p63', newDns, window.settings.p63)) changedCount++;
+            } else {
+                // User disabled static IP — send empty string to revert to DHCP
+                if (window.settings.p60 !== '') {
+                    formData.p60 = '';
+                    formData.p61 = '';
+                    formData.p62 = '';
+                    formData.p63 = '';
+                    changedCount++;
+                }
+            }
+        }
     }
 
     // Advanced form fields (advancedForm)
@@ -1753,7 +1785,8 @@ function handleFormSubmit(e, formId) {
     const networkSettingsChanged = 
         formData.p00 !== undefined ||
         formData.p34 !== undefined ||
-        formData.p35 !== undefined;
+        formData.p35 !== undefined ||
+        formData.p60 !== undefined;
 
 
     // Save settings using shared function
@@ -1853,6 +1886,40 @@ function setupSettingsSection() {
         if (settingsForm) {
             settingsForm.addEventListener('submit', (e) => handleFormSubmit(e, 'settingsForm'));
         }
+
+        // Static IP toggle: show / hide the panel when the checkbox changes
+        // When toggled ON and fields are empty, pre-fill with current DHCP values
+        const useStaticIpEl = el('use_static_ip');
+        const staticIpFields = el('static-ip-fields');
+        if (useStaticIpEl && staticIpFields) {
+            useStaticIpEl.addEventListener('change', function () {
+                const show = this.checked;
+                staticIpFields.style.display = show ? 'block' : 'none';
+                if (show) {
+                    const ipEl   = el('static_ip');
+                    const gwEl   = el('static_gw');
+                    const nmEl   = el('static_nm');
+                    const dns1El = el('static_dns1');
+                    const dns2El = el('static_dns2');
+                    // Only pre-fill if all IP fields are empty (no previous config)
+                    if (ipEl && !ipEl.value && gwEl && !gwEl.value) {
+                        fetch('/api/status')
+                            .then(r => r.json())
+                            .then(status => {
+                                if (ipEl   && !ipEl.value   && status.ip_address && status.ip_address !== '0.0.0.0') ipEl.value   = status.ip_address;
+                                if (gwEl   && !gwEl.value   && status.ip_gw      && status.ip_gw      !== '0.0.0.0') gwEl.value   = status.ip_gw;
+                                if (nmEl   && !nmEl.value)  nmEl.value   = (status.ip_nm && status.ip_nm !== '0.0.0.0') ? status.ip_nm : '255.255.255.0';
+                                if (dns1El && !dns1El.value && status.ip_dns1    && status.ip_dns1 !== '0.0.0.0')     dns1El.value = status.ip_dns1;
+                                if (dns2El && !dns2El.value && status.ip_dns2    && status.ip_dns2 !== '0.0.0.0')     dns2El.value = status.ip_dns2;
+                            })
+                            .catch(() => {
+                                // Fallback: leave empty, user fills manually
+                                if (nmEl && !nmEl.value) nmEl.value = '255.255.255.0';
+                            });
+                    }
+                }
+            });
+        }
     }
 
     // Populate fields if settings are loaded
@@ -1870,6 +1937,31 @@ function setupSettingsSection() {
         if (fahrenheitEl && window.settings.p36 !== undefined) fahrenheitEl.checked = window.settings.p36;
         if (hour12El && window.settings.p37 !== undefined) hour12El.checked = window.settings.p37;
         if (updateFirmwareEl && window.settings.p39 !== undefined) updateFirmwareEl.checked = window.settings.p39;
+
+        // Populate static IP fields
+        const hasStaticIp = window.settings.p60 !== undefined && window.settings.p60 !== '';
+        const useStaticIpEl2 = el('use_static_ip');
+        const staticIpFields2 = el('static-ip-fields');
+        if (useStaticIpEl2) {
+            useStaticIpEl2.checked = hasStaticIp;
+            if (staticIpFields2) staticIpFields2.style.display = hasStaticIp ? 'block' : 'none';
+        }
+        if (hasStaticIp) {
+            const staticIpEl  = el('static_ip');
+            const staticGwEl  = el('static_gw');
+            const staticNmEl  = el('static_nm');
+            const staticDns1El = el('static_dns1');
+            const staticDns2El = el('static_dns2');
+            if (staticIpEl  && window.settings.p60 !== undefined) staticIpEl.value  = window.settings.p60;
+            if (staticGwEl  && window.settings.p61 !== undefined) staticGwEl.value  = window.settings.p61;
+            if (staticNmEl) staticNmEl.value = (window.settings.p62 !== undefined && window.settings.p62 !== '')
+                                               ? window.settings.p62 : '255.255.255.0';
+            if (window.settings.p63 !== undefined && window.settings.p63 !== '') {
+                const dnsParts = window.settings.p63.split(',');
+                if (staticDns1El && dnsParts[0]) staticDns1El.value = dnsParts[0];
+                if (staticDns2El && dnsParts[1]) staticDns2El.value = dnsParts[1];
+            }
+        }
     }
 }
 

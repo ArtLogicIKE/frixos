@@ -1520,19 +1520,134 @@ textarea[aria-invalid="true"] {
     gap: 15px;
 }
 
-/* WiFi Network List Styles */
-.network-section {
-    margin: 20px 0;
+/* Connection Settings two-column layout */
+.connection-layout {
+    display: flex;
+    gap: 16px;
+    align-items: stretch;
+}
+
+.connection-left {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.connection-right {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+@media (max-width: 820px) {
+    .connection-layout {
+        flex-direction: column;
+    }
+    .connection-right {
+        flex: none;
+    }
+}
+
+/* Static IP panel */
+.static-ip-section {
+    margin: 14px 0 10px 0;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.static-ip-toggle {
+    padding: 10px 14px;
+    background: var(--input-bg);
+    margin: 0 !important;
+    border-radius: 0;
+    cursor: pointer;
+    user-select: none;
+}
+
+.static-ip-panel {
+    padding: 14px 16px 4px 16px;
     border-top: 1px solid var(--border-color);
-    padding-top: 20px;
+    background: var(--section-bg, var(--bg-color));
+    animation: fadeInDown 0.18s ease;
+}
+
+/* Force all labels in the panel to the same width so inputs align vertically */
+.static-ip-panel .form-group label {
+    width: 115px;
+    min-width: 115px;
+    max-width: 115px;
+}
+
+@keyframes fadeInDown {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* DNS row — two inputs side by side inside a .form-group */
+.sip-dns-pair {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex: 1;
+    min-width: 150px;
+}
+
+.sip-dns-field {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+    min-width: 0;
+}
+
+.sip-dns-field input[type="text"] {
+    flex: 1;
+    min-width: 0;
+    max-width: 100%;
+    padding: 6px 8px;
+    border: 1px solid var(--input-border);
+    border-radius: 4px;
+    background-color: var(--input-bg);
+    color: var(--text-color);
+    font-size: 0.9rem;
+}
+
+.sip-dns-field input[type="text"]:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(var(--primary-color-rgb, 0,120,212), 0.2);
+}
+
+.sip-dns-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--primary-color);
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.label-optional {
+    font-size: 0.8em;
+    opacity: 0.65;
+    font-weight: normal;
 }
 
 .network-list {
     border: 1px solid var(--input-border);
     border-radius: 4px;
     padding: 15px;
-    margin: 15px 0;
+    margin: 10px 0;
     min-height: 120px;
+    flex: 1;
     position: relative;
     background-color: var(--input-bg);
 }

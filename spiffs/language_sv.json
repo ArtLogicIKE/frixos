@@ -21,7 +21,15 @@
       "fahrenheit": "Amerikanska enheter (F, mph, ...)",
       "hour12": "Tid i 12-timmarsformat",
       "auto_update": "Kontrollera automatiskt efter firmware-uppdateringar",
-      "restart_note": "* Ändring av anslutningsinställningar kommer att starta om enheten."
+      "restart_note": "* Ändring av anslutningsinställningar kommer att starta om enheten.",
+      "static_ip_toggle": "Använd statisk IP",
+      "static_ip": "IP-adress",
+      "static_gw": "Gateway",
+      "static_nm": "Nätmask",
+      "static_dns1": "DNS-server 1",
+      "static_dns2": "DNS-server 2",
+      "optional": "(valfritt)",
+      "static_dns_label": "DNS-servrar"
     },
     "wifi": {
       "available_networks": "Tillgängliga WiFi-nätverk",
@@ -29,6 +37,12 @@
       "scan_button": "Skanna tillgängliga nätverk",
       "no_scan_message": "Klicka på \"Sök tillgängliga nätverk\" för att se WiFi-nätverk",
       "no_networks": "Inga nätverk hittades"
+    },
+    "regional": {
+      "title": "Regionala inställningar"
+    },
+    "autoupdate": {
+      "title": "Automatisk uppdatering"
     }
   },
   "screen": {

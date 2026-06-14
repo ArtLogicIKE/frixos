@@ -11,6 +11,7 @@
 #include "esp_spiffs.h"
 #include "mdns.h"
 #include <string.h>
+#include "lwip/dns.h"
 
 #include "f-dns.h"
 #include "f-settings.h"
@@ -36,6 +37,63 @@ bool connect_to_wifi(void)
     esp_event_loop_create_default();
     esp_netif_t *sta_netif = esp_netif_create_default_wifi_sta();
     esp_netif_set_hostname(sta_netif, eeprom_hostname);
+
+    // Apply static IP if configured, otherwise DHCP is used by default
+    if (eeprom_static_ip[0] != '\0')
+    {
+        esp_netif_ip_info_t ip_info;
+        memset(&ip_info, 0, sizeof(ip_info));
+        ip_info.ip.addr      = ipaddr_addr(eeprom_static_ip);
+        ip_info.gw.addr      = (eeprom_static_gw[0] != '\0') ? ipaddr_addr(eeprom_static_gw) : 0;
+        ip_info.netmask.addr = (eeprom_static_nm[0] != '\0') ? ipaddr_addr(eeprom_static_nm)
+                                                              : ipaddr_addr("255.255.255.0");
+
+        esp_netif_dhcpc_stop(sta_netif);
+        esp_err_t ip_err = esp_netif_set_ip_info(sta_netif, &ip_info);
+        if (ip_err != ESP_OK)
+        {
+            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Failed to set static IP: %s — falling back to DHCP", esp_err_to_name(ip_err));
+            esp_netif_dhcpc_start(sta_netif);
+        }
+        else
+        {
+            ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Static IP configured: %s / %s / GW %s",
+                        eeprom_static_ip, eeprom_static_nm, eeprom_static_gw);
+
+            // Configure DNS servers from comma-separated eeprom_static_dns
+            if (eeprom_static_dns[0] != '\0')
+            {
+                char dns_copy[40];
+                strncpy(dns_copy, eeprom_static_dns, sizeof(dns_copy) - 1);
+                dns_copy[sizeof(dns_copy) - 1] = '\0';
+
+                char *dns1 = dns_copy;
+                char *dns2 = strchr(dns_copy, ',');
+                if (dns2)
+                {
+                    *dns2 = '\0'; // split
+                    dns2++;       // advance to second entry
+                }
+
+                esp_netif_dns_info_t dns_info;
+                if (dns1 && dns1[0] != '\0')
+                {
+                    dns_info.ip.u_addr.ip4.addr = ipaddr_addr(dns1);
+                    dns_info.ip.type = ESP_IPADDR_TYPE_V4;
+                    esp_netif_set_dns_info(sta_netif, ESP_NETIF_DNS_MAIN, &dns_info);
+                    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "DNS1: %s", dns1);
+                }
+                if (dns2 && dns2[0] != '\0')
+                {
+                    dns_info.ip.u_addr.ip4.addr = ipaddr_addr(dns2);
+                    dns_info.ip.type = ESP_IPADDR_TYPE_V4;
+                    esp_netif_set_dns_info(sta_netif, ESP_NETIF_DNS_BACKUP, &dns_info);
+                    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "DNS2: %s", dns2);
+                }
+            }
+        }
+    }
+
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     esp_wifi_init(&cfg);
 
