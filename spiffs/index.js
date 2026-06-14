@@ -37,6 +37,7 @@ let passwordTogglesCache = null;
 let tokenCodesCache = null;
 let languageOptionsCache = null;
 let fontSamplesCache = null;
+let dragRafHandle = null;
 
 // Helper to invalidate I18n element caches when dynamic content is added or replaced
 function invalidateI18nCache() {
@@ -4700,7 +4701,9 @@ function beginDrag(id, pointerEvent, fromPalette) {
         startLeft,
         startTop,
         fromPalette,
-        moved: false
+        moved: false,
+        scale,
+        rect: canvas.getBoundingClientRect()
     };
     updateScreenStatusLine();
 }
@@ -4726,12 +4729,11 @@ function onScreenPointerDown(e) {
 function onScreenPointerMove(e) {
     const d = window.screenEditor.dragging;
     if (!d) return;
-    const canvas = el('screenCanvas');
-    if (!canvas) return;
     const profile = getProfileObj(window.screenEditor.mode);
     if (!profile) return;
     const elem = ensureElementInProfile(profile, d.id);
-    const scale = window.screenEditor.scale || getScreenScale();
+    const scale = d.scale;
+    const rect = d.rect;
 
     const dx = e.clientX - d.originX;
     const dy = e.clientY - d.originY;
@@ -4744,7 +4746,6 @@ function onScreenPointerMove(e) {
             elem.enabled = 1;
         }
         d.moved = true;
-        const rect = canvas.getBoundingClientRect();
         const def = findElementDef(d.id);
         const elementId = def ? def.id : d.id;
         elem.x = clamp(Math.round((e.clientX - rect.left - 10) / scale), 0, SCREEN_SIZE - 1);
@@ -4760,12 +4761,21 @@ function onScreenPointerMove(e) {
         elem.y = visualYToLayoutY(visualY, elementId);
     }
 
-    renderScreenCanvas();
+    if (!dragRafHandle) {
+        dragRafHandle = requestAnimationFrame(() => {
+            renderScreenCanvas();
+            dragRafHandle = null;
+        });
+    }
 }
 
 function onScreenPointerUp(e) {
     const d = window.screenEditor.dragging;
     if (!d) return;
+    if (dragRafHandle) {
+        cancelAnimationFrame(dragRafHandle);
+        dragRafHandle = null;
+    }
     const placedFromPalette = d.fromPalette && d.moved && isScreenStaticTextElement(d.id);
     window.screenEditor.dragging = null;
     updateScreenStatusLine();
