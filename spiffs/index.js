@@ -59,10 +59,11 @@ function highlightElement(element) {
 function updateCharCounter(input, counter) {
     if (!input || !counter) return;
     const length = input.value.length;
-    const maxLength = input.getAttribute('maxlength') || 511;
+    const maxLength = parseInt(input.getAttribute('maxlength') || 511, 10);
     counter.textContent = `${length} / ${maxLength}`;
 
-    counter.classList.toggle('near-limit', length >= 450 && length < maxLength);
+    // Optimization: Use dynamic 90% threshold for various input lengths
+    counter.classList.toggle('near-limit', length >= maxLength * 0.9 && length < maxLength);
     counter.classList.toggle('at-limit', length >= maxLength);
 }
 
@@ -1134,7 +1135,7 @@ function toggleSection(header) {
 // Function to initialize accessibility attributes
 function initA11y() {
     // Link inputs to error labels, counters, and token masks via aria-describedby
-    const selectors = '.input-error, #message-counter, .token-mask, [data-i18n="advanced.message.scroll_delay_help"]';
+    const selectors = '.input-error, .message-counter, .token-mask, [data-i18n="advanced.message.scroll_delay_help"]';
     document.querySelectorAll(selectors).forEach(el_desc => {
         let inputId = el_desc.id ? el_desc.id.replace(/-(error|counter|mask|help)/, '') : '';
         if (el_desc.dataset.i18n === 'advanced.message.scroll_delay_help') inputId = 'scroll_delay';
@@ -1853,6 +1854,16 @@ function setupSettingsSection() {
         if (settingsForm) {
             settingsForm.addEventListener('submit', (e) => handleFormSubmit(e, 'settingsForm'));
         }
+
+        // Setup character counters
+        ['hostname', 'wifi_ssid'].forEach(id => {
+            const input = el(id);
+            const counter = el(id + '-counter');
+            if (input && counter) {
+                input.addEventListener('input', () => updateCharCounter(input, counter));
+                updateCharCounter(input, counter);
+            }
+        });
     }
 
     // Populate fields if settings are loaded
@@ -4644,12 +4655,19 @@ function renderScreenOptions() {
         textLabel.textContent = getNestedTranslation(trans, 'screen.message_text') || 'Text';
         const textArea = document.createElement('textarea');
         const maxLen = e.id === 'message' ? 511 : 96;
+        textArea.id = e.id;
         textArea.maxLength = maxLen;
         textArea.rows = e.id === 'message' ? 3 : 2;
+
+        const counter = document.createElement('div');
+        counter.id = e.id + '-counter';
+        counter.className = 'message-counter';
+
         if (e.id === 'message') {
             textArea.value = profile.scroll_text || '';
             textArea.addEventListener('input', () => {
                 profile.scroll_text = textArea.value;
+                updateCharCounter(textArea, counter);
                 renderScreenCanvas();
             });
         } else {
@@ -4658,12 +4676,15 @@ function renderScreenOptions() {
             textArea.value = profile.static_texts[textKey] || '';
             textArea.addEventListener('input', () => {
                 profile.static_texts[textKey] = textArea.value;
+                updateCharCounter(textArea, counter);
                 renderScreenCanvas();
                 if (isScreenStaticTextElement(e.id)) renderScreenPalette();
             });
         }
         textRow.appendChild(textLabel);
         textRow.appendChild(textArea);
+        textRow.appendChild(counter);
+        updateCharCounter(textArea, counter);
         setupTokenHighlightTextarea(textArea);
         opt.appendChild(textRow);
         appendScreenTokenButtons(opt, textArea);
@@ -5138,6 +5159,16 @@ function setupIntegrationsSection() {
                 updateTokenMask(this.value, stockKeyMask);
             });
         }
+
+        // Setup character counters
+        ['eeprom_ha_url', 'eeprom_glucose_username'].forEach(id => {
+            const input = el(id);
+            const counter = el(id + '-counter');
+            if (input && counter) {
+                input.addEventListener('input', () => updateCharCounter(input, counter));
+                updateCharCounter(input, counter);
+            }
+        });
 
         // Add event listeners for shared glucose monitoring fields
         const glucoseRefresh = el('eeprom_glucose_refresh');

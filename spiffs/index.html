@@ -86,7 +86,8 @@
                     <div class="section-content">
                         <div class="form-group">
                             <label for="wifi_ssid" data-i18n="settings.connection.wifi_ssid">WiFi SSID</label>
-                            <input type="text" id="wifi_ssid" name="wifi_ssid" autocomplete="username">
+                            <input type="text" id="wifi_ssid" name="wifi_ssid" autocomplete="username" maxlength="32">
+                            <div id="wifi_ssid-counter" class="message-counter"></div>
                         </div>
                         <div class="form-group">
                             <label for="wifi_pass" data-i18n="settings.connection.wifi_password">WiFi Password</label>
@@ -97,7 +98,8 @@
                         </div>
                         <div class="form-group">
                             <label for="hostname" data-i18n="settings.connection.hostname">Hostname</label>
-                            <input type="text" id="hostname" name="hostname" required aria-required="true">
+                            <input type="text" id="hostname" name="hostname" required aria-required="true" maxlength="32">
+                            <div id="hostname-counter" class="message-counter"></div>
                             <span id="hostname-error" class="input-error"></span>
                         </div>
                         <div class="checkbox-container">
@@ -443,6 +445,7 @@
                             <label for="eeprom_ha_url" data-i18n="integrations.ha.server_url">Server URL</label>
                             <input type="text" id="eeprom_ha_url" name="eeprom_ha_url" maxlength="200"
                                 placeholder="e.g. http://homeassistant.local:8123">
+                            <div id="eeprom_ha_url-counter" class="message-counter"></div>
                             <span id="eeprom_ha_url-error" class="input-error"></span>
                         </div>
                         <div class="form-group">
@@ -553,6 +556,7 @@
                                 maxlength="64"
                                 data-i18n-placeholder="integrations.glucose_monitors.username_placeholder"
                                 autocomplete="username">
+                            <div id="eeprom_glucose_username-counter" class="message-counter"></div>
                             <span id="eeprom_glucose_username-error" class="input-error"></span>
                         </div>
                         <div class="form-group">
