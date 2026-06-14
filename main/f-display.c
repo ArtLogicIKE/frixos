@@ -114,6 +114,7 @@ lv_obj_t *img_digits_sprite = NULL,
          *img_mgdl_aux = NULL;
 
 lv_obj_t *label_msg = NULL;
+lv_obj_t *label_msg_loop = NULL; // second label for seamless infinite scrolling
 lv_obj_t *label_static[SCREEN_STATIC_TEXT_COUNT] = {NULL};
 lv_obj_t *label_digit = NULL;
 lv_obj_t *label_digit_aux = NULL;
@@ -145,6 +146,7 @@ static lv_obj_t *label_degree_aux = NULL;
 #define MIN_ANIMATION_TIME 1000 // Minimum animation time in milliseconds
 
 int label_scroll_pos = 0, label_max_pos = MSG_WIDTH;
+bool label_scroll_swap = false; // which physical label is leftmost in the scroll belt
 lv_obj_t *digit_objs[NUM_DIGITS] = {NULL, NULL, NULL, NULL};
 lv_obj_t *dots[2] = {NULL, NULL};
 lv_obj_t *aux_digit_objs[NUM_DIGITS] = {NULL, NULL, NULL, NULL};
@@ -198,6 +200,7 @@ static esp_timer_handle_t fade_timer = NULL; // ESP timer handle
 static bool fade_update_needed = false;      // Flag to indicate fade update is needed
 static int label_size = 0;
 static char last_scroll_msg[SCROLL_MSG_LENGTH];
+static uint8_t last_scroll_font = 0xFF; // font index active when last_scroll_msg was set
 
 LV_FONT_DECLARE(frixos_8);
 LV_FONT_DECLARE(frixos_10);
@@ -300,8 +303,14 @@ static void apply_message_widget_styles(const screen_widget_t *w)
   if (label_msg == NULL || w == NULL)
     return;
 
-  lv_obj_set_style_text_color(label_msg, lv_color_make(w->color_r, w->color_g, w->color_b), 0);
+  lv_color_t msg_color = lv_color_make(w->color_r, w->color_g, w->color_b);
+  lv_obj_set_style_text_color(label_msg, msg_color, 0);
   apply_text_widget_background(label_msg, w, active_message_font_index());
+  if (label_msg_loop != NULL)
+  {
+    lv_obj_set_style_text_color(label_msg_loop, msg_color, 0);
+    apply_text_widget_background(label_msg_loop, w, active_message_font_index());
+  }
 }
 
 static void apply_static_text_widget(lv_obj_t *label, const screen_widget_t *w, const char *text)
@@ -661,19 +670,24 @@ void set_scroll_message(const char *msg)
     font = &frixos_8; // Use default font
   }
 
-  // Create a temporary buffer to measure text size
+  // Measure new text width
   lv_point_t size;
+  lv_text_get_size(&size, msg, font, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+
+  // If the text content AND font are unchanged, preserve the in-progress
+  // scroll state so the belt never resets to the right edge mid-cycle.
+  bool content_changed = (strcmp(msg, last_scroll_msg) != 0) || (msg_font != last_scroll_font);
 
   strncpy(last_scroll_msg, msg, sizeof(last_scroll_msg) - 1);
   last_scroll_msg[sizeof(last_scroll_msg) - 1] = '\0';
+  last_scroll_font = msg_font;
 
   lvgl_port_lock(0);
   lv_obj_set_style_text_font(label_msg, font, 0);
-  // Use LVGL's safe text setting function
+  lv_obj_set_style_text_font(label_msg_loop, font, 0);
   lv_label_set_text(label_msg, msg);
-  lv_text_get_size(&size, msg, font, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+  lv_label_set_text(label_msg_loop, msg);
   label_size = size.x;
-  label_scroll_pos = 0;
   const screen_widget_t *w_msg = active_screen_widget(SCREEN_ELEM_MESSAGE);
   apply_message_widget_styles(w_msg);
   const int msg_x = screen_layout_positions_live ? layout_abs_x(w_msg) : BOOT_MSG_X;
@@ -682,9 +696,20 @@ void set_scroll_message(const char *msg)
   if (label_size > MSG_CENTER_WIDTH)
   { // scrolling, left aligned
     lv_obj_set_style_text_align(label_msg, LV_TEXT_ALIGN_LEFT, 0);
+    lv_obj_set_style_text_align(label_msg_loop, LV_TEXT_ALIGN_LEFT, 0);
     lv_obj_set_width(label_msg, LV_SIZE_CONTENT);
-    lv_obj_set_pos(label_msg, msg_x + MSG_WIDTH, msg_y);
-    label_max_pos = (label_size);
+    lv_obj_set_width(label_msg_loop, LV_SIZE_CONTENT);
+    label_max_pos = label_size;
+    if (content_changed)
+    {
+      // New text or font: restart belt from the right edge.
+      label_scroll_pos = MSG_WIDTH;
+      label_scroll_swap = false;
+      lv_obj_set_pos(label_msg,      msg_x + MSG_WIDTH, msg_y);
+      lv_obj_set_pos(label_msg_loop, msg_x + MSG_WIDTH + label_max_pos + 20, msg_y);
+    }
+    // else: same content, same font — belt keeps scrolling uninterrupted.
+    lv_obj_clear_flag(label_msg_loop, LV_OBJ_FLAG_HIDDEN);
   }
   else
   { // centered
@@ -693,6 +718,7 @@ void set_scroll_message(const char *msg)
     lv_obj_set_style_text_align(label_msg, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_width(label_msg, centered_label_width);
     lv_obj_set_pos(label_msg, msg_x, msg_y);
+    lv_obj_add_flag(label_msg_loop, LV_OBJ_FLAG_HIDDEN);
     ESP_LOG_WEB(ESP_LOG_INFO, TAG, "set_scroll_message: centered");
     label_max_pos = 0;
   }
@@ -725,16 +751,22 @@ void startup_display(void)
   lv_obj_align(img_logo, LV_ALIGN_TOP_LEFT, 42, 32);
 
   label_msg = lv_label_create(lv_scr_act());
-  if (label_msg == NULL)
+  label_msg_loop = lv_label_create(lv_scr_act());
+  if (label_msg == NULL || label_msg_loop == NULL)
   {
-    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to create label_msg");
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to create message labels");
     return;
   }
   lv_label_set_long_mode(label_msg, LV_LABEL_LONG_CLIP);
-  lv_obj_set_width(label_msg, LV_SIZE_CONTENT); // Set fixed width to match available space
+  lv_label_set_long_mode(label_msg_loop, LV_LABEL_LONG_CLIP);
+  lv_obj_set_width(label_msg, LV_SIZE_CONTENT);
+  lv_obj_set_width(label_msg_loop, LV_SIZE_CONTENT);
   lv_obj_set_style_text_font(label_msg, get_selected_font(active_message_font_index()), 0);
+  lv_obj_set_style_text_font(label_msg_loop, get_selected_font(active_message_font_index()), 0);
   lv_obj_set_style_text_align(label_msg, LV_TEXT_ALIGN_CENTER, 0);
+  lv_obj_set_style_text_align(label_msg_loop, LV_TEXT_ALIGN_CENTER, 0);
   lv_obj_set_pos(label_msg, BOOT_MSG_X, BOOT_MSG_Y);
+  lv_obj_add_flag(label_msg_loop, LV_OBJ_FLAG_HIDDEN); // hidden until scrolling active
 
   // Optimize label for smooth scrolling
   // lv_obj_set_style_anim_speed(label_msg, 150, LV_PART_MAIN); // Optimized animation speed for smoothness
@@ -2236,20 +2268,31 @@ void display_task(void *pvParameters)
     }
 
     if (label_size > MSG_CENTER_WIDTH)
-    { // scrolling, left aligned
-      // ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Label pos %d, max %d", label_scroll_pos, label_max_pos);
-      label_scroll_pos++;
-      if (label_scroll_pos >= label_max_pos)
-        label_scroll_pos = -MSG_WIDTH;
+    { // scrolling — belt algorithm:
+      // label_scroll_pos tracks the x-offset of the leftmost label.
+      // Both labels are always scroll_period apart.
+      // When the leftmost label fully exits left it teleports (invisibly)
+      // to become the new rightmost, and the roles swap.
+      const int scroll_period = label_max_pos + 20;
+      label_scroll_pos--;
+      // Right edge of leftmost label: label_scroll_pos + label_max_pos
+      // When it goes below 0 the label has fully exited the screen.
+      if (label_scroll_pos + label_max_pos < 0)
+      {
+        label_scroll_pos += scroll_period; // teleport: now rightmost
+        label_scroll_swap = !label_scroll_swap; // swap physical label roles
+      }
 
-      // display_string_substring() already acquires/releases the LVGL lock.
-      // Taking lvgl_port_lock() here causes a self-deadlock in the display task.
       {
         const screen_widget_t *w_msg = active_screen_widget(SCREEN_ELEM_MESSAGE);
         const int msg_x = screen_layout_positions_live ? layout_abs_x(w_msg) : BOOT_MSG_X;
         const int msg_y = screen_layout_positions_live ? layout_abs_y(w_msg) : BOOT_MSG_Y;
-        display_string_substring(msg_scrolling, (msg_x > 6 ? msg_x - 6 : msg_x), msg_y,
-                                 label_scroll_pos, MSG_WIDTH, label_msg, get_selected_font(active_message_font_index()));
+        lv_obj_t *left_label  = label_scroll_swap ? label_msg_loop : label_msg;
+        lv_obj_t *right_label = label_scroll_swap ? label_msg       : label_msg_loop;
+        lvgl_port_lock(0);
+        lv_obj_set_pos(left_label,  msg_x + label_scroll_pos,                msg_y);
+        lv_obj_set_pos(right_label, msg_x + label_scroll_pos + scroll_period, msg_y);
+        lvgl_port_unlock();
       }
     }
 
@@ -3133,8 +3176,9 @@ void display_string_substring(const char *text, int32_t x, int32_t y,
   }
 
   // Create substring with only the characters that will be visible
+  // Guard against start_pixel beyond text end (gap phase of infinite loop)
   int32_t substring_len = end_char_index - start_char_index;
-  if (substring_len <= 0)
+  if (substring_len <= 0 || !start_found)
   {
     // No characters to display
     lv_label_set_text(label_obj, "");
@@ -3166,23 +3210,10 @@ void display_string_substring(const char *text, int32_t x, int32_t y,
     lv_label_set_text(label_obj, substring_buffer);
   }
 
-  // Cache position to avoid unnecessary LVGL calls
-  static int32_t last_x = -1, last_y = -1, last_width = -1;
+  // Position changes every frame during scrolling; set directly
   int32_t new_x = x - char_offset + padding_offset;
-
-  if (last_x != new_x || last_y != y)
-  {
-    lv_obj_set_pos(label_obj, new_x, y);
-    last_x = new_x;
-    last_y = y;
-  }
-
-  // Set the width to limit what's visible
-  if (last_width != width_pixels)
-  {
-    lv_obj_set_width(label_obj, width_pixels);
-    last_width = width_pixels;
-  }
+  lv_obj_set_pos(label_obj, new_x, y);
+  lv_obj_set_width(label_obj, width_pixels);
 
   lvgl_port_unlock();
 }
