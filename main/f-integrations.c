@@ -715,6 +715,19 @@ static void integration_timer_callback(void *arg)
     }
 }
 
+static bool integration_token_name_exists(const integration_token_t *tokens, int count, const char *name)
+{
+    if (!tokens || !name)
+        return false;
+
+    for (int i = 0; i < count; i++)
+    {
+        if (tokens[i].name && strcmp(tokens[i].name, name) == 0)
+            return true;
+    }
+    return false;
+}
+
 void parse_HA_entities(const char *input)
 {
     // Free existing tokens if any
@@ -828,6 +841,16 @@ void parse_HA_entities(const char *input)
         }
         strncpy(name_str, token_start, name_len);
         name_str[name_len] = '\0';
+
+        if (integration_token_name_exists(integration_active_tokens[INTEGRATION_HA], token_index, name_str))
+        {
+            free(name_str);
+            free(entity_str);
+            if (path_allocated)
+                free(path_str);
+            p = end + 1;
+            continue;
+        }
 
         // Initialize token in array using helper function
         if (!init_integration_token(&integration_active_tokens[INTEGRATION_HA][token_index], name_str, entity_str, path_str))
@@ -959,8 +982,13 @@ void parse_integrations(void)
 {
     ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Parse integrations");
 
-    static char message_corpus[INTEGRATION_MESSAGE_CORPUS_SIZE];
-    build_integration_message_corpus(message_corpus, sizeof(message_corpus));
+    char *message_corpus = get_shared_buffer(INTEGRATION_MESSAGE_CORPUS_SIZE, "int_corpus");
+    if (message_corpus == NULL)
+    {
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Integration corpus buffer unavailable");
+        return;
+    }
+    build_integration_message_corpus(message_corpus, INTEGRATION_MESSAGE_CORPUS_SIZE);
 
     // determine active integrations
     integration_active[INTEGRATION_HA] = (eeprom_ha_url[0] != '\0' && eeprom_ha_token[0] != '\0');
@@ -1023,28 +1051,46 @@ void parse_integrations(void)
 
     // Mark that tokens have been updated
     integration_tokens_updated = true;
+
+    release_shared_buffer(message_corpus);
 }
+
+static TaskHandle_t integrations_reparse_task = NULL;
+static volatile bool integrations_reparse_pending = false;
 
 static void deferred_parse_integrations_task(void *arg)
 {
     (void)arg;
-    parse_integrations();
-    force_integration_update();
+    do
+    {
+        integrations_reparse_pending = false;
+        parse_integrations();
+        force_integration_update();
+    } while (integrations_reparse_pending);
+
+    integrations_reparse_task = NULL;
     vTaskDelete(NULL);
 }
 
 void schedule_parse_integrations(void)
 {
+    if (integrations_reparse_task != NULL)
+    {
+        integrations_reparse_pending = true;
+        return;
+    }
+
     BaseType_t created = xTaskCreatePinnedToCore(
         deferred_parse_integrations_task,
         "int_reparse",
         6144,
         NULL,
         3,
-        NULL,
+        &integrations_reparse_task,
         1);
     if (created != pdPASS)
     {
+        integrations_reparse_task = NULL;
         ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Deferred integration parse task create failed, parsing inline");
         parse_integrations();
         force_integration_update();

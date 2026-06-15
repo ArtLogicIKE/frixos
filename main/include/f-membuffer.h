@@ -6,7 +6,7 @@
 #include <stdbool.h>
 
 // Buffer pool configuration
-#define MAX_BUFFER_POOL_SIZE 4  // Max buffers to allocate - should be enough for all integrations
+#define MAX_BUFFER_POOL_SIZE 3  // Max concurrent shared buffers (SSL is serialized; 3 covers httpd + background fetch)
 #define HTTP_BUFFER_SIZE 4096
 #define BUFFER_POOL_TIMEOUT_MS 1000
 

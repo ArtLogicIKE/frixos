@@ -7,6 +7,7 @@ lichten-dot.jpg
 kaboom-dot.jpg
 kablame-dot.jpg
 lcd-ampm.jpg
+default-grid.jpg
 lichten-ampm.jpg
 robrito-ampm.jpg
 nixie-ampm.jpg
@@ -50,8 +51,8 @@ ficasso.jpg
 default-weather.jpg
 kablame-weather.jpg
 light-font.jpg
-default-font.jpg
 bold-font.jpg
+default-font.jpg
 lcd-font.jpg
 kablamo-font.jpg
 nixie-weather.jpg
@@ -64,8 +65,8 @@ lichten-font.jpg
 timezone.txt
 robrito-font.jpg
 kablame-font.jpg
-language_da.json
 language_en.json
+language_da.json
 language_sv.json
 language_it.json
 language_pl.json

@@ -52,8 +52,30 @@ static int latest_trend_arrow = 0;
 static time_t latest_timestamp = 0;
 // Small sliding window buffer for handling objects that span chunks (max measurement object ~500 bytes)
 #define GLUCOSE_CHUNK_BUFFER_SIZE 1024
-static char glucose_chunk_buffer[GLUCOSE_CHUNK_BUFFER_SIZE];
+static char *glucose_chunk_buffer = NULL;
 static int glucose_chunk_buffer_len = 0;
+
+static void freestyle_release_chunk_buffer(void)
+{
+    if (glucose_chunk_buffer != NULL)
+    {
+        release_shared_buffer(glucose_chunk_buffer);
+        glucose_chunk_buffer = NULL;
+    }
+    glucose_chunk_buffer_len = 0;
+}
+
+static bool freestyle_acquire_chunk_buffer(void)
+{
+    freestyle_release_chunk_buffer();
+    glucose_chunk_buffer = get_shared_buffer(GLUCOSE_CHUNK_BUFFER_SIZE, "FREESTYLE_CHUNK");
+    if (glucose_chunk_buffer == NULL)
+    {
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Freestyle chunk buffer unavailable");
+        return false;
+    }
+    return true;
+}
 
 static time_t parse_freestyle_timestamp(const char *timestamp_str);
 
@@ -254,7 +276,7 @@ static bool extract_string_value(char *field_start, char *obj_end, char *buffer,
 // Function to process glucose chunks and extract latest measurement from glucoseMeasurement objects
 static void process_glucose_chunk(const char *chunk, int len)
 {
-    if (len <= 0)
+    if (len <= 0 || glucose_chunk_buffer == NULL)
         return;
     
     // If buffer would overflow, shift left to keep only the tail (last 512 bytes)
@@ -870,9 +892,11 @@ bool fetch_freestyle_glucose(void)
         char graph_url[256];
         snprintf(graph_url, sizeof(graph_url), "%s/llu/connections/%s/graph", get_freestyle_base_url(), eeprom_libre_patient_id);
 
+        if (!freestyle_acquire_chunk_buffer())
+            return false;
+
         // Enable chunk processing mode for glucose fetch
         is_glucose_chunk_mode = true;
-        glucose_chunk_buffer_len = 0;
         latest_glucose_value = 0.0;
         latest_trend_arrow = 0;
         latest_timestamp = 0;
@@ -885,6 +909,7 @@ bool fetch_freestyle_glucose(void)
         {
             ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to acquire SSL semaphore for fetch_freestyle_glucose");
             is_glucose_chunk_mode = false;
+            freestyle_release_chunk_buffer();
             return false;
         }
 
@@ -965,7 +990,7 @@ bool fetch_freestyle_glucose(void)
 
         // Disable chunk processing mode and release SSL semaphore before any retry/return.
         is_glucose_chunk_mode = false;
-        glucose_chunk_buffer_len = 0;
+        freestyle_release_chunk_buffer();
         release_ssl_semaphore();
 
         if (success)

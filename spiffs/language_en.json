@@ -28,7 +28,15 @@
       "fahrenheit": "US units (F, mph, ...)",
       "hour12": "Time in 12-hour format",
       "auto_update": "Automatically check for firmware updates",
-      "restart_note": "* Changing connection settings will restart the device."
+      "restart_note": "* Changing connection settings will restart the device.",
+      "static_ip_toggle": "Use Static IP",
+      "static_ip": "IP Address",
+      "static_gw": "Gateway",
+      "static_nm": "Subnet Mask",
+      "static_dns1": "DNS Server 1",
+      "static_dns2": "DNS Server 2",
+      "optional": "(optional)",
+      "static_dns_label": "DNS Servers"
     },
     "wifi": {
       "available_networks": "Available WiFi Networks",
@@ -39,6 +47,12 @@
       "signal": "Signal strength",
       "secure": "Secure",
       "open": "Open"
+    },
+    "regional": {
+      "title": "Regional Settings"
+    },
+    "autoupdate": {
+      "title": "Automatic Update"
     }
   },
   "screen": {
@@ -56,6 +70,7 @@
     "palette": "Palette",
     "options": "Options",
     "enabled": "Enabled",
+    "disabled": "Disabled",
     "layer": "Layer",
     "layers": {
       "back": "1 (back)",
@@ -80,7 +95,7 @@
     "copy_to_day": "Copy layout to Day",
     "copy_to_night": "Copy layout to Night",
     "save_to_file": "Save to File",
-    "read_from_file": "Read from File",
+    "read_from_file": "Load from File",
     "ampm_note": "AM/PM indicator is only visible when 12-hour format is used (from Settings).",
     "display_schedule": {
       "title": "Display Schedule",
@@ -128,7 +143,8 @@
       "text_5": "Text 5",
       "text_6": "Text 6",
       "text_7": "Text 7",
-      "text_8": "Text 8"
+      "text_8": "Text 8",
+      "screen_grid": "Screen Grid"
     }
   },
   "advanced": {

@@ -1,11 +1,12 @@
 {
   "C_Cpp.intelliSenseEngine": "default",
-  "idf.espIdfPathWin": "c:\\Espressif\\frameworks\\esp-idf-v6.0.1",
+  "idf.espIdfPathWin": "c:\\Espressif\\frameworks\\v6.0.1\\esp-idf",
   "idf.openOcdConfigs": [
     "board/esp32-wrover-kit-3.3v.cfg"
   ],
   "idf.portWin": "COM6",
   "idf.toolsPathWin": "c:\\Espressif\\tools",
+  "idf.gitPathWin": "c:\\Espressif\\tools\\idf-git\\2.44.0\\cmd\\git.exe",
   "idf.flashType": "UART",
   "files.associations": {
     "sdkconfig.h": "c",
@@ -29,7 +30,8 @@
     "f-dexcom.h": "c",
     "lv_image_decoder.h": "c"
   },
-  "idf.pythonInstallPath": "c:\\Espressif\\tools\\tools\\idf-python\\3.11.2\\python.exe",
-  "idf.currentSetup": "c:\\Espressif\\frameworks\\esp-idf-v6.0.1",
+  "idf.pythonInstallPath": "c:\\Espressif\\tools\\python\\v6.0.1\\venv\\Scripts\\python.exe",
+  "idf.currentSetup": "C:\\Espressif\\frameworks\\v6.0.1\\esp-idf",
+  "idf.buildPath": "${workspaceFolder}/build",
   "idf.customExtraVars": {}
 }

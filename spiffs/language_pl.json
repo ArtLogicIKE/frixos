@@ -21,7 +21,15 @@
       "fahrenheit": "Jednostki amerykańskie (F, mph, ...)",
       "hour12": "Czas w formacie 12-godzinnym",
       "auto_update": "Automatycznie sprawdzaj aktualizacje oprogramowania",
-      "restart_note": "* Zmiana ustawień połączenia uruchomi urządzenie ponownie."
+      "restart_note": "* Zmiana ustawień połączenia uruchomi urządzenie ponownie.",
+      "static_ip_toggle": "Użyj stałego IP",
+      "static_ip": "Adres IP",
+      "static_gw": "Brama",
+      "static_nm": "Maska podsieci",
+      "static_dns1": "Serwer DNS 1",
+      "static_dns2": "Serwer DNS 2",
+      "optional": "(opcjonalnie)",
+      "static_dns_label": "Serwery DNS"
     },
     "wifi": {
       "available_networks": "Dostępne sieci WiFi",
@@ -29,6 +37,12 @@
       "scan_button": "Skanuj dostępne sieci",
       "no_scan_message": "Kliknij \"Skanuj dostępne sieci\", aby zobaczyć sieci WiFi",
       "no_networks": "Nie znaleziono sieci"
+    },
+    "regional": {
+      "title": "Ustawienia regionalne"
+    },
+    "autoupdate": {
+      "title": "Automatyczna aktualizacja"
     }
   },
   "screen": {

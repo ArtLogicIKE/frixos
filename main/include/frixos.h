@@ -75,6 +75,10 @@ extern char ltr303_integration_time;
 extern char eeprom_hostname[33]; 
 extern char eeprom_wifi_ssid[33];
 extern char eeprom_wifi_pass[64];
+extern char eeprom_static_ip[16];   // p60: Static IP (empty = DHCP)
+extern char eeprom_static_gw[16];   // p61: Default gateway
+extern char eeprom_static_nm[16];   // p62: Subnet mask
+extern char eeprom_static_dns[40];  // p63: DNS servers, comma-separated
 extern uint8_t eeprom_wifi_start;  // WiFi Active Hours Start (0-23)
 extern uint8_t eeprom_wifi_end;    // WiFi Active Hours End (0-23)
 extern uint8_t eeprom_dim_start;   // Time-of-day dimming start hour (0-23)

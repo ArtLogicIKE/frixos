@@ -4,14 +4,20 @@
         {
             "label": "ESP-IDF: Build",
             "type": "shell",
-            "command": "idf.py build",
+            "command": ". 'C:\\Espressif\\tools\\Microsoft.v6.0.1.PowerShell_profile.ps1'; Set-Location '${workspaceFolder}'; idf.py build; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }",
+            "options": {
+                "shell": {
+                    "executable": "pwsh.exe",
+                    "args": ["-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command"]
+                }
+            },
             "group": {
                 "kind": "build",
                 "isDefault": true
             },
             "presentation": {
                 "reveal": "always",
-                "panel": "new"
+                "panel": "shared"
             },
             "problemMatcher": []
         },
@@ -30,4 +36,4 @@
             "problemMatcher": []
         }
     ]
-} 
+}

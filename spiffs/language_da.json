@@ -21,7 +21,15 @@
       "fahrenheit": "Amerikanske enheder (F, mph, ...)",
       "hour12": "Tid i 12-timers format",
       "auto_update": "Kontroller automatisk for firmware-opdateringer",
-      "restart_note": "* Ændring af forbindelsesindstillinger vil genstarte enheden."
+      "restart_note": "* Ændring af forbindelsesindstillinger vil genstarte enheden.",
+      "static_ip_toggle": "Brug statisk IP",
+      "static_ip": "IP-adresse",
+      "static_gw": "Gateway",
+      "static_nm": "Undernetmaske",
+      "static_dns1": "DNS-server 1",
+      "static_dns2": "DNS-server 2",
+      "optional": "(valgfrit)",
+      "static_dns_label": "DNS-servere"
     },
     "wifi": {
       "available_networks": "Tilgængelige WiFi-netværk",
@@ -29,6 +37,12 @@
       "scan_button": "Scan tilgængelige netværk",
       "no_scan_message": "Klik på \"Scan tilgængelige netværk\" for at se WiFi-netværk",
       "no_networks": "Ingen netværk fundet"
+    },
+    "regional": {
+      "title": "Regionale indstillinger"
+    },
+    "autoupdate": {
+      "title": "Automatisk opdatering"
     }
   },
   "screen": {

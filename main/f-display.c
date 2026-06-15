@@ -275,22 +275,32 @@ static void text_label_draw_trim_bg(lv_event_t *e)
   lv_draw_rect(layer, &draw_dsc, &bg_coords);
 }
 
-#define LABEL_TRIM_BG_TAG ((void *)1)
+static lv_obj_t *trim_bg_labels[SCREEN_STATIC_TEXT_COUNT + 4];
+static int trim_bg_labels_count = 0;
+
+static bool label_has_trim_bg_draw(lv_obj_t *label)
+{
+  for (int i = 0; i < trim_bg_labels_count; i++)
+  {
+    if (trim_bg_labels[i] == label)
+      return true;
+  }
+  return false;
+}
 
 static void register_label_trim_bg_draw(lv_obj_t *label)
 {
-  if (lv_obj_get_user_data(label) == LABEL_TRIM_BG_TAG)
+  if (label == NULL || label_has_trim_bg_draw(label))
     return;
+  if (trim_bg_labels_count < (int)(sizeof(trim_bg_labels) / sizeof(trim_bg_labels[0])))
+    trim_bg_labels[trim_bg_labels_count++] = label;
   lv_obj_add_event_cb(label, text_label_draw_trim_bg, LV_EVENT_DRAW_MAIN_BEGIN, NULL);
-  lv_obj_set_user_data(label, LABEL_TRIM_BG_TAG);
 }
 
 static void apply_text_widget_background(lv_obj_t *label, const screen_widget_t *w, uint8_t font_idx)
 {
   if (font_idx > MAX_FONT_INDEX)
     font_idx = 0;
-
-  register_label_trim_bg_draw(label);
   lv_obj_set_style_pad_all(label, 0, LV_PART_MAIN);
   lv_obj_set_height(label, get_selected_font_height(font_idx));
   lv_obj_set_style_bg_color(label, lv_color_make(w->bg_r, w->bg_g, w->bg_b), LV_PART_MAIN);
@@ -579,6 +589,15 @@ esp_err_t startup_lvgl(void)
 lv_obj_t *grid[64];
 int grid_objs = 0;
 
+static void raise_grid_foreground(void)
+{
+  if (!eeprom_show_grid || !grid_objs)
+    return;
+
+  for (int i = 0; i < grid_objs; i++)
+    lv_obj_move_foreground(grid[i]);
+}
+
 void show_grid(uint8_t show)
 {
   if (show)
@@ -588,6 +607,8 @@ void show_grid(uint8_t show)
 
     for (int i = 0; i < grid_objs; i++)
       lv_obj_clear_flag(grid[i], LV_OBJ_FLAG_HIDDEN);
+
+    raise_grid_foreground();
   }
   else
   {
@@ -644,6 +665,25 @@ void create_grid(lv_obj_t *scr)
     lv_obj_set_style_bg_opa(line_h, LV_OPA_TRANSP, 0);
     grid[grid_objs++] = line_h;
   }
+
+  static lv_point_precise_t center_v[] = {{64, 0}, {64, 128}};
+  static lv_point_precise_t center_h[] = {{0, 64}, {128, 64}};
+
+  lv_obj_t *line_cv = lv_line_create(scr);
+  lv_line_set_points(line_cv, center_v, 2);
+  lv_obj_set_style_line_color(line_cv, lv_color_make(0x00, 0xFF, 0x00), 0);
+  lv_obj_set_style_line_width(line_cv, 1, 0);
+  lv_obj_set_style_line_opa(line_cv, LV_OPA_COVER, 0);
+  lv_obj_set_style_bg_opa(line_cv, LV_OPA_TRANSP, 0);
+  grid[grid_objs++] = line_cv;
+
+  lv_obj_t *line_ch = lv_line_create(scr);
+  lv_line_set_points(line_ch, center_h, 2);
+  lv_obj_set_style_line_color(line_ch, lv_color_make(0x00, 0xFF, 0x00), 0);
+  lv_obj_set_style_line_width(line_ch, 1, 0);
+  lv_obj_set_style_line_opa(line_ch, LV_OPA_COVER, 0);
+  lv_obj_set_style_bg_opa(line_ch, LV_OPA_TRANSP, 0);
+  grid[grid_objs++] = line_ch;
 }
 
 // warning - assumes it is running in a port lock/unlock wrapper
@@ -837,6 +877,13 @@ void startup_display(void)
   lv_obj_add_flag(img_wifi, LV_OBJ_FLAG_HIDDEN);
   lv_obj_add_flag(img_mgdl, LV_OBJ_FLAG_HIDDEN);
   lv_obj_add_flag(img_mgdl_aux, LV_OBJ_FLAG_HIDDEN);
+
+  register_label_trim_bg_draw(label_msg);
+  for (int i = 0; i < SCREEN_STATIC_TEXT_COUNT; i++)
+    register_label_trim_bg_draw(label_static[i]);
+  register_label_trim_bg_draw(label_digit);
+  register_label_trim_bg_draw(label_digit_aux);
+
   lvgl_port_unlock(); // Unlock LVGL
 
   display_changed(); // set the objects to the initial state
@@ -1463,6 +1510,8 @@ static void apply_screen_layout_z_order(const screen_layout_profile_t *layout)
     for (int j = 0; j < count; j++)
       lv_obj_move_foreground(objs[j]);
   }
+
+  raise_grid_foreground();
 }
 
 static void apply_screen_layout_positions(void)
@@ -2417,7 +2466,10 @@ void prepare_tokens(void)
   token_t *all_tokens = calloc(prepared_tokens_count + tokencount + 1, sizeof(token_t));
   if (all_tokens == NULL)
   {
-    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Token alloc failed");
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Token alloc failed, free heap %u",
+                (unsigned)esp_get_free_heap_size());
+    prepared_tokens = base_tokens;
+    prepared_tokens_count = 18;
     return;
   }
 
@@ -2909,7 +2961,7 @@ void cleanup_tokens(void)
 
 // Character width cache for Unicode code points
 // Using a simple hash table approach for Unicode characters
-#define CACHE_SIZE 512
+#define CACHE_SIZE 128
 static struct
 {
   uint32_t code_point;

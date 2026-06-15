@@ -121,7 +121,7 @@ const translations = {
             copy_to_day: 'Copy layout to Day',
             copy_to_night: 'Copy layout to Night',
             save_to_file: 'Save to File',
-            read_from_file: 'Read from File'
+            read_from_file: 'Load from File'
         },
         settings: {
             connection: {
@@ -663,7 +663,10 @@ function setupPasswordToggles() {
 function setupLanguageSelector() {
     const languageToggle = el('language-toggle');
     const languageDropdown = el('language-dropdown');
-    
+    if (!languageToggle || !languageDropdown) {
+        return;
+    }
+
     // Toggle dropdown on button click
     languageToggle.addEventListener('click', function(e) {
         e.stopPropagation();
@@ -758,7 +761,7 @@ window.filesSort = { key: 'name', direction: 'asc' };
 window.settings = {}; // Will be populated as sections are loaded
 window.settingsLoaded = {
     theme: false,      // p40, p41 for theme and language
-    settings: false,   // p00, p34-p39 for settings section
+    settings: false,   // p00, p03, p09, p34-p39 for settings section
     advanced: false,   // p01-p24, p42, p43 for advanced section
     integrations: false // p25-p33 for integrations section
 };
@@ -768,38 +771,86 @@ let activeSection = null;
 let activeMenuItem = null;
 const menuItemsMap = new Map();
 
+function settingsResponseHasParams(data) {
+    if (!data || typeof data !== 'object' || data.status === 'error') {
+        return false;
+    }
+    return Object.keys(data).some(k => /^p\d+$/.test(k));
+}
+
+function mergeSettingsData(data) {
+    if (!data || typeof data !== 'object') {
+        return false;
+    }
+    let merged = false;
+    Object.keys(data).forEach(key => {
+        if (key === 'status' || key === 'message') {
+            return;
+        }
+        window.settings[key] = data[key];
+        merged = true;
+    });
+    return merged;
+}
+
+async function fetchSettingsJson(url, options = {}) {
+    const response = await fetch(url);
+    let data = null;
+    try {
+        data = await response.json();
+    } catch (parseErr) {
+        throw new Error(`Invalid JSON from ${url}`);
+    }
+    if (!response.ok || (data && data.status === 'error')) {
+        const msg = (data && data.message) ? data.message : `HTTP ${response.status}`;
+        throw new Error(msg);
+    }
+    if (!settingsResponseHasParams(data) && options.fallbackUrl) {
+        const fallbackResp = await fetch(options.fallbackUrl);
+        const fallbackData = await fallbackResp.json();
+        if (fallbackResp.ok && settingsResponseHasParams(fallbackData)) {
+            return fallbackData;
+        }
+    }
+    return data;
+}
+
 // Function to fetch minimal parameters for theme and language
 async function fetchThemeParams() {
     if (window.settingsLoaded.theme) {
         return window.settings;
     }
 
-    // Use query parameter to fetch only theme-related parameters
     try {
-        const response = await fetch('/api/settings?group=theme');
-        const data = await response.json();
-        
-        // Store theme-related parameters
-        Object.keys(data).forEach(key => {
-            window.settings[key] = data[key];
+        let data = await fetchSettingsJson('/api/settings?group=theme', {
+            fallbackUrl: '/api/settings'
         });
+        if (!settingsResponseHasParams(data)) {
+            data = await fetchSettingsJson('/api/settings');
+        }
+        if (!mergeSettingsData(data)) {
+            throw new Error('Theme settings response contained no parameters');
+        }
         window.settingsLoaded.theme = true;
 
-        // Initialize theme using the settings data
         initTheme(data);
 
-        // Load and apply language preference
         const languageIndex = data.p41 !== undefined ? data.p41 : 0;
         const selectedLang = LANGUAGES[languageIndex] || 'en';
-        await translate(selectedLang);
+        try {
+            await translate(selectedLang);
+        } catch (translateErr) {
+            console.warn('Translation load failed, using English:', translateErr);
+            await translate('en');
+        }
 
         return data;
     } catch (error) {
         console.error('Error loading theme parameters:', error);
-        showStatus(getMessage('error_loading_settings'), 'error');
         throw error;
     }
 }
+
 // Function to fetch parameters for a specific section
 function fetchSectionParams(sectionName) {
     const sectionMap = {
@@ -807,32 +858,32 @@ function fetchSectionParams(sectionName) {
         advanced: 'advanced',
         integrations: 'integrations'
     };
-    
+
     const mappedSection = sectionMap[sectionName];
     if (!mappedSection) {
-        return window.settings;
+        return Promise.resolve(window.settings);
     }
-    
-    // Check if already loaded for this section
+
     if (window.settingsLoaded[mappedSection]) {
-        return window.settings;
+        return Promise.resolve(window.settings);
     }
-    
-    // Need to fetch parameters (first time a section is shown)
-    // Use query parameter to fetch only the parameters needed for this section
-    return fetch(`/api/settings?group=${mappedSection}`)
-        .then(response => response.json())
-        .then(data => {
-            // Merge fetched parameters into window.settings
-            Object.keys(data).forEach(key => {
-                window.settings[key] = data[key];
-            });
+
+    const groupedUrl = mappedSection === 'settings'
+        ? '/api/settings?group=settings&params=p03,p09'
+        : `/api/settings?group=${mappedSection}`;
+    return fetchSettingsJson(groupedUrl, { fallbackUrl: '/api/settings' })
+        .then(async (data) => {
+            if (!settingsResponseHasParams(data)) {
+                data = await fetchSettingsJson('/api/settings');
+            }
+            if (!mergeSettingsData(data)) {
+                throw new Error(`No settings parameters in response for ${sectionName}`);
+            }
             window.settingsLoaded[mappedSection] = true;
             return data;
         })
         .catch(error => {
             console.error(`Error loading parameters for ${sectionName} section:`, error);
-            showStatus(getMessage('error_loading_settings'), 'error');
             throw error;
         });
 }
@@ -840,8 +891,18 @@ function fetchSectionParams(sectionName) {
 document.addEventListener('DOMContentLoaded', function() {
     // Load theme and settings params together (settings is default page, so preload it)
     // Other sections (advanced, integrations) load on demand when navigated to
-    Promise.all([fetchThemeParams(), fetchSectionParams('settings')])
-        .then(() => {
+    Promise.allSettled([fetchThemeParams(), fetchSectionParams('settings')])
+        .then((results) => {
+            const settingsResult = results[1];
+            if (settingsResult.status === 'rejected') {
+                console.error('Settings section failed to load:', settingsResult.reason);
+                showStatus(getMessage('error_loading_settings'), 'error');
+                return;
+            }
+            if (results[0].status === 'rejected') {
+                console.warn('Theme parameters failed to load:', results[0].reason);
+            }
+
             setupPasswordToggles();
 
             // Setup language selector
@@ -921,9 +982,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Theme management functions
 function initTheme(settings) {
-    // If eeprom_dark_theme is not undefined, set the theme based on that value
-    if (settings.eeprom_dark_theme !== undefined) {
-        const isDarkTheme = !!settings.eeprom_dark_theme;
+    const darkTheme = settings.p40 !== undefined ? settings.p40 : settings.eeprom_dark_theme;
+    if (darkTheme !== undefined) {
+        const isDarkTheme = !!darkTheme;
         if (isDarkTheme) {
             document.body.classList.remove('light-theme');
         } else {
@@ -957,7 +1018,7 @@ function toggleTheme() {
             'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-            eeprom_dark_theme: !isDarkTheme ? 1 : 0
+            p40: !isDarkTheme ? 1 : 0
         })
     })
     .then(response => response.json())
@@ -1436,6 +1497,9 @@ function addIfChanged(formData, key, newValue, oldValue) {
  * 
  * Basic Settings:
  * - p00 = hostname (Device hostname)
+ * - p03 = rotation (Display rotation)
+ * - p08 = show_grid (Screen grid overlay — Layout palette)
+ * - p09 = mirroring (Mirror display)
  * - p34 = wifi_ssid (WiFi SSID)
  * - p35 = wifi_pass (WiFi password)
  * - p36 = fahrenheit (Temperature unit)
@@ -1450,13 +1514,10 @@ function addIfChanged(formData, key, newValue, oldValue) {
  * Advanced Settings:
  * - p01 = ofs_x (X offset)
  * - p02 = ofs_y (Y offset) 
- * - p03 = rotation (Display rotation)
  * - p04 = dayfont (Day font)
  * - p05 = nightfont (Night font)
  * - p06 = quiet_scroll (Show scrolling message)
  * - p07 = quiet_weather (legacy; layout controls weather/moon visibility)
- * - p08 = show_grid (Show grid)
- * - p09 = mirroring (Mirror display)
  * - p10 = color_filter (Day color filter)
  * - p11 = night_color_filter (Night color filter)
  * - p12 = msg_color (Message color)
@@ -1563,6 +1624,44 @@ function handleFormSubmit(e, formId) {
         if (updateFirmwareEl && addIfChanged(formData, 'p39', updateFirmwareEl.checked ? 1 : 0, window.settings.p39)) {
             changedCount++;
         }
+
+        // Static IP settings (p60-p63)
+        const useStaticIpEl = getFieldInForm('use_static_ip');
+        if (useStaticIpEl) {
+            if (useStaticIpEl.checked) {
+                // User wants static IP — collect field values
+                const staticIpEl  = getFieldInForm('static_ip');
+                const staticGwEl  = getFieldInForm('static_gw');
+                const staticNmEl  = getFieldInForm('static_nm');
+                const staticDns1El = getFieldInForm('static_dns1');
+                const staticDns2El = getFieldInForm('static_dns2');
+                const newIp  = staticIpEl  ? staticIpEl.value.trim()  : '';
+                const newGw  = staticGwEl  ? staticGwEl.value.trim()  : '';
+                const newNm  = staticNmEl  ? staticNmEl.value.trim()  : '255.255.255.0';
+                const dns1   = staticDns1El ? staticDns1El.value.trim() : '';
+                const dns2   = staticDns2El ? staticDns2El.value.trim() : '';
+                const newDns = [dns1, dns2].filter(Boolean).join(',');
+                if (addIfChanged(formData, 'p60', newIp,  window.settings.p60)) changedCount++;
+                if (addIfChanged(formData, 'p61', newGw,  window.settings.p61)) changedCount++;
+                if (addIfChanged(formData, 'p62', newNm,  window.settings.p62)) changedCount++;
+                if (addIfChanged(formData, 'p63', newDns, window.settings.p63)) changedCount++;
+            } else {
+                // User disabled static IP — send empty string to revert to DHCP
+                if (window.settings.p60 !== '') {
+                    formData.p60 = '';
+                    formData.p61 = '';
+                    formData.p62 = '';
+                    formData.p63 = '';
+                    changedCount++;
+                }
+            }
+        }
+
+        const rotationEl = getFieldInForm('rotation');
+        if (rotationEl && addIfChanged(formData, 'p03', parseInt(rotationEl.value) || 0, window.settings.p03)) changedCount++;
+
+        const mirroringEl = getFieldInForm('mirroring');
+        if (mirroringEl && addIfChanged(formData, 'p09', mirroringEl.checked ? 1 : 0, window.settings.p09)) changedCount++;
     }
 
     // Advanced form fields (advancedForm)
@@ -1572,15 +1671,6 @@ function handleFormSubmit(e, formId) {
         
         const ofsYEl = getFieldInForm('ofs_y');
         if (ofsYEl && addIfChanged(formData, 'p02', parseInt(ofsYEl.value) || 0, window.settings.p02)) changedCount++;
-        
-        const rotationEl = getFieldInForm('rotation');
-        if (rotationEl && addIfChanged(formData, 'p03', parseInt(rotationEl.value) || 0, window.settings.p03)) changedCount++;
-        
-        const showGridEl = getFieldInForm('show_grid');
-        if (showGridEl && addIfChanged(formData, 'p08', showGridEl.checked ? 1 : 0, window.settings.p08)) changedCount++;
-        
-        const mirroringEl = getFieldInForm('mirroring');
-        if (mirroringEl && addIfChanged(formData, 'p09', mirroringEl.checked ? 1 : 0, window.settings.p09)) changedCount++;
         
         const latEl = getFieldInForm('lat');
         if (latEl && addIfChanged(formData, 'p17', latEl.value, window.settings.p17)) changedCount++;
@@ -1753,7 +1843,8 @@ function handleFormSubmit(e, formId) {
     const networkSettingsChanged = 
         formData.p00 !== undefined ||
         formData.p34 !== undefined ||
-        formData.p35 !== undefined;
+        formData.p35 !== undefined ||
+        formData.p60 !== undefined;
 
 
     // Save settings using shared function
@@ -1853,6 +1944,40 @@ function setupSettingsSection() {
         if (settingsForm) {
             settingsForm.addEventListener('submit', (e) => handleFormSubmit(e, 'settingsForm'));
         }
+
+        // Static IP toggle: show / hide the panel when the checkbox changes
+        // When toggled ON and fields are empty, pre-fill with current DHCP values
+        const useStaticIpEl = el('use_static_ip');
+        const staticIpFields = el('static-ip-fields');
+        if (useStaticIpEl && staticIpFields) {
+            useStaticIpEl.addEventListener('change', function () {
+                const show = this.checked;
+                staticIpFields.style.display = show ? 'block' : 'none';
+                if (show) {
+                    const ipEl   = el('static_ip');
+                    const gwEl   = el('static_gw');
+                    const nmEl   = el('static_nm');
+                    const dns1El = el('static_dns1');
+                    const dns2El = el('static_dns2');
+                    // Only pre-fill if all IP fields are empty (no previous config)
+                    if (ipEl && !ipEl.value && gwEl && !gwEl.value) {
+                        fetch('/api/status')
+                            .then(r => r.json())
+                            .then(status => {
+                                if (ipEl   && !ipEl.value   && status.ip_address && status.ip_address !== '0.0.0.0') ipEl.value   = status.ip_address;
+                                if (gwEl   && !gwEl.value   && status.ip_gw      && status.ip_gw      !== '0.0.0.0') gwEl.value   = status.ip_gw;
+                                if (nmEl   && !nmEl.value)  nmEl.value   = (status.ip_nm && status.ip_nm !== '0.0.0.0') ? status.ip_nm : '255.255.255.0';
+                                if (dns1El && !dns1El.value && status.ip_dns1    && status.ip_dns1 !== '0.0.0.0')     dns1El.value = status.ip_dns1;
+                                if (dns2El && !dns2El.value && status.ip_dns2    && status.ip_dns2 !== '0.0.0.0')     dns2El.value = status.ip_dns2;
+                            })
+                            .catch(() => {
+                                // Fallback: leave empty, user fills manually
+                                if (nmEl && !nmEl.value) nmEl.value = '255.255.255.0';
+                            });
+                    }
+                }
+            });
+        }
     }
 
     // Populate fields if settings are loaded
@@ -1863,13 +1988,42 @@ function setupSettingsSection() {
         const fahrenheitEl = el('fahrenheit');
         const hour12El = el('hour12');
         const updateFirmwareEl = el('update_firmware');
+        const rotationEl = el('rotation');
+        const mirroringEl = el('mirroring');
         
         if (hostnameEl && window.settings.p00 !== undefined) hostnameEl.value = window.settings.p00;
         if (wifiSsidEl && window.settings.p34 !== undefined) wifiSsidEl.value = window.settings.p34;
         if (wifiPassEl && window.settings.p35 !== undefined) wifiPassEl.value = window.settings.p35;
+        if (rotationEl && window.settings.p03 !== undefined) rotationEl.value = window.settings.p03 || 0;
+        if (mirroringEl && window.settings.p09 !== undefined) mirroringEl.checked = window.settings.p09;
         if (fahrenheitEl && window.settings.p36 !== undefined) fahrenheitEl.checked = window.settings.p36;
         if (hour12El && window.settings.p37 !== undefined) hour12El.checked = window.settings.p37;
         if (updateFirmwareEl && window.settings.p39 !== undefined) updateFirmwareEl.checked = window.settings.p39;
+
+        // Populate static IP fields
+        const hasStaticIp = window.settings.p60 !== undefined && window.settings.p60 !== '';
+        const useStaticIpEl2 = el('use_static_ip');
+        const staticIpFields2 = el('static-ip-fields');
+        if (useStaticIpEl2) {
+            useStaticIpEl2.checked = hasStaticIp;
+            if (staticIpFields2) staticIpFields2.style.display = hasStaticIp ? 'block' : 'none';
+        }
+        if (hasStaticIp) {
+            const staticIpEl  = el('static_ip');
+            const staticGwEl  = el('static_gw');
+            const staticNmEl  = el('static_nm');
+            const staticDns1El = el('static_dns1');
+            const staticDns2El = el('static_dns2');
+            if (staticIpEl  && window.settings.p60 !== undefined) staticIpEl.value  = window.settings.p60;
+            if (staticGwEl  && window.settings.p61 !== undefined) staticGwEl.value  = window.settings.p61;
+            if (staticNmEl) staticNmEl.value = (window.settings.p62 !== undefined && window.settings.p62 !== '')
+                                               ? window.settings.p62 : '255.255.255.0';
+            if (window.settings.p63 !== undefined && window.settings.p63 !== '') {
+                const dnsParts = window.settings.p63.split(',');
+                if (staticDns1El && dnsParts[0]) staticDns1El.value = dnsParts[0];
+                if (staticDns2El && dnsParts[1]) staticDns2El.value = dnsParts[1];
+            }
+        }
     }
 }
 
@@ -3135,6 +3289,15 @@ function updateScreenStatusLine() {
     const profile = getProfileObj(window.screenEditor.mode);
     const selectedId = window.screenEditor.selectedId;
 
+    if (selectedId === 'screen_grid') {
+        const name = getScreenElementLabel('screen_grid');
+        const state = getScreenGridEnabled()
+            ? (getScreenTranslation('screen.enabled', 'Enabled'))
+            : (getScreenTranslation('screen.disabled', 'Disabled'));
+        status.textContent = `Selected: ${name} (${state})`;
+        return;
+    }
+
     if (selectedId && profile) {
         const elem = profile.elements.find(item => item.id === selectedId);
         const def = findElementDef(selectedId);
@@ -3321,6 +3484,18 @@ const SCREEN_PALETTE_TEXT_DEF = {
     dynamicHeight: true
 };
 
+const SCREEN_PALETTE_GRID_DEF = {
+    id: 'screen_grid',
+    label: 'Screen Grid',
+    w: 32,
+    h: 32,
+    img: 'default-grid.jpg',
+    paletteFitFullImage: true,
+    paletteToggle: true
+};
+
+const SCREEN_ALIGNMENT_GRID_LINES = [20, 30, 40, 90, 100, 110];
+
 function getPaletteNewTextIconLabel() {
     return getScreenTranslation('screen.palette_text_icon', 'Text');
 }
@@ -3373,11 +3548,24 @@ function getScreenPaletteDefs() {
             }
         });
     }
-    const items = [...base, ...enabledTextItems];
+    const items = [...base, ...enabledTextItems, SCREEN_PALETTE_GRID_DEF];
     if (getNextTextSlot(profile) !== null) {
         items.push(SCREEN_PALETTE_TEXT_DEF);
     }
     return items;
+}
+
+function isScreenGridElement(id) {
+    return id === 'screen_grid';
+}
+
+function getScreenGridEnabled() {
+    return !!(window.settings && window.settings.p08);
+}
+
+function setScreenGridEnabled(enabled) {
+    if (!window.settings) window.settings = {};
+    window.settings.p08 = enabled ? 1 : 0;
 }
 
 function resolvePaletteElementId(paletteId, profile) {
@@ -3453,6 +3641,229 @@ function makeDefaultScreenProfile() {
 
 const SCREEN_LAYOUT_VERSION = 9;
 
+/* Compact binary wire format for /api/screen (must match f-screen-layout-bin.h). */
+const SCREEN_BIN_MAGIC = 0x4653584C;
+const SCREEN_BIN_FORMAT = 1;
+const SCREEN_BIN_FONT_LEN = 12;
+const SCREEN_BIN_WIDGET_SIZE = 13;
+const SCREEN_BIN_WIDGET_COUNT = 19;
+const SCREEN_BIN_SCROLL_LEN = 512;
+const SCREEN_BIN_STATIC_TEXT_LEN = 96;
+const SCREEN_BIN_STATIC_TEXT_COUNT = 8;
+const SCREEN_BIN_HEADER_SIZE = 64;
+const SCREEN_BIN_PROFILE_SIZE =
+    SCREEN_BIN_WIDGET_COUNT * SCREEN_BIN_WIDGET_SIZE +
+    SCREEN_BIN_SCROLL_LEN +
+    SCREEN_BIN_STATIC_TEXT_COUNT * SCREEN_BIN_STATIC_TEXT_LEN +
+    SCREEN_BIN_STATIC_TEXT_LEN * 2;
+const SCREEN_BIN_WIRE_SIZE = SCREEN_BIN_HEADER_SIZE + SCREEN_BIN_PROFILE_SIZE * 2;
+const SCREEN_BIN_MIME = 'application/vnd.frixos.screen-layout+1';
+
+/* Firmware widget[] index order (screen_element_id_t). */
+const SCREEN_WIRE_ELEM_IDS = [
+    'glucose_level', 'glucose_trend', 'wifi_off', 'weather', 'moon', 'time', 'message',
+    'text_1', 'text_2', 'text_3', 'text_4', 'text_5', 'text_6', 'text_7', 'text_8',
+    'ampm', 'time_aux', 'digit_label', 'digit_label_aux'
+];
+
+function screenHexToRgb(hex, fallback) {
+    if (!hex || hex.length !== 7 || hex[0] !== '#') return fallback;
+    const n = parseInt(hex.slice(1), 16);
+    if (Number.isNaN(n)) return fallback;
+    return { r: (n >> 16) & 0xff, g: (n >> 8) & 0xff, b: n & 0xff };
+}
+
+function screenRgbToHex(r, g, b) {
+    const h = (v) => v.toString(16).padStart(2, '0');
+    return `#${h(r)}${h(g)}${h(b)}`;
+}
+
+function screenReadFixedString(view, offset, len) {
+    const bytes = new Uint8Array(view.buffer, view.byteOffset + offset, len);
+    let end = bytes.indexOf(0);
+    if (end < 0) end = len;
+    return new TextDecoder().decode(bytes.subarray(0, end));
+}
+
+function screenWriteFixedString(view, offset, len, value) {
+    const bytes = new Uint8Array(view.buffer, view.byteOffset + offset, len);
+    bytes.fill(0);
+    const text = value == null ? '' : String(value);
+    const encoded = new TextEncoder().encode(text);
+    bytes.set(encoded.subarray(0, Math.min(encoded.length, len - 1)));
+}
+
+function screenFindProfileElement(profile, id) {
+    if (!profile || !Array.isArray(profile.elements)) return null;
+    let elem = profile.elements.find(e => e && e.id === id);
+    if (!elem && id === 'time_aux') {
+        elem = profile.elements.find(e => e && e.id === 'glucose');
+    }
+    return elem;
+}
+
+function screenReadWidget(view, offset) {
+    return {
+        enabled: view.getUint8(offset) ? 1 : 0,
+        x: view.getUint8(offset + 1),
+        y: view.getUint8(offset + 2),
+        z: view.getUint8(offset + 3),
+        font: view.getUint8(offset + 4),
+        width: view.getUint8(offset + 5),
+        align: view.getUint8(offset + 6),
+        color_r: view.getUint8(offset + 7),
+        color_g: view.getUint8(offset + 8),
+        color_b: view.getUint8(offset + 9),
+        bg_r: view.getUint8(offset + 10),
+        bg_g: view.getUint8(offset + 11),
+        bg_b: view.getUint8(offset + 12)
+    };
+}
+
+function screenWriteWidget(view, offset, elem) {
+    const opts = elem && elem.options ? elem.options : {};
+    const fg = screenHexToRgb(opts.color, { r: 255, g: 255, b: 255 });
+    const bg = screenHexToRgb(opts.bg_color, { r: 0, g: 0, b: 0 });
+    view.setUint8(offset, elem && elem.enabled ? 1 : 0);
+    view.setUint8(offset + 1, elem && elem.x != null ? elem.x : 0);
+    view.setUint8(offset + 2, elem && elem.y != null ? elem.y : 0);
+    view.setUint8(offset + 3, elem && elem.z != null ? elem.z : 0);
+    view.setUint8(offset + 4, opts.font != null ? opts.font : 0);
+    view.setUint8(offset + 5, opts.width != null ? opts.width : 0);
+    view.setUint8(offset + 6, opts.align != null ? opts.align : 0);
+    view.setUint8(offset + 7, fg.r);
+    view.setUint8(offset + 8, fg.g);
+    view.setUint8(offset + 9, fg.b);
+    view.setUint8(offset + 10, bg.r);
+    view.setUint8(offset + 11, bg.g);
+    view.setUint8(offset + 12, bg.b);
+}
+
+function screenWireProfileToJson(view, offset) {
+    const profile = {
+        elements: [],
+        scroll_text: '',
+        static_texts: { ...SCREEN_DEFAULT_STATIC_TEXTS }
+    };
+    let off = offset;
+
+    SCREEN_WIRE_ELEM_IDS.forEach(id => {
+        const w = screenReadWidget(view, off);
+        off += SCREEN_BIN_WIDGET_SIZE;
+        const elem = { id, enabled: w.enabled, x: w.x, y: w.y, z: w.z };
+        if (isScreenTextElement(id)) {
+            elem.options = {
+                font: w.font,
+                color: screenRgbToHex(w.color_r, w.color_g, w.color_b),
+                bg_color: screenRgbToHex(w.bg_r, w.bg_g, w.bg_b)
+            };
+            if (isScreenClippedTextElement(id) || id === 'message') {
+                elem.options.width = w.width;
+                elem.options.align = w.align;
+            }
+        }
+        profile.elements.push(elem);
+    });
+
+    profile.scroll_text = screenReadFixedString(view, off, SCREEN_BIN_SCROLL_LEN);
+    off += SCREEN_BIN_SCROLL_LEN;
+    SCREEN_TEXT_SLOT_IDS.forEach(id => {
+        profile.static_texts[id] = screenReadFixedString(view, off, SCREEN_BIN_STATIC_TEXT_LEN);
+        off += SCREEN_BIN_STATIC_TEXT_LEN;
+    });
+    profile.static_texts.digit_label = screenReadFixedString(view, off, SCREEN_BIN_STATIC_TEXT_LEN);
+    off += SCREEN_BIN_STATIC_TEXT_LEN;
+    profile.static_texts.digit_label_aux = screenReadFixedString(view, off, SCREEN_BIN_STATIC_TEXT_LEN);
+    off += SCREEN_BIN_STATIC_TEXT_LEN;
+
+    return { profile, offset: off };
+}
+
+function decodeScreenLayoutBinary(bytes) {
+    if (!bytes || bytes.byteLength !== SCREEN_BIN_WIRE_SIZE) {
+        throw new Error('invalid screen wire size');
+    }
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    if (view.getUint32(0, true) !== SCREEN_BIN_MAGIC) {
+        throw new Error('invalid screen wire magic');
+    }
+    if (view.getUint8(4) !== SCREEN_BIN_FORMAT) {
+        throw new Error('unsupported screen wire format');
+    }
+
+    const layout = {
+        version: view.getUint8(5),
+        scroll_delay: view.getUint8(6),
+        day_color_filter: view.getUint8(7),
+        night_color_filter: view.getUint8(8),
+        day_font: screenReadFixedString(view, 12, SCREEN_BIN_FONT_LEN),
+        night_font: screenReadFixedString(view, 24, SCREEN_BIN_FONT_LEN),
+        day_aux_font: screenReadFixedString(view, 36, SCREEN_BIN_FONT_LEN),
+        night_aux_font: screenReadFixedString(view, 48, SCREEN_BIN_FONT_LEN),
+        w: view.getUint16(60, true),
+        h: view.getUint16(62, true),
+        profiles: {}
+    };
+
+    let off = SCREEN_BIN_HEADER_SIZE;
+    const day = screenWireProfileToJson(view, off);
+    off = day.offset;
+    const night = screenWireProfileToJson(view, off);
+    layout.profiles.day = day.profile;
+    layout.profiles.night = night.profile;
+    return layout;
+}
+
+function encodeScreenLayoutBinary(layout) {
+    ensureScreenLayoutMeta(layout);
+    ensureScreenProfileShape(layout.profiles.day);
+    ensureScreenProfileShape(layout.profiles.night);
+
+    const buf = new ArrayBuffer(SCREEN_BIN_WIRE_SIZE);
+    const view = new DataView(buf);
+    const bytes = new Uint8Array(buf);
+    bytes.fill(0);
+
+    view.setUint32(0, SCREEN_BIN_MAGIC, true);
+    view.setUint8(4, SCREEN_BIN_FORMAT);
+    view.setUint8(5, SCREEN_LAYOUT_VERSION);
+    view.setUint8(6, layout.scroll_delay != null ? layout.scroll_delay : 65);
+    view.setUint8(7, layout.day_color_filter != null ? layout.day_color_filter : 0);
+    view.setUint8(8, layout.night_color_filter != null ? layout.night_color_filter : 0);
+    screenWriteFixedString(view, 12, SCREEN_BIN_FONT_LEN, layout.day_font || 'bold');
+    screenWriteFixedString(view, 24, SCREEN_BIN_FONT_LEN, layout.night_font || 'bold');
+    screenWriteFixedString(view, 36, SCREEN_BIN_FONT_LEN, layout.day_aux_font || layout.day_font || 'bold');
+    screenWriteFixedString(view, 48, SCREEN_BIN_FONT_LEN, layout.night_aux_font || layout.night_font || 'bold');
+    view.setUint16(60, layout.w || SCREEN_SIZE, true);
+    view.setUint16(62, layout.h || SCREEN_SIZE, true);
+
+    let off = SCREEN_BIN_HEADER_SIZE;
+    ['day', 'night'].forEach(mode => {
+        const profile = layout.profiles[mode];
+        SCREEN_WIRE_ELEM_IDS.forEach(id => {
+            screenWriteWidget(view, off, screenFindProfileElement(profile, id));
+            off += SCREEN_BIN_WIDGET_SIZE;
+        });
+        screenWriteFixedString(view, off, SCREEN_BIN_SCROLL_LEN, profile.scroll_text || '');
+        off += SCREEN_BIN_SCROLL_LEN;
+        SCREEN_TEXT_SLOT_IDS.forEach(id => {
+            const text = profile.static_texts && profile.static_texts[id] != null
+                ? profile.static_texts[id]
+                : '';
+            screenWriteFixedString(view, off, SCREEN_BIN_STATIC_TEXT_LEN, text);
+            off += SCREEN_BIN_STATIC_TEXT_LEN;
+        });
+        screenWriteFixedString(view, off, SCREEN_BIN_STATIC_TEXT_LEN,
+            profile.static_texts && profile.static_texts.digit_label != null ? profile.static_texts.digit_label : '');
+        off += SCREEN_BIN_STATIC_TEXT_LEN;
+        screenWriteFixedString(view, off, SCREEN_BIN_STATIC_TEXT_LEN,
+            profile.static_texts && profile.static_texts.digit_label_aux != null ? profile.static_texts.digit_label_aux : '');
+        off += SCREEN_BIN_STATIC_TEXT_LEN;
+    });
+
+    return bytes;
+}
+
 const SCREEN_DEFAULT_LAYOUT = {
     version: SCREEN_LAYOUT_VERSION,
     scroll_delay: 65,
@@ -3493,6 +3904,7 @@ function getProfileObj(mode) {
 
 function findElementDef(id) {
     if (id === 'text') return SCREEN_PALETTE_TEXT_DEF;
+    if (id === 'screen_grid') return SCREEN_PALETTE_GRID_DEF;
     return SCREEN_ELEMENT_DEFS.find(d => d.id === id) || null;
 }
 
@@ -3640,6 +4052,74 @@ function ensureElementInProfile(profile, id) {
     return e;
 }
 
+function isScreenSectionVisible() {
+    const section = el('screen-section');
+    return !!(section && section.style.display !== 'none');
+}
+
+function focusScreenCanvas() {
+    const canvas = el('screenCanvas');
+    if (canvas && typeof canvas.focus === 'function') {
+        canvas.focus({ preventScroll: true });
+    }
+}
+
+function shouldIgnoreScreenKeyboardNudge() {
+    if (window.screenEditor.dragging) return true;
+    const active = document.activeElement;
+    if (!active) return false;
+    const tag = active.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+    if (active.isContentEditable) return true;
+    if (active.closest && active.closest('.palette-item')) return true;
+    return false;
+}
+
+function nudgeSelectedScreenElement(key, shiftKey) {
+    const selectedId = window.screenEditor.selectedId;
+    if (!selectedId || isScreenGridElement(selectedId)) return false;
+
+    const nudge = shiftKey ? 10 : 1;
+    const profile = getProfileObj(window.screenEditor.mode);
+    if (!profile) return false;
+    const elem = ensureElementInProfile(profile, selectedId);
+
+    let changed = false;
+    if (key === 'ArrowLeft') {
+        elem.x = clamp(elem.x - nudge, 0, SCREEN_SIZE - 1);
+        changed = true;
+    } else if (key === 'ArrowRight') {
+        elem.x = clamp(elem.x + nudge, 0, SCREEN_SIZE - 1);
+        changed = true;
+    } else if (key === 'ArrowUp') {
+        const visualY = layoutYToVisualY(elem.y, selectedId);
+        const newVisualY = clamp(visualY - nudge, 0, SCREEN_SIZE - 1);
+        elem.y = visualYToLayoutY(newVisualY, selectedId);
+        changed = true;
+    } else if (key === 'ArrowDown') {
+        const visualY = layoutYToVisualY(elem.y, selectedId);
+        const newVisualY = clamp(visualY + nudge, 0, SCREEN_SIZE - 1);
+        elem.y = visualYToLayoutY(newVisualY, selectedId);
+        changed = true;
+    }
+
+    if (changed) {
+        renderScreenCanvas();
+        renderScreenOptions();
+        updateScreenStatusLine();
+    }
+    return changed;
+}
+
+function onScreenArrowKeyDown(e) {
+    if (!isScreenSectionVisible()) return;
+    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
+    if (shouldIgnoreScreenKeyboardNudge()) return;
+    if (nudgeSelectedScreenElement(e.key, e.shiftKey)) {
+        e.preventDefault();
+    }
+}
+
 function setupScreenSection() {
     if (window.screenEventListenersSet) return;
     window.screenEventListenersSet = true;
@@ -3674,43 +4154,9 @@ function setupScreenSection() {
         canvas.addEventListener('pointerup', onScreenPointerUp);
         canvas.addEventListener('pointercancel', onScreenPointerUp);
         canvas.addEventListener('pointerleave', clearScreenCanvasPointer);
-
-        canvas.addEventListener('keydown', (e) => {
-            const selectedId = window.screenEditor.selectedId;
-            if (!selectedId) return;
-
-            const nudge = e.shiftKey ? 10 : 1;
-            const profile = getProfileObj(window.screenEditor.mode);
-            if (!profile) return;
-            const elem = ensureElementInProfile(profile, selectedId);
-
-            let changed = false;
-            if (e.key === 'ArrowLeft') {
-                elem.x = clamp(elem.x - nudge, 0, SCREEN_SIZE - 1);
-                changed = true;
-            } else if (e.key === 'ArrowRight') {
-                elem.x = clamp(elem.x + nudge, 0, SCREEN_SIZE - 1);
-                changed = true;
-            } else if (e.key === 'ArrowUp') {
-                const visualY = layoutYToVisualY(elem.y, selectedId);
-                const newVisualY = clamp(visualY - nudge, 0, SCREEN_SIZE - 1);
-                elem.y = visualYToLayoutY(newVisualY, selectedId);
-                changed = true;
-            } else if (e.key === 'ArrowDown') {
-                const visualY = layoutYToVisualY(elem.y, selectedId);
-                const newVisualY = clamp(visualY + nudge, 0, SCREEN_SIZE - 1);
-                elem.y = visualYToLayoutY(newVisualY, selectedId);
-                changed = true;
-            }
-
-            if (changed) {
-                e.preventDefault();
-                renderScreenCanvas();
-                renderScreenOptions();
-                updateScreenStatusLine();
-            }
-        });
     }
+
+    document.addEventListener('keydown', onScreenArrowKeyDown);
 
     renderScreenPalette();
     updateScreenModeButtons();
@@ -3937,6 +4383,13 @@ function renderScreenPalette() {
         } else {
             item.tabIndex = 0;
         }
+        if (window.screenEditor.selectedId === def.id ||
+            (def.id === 'screen_grid' && getScreenGridEnabled())) {
+            item.classList.add('palette-item-selected');
+        }
+        if (def.paletteToggle) {
+            item.classList.add('palette-item-toggle');
+        }
 
         const swatch = document.createElement('div');
         swatch.className = 'palette-swatch';
@@ -3950,15 +4403,53 @@ function renderScreenPalette() {
         item.appendChild(label);
 
         if (!unavailable) {
-            item.addEventListener('pointerdown', (e) => {
-                e.preventDefault();
-                const resolvedId = resolvePaletteElementId(def.id, getProfileObj(window.screenEditor.mode));
+            const selectPaletteItem = () => {
+                if (def.paletteToggle) {
+                    if (def.id === 'screen_grid') {
+                        setScreenGridEnabled(!getScreenGridEnabled());
+                    }
+                    window.screenEditor.selectedId = def.id;
+                    renderScreenCanvas();
+                    renderScreenOptions();
+                    renderScreenPalette();
+                    updateScreenStatusLine();
+                    focusScreenCanvas();
+                    saveScreenTimeDisplaySettings();
+                    return;
+                }
+                const activeProfile = getProfileObj(window.screenEditor.mode);
+                if (!activeProfile) return;
+                const resolvedId = resolvePaletteElementId(def.id, activeProfile);
                 if (!resolvedId) return;
-                beginDrag(resolvedId, e, true);
-            });
+                const elObj = ensureElementInProfile(activeProfile, resolvedId);
+                elObj.enabled = 1;
+                window.screenEditor.selectedId = resolvedId;
+                renderScreenCanvas();
+                renderScreenOptions();
+                renderScreenPalette();
+                focusScreenCanvas();
+            };
+
+            if (def.paletteToggle) {
+                item.addEventListener('pointerdown', (e) => {
+                    e.preventDefault();
+                    selectPaletteItem();
+                });
+            } else {
+                item.addEventListener('pointerdown', (e) => {
+                    e.preventDefault();
+                    const resolvedId = resolvePaletteElementId(def.id, getProfileObj(window.screenEditor.mode));
+                    if (!resolvedId) return;
+                    beginDrag(resolvedId, e, true);
+                });
+            }
             item.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
+                    if (def.paletteToggle) {
+                        selectPaletteItem();
+                        return;
+                    }
                     const activeProfile = getProfileObj(window.screenEditor.mode);
                     if (!activeProfile) return;
                     const resolvedId = resolvePaletteElementId(def.id, activeProfile);
@@ -3969,6 +4460,7 @@ function renderScreenPalette() {
                     renderScreenCanvas();
                     renderScreenOptions();
                     renderScreenPalette();
+                    focusScreenCanvas();
                 }
             });
         }
@@ -3981,16 +4473,19 @@ async function fetchScreenLayout() {
     try {
         await refreshScreenLayoutSelect();
         const [settingsResp, response] = await Promise.all([
-            fetch('/api/settings?params=p24,p50,p48,p49,p57,p58,p59'),
+            fetchSettingsJson('/api/settings?params=p08,p24,p50,p48,p49,p57,p58,p59', {
+                fallbackUrl: '/api/settings'
+            }).catch(() => fetchSettingsJson('/api/settings')),
             fetch('/api/screen')
         ]);
-        if (settingsResp.ok) {
-            const settingsData = await settingsResp.json();
-            Object.keys(settingsData).forEach(key => {
-                window.settings[key] = settingsData[key];
-            });
+        if (settingsResp) {
+            mergeSettingsData(settingsResp);
         }
-        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(`Screen layout fetch failed: HTTP ${response.status}`);
+        }
+        const wire = new Uint8Array(await response.arrayBuffer());
+        const data = decodeScreenLayoutBinary(wire);
         window.screenLayout = prepareScreenLayout(data);
         if (!window.screenLayout.profiles) window.screenLayout.profiles = { day: makeDefaultScreenProfile(), night: makeDefaultScreenProfile() };
         if (!window.screenLayout.profiles.day) window.screenLayout.profiles.day = makeDefaultScreenProfile();
@@ -4014,6 +4509,10 @@ async function saveScreenTimeDisplaySettings() {
     const auxScheduleList = el('display-schedule-aux-list');
 
     const formData = {};
+    const gridEnabled = getScreenGridEnabled() ? 1 : 0;
+    if (window.settings && gridEnabled !== (window.settings.p08 || 0)) {
+        formData.p08 = gridEnabled;
+    }
     if (leading) formData.p24 = leading.checked ? 1 : 0;
     if (dots) formData.p50 = dots.checked ? 1 : 0;
     if (scheduleList) {
@@ -4059,10 +4558,14 @@ async function saveScreenLayout() {
     try {
         toggleLoading(saveBtn, true);
         showStatus(getMessage('saving_settings'), 'info');
+        const body = encodeScreenLayoutBinary(window.screenLayout);
+        if (body.byteLength !== SCREEN_BIN_WIRE_SIZE) {
+            throw new Error(`screen wire size mismatch: ${body.byteLength} != ${SCREEN_BIN_WIRE_SIZE}`);
+        }
         const response = await fetch('/api/screen', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(window.screenLayout)
+            headers: { 'Content-Type': 'application/octet-stream' },
+            body
         });
         const data = await response.json().catch(() => ({}));
         if (response.ok && data && data.status === 'ok') {
@@ -4079,7 +4582,14 @@ async function saveScreenLayout() {
                 showStatus(getMessage('error_saving_settings'), 'error');
             }
         } else {
-            showStatus(getMessage('error_saving_settings') + (data && data.error ? data.error : 'Unknown error'), 'error');
+            let detail = data && data.error ? data.error : 'Unknown error';
+            if (data && data.got != null && data.expected != null) {
+                detail += ` (${data.got} bytes, expected ${data.expected})`;
+            }
+            if (data && data.error === 'bad_content_type') {
+                detail += ' — hard-refresh the page (Ctrl+F5)';
+            }
+            showStatus(getMessage('error_saving_settings') + detail, 'error');
         }
     } catch (error) {
         console.error('Error saving screen layout:', error);
@@ -4216,9 +4726,25 @@ function createScreenGuideLine(orientation, posPx, kind) {
     return line;
 }
 
+function appendScreenAlignmentGrid(canvas, scale) {
+    SCREEN_ALIGNMENT_GRID_LINES.forEach(pos => {
+        canvas.appendChild(createScreenGuideLine('v', pos * scale, 'matrix'));
+        canvas.appendChild(createScreenGuideLine('h', pos * scale, 'matrix'));
+    });
+}
+
+function appendScreenCenterCross(canvas, scale, kind) {
+    canvas.appendChild(createScreenGuideLine('v', 64 * scale, kind));
+    canvas.appendChild(createScreenGuideLine('h', 64 * scale, kind));
+}
+
 function appendScreenGuides(canvas, scale) {
-    canvas.appendChild(createScreenGuideLine('v', 64 * scale, 'matrix'));
-    canvas.appendChild(createScreenGuideLine('h', 64 * scale, 'matrix'));
+    if (getScreenGridEnabled()) {
+        appendScreenAlignmentGrid(canvas, scale);
+        appendScreenCenterCross(canvas, scale, 'center');
+    } else {
+        appendScreenCenterCross(canvas, scale, 'matrix');
+    }
 
     const selectedId = window.screenEditor.selectedId;
     if (!selectedId) return;
@@ -4274,6 +4800,7 @@ function renderScreenCanvas() {
             ev.preventDefault();
             ev.stopPropagation();
             window.screenEditor.selectedId = e.id;
+            focusScreenCanvas();
             beginDrag(e.id, ev, false);
             renderScreenCanvas();
             renderScreenOptions();
@@ -4352,11 +4879,37 @@ function renderScreenOptions() {
     opt.innerHTML = '';
     if (!window.screenLayout || !window.screenEditor.selectedId) return;
 
+    const trans = translations[currentLanguage] || translations.en;
+
+    if (isScreenGridElement(window.screenEditor.selectedId)) {
+        const title = document.createElement('h3');
+        title.textContent = (getNestedTranslation(trans, 'screen.options') || 'Options') + `: ${getScreenElementLabel('screen_grid')}`;
+        opt.appendChild(title);
+
+        const enabledRow = document.createElement('div');
+        enabledRow.className = 'form-group';
+        const enabledLabel = document.createElement('label');
+        enabledLabel.textContent = getNestedTranslation(trans, 'screen.enabled') || 'Enabled';
+        const enabledInput = document.createElement('input');
+        enabledInput.type = 'checkbox';
+        enabledInput.checked = getScreenGridEnabled();
+        enabledInput.addEventListener('change', () => {
+            setScreenGridEnabled(enabledInput.checked);
+            renderScreenCanvas();
+            renderScreenPalette();
+            updateScreenStatusLine();
+            saveScreenTimeDisplaySettings();
+        });
+        enabledRow.appendChild(enabledLabel);
+        enabledRow.appendChild(enabledInput);
+        opt.appendChild(enabledRow);
+        return;
+    }
+
     const profile = getProfileObj(window.screenEditor.mode);
     if (!profile) return;
     const e = ensureElementInProfile(profile, window.screenEditor.selectedId);
     const def = findElementDef(e.id);
-    const trans = translations[currentLanguage] || translations.en;
 
     const title = document.createElement('h3');
     title.textContent = (getNestedTranslation(trans, 'screen.options') || 'Options') + `: ${getScreenElementLabel(e.id)}`;
@@ -4673,6 +5226,7 @@ function renderScreenOptions() {
 function beginDrag(id, pointerEvent, fromPalette) {
     const canvas = el('screenCanvas');
     if (!canvas) return;
+    focusScreenCanvas();
     if (!window.screenLayout) return;
     const profile = getProfileObj(window.screenEditor.mode);
     if (!profile) return;
@@ -4709,9 +5263,7 @@ function onScreenPointerDown(e) {
     if (window.screenEditor.dragging) return;
     trackScreenCanvasPointer(e);
 
-    // Focus the canvas to enable keyboard nudge
-    const canvas = el('screenCanvas');
-    if (canvas) canvas.focus();
+    focusScreenCanvas();
 
     const target = e.target && e.target.closest ? e.target.closest('.screen-element') : null;
     if (!target) {
@@ -4893,9 +5445,6 @@ function setupAdvancedSection() {
         const messageCounter = el('message-counter');
         if (el('ofs_x') && window.settings.p01 !== undefined) el('ofs_x').value = window.settings.p01 || 0;
         if (el('ofs_y') && window.settings.p02 !== undefined) el('ofs_y').value = window.settings.p02 || 0;
-        if (el('rotation') && window.settings.p03 !== undefined) el('rotation').value = window.settings.p03 || 0;
-        if (el('show_grid') && window.settings.p08 !== undefined) el('show_grid').checked = window.settings.p08;
-        if (el('mirroring') && window.settings.p09 !== undefined) el('mirroring').checked = window.settings.p09;
         if (el('lat') && window.settings.p17 !== undefined) el('lat').value = window.settings.p17 || '';
         if (el('lon') && window.settings.p18 !== undefined) el('lon').value = window.settings.p18 || '';
         if (el('timezone') && window.settings.p19 !== undefined) el('timezone').value = window.settings.p19 || '';

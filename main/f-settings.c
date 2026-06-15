@@ -9,6 +9,7 @@
 #include "f-membuffer.h"
 #include "frixos.h"
 #include "f-display.h"
+#include "f-screen-layout-bin.h"
 #include "f-pwm.h"
 #include "f-wifi.h"
 #include "f-ota.h"
@@ -36,6 +37,7 @@
 #include "freertos/event_groups.h"
 #include "esp_wifi.h"
 #include "unistd.h"
+#include "lwip/ip_addr.h"
 
 /*
  * Field Name Mappings (pXX format to reduce HTTP header size):
@@ -100,10 +102,18 @@
  * - p59 = eeprom_disp_sched_aux (Aux digit display schedule JSON)
  * - p44 = eeprom_libre_region (Libre region)
  * - p54 = eeprom_ns_url (Nightscout URL, max 100 chars)
+ *
+ * Network / Static IP Settings:
+ * - p60 = static_ip (Static IP address, empty = DHCP)
+ * - p61 = static_gw (Default gateway)
+ * - p62 = static_nm (Subnet mask, default 255.255.255.0)
+ * - p63 = static_dns (DNS servers, comma-separated e.g. "8.8.8.8,8.8.4.4")
  */
 
 // Tag for logging
 static const char *TAG = "f-settings";
+
+#define SCREEN_LAYOUT_MIME "application/vnd.frixos.screen-layout+1"
 
 /* ---- Display schedule helpers ---- */
 
@@ -430,17 +440,41 @@ esp_err_t generic_file_handler(httpd_req_t *req)
     const char *uri = req->uri;
     ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Serving file for URI: %s", uri);
 
-    // Get the filename from the URI by stripping the leading slash
-    const char *filename = uri;
-    if (filename[0] == '/')
+    // Get the filename from the URI by stripping the leading slash and query string
+    const char *uri_path = uri;
+    if (uri_path[0] == '/')
     {
-        filename++;
+        uri_path++;
     }
 
-    // Use default file if the URI is the root or empty
-    if (strlen(filename) == 0)
+    char filename_buf[128];
+    const char *filename;
+    if (strlen(uri_path) == 0)
     {
         filename = "index.html";
+    }
+    else
+    {
+        strncpy(filename_buf, uri_path, sizeof(filename_buf) - 1);
+        filename_buf[sizeof(filename_buf) - 1] = '\0';
+        char *query = strchr(filename_buf, '?');
+        if (query != NULL)
+        {
+            *query = '\0';
+        }
+        char *fragment = strchr(filename_buf, '#');
+        if (fragment != NULL)
+        {
+            *fragment = '\0';
+        }
+        if (filename_buf[0] == '\0')
+        {
+            filename = "index.html";
+        }
+        else
+        {
+            filename = filename_buf;
+        }
     }
 
     // Log the requested file
@@ -632,6 +666,30 @@ static const char *get_query_param(const char *uri, const char *param_name, char
     return NULL;
 }
 
+// Read one URL query parameter using the ESP-IDF query APIs (falls back to parsing req->uri).
+static bool get_request_query_param(httpd_req_t *req, const char *key, char *out_buf, size_t out_len)
+{
+    if (!req || !key || !out_buf || out_len == 0)
+    {
+        return false;
+    }
+
+    out_buf[0] = '\0';
+
+    size_t qlen = httpd_req_get_url_query_len(req);
+    if (qlen > 0 && qlen < 512)
+    {
+        char qbuf[512];
+        if (httpd_req_get_url_query_str(req, qbuf, sizeof(qbuf)) == ESP_OK &&
+            httpd_query_key_value(qbuf, key, out_buf, out_len) == ESP_OK)
+        {
+            return true;
+        }
+    }
+
+    return get_query_param(req->uri, key, out_buf, out_len) != NULL;
+}
+
 // Helper function to calculate a bitmask of parameters to include in JSON response.
 // Bit N corresponds to parameter pN.
 static uint64_t calculate_include_mask(const char *group, const char *params)
@@ -654,9 +712,11 @@ static uint64_t calculate_include_mask(const char *group, const char *params)
         }
         else if (strcmp(group, "settings") == 0)
         {
-            // p00, p34, p35, p36, p37, p39
-            mask |= (1ULL << 0) | (1ULL << 34) | (1ULL << 35) |
-                    (1ULL << 36) | (1ULL << 37) | (1ULL << 39);
+            // p00, p03, p09, p34-p37, p39, p60-p63
+            mask |= (1ULL << 0) | (1ULL << 3) | (1ULL << 9) |
+                    (1ULL << 34) | (1ULL << 35) |
+                    (1ULL << 36) | (1ULL << 37) | (1ULL << 39) |
+                    (1ULL << 60) | (1ULL << 61) | (1ULL << 62) | (1ULL << 63);
         }
         else if (strcmp(group, "advanced") == 0)
         {
@@ -706,8 +766,8 @@ esp_err_t send_json_settings(httpd_req_t *req)
     // Parse query parameters into local buffers to fix the static buffer overwrite bug in get_query_param
     char group_local[64] = {0};
     char params_local[256] = {0};
-    get_query_param(req->uri, "group", group_local, sizeof(group_local));
-    get_query_param(req->uri, "params", params_local, sizeof(params_local));
+    get_request_query_param(req, "group", group_local, sizeof(group_local));
+    get_request_query_param(req, "params", params_local, sizeof(params_local));
 
     if (group_local[0] != '\0' || params_local[0] != '\0')
     {
@@ -723,6 +783,10 @@ esp_err_t send_json_settings(httpd_req_t *req)
     if (mask & (1ULL << 0)) cJSON_AddStringToObject(root, "p00", eeprom_hostname);
     if (mask & (1ULL << 34)) cJSON_AddStringToObject(root, "p34", eeprom_wifi_ssid);
     if (mask & (1ULL << 35)) cJSON_AddStringToObject(root, "p35", eeprom_wifi_pass);
+    if (mask & (1ULL << 60)) cJSON_AddStringToObject(root, "p60", eeprom_static_ip);
+    if (mask & (1ULL << 61)) cJSON_AddStringToObject(root, "p61", eeprom_static_gw);
+    if (mask & (1ULL << 62)) cJSON_AddStringToObject(root, "p62", eeprom_static_nm);
+    if (mask & (1ULL << 63)) cJSON_AddStringToObject(root, "p63", eeprom_static_dns);
     if (mask & (1ULL << 17)) cJSON_AddStringToObject(root, "p17", eeprom_lat);
     if (mask & (1ULL << 18)) cJSON_AddStringToObject(root, "p18", eeprom_lon);
     if (mask & (1ULL << 19)) cJSON_AddStringToObject(root, "p19", eeprom_timezone);
@@ -929,6 +993,52 @@ static bool validate_json_params(cJSON *root, char *err_buf, size_t err_size)
     /* p35 wifi_pass */
     if ((item = cJSON_GetObjectItem(root, "p35")) && cJSON_IsString(item))
         CHECK_STR_LEN("wifi_pass", item->valuestring, sizeof(eeprom_wifi_pass) - 1);
+
+    /* p60-p63 static IP settings — validate IPv4 format when non-empty */
+    {
+        static const char *static_ip_params[] = {"p60", "p61", "p62", "p63"};
+        static const size_t static_ip_max_lens[] = {
+            sizeof(eeprom_static_ip) - 1, sizeof(eeprom_static_gw) - 1,
+            sizeof(eeprom_static_nm) - 1, sizeof(eeprom_static_dns) - 1
+        };
+        static const char *static_ip_names[] = {"static_ip", "static_gw", "static_nm", "static_dns"};
+
+        for (int _si = 0; _si < 4; _si++) {
+            item = cJSON_GetObjectItem(root, static_ip_params[_si]);
+            if (!item || !cJSON_IsString(item)) continue;
+            sval = item->valuestring;
+            len = strlen(sval);
+            if (len == 0) continue; /* empty = DHCP / default */
+            if (len > static_ip_max_lens[_si]) {
+                snprintf(err_buf, err_size, "Invalid %s: too long", static_ip_names[_si]);
+                return false;
+            }
+            /* p63 may contain a comma-separated pair — validate each part */
+            if (_si == 3) {
+                char tmp63[40];
+                strncpy(tmp63, sval, sizeof(tmp63) - 1);
+                tmp63[sizeof(tmp63) - 1] = '\0';
+                char *part2 = strchr(tmp63, ',');
+                if (part2) { *part2 = '\0'; part2++; }
+                if (ipaddr_addr(tmp63) == IPADDR_NONE) {
+                    snprintf(err_buf, err_size, "Invalid static_dns: bad DNS1 address");
+                    return false;
+                }
+                if (part2 && part2[0] != '\0' && ipaddr_addr(part2) == IPADDR_NONE) {
+                    snprintf(err_buf, err_size, "Invalid static_dns: bad DNS2 address");
+                    return false;
+                }
+            } else {
+                char tmp_ip[16];
+                strncpy(tmp_ip, sval, sizeof(tmp_ip) - 1);
+                tmp_ip[sizeof(tmp_ip) - 1] = '\0';
+                if (ipaddr_addr(tmp_ip) == IPADDR_NONE) {
+                    snprintf(err_buf, err_size, "Invalid %s: not a valid IPv4 address", static_ip_names[_si]);
+                    return false;
+                }
+            }
+        }
+    }
 
     /* p36 fahrenheit */
     if ((item = cJSON_GetObjectItem(root, "p36")) && cJSON_IsNumber(item))
@@ -1232,333 +1342,94 @@ static bool validate_json_params(cJSON *root, char *err_buf, size_t err_size)
 }
 
 // ----------------
-// /api/screen
+// /api/screen  (compact binary wire format; JSON is used only in the browser)
 // ----------------
-static const char *screen_elem_id_str[SCREEN_ELEM_COUNT] = {
-    "glucose_level",
-    "glucose_trend",
-    "wifi_off",
-    "weather",
-    "moon",
-    "time",
-    "message",
-    "text_1",
-    "text_2",
-    "text_3",
-    "text_4",
-    "text_5",
-    "text_6",
-    "text_7",
-    "text_8",
-    "ampm",
-    "time_aux",
-    "digit_label",
-    "digit_label_aux",
-};
-
-static int screen_elem_from_id(const char *id)
-{
-    if (!id) return -1;
-    if (strcmp(id, "glucose") == 0) return SCREEN_ELEM_TIME_AUX;
-    for (int i = 0; i < SCREEN_ELEM_COUNT; i++)
-    {
-        if (strcmp(id, screen_elem_id_str[i]) == 0) return i;
-    }
-    return -1;
-}
-
-static int clamp_int(int v, int lo, int hi)
-{
-    if (v < lo) return lo;
-    if (v > hi) return hi;
-    return v;
-}
-
-static void screen_color_to_hex(char *out, size_t out_len, uint8_t r, uint8_t g, uint8_t b)
-{
-    snprintf(out, out_len, "#%02x%02x%02x", r, g, b);
-}
-
-static bool screen_parse_color_hex(const char *color_str, uint8_t *r, uint8_t *g, uint8_t *b)
-{
-    if (!color_str || strlen(color_str) != 7 || color_str[0] != '#')
-        return false;
-
-    char hex[3] = {0};
-    hex[0] = color_str[1];
-    hex[1] = color_str[2];
-    *r = (uint8_t)strtol(hex, NULL, 16);
-    hex[0] = color_str[3];
-    hex[1] = color_str[4];
-    *g = (uint8_t)strtol(hex, NULL, 16);
-    hex[0] = color_str[5];
-    hex[1] = color_str[6];
-    *b = (uint8_t)strtol(hex, NULL, 16);
-    return true;
-}
-
-static void screen_widget_to_json(cJSON *obj, const char *id, const screen_widget_t *w)
-{
-    cJSON_AddStringToObject(obj, "id", id);
-    cJSON_AddNumberToObject(obj, "enabled", w->enabled ? 1 : 0);
-    cJSON_AddNumberToObject(obj, "x", w->x);
-    cJSON_AddNumberToObject(obj, "y", w->y);
-    cJSON_AddNumberToObject(obj, "z", w->z);
-
-    if (screen_elem_is_text(screen_elem_from_id(id)))
-    {
-        cJSON *options = cJSON_CreateObject();
-        cJSON_AddNumberToObject(options, "font", w->font <= 4 ? w->font : 0);
-        char color_hex[8];
-        screen_color_to_hex(color_hex, sizeof(color_hex), w->color_r, w->color_g, w->color_b);
-        cJSON_AddStringToObject(options, "color", color_hex);
-        screen_color_to_hex(color_hex, sizeof(color_hex), w->bg_r, w->bg_g, w->bg_b);
-        cJSON_AddStringToObject(options, "bg_color", color_hex);
-        if (screen_elem_has_text_layout(screen_elem_from_id(id)))
-        {
-            cJSON_AddNumberToObject(options, "width", w->width);
-            cJSON_AddNumberToObject(options, "align", w->align <= SCREEN_MSG_ALIGN_RIGHT ? w->align : SCREEN_MSG_ALIGN_LEFT);
-        }
-        cJSON_AddItemToObject(obj, "options", options);
-    }
-}
-
-static esp_err_t parse_screen_profile(const cJSON *profile_obj, screen_layout_profile_t *out_profile, char *errbuf, size_t errbuf_len)
-{
-    if (!cJSON_IsObject(profile_obj))
-    {
-        snprintf(errbuf, errbuf_len, "profile must be an object");
-        return ESP_FAIL;
-    }
-
-    const cJSON *elements = cJSON_GetObjectItem(profile_obj, "elements");
-    if (!cJSON_IsArray(elements))
-    {
-        snprintf(errbuf, errbuf_len, "profile.elements must be an array");
-        return ESP_FAIL;
-    }
-
-    bool seen[SCREEN_ELEM_COUNT] = {0};
-
-    cJSON *el = NULL;
-    cJSON_ArrayForEach(el, elements)
-    {
-        if (!cJSON_IsObject(el))
-        {
-            snprintf(errbuf, errbuf_len, "element must be an object");
-            return ESP_FAIL;
-        }
-
-        const cJSON *id_item = cJSON_GetObjectItem(el, "id");
-        const char *id = cJSON_IsString(id_item) ? id_item->valuestring : NULL;
-        int elem = screen_elem_from_id(id);
-        if (elem < 0)
-        {
-            snprintf(errbuf, errbuf_len, "unknown element id");
-            return ESP_FAIL;
-        }
-        if (seen[elem])
-        {
-            snprintf(errbuf, errbuf_len, "duplicate element id");
-            return ESP_FAIL;
-        }
-        seen[elem] = true;
-
-        screen_widget_t w = out_profile->widget[elem];
-
-        const cJSON *enabled = cJSON_GetObjectItem(el, "enabled");
-        if (cJSON_IsNumber(enabled)) w.enabled = enabled->valueint ? 1 : 0;
-
-        const cJSON *x = cJSON_GetObjectItem(el, "x");
-        const cJSON *y = cJSON_GetObjectItem(el, "y");
-        const cJSON *z = cJSON_GetObjectItem(el, "z");
-        if (cJSON_IsNumber(x)) w.x = (uint8_t)clamp_int(x->valueint, 0, 127);
-        if (cJSON_IsNumber(y)) w.y = (uint8_t)clamp_int(y->valueint, 0, 127);
-        if (cJSON_IsNumber(z)) w.z = (uint8_t)clamp_int(z->valueint, 0, 4);
-
-        if (screen_elem_is_text((screen_element_id_t)elem))
-        {
-            const cJSON *options = cJSON_GetObjectItem(el, "options");
-            if (cJSON_IsObject(options))
-            {
-                const cJSON *font = cJSON_GetObjectItem(options, "font");
-                if (cJSON_IsNumber(font))
-                {
-                    int fv = font->valueint;
-                    if (fv >= 0 && fv <= 4)
-                        w.font = (uint8_t)fv;
-                }
-
-                const cJSON *color = cJSON_GetObjectItem(options, "color");
-                if (cJSON_IsString(color))
-                {
-                    uint8_t r = 255, g = 255, b = 255;
-                    if (screen_parse_color_hex(color->valuestring, &r, &g, &b))
-                    {
-                        w.color_r = r;
-                        w.color_g = g;
-                        w.color_b = b;
-                    }
-                }
-
-                const cJSON *bg_color = cJSON_GetObjectItem(options, "bg_color");
-                if (cJSON_IsString(bg_color))
-                {
-                    uint8_t r = 0, g = 0, b = 0;
-                    if (screen_parse_color_hex(bg_color->valuestring, &r, &g, &b))
-                    {
-                        w.bg_r = r;
-                        w.bg_g = g;
-                        w.bg_b = b;
-                    }
-                }
-
-                if (screen_elem_has_text_layout((screen_element_id_t)elem))
-                {
-                    const cJSON *width = cJSON_GetObjectItem(options, "width");
-                    if (cJSON_IsNumber(width))
-                        w.width = (uint8_t)clamp_int(width->valueint, 0, 127);
-
-                    const cJSON *align = cJSON_GetObjectItem(options, "align");
-                    if (cJSON_IsNumber(align))
-                        w.align = (uint8_t)clamp_int(align->valueint, 0, SCREEN_MSG_ALIGN_RIGHT);
-                }
-            }
-        }
-
-        out_profile->widget[elem] = w;
-    }
-
-    const cJSON *scroll_text = cJSON_GetObjectItem(profile_obj, "scroll_text");
-    if (cJSON_IsString(scroll_text))
-    {
-        strncpy(out_profile->scroll_text, scroll_text->valuestring, SCROLL_MSG_LENGTH - 1);
-        out_profile->scroll_text[SCROLL_MSG_LENGTH - 1] = '\0';
-    }
-
-    const cJSON *static_texts = cJSON_GetObjectItem(profile_obj, "static_texts");
-    if (cJSON_IsObject(static_texts))
-    {
-        for (int i = 0; i < SCREEN_STATIC_TEXT_COUNT; i++)
-        {
-            const cJSON *text_item = cJSON_GetObjectItem(static_texts, screen_elem_id_str[SCREEN_ELEM_TEXT_1 + i]);
-            if (cJSON_IsString(text_item))
-            {
-                strncpy(out_profile->static_text[i], text_item->valuestring, SCREEN_STATIC_TEXT_LENGTH - 1);
-                out_profile->static_text[i][SCREEN_STATIC_TEXT_LENGTH - 1] = '\0';
-            }
-        }
-
-        const cJSON *digit_label = cJSON_GetObjectItem(static_texts, "digit_label");
-        if (cJSON_IsString(digit_label))
-        {
-            strncpy(out_profile->digit_label_text, digit_label->valuestring, SCREEN_STATIC_TEXT_LENGTH - 1);
-            out_profile->digit_label_text[SCREEN_STATIC_TEXT_LENGTH - 1] = '\0';
-        }
-
-        const cJSON *digit_label_aux = cJSON_GetObjectItem(static_texts, "digit_label_aux");
-        if (cJSON_IsString(digit_label_aux))
-        {
-            strncpy(out_profile->digit_label_aux_text, digit_label_aux->valuestring, SCREEN_STATIC_TEXT_LENGTH - 1);
-            out_profile->digit_label_aux_text[SCREEN_STATIC_TEXT_LENGTH - 1] = '\0';
-        }
-    }
-
-    return ESP_OK;
-}
 
 esp_err_t screen_get_handler(httpd_req_t *req)
 {
-    cJSON *root = cJSON_CreateObject();
-    cJSON_AddNumberToObject(root, "version", eeprom_screen_layout.version);
-    cJSON_AddNumberToObject(root, "scroll_delay", eeprom_screen_layout.scroll_delay);
-    cJSON_AddStringToObject(root, "day_font", eeprom_font[0]);
-    cJSON_AddStringToObject(root, "night_font", eeprom_font[1]);
-    cJSON_AddStringToObject(root, "day_aux_font", eeprom_aux_font[0]);
-    cJSON_AddStringToObject(root, "night_aux_font", eeprom_aux_font[1]);
-    cJSON_AddNumberToObject(root, "day_color_filter", eeprom_color_filter[0]);
-    cJSON_AddNumberToObject(root, "night_color_filter", eeprom_color_filter[1]);
-    cJSON_AddNumberToObject(root, "w", LCD_H_RES);
-    cJSON_AddNumberToObject(root, "h", LCD_V_RES);
-
-    cJSON *profiles = cJSON_CreateObject();
-    cJSON_AddItemToObject(root, "profiles", profiles);
-
-    const char *profile_names[2] = {"day", "night"};
-    for (int pi = 0; pi < 2; pi++)
-    {
-        cJSON *p = cJSON_CreateObject();
-        cJSON *elements = cJSON_CreateArray();
-        cJSON_AddItemToObject(p, "elements", elements);
-        cJSON_AddStringToObject(p, "scroll_text", eeprom_screen_layout.profile[pi].scroll_text);
-
-        cJSON *static_texts = cJSON_CreateObject();
-        for (int i = 0; i < SCREEN_STATIC_TEXT_COUNT; i++)
-            cJSON_AddStringToObject(static_texts, screen_elem_id_str[SCREEN_ELEM_TEXT_1 + i],
-                                    eeprom_screen_layout.profile[pi].static_text[i]);
-        cJSON_AddStringToObject(static_texts, "digit_label",
-                                eeprom_screen_layout.profile[pi].digit_label_text);
-        cJSON_AddStringToObject(static_texts, "digit_label_aux",
-                                eeprom_screen_layout.profile[pi].digit_label_aux_text);
-        cJSON_AddItemToObject(p, "static_texts", static_texts);
-
-        for (int i = 0; i < SCREEN_ELEM_COUNT; i++)
-        {
-            cJSON *el = cJSON_CreateObject();
-            screen_widget_to_json(el, screen_elem_id_str[i], &eeprom_screen_layout.profile[pi].widget[i]);
-            cJSON_AddItemToArray(elements, el);
-        }
-
-        cJSON_AddItemToObject(profiles, profile_names[pi], p);
-    }
-
-    char *json_string = cJSON_PrintUnformatted(root);
-    cJSON_Delete(root);
-
-    if (!json_string)
+    char *wire_buf = get_shared_buffer(FRIXOS_SCREEN_LAYOUT_WIRE_SIZE, "screen_wire");
+    if (wire_buf == NULL)
     {
         httpd_resp_set_status(req, "500 Internal Server Error");
         httpd_resp_set_type(req, "application/json");
-        httpd_resp_send(req, "{\"status\":\"error\",\"error\":\"no_mem\"}", HTTPD_RESP_USE_STRLEN);
+        httpd_resp_send(req, "{\"status\":\"error\",\"error\":\"no_memory\"}", HTTPD_RESP_USE_STRLEN);
         return ESP_OK;
     }
 
-    httpd_resp_set_type(req, "application/json");
-    httpd_resp_send(req, json_string, HTTPD_RESP_USE_STRLEN);
-    free(json_string);
-    return ESP_OK;
+    size_t written = 0;
+    if (!screen_layout_wire_encode((uint8_t *)wire_buf, FRIXOS_SCREEN_LAYOUT_WIRE_SIZE, &written))
+    {
+        release_shared_buffer(wire_buf);
+        httpd_resp_set_status(req, "500 Internal Server Error");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_send(req, "{\"status\":\"error\",\"error\":\"encode\"}", HTTPD_RESP_USE_STRLEN);
+        return ESP_OK;
+    }
+
+    httpd_resp_set_type(req, SCREEN_LAYOUT_MIME);
+    esp_err_t ret = httpd_resp_send(req, wire_buf, written);
+    release_shared_buffer(wire_buf);
+    return ret;
+}
+
+static bool screen_post_content_type_ok(httpd_req_t *req)
+{
+    char content_type[64] = {0};
+    if (httpd_req_get_hdr_value_str(req, "Content-Type", content_type, sizeof(content_type)) != ESP_OK)
+        return false;
+    return strstr(content_type, "application/octet-stream") != NULL ||
+           strstr(content_type, "application/vnd.frixos.screen-layout") != NULL;
 }
 
 esp_err_t screen_post_handler(httpd_req_t *req)
 {
-    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Screen POST request received, content_len=%d", req->content_len);
+    const int expected = (int)FRIXOS_SCREEN_LAYOUT_WIRE_SIZE;
+    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Screen POST content_len=%d expected=%d", req->content_len, expected);
 
-    int remaining = req->content_len;
-    if (remaining <= 0 || remaining > 32768)
+    if (!screen_post_content_type_ok(req))
     {
         httpd_resp_set_status(req, "400 Bad Request");
         httpd_resp_set_type(req, "application/json");
-        httpd_resp_send(req, "{\"status\":\"error\",\"error\":\"invalid_length\"}", HTTPD_RESP_USE_STRLEN);
+        httpd_resp_send(req,
+                        "{\"status\":\"error\",\"error\":\"bad_content_type\",\"hint\":\"refresh browser cache\"}",
+                        HTTPD_RESP_USE_STRLEN);
         return ESP_OK;
     }
 
-    char *http_buffer = (char *)calloc(1, remaining + 1);
-    if (!http_buffer)
+    int remaining = req->content_len;
+    if (remaining <= 0)
+        remaining = expected;
+    else if (remaining != expected)
+    {
+        char resp[96];
+        snprintf(resp, sizeof(resp),
+                 "{\"status\":\"error\",\"error\":\"invalid_length\",\"got\":%d,\"expected\":%d}",
+                 req->content_len, expected);
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Screen POST bad length %d (expected %d)", req->content_len, expected);
+        httpd_resp_set_status(req, "400 Bad Request");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_send(req, resp, HTTPD_RESP_USE_STRLEN);
+        return ESP_OK;
+    }
+
+    char *wire_buf = get_shared_buffer(FRIXOS_SCREEN_LAYOUT_WIRE_SIZE, "screen_wire");
+    if (wire_buf == NULL)
     {
         httpd_resp_set_status(req, "500 Internal Server Error");
         httpd_resp_set_type(req, "application/json");
-        httpd_resp_send(req, "{\"status\":\"error\",\"error\":\"no_mem\"}", HTTPD_RESP_USE_STRLEN);
+        httpd_resp_send(req, "{\"status\":\"error\",\"error\":\"no_memory\"}", HTTPD_RESP_USE_STRLEN);
         return ESP_OK;
     }
 
     int received = 0;
     while (remaining > 0)
     {
-        int ret = httpd_req_recv(req, http_buffer + received, remaining);
+        int ret = httpd_req_recv(req, wire_buf + received, remaining);
         if (ret <= 0)
         {
-            if (ret == HTTPD_SOCK_ERR_TIMEOUT) continue;
-            free(http_buffer);
+            if (ret == HTTPD_SOCK_ERR_TIMEOUT)
+                continue;
+            release_shared_buffer(wire_buf);
             httpd_resp_set_status(req, "400 Bad Request");
             httpd_resp_set_type(req, "application/json");
             httpd_resp_send(req, "{\"status\":\"error\",\"error\":\"recv\"}", HTTPD_RESP_USE_STRLEN);
@@ -1567,87 +1438,23 @@ esp_err_t screen_post_handler(httpd_req_t *req)
         received += ret;
         remaining -= ret;
     }
-    http_buffer[received] = '\0';
 
-    cJSON *root = cJSON_Parse(http_buffer);
-    free(http_buffer);
-    if (!root)
+    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Screen POST %d bytes, free heap %u",
+                received, (unsigned)esp_get_free_heap_size());
+
+    screen_layout_t new_layout;
+    esp_err_t decode_err = screen_layout_wire_decode(
+        (const uint8_t *)wire_buf, received, &new_layout,
+        eeprom_font[0], eeprom_font[1], eeprom_aux_font[0], eeprom_aux_font[1],
+        &eeprom_color_filter[0], &eeprom_color_filter[1]);
+    release_shared_buffer(wire_buf);
+    if (decode_err != ESP_OK)
     {
         httpd_resp_set_status(req, "400 Bad Request");
         httpd_resp_set_type(req, "application/json");
-        httpd_resp_send(req, "{\"status\":\"error\",\"error\":\"bad_json\"}", HTTPD_RESP_USE_STRLEN);
+        httpd_resp_send(req, "{\"status\":\"error\",\"error\":\"bad_wire\"}", HTTPD_RESP_USE_STRLEN);
         return ESP_OK;
     }
-
-    screen_layout_t new_layout = eeprom_screen_layout;
-    new_layout.version = FRIXOS_SCREEN_LAYOUT_VERSION;
-
-    const cJSON *scroll_delay = cJSON_GetObjectItem(root, "scroll_delay");
-    if (cJSON_IsNumber(scroll_delay))
-        new_layout.scroll_delay = (uint8_t)clamp_int(scroll_delay->valueint, 30, 255);
-
-    char errbuf[96] = {0};
-    const cJSON *profiles = cJSON_GetObjectItem(root, "profiles");
-    if (!cJSON_IsObject(profiles))
-    {
-        cJSON_Delete(root);
-        httpd_resp_set_status(req, "400 Bad Request");
-        httpd_resp_set_type(req, "application/json");
-        httpd_resp_send(req, "{\"status\":\"error\",\"error\":\"missing_profiles\"}", HTTPD_RESP_USE_STRLEN);
-        return ESP_OK;
-    }
-
-    const cJSON *day = cJSON_GetObjectItem(profiles, "day");
-    const cJSON *night = cJSON_GetObjectItem(profiles, "night");
-    if (parse_screen_profile(day, &new_layout.profile[0], errbuf, sizeof(errbuf)) != ESP_OK ||
-        parse_screen_profile(night, &new_layout.profile[1], errbuf, sizeof(errbuf)) != ESP_OK)
-    {
-        cJSON_Delete(root);
-        httpd_resp_set_status(req, "400 Bad Request");
-        httpd_resp_set_type(req, "application/json");
-        char resp[180];
-        snprintf(resp, sizeof(resp), "{\"status\":\"error\",\"error\":\"%s\"}", errbuf[0] ? errbuf : "invalid");
-        httpd_resp_send(req, resp, HTTPD_RESP_USE_STRLEN);
-        return ESP_OK;
-    }
-
-    const cJSON *day_font = cJSON_GetObjectItem(root, "day_font");
-    if (cJSON_IsString(day_font))
-    {
-        strncpy(eeprom_font[0], day_font->valuestring, sizeof(eeprom_font[0]) - 1);
-        eeprom_font[0][sizeof(eeprom_font[0]) - 1] = '\0';
-    }
-
-    const cJSON *night_font = cJSON_GetObjectItem(root, "night_font");
-    if (cJSON_IsString(night_font))
-    {
-        strncpy(eeprom_font[1], night_font->valuestring, sizeof(eeprom_font[1]) - 1);
-        eeprom_font[1][sizeof(eeprom_font[1]) - 1] = '\0';
-    }
-
-    const cJSON *day_aux_font = cJSON_GetObjectItem(root, "day_aux_font");
-    if (cJSON_IsString(day_aux_font))
-    {
-        strncpy(eeprom_aux_font[0], day_aux_font->valuestring, sizeof(eeprom_aux_font[0]) - 1);
-        eeprom_aux_font[0][sizeof(eeprom_aux_font[0]) - 1] = '\0';
-    }
-
-    const cJSON *night_aux_font = cJSON_GetObjectItem(root, "night_aux_font");
-    if (cJSON_IsString(night_aux_font))
-    {
-        strncpy(eeprom_aux_font[1], night_aux_font->valuestring, sizeof(eeprom_aux_font[1]) - 1);
-        eeprom_aux_font[1][sizeof(eeprom_aux_font[1]) - 1] = '\0';
-    }
-
-    const cJSON *day_color_filter = cJSON_GetObjectItem(root, "day_color_filter");
-    if (cJSON_IsNumber(day_color_filter))
-        eeprom_color_filter[0] = (uint8_t)clamp_int(day_color_filter->valueint, 0, 4);
-
-    const cJSON *night_color_filter = cJSON_GetObjectItem(root, "night_color_filter");
-    if (cJSON_IsNumber(night_color_filter))
-        eeprom_color_filter[1] = (uint8_t)clamp_int(night_color_filter->valueint, 0, 4);
-
-    cJSON_Delete(root);
 
     eeprom_screen_layout = new_layout;
     screen_layout_sync_legacy_eeprom(&eeprom_screen_layout);
@@ -1753,6 +1560,7 @@ esp_err_t settings_post_handler(httpd_req_t *req)
     char orig_hostname[33];
     char orig_wifi_ssid[33];
     char orig_wifi_pass[64];
+    char orig_static_ip[16];
     char orig_lat[12];
     char orig_lon[12];
     char orig_timezone[TZ_LENGTH];
@@ -1763,6 +1571,7 @@ esp_err_t settings_post_handler(httpd_req_t *req)
     strncpy(orig_hostname, eeprom_hostname, sizeof(orig_hostname));
     strncpy(orig_wifi_ssid, eeprom_wifi_ssid, sizeof(orig_wifi_ssid));
     strncpy(orig_wifi_pass, eeprom_wifi_pass, sizeof(orig_wifi_pass));
+    strncpy(orig_static_ip, eeprom_static_ip, sizeof(orig_static_ip));
     strncpy(orig_lat, eeprom_lat, sizeof(orig_lat));
     strncpy(orig_lon, eeprom_lon, sizeof(orig_lon));
     strncpy(orig_timezone, eeprom_timezone, sizeof(orig_timezone));
@@ -1822,6 +1631,32 @@ esp_err_t settings_post_handler(httpd_req_t *req)
     if (cJSON_IsString(wifi_pass))
     {
         strncpy(eeprom_wifi_pass, wifi_pass->valuestring, sizeof(eeprom_wifi_pass) - 1);
+    }
+
+    // Static IP settings (p60-p63) — empty string clears setting (reverts to DHCP)
+    cJSON *static_ip_item = cJSON_GetObjectItem(root, "p60");
+    if (cJSON_IsString(static_ip_item))
+    {
+        strncpy(eeprom_static_ip, static_ip_item->valuestring, sizeof(eeprom_static_ip) - 1);
+        eeprom_static_ip[sizeof(eeprom_static_ip) - 1] = '\0';
+    }
+    cJSON *static_gw_item = cJSON_GetObjectItem(root, "p61");
+    if (cJSON_IsString(static_gw_item))
+    {
+        strncpy(eeprom_static_gw, static_gw_item->valuestring, sizeof(eeprom_static_gw) - 1);
+        eeprom_static_gw[sizeof(eeprom_static_gw) - 1] = '\0';
+    }
+    cJSON *static_nm_item = cJSON_GetObjectItem(root, "p62");
+    if (cJSON_IsString(static_nm_item))
+    {
+        strncpy(eeprom_static_nm, static_nm_item->valuestring, sizeof(eeprom_static_nm) - 1);
+        eeprom_static_nm[sizeof(eeprom_static_nm) - 1] = '\0';
+    }
+    cJSON *static_dns_item = cJSON_GetObjectItem(root, "p63");
+    if (cJSON_IsString(static_dns_item))
+    {
+        strncpy(eeprom_static_dns, static_dns_item->valuestring, sizeof(eeprom_static_dns) - 1);
+        eeprom_static_dns[sizeof(eeprom_static_dns) - 1] = '\0';
     }
 
     // Process display format settings
@@ -2448,7 +2283,8 @@ esp_err_t settings_post_handler(httpd_req_t *req)
     // Check if network settings changed
     if (strcmp(orig_wifi_ssid, eeprom_wifi_ssid) != 0 ||
         strcmp(orig_wifi_pass, eeprom_wifi_pass) != 0 ||
-        strcmp(orig_hostname, eeprom_hostname) != 0)
+        strcmp(orig_hostname, eeprom_hostname) != 0 ||
+        strcmp(orig_static_ip, eeprom_static_ip) != 0)
     {
         critical_settings_changed = true;
         ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Network settings changed, device will restart");
@@ -2609,8 +2445,8 @@ esp_err_t status_api_handler(httpd_req_t *req)
 
     // Check if we should include logs and integration details
     char logs_buffer[8] = {0};
-    const char *logs_param = get_query_param(req->uri, "logs", logs_buffer, sizeof(logs_buffer));
-    bool include_logs = (logs_param != NULL && strcmp(logs_param, "1") == 0);
+    get_request_query_param(req, "logs", logs_buffer, sizeof(logs_buffer));
+    bool include_logs = (logs_buffer[0] != '\0' && strcmp(logs_buffer, "1") == 0);
 
     // Set response headers first to ensure proper HTTP response
     httpd_resp_set_type(req, "application/json");
@@ -2666,9 +2502,29 @@ esp_err_t status_api_handler(httpd_req_t *req)
     esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
     if (netif && esp_netif_get_ip_info(netif, &ip_info) == ESP_OK)
     {
-        char ip_str[16];
+        char ip_str[16], gw_str[16], nm_str[16];
         snprintf(ip_str, sizeof(ip_str), IPSTR, IP2STR(&ip_info.ip));
+        snprintf(gw_str, sizeof(gw_str), IPSTR, IP2STR(&ip_info.gw));
+        snprintf(nm_str, sizeof(nm_str), IPSTR, IP2STR(&ip_info.netmask));
         cJSON_AddStringToObject(root, "ip_address", ip_str);
+        cJSON_AddStringToObject(root, "ip_gw", gw_str);
+        cJSON_AddStringToObject(root, "ip_nm", nm_str);
+
+        // DNS servers
+        esp_netif_dns_info_t dns_main = {0}, dns_backup = {0};
+        char dns1_str[16] = "", dns2_str[16] = "";
+        if (esp_netif_get_dns_info(netif, ESP_NETIF_DNS_MAIN, &dns_main) == ESP_OK &&
+            dns_main.ip.u_addr.ip4.addr != 0)
+        {
+            snprintf(dns1_str, sizeof(dns1_str), IPSTR, IP2STR(&dns_main.ip.u_addr.ip4));
+        }
+        if (esp_netif_get_dns_info(netif, ESP_NETIF_DNS_BACKUP, &dns_backup) == ESP_OK &&
+            dns_backup.ip.u_addr.ip4.addr != 0)
+        {
+            snprintf(dns2_str, sizeof(dns2_str), IPSTR, IP2STR(&dns_backup.ip.u_addr.ip4));
+        }
+        cJSON_AddStringToObject(root, "ip_dns1", dns1_str);
+        cJSON_AddStringToObject(root, "ip_dns2", dns2_str);
     }
 
     // Add memory status

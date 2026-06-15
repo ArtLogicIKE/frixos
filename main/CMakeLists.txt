@@ -3,6 +3,7 @@
 idf_component_register(SRCS 
     "main.c"
     "f-screen-layout.c"
+    "f-screen-layout-bin.c"
     "f-wifi.c"
     "f-display.c"
     "f-time.c"
