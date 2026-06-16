@@ -368,7 +368,15 @@ function fetchSectionParams(sectionName) {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Load theme and settings params together (settings is default page, so preload it)
+    const initialHash = window.location.hash.substring(1) || 'settings';
+    document.querySelectorAll('.page-section').forEach(s => s.style.display = 'none');
+    const targetSection = el(initialHash + '-section');
+    if (targetSection) {
+        targetSection.style.display = 'block';
+        showSectionLoader(initialHash);
+    }
+
+    // Load theme and settings params together (settings is default page, so preload it) (settings is default page, so preload it)
     // Other sections (advanced, integrations) load on demand when navigated to
     Promise.allSettled([fetchThemeParams(), fetchSectionParams('settings')])
         .then((results) => {
@@ -397,6 +405,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Initialize the current section based on URL hash (settings already loaded)
             navigateToSection();
+
             
             // Setup hostname validation
             setupHostnameValidation();
@@ -582,34 +591,40 @@ function navigateToSection() {
         
         // Load parameters for the section if not already loaded
         if (hash === 'settings' && !window.sectionsInitialized.settings) {
+            showSectionLoader('settings');
             fetchSectionParams('settings')
                 .then(data => {
                     setupSettingsSection();
                     window.sectionsInitialized.settings = true;
+                    hideSectionLoader('settings');
                 })
                 .catch(error => {
                     console.error('Error loading settings section:', error);
+                    hideSectionLoader('settings');
                 });
         } else if (hash === 'advanced' && !window.sectionsInitialized.advanced) {
+            showSectionLoader('advanced');
             fetchSectionParams('advanced')
                 .then(data => {
                     setupAdvancedSection();
                     window.sectionsInitialized.advanced = true;
+                    hideSectionLoader('advanced');
                 })
                 .catch(error => {
                     console.error('Error loading advanced section:', error);
+                    hideSectionLoader('advanced');
                 });
         } else if (hash === 'integrations' && !window.sectionsInitialized.integrations) {
-            const integrationsFormEarly = el('integrationsForm');
-            const submitWhileLoading = integrationsFormEarly && integrationsFormEarly.querySelector('button[type="submit"]');
-            if (submitWhileLoading) submitWhileLoading.disabled = true;
+            showSectionLoader('integrations');
             fetchSectionParams('integrations')
                 .then(data => {
                     setupIntegrationsSection();
                     window.sectionsInitialized.integrations = true;
+                    hideSectionLoader('integrations');
                 })
                 .catch(error => {
                     console.error('Error loading integrations section:', error);
+                    hideSectionLoader('integrations');
                 });
         } else if (hash === 'status' && !window.sectionsInitialized.status) {
             // Status section uses /api/status, not /api/settings
@@ -626,18 +641,23 @@ function navigateToSection() {
         } else if (hash === 'settings' && window.sectionsInitialized.settings) {
             // Re-initialize with already loaded data
             setupSettingsSection();
+            hideSectionLoader('settings');
         } else if (hash === 'advanced' && window.sectionsInitialized.advanced) {
             // Re-initialize with already loaded data
             setupAdvancedSection();
+            hideSectionLoader('advanced');
         } else if (hash === 'integrations' && window.sectionsInitialized.integrations) {
             // Re-initialize with already loaded data
             setupIntegrationsSection();
+            hideSectionLoader('integrations');
         } else if (hash === 'status' && window.sectionsInitialized.status) {
             // Re-fetch status data when returning to status page
             fetchStatus(true);
+            hideSectionLoader('status');
         } else if (hash === 'screen' && window.sectionsInitialized.screen) {
             setupScreenSection();
             refreshScreenLayoutSelect();
+            hideSectionLoader('screen');
         }
     }
 }
@@ -970,3 +990,53 @@ function addIfChanged(formData, key, newValue, oldValue) {
     return false;
 }
 
+
+function showSectionLoader(sectionId) {
+    const section = el(sectionId + '-section');
+    if (!section) return;
+    
+    section.classList.add('is-loading');
+    Array.from(section.children).forEach(child => {
+        if (!child.classList.contains('section-loader')) {
+            child.style.display = 'none';
+        }
+    });
+
+    let loader = section.querySelector('.section-loader');
+    if (!loader) {
+        loader = document.createElement('div');
+        loader.className = 'section-loader';
+        loader.innerHTML = `
+            <div class="spinner"></div>
+            <div class="loader-text" data-i18n="common.loading">Loading...</div>
+        `;
+        section.appendChild(loader);
+    }
+    
+    if (typeof currentLanguage !== 'undefined' && typeof translations !== 'undefined') {
+        const trans = translations[currentLanguage] || translations?.en;
+        if (trans) {
+            const textNode = getNestedTranslation(trans, 'common.loading') || 'Loading...';
+            if (textNode) loader.querySelector('.loader-text').textContent = textNode;
+        }
+    }
+    
+    loader.style.display = 'flex';
+}
+
+function hideSectionLoader(sectionId) {
+    const section = el(sectionId + '-section');
+    if (!section) return;
+    
+    let loader = section.querySelector('.section-loader');
+    if (loader) loader.style.display = 'none';
+    section.classList.remove('is-loading');
+    Array.from(section.children).forEach(child => {
+        if (!child.classList.contains('section-loader')) {
+            child.style.display = '';
+            child.style.animation = 'none'; // reset
+            void child.offsetWidth; // trigger reflow
+            child.style.animation = 'fadeIn 0.4s ease forwards';
+        }
+    });
+}

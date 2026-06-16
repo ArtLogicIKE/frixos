@@ -252,3 +252,89 @@ h1 {
     font-size: 1.1rem;
 }
 
+
+/* Section Loader */
+.section-loader {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    background-color: transparent;
+    animation: fadeIn 0.3s ease;
+}
+
+.spinner {
+    width: 48px;
+    height: 48px;
+    border: 4px solid rgba(0, 170, 255, 0.15);
+    border-radius: 50%;
+    border-top-color: var(--primary-color);
+    animation: loader-spin 1s cubic-bezier(0.5, 0.1, 0.4, 0.9) infinite;
+    margin-bottom: 20px;
+}
+
+.loader-text {
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    animation: loader-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    letter-spacing: 0.5px;
+}
+
+@keyframes loader-spin { 
+    to { transform: rotate(360deg); } 
+}
+@keyframes loader-pulse { 
+    0%, 100% { opacity: 0.5; } 
+    50% { opacity: 1; } 
+}
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Help Icon Header */
+.section-header-help {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 10px;
+    height: 30px;
+}
+
+.help-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background-color: var(--section-content-bg);
+    color: var(--primary-color);
+    text-decoration: none;
+    font-size: 1.1rem;
+    font-weight: bold;
+    border: 1px solid var(--border-color);
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    margin-bottom: 15px;
+}
+
+.help-icon:hover, .help-icon:focus {
+    background-color: var(--primary-color);
+    color: #fff;
+    border-color: var(--primary-color);
+    transform: scale(1.05);
+    box-shadow: 0 2px 8px rgba(0, 170, 255, 0.3);
+    outline: none;
+}
+
+
+.page-section {
+    display: none;
+}
+.page-section.is-loading > *:not(.section-loader) {
+    display: none !important;
+}
