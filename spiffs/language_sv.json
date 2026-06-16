@@ -177,7 +177,22 @@
       "timezone": "Tidszon",
       "timezone_placeholder": "Ange tidszon i POSIX-format ENDAST om automatisk detektering inte fungerar",
       "help_text": "Du kan hitta en lista över POSIX-tidszoner <a href=\"https://leo.leung.xyz/wiki/Timezone\" target=\"_blank\">här</a>. Lat/Lon påverkar endast väderdata.",
-      "restart_note": "* Ändring av platsinställningar kommer att starta om enheten."
+      "restart_note": "* Ändring av platsinställningar kommer att starta om enheten.",
+      "city": "Stad",
+      "city_placeholder": "Sök efter stadsnamn…",
+      "btn_search": "Sök",
+      "btn_geolocate": "Hitta mig",
+      "coordinates": "Koordinater",
+      "lat_short": "Lat.",
+      "lon_short": "Long.",
+      "geolocate_loading": "Hämtar plats från enheten…",
+      "geolocate_error": "Kunde inte läsa plats från enheten.",
+      "city_searching": "Söker…",
+      "city_not_found": "Stad hittades inte.",
+      "city_search_error": "Sökning misslyckades. Kontrollera anslutningen.",
+      "city_found": "Hittade: {city}",
+      "reverse_geocode_loading": "Identifierar närmaste stad…",
+      "geolocate_no_data": "Inga IP-koordinater tillgängliga på enheten ännu. Använd stadssökning."
     },
     "wifi_hours": {
       "title": "WiFi-aktiva timmar",
