@@ -1824,7 +1824,7 @@ static bool is_time_of_day_bright(void)
   if (timeinfo.tm_year + 1900 <= 2025)
     return true;
 
-  return is_hour_in_range(eeprom_dim_start, eeprom_dim_end, timeinfo.tm_hour);
+  return is_time_in_range(eeprom_dim_start, eeprom_dim_end, timeinfo.tm_hour * 60 + timeinfo.tm_min);
 }
 
 static void handle_als_and_brightness(uint32_t loop_counter)

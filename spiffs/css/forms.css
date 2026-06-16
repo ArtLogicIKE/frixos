@@ -194,3 +194,84 @@ textarea[aria-invalid="true"] {
     animation: fadeIn 0.5s ease-in-out;
 }
 
+
+/* Custom Time Range Component - MUI Inspired */
+.time-range-group {
+    width: 200px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.time-box {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.time-box label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+    font-weight: 500;
+    transition: color 0.2s ease;
+}
+
+.time-box:focus-within label {
+    color: var(--primary-color);
+}
+
+.time-input-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.time-select {
+    width: 120px;
+    padding: 12px 14px;
+    font-size: 1rem;
+    color: var(--text-color);
+    background-color: transparent;
+    border: 1px solid var(--input-border);
+    border-radius: 4px;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    font-family: inherit;
+    box-sizing: border-box;
+}
+
+.time-select:hover {
+    border-color: #888888;
+}
+
+.time-select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: inset 0 0 0 1px var(--primary-color);
+}
+
+/* Material Design native clock icon styling */
+.time-select::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+    filter: invert(1);
+    /* Expand clickable area slightly if desired */
+    padding: 4px;
+}
+
+.time-select:hover::-webkit-calendar-picker-indicator {
+    opacity: 1;
+}
+
+.light-theme .time-select::-webkit-calendar-picker-indicator {
+    filter: invert(0);
+}
+
+.time-divider {
+    color: var(--text-secondary);
+    padding-top: 24px; /* match the label spacing */
+    opacity: 0.5;
+    flex-shrink: 0;
+}

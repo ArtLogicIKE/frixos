@@ -519,3 +519,18 @@ function updateCgmExclusivity() {
     dexcom.disabled = libreEnabled || nsEnabled;
 }
 
+
+// Helper to parse time string HH:MM to minutes
+function parseTimeStringToMins(timeStr) {
+    if (!timeStr) return 0;
+    const parts = timeStr.split(':');
+    return (parseInt(parts[0] || '0', 10) * 60) + parseInt(parts[1] || '0', 10);
+}
+
+// Helper to format minutes to HH:MM string
+function formatMinsToTimeString(mins) {
+    const totalMins = parseInt(mins, 10) || 0;
+    const h = Math.floor(totalMins / 60) % 24;
+    const m = totalMins % 60;
+    return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+}

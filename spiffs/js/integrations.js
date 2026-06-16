@@ -76,13 +76,13 @@ function setupAdvancedSection() {
         if (el('lat') && window.settings.p17 !== undefined) el('lat').value = window.settings.p17 || '';
         if (el('lon') && window.settings.p18 !== undefined) el('lon').value = window.settings.p18 || '';
         if (el('timezone') && window.settings.p19 !== undefined) el('timezone').value = window.settings.p19 || '';
-        if (el('wifi_start') && window.settings.p46 !== undefined) el('wifi_start').value = window.settings.p46 || 0;
-        if (el('wifi_end') && window.settings.p47 !== undefined) el('wifi_end').value = window.settings.p47 || 0;
+        if (el('wifi_start') && window.settings.p46 !== undefined) el('wifi_start').value = formatMinsToTimeString(window.settings.p46);
+        if (el('wifi_end') && window.settings.p47 !== undefined) el('wifi_end').value = formatMinsToTimeString(window.settings.p47);
         if (el('lux_sensitivity') && window.settings.p20 !== undefined) el('lux_sensitivity').value = window.settings.p20 || 2.5;
         if (el('lux_threshold') && window.settings.p21 !== undefined) el('lux_threshold').value = window.settings.p21 || 50;
         if (el('dim_mode') && window.settings.p22 !== undefined) el('dim_mode').value = String(window.settings.p22);
-        if (el('dim_start') && window.settings.p55 !== undefined) el('dim_start').value = window.settings.p55 || 0;
-        if (el('dim_end') && window.settings.p56 !== undefined) el('dim_end').value = window.settings.p56 || 0;
+        if (el('dim_start') && window.settings.p55 !== undefined) el('dim_start').value = formatMinsToTimeString(window.settings.p55);
+        if (el('dim_end') && window.settings.p56 !== undefined) el('dim_end').value = formatMinsToTimeString(window.settings.p56);
         updateDimmingModeSections();
         if (el('brightness_LED0') && window.settings.p23 && window.settings.p23[0] !== undefined) el('brightness_LED0').value = window.settings.p23[0];
         if (el('brightness_LED1') && window.settings.p23 && window.settings.p23[1] !== undefined) el('brightness_LED1').value = window.settings.p23[1];

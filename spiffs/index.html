@@ -251,15 +251,24 @@
                         <h2 data-i18n="advanced.wifi_hours.title">WiFi Active Hours</h2>
                     </div>
                     <div class="section-content">
-                        <div class="form-group">
-                            <label for="wifi_start" data-i18n="advanced.wifi_hours.start">Start</label>
-                            <input type="number" id="wifi_start" name="wifi_start" min="0" max="23" value="0">
-                            <span id="wifi_start-error" class="input-error"></span>
-                        </div>
-                        <div class="form-group">
-                            <label for="wifi_end" data-i18n="advanced.wifi_hours.end">End</label>
-                            <input type="number" id="wifi_end" name="wifi_end" min="0" max="23" value="0">
-                            <span id="wifi_end-error" class="input-error"></span>
+                        <div class="time-range-group">
+                            <div class="time-box">
+                                <label for="wifi_start" data-i18n="advanced.wifi_hours.start">Start</label>
+                                <div class="time-input-wrap">
+                                    <input type="time" id="wifi_start" name="wifi_start" class="time-select" required>
+                                </div>
+                                <span id="wifi_start-error" class="input-error"></span>
+                            </div>
+                            <div class="time-divider">
+                                <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                            </div>
+                            <div class="time-box">
+                                <label for="wifi_end" data-i18n="advanced.wifi_hours.end">End</label>
+                                <div class="time-input-wrap">
+                                    <input type="time" id="wifi_end" name="wifi_end" class="time-select" required>
+                                </div>
+                                <span id="wifi_end-error" class="input-error"></span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -298,15 +307,24 @@
                         </div>
                         <div id="timeofday_dimming_section">
                             <h3 data-i18n="advanced.brightness.timeofday_dimming">Time-of-day dimming</h3>
-                            <div class="form-group">
-                                <label for="dim_start" data-i18n="advanced.brightness.dim_start">Start</label>
-                                <input type="number" id="dim_start" name="dim_start" min="0" max="23" value="0">
-                                <span id="dim_start-error" class="input-error"></span>
-                            </div>
-                            <div class="form-group">
-                                <label for="dim_end" data-i18n="advanced.brightness.dim_end">End</label>
-                                <input type="number" id="dim_end" name="dim_end" min="0" max="23" value="0">
-                                <span id="dim_end-error" class="input-error"></span>
+                            <div class="time-range-group">
+                                <div class="time-box">
+                                    <label for="dim_start" data-i18n="advanced.brightness.dim_start">Start</label>
+                                    <div class="time-input-wrap">
+                                        <input type="time" id="dim_start" name="dim_start" class="time-select" required>
+                                    </div>
+                                    <span id="dim_start-error" class="input-error"></span>
+                                </div>
+                                <div class="time-divider">
+                                    <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                                </div>
+                                <div class="time-box">
+                                    <label for="dim_end" data-i18n="advanced.brightness.dim_end">End</label>
+                                    <div class="time-input-wrap">
+                                        <input type="time" id="dim_end" name="dim_end" class="time-select" required>
+                                    </div>
+                                    <span id="dim_end-error" class="input-error"></span>
+                                </div>
                             </div>
                         </div>
                         <h3 data-i18n="advanced.brightness.led_levels">LED Brightness Levels (%)</h3>

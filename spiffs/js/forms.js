@@ -189,10 +189,10 @@ function handleFormSubmit(e, formId) {
         if (timezoneEl && addIfChanged(formData, 'p19', timezoneEl.value, window.settings.p19)) changedCount++;
         
         const wifiStartEl = getFieldInForm('wifi_start');
-        if (wifiStartEl && addIfChanged(formData, 'p46', parseInt(wifiStartEl.value) || 0, window.settings.p46)) changedCount++;
+        if (wifiStartEl && addIfChanged(formData, 'p46', parseTimeStringToMins(wifiStartEl.value), window.settings.p46)) changedCount++;
         
         const wifiEndEl = getFieldInForm('wifi_end');
-        if (wifiEndEl && addIfChanged(formData, 'p47', parseInt(wifiEndEl.value) || 0, window.settings.p47)) changedCount++;
+        if (wifiEndEl && addIfChanged(formData, 'p47', parseTimeStringToMins(wifiEndEl.value), window.settings.p47)) changedCount++;
         
         const luxSensitivityEl = getFieldInForm('lux_sensitivity');
         if (luxSensitivityEl && addIfChanged(formData, 'p20', parseFloat(luxSensitivityEl.value) || 0, window.settings.p20)) changedCount++;
@@ -204,10 +204,10 @@ function handleFormSubmit(e, formId) {
         if (dimModeEl && addIfChanged(formData, 'p22', parseInt(dimModeEl.value, 10) || 0, window.settings.p22)) changedCount++;
 
         const dimStartEl = getFieldInForm('dim_start');
-        if (dimStartEl && addIfChanged(formData, 'p55', parseInt(dimStartEl.value, 10) || 0, window.settings.p55)) changedCount++;
+        if (dimStartEl && addIfChanged(formData, 'p55', parseTimeStringToMins(dimStartEl.value), window.settings.p55)) changedCount++;
 
         const dimEndEl = getFieldInForm('dim_end');
-        if (dimEndEl && addIfChanged(formData, 'p56', parseInt(dimEndEl.value, 10) || 0, window.settings.p56)) changedCount++;
+        if (dimEndEl && addIfChanged(formData, 'p56', parseTimeStringToMins(dimEndEl.value), window.settings.p56)) changedCount++;
         
         // Handle brightness array - check if any element changed
         // Backend expects exactly 2 elements [day, night], range 1-100. Do not send a third element.

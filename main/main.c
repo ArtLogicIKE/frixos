@@ -91,10 +91,10 @@ char eeprom_static_ip[16]  = "";             // p60: Static IP (empty = DHCP)
 char eeprom_static_gw[16]  = "";             // p61: Default gateway
 char eeprom_static_nm[16]  = "255.255.255.0"; // p62: Subnet mask
 char eeprom_static_dns[40] = "";             // p63: DNS servers, comma-separated
-uint8_t eeprom_wifi_start = 0;                                     // WiFi Active Hours Start (0-23), default 0
-uint8_t eeprom_wifi_end = 0;                                       // WiFi Active Hours End (0-23), default 0
-uint8_t eeprom_dim_start = 0;                                      // Time-of-day dimming start (0-23), default 0
-uint8_t eeprom_dim_end = 0;                                        // Time-of-day dimming end (0-23), default 0
+uint16_t eeprom_wifi_start = 0;                                     // WiFi Active Hours Start (0-23), default 0
+uint16_t eeprom_wifi_end = 0;                                       // WiFi Active Hours End (0-23), default 0
+uint16_t eeprom_dim_start = 0;                                      // Time-of-day dimming start (0-23), default 0
+uint16_t eeprom_dim_end = 0;                                        // Time-of-day dimming end (0-23), default 0
 char eeprom_lat[12] = "", my_lat[12] = "";                         // "48.123456";
 char eeprom_lon[12] = "", my_lon[12] = "";                         // "16.123456";
 char eeprom_timezone[TZ_LENGTH] = "", my_timezone[TZ_LENGTH] = ""; // EET-2EEST,M3.5.0/3,M10.5.0/4";
@@ -139,12 +139,12 @@ static const nvs_setting_t settings_table[] = {
     {"dayfont", SETTING_TYPE_STR, eeprom_font[0], sizeof(eeprom_font[0])},
     {"nightfont", SETTING_TYPE_STR, eeprom_font[1], sizeof(eeprom_font[1])},
     {"dim_disable", SETTING_TYPE_U8, &eeprom_dim_mode, 0},
-    {"dim_start", SETTING_TYPE_U8, &eeprom_dim_start, 0},
-    {"dim_end", SETTING_TYPE_U8, &eeprom_dim_end, 0},
+    {"dim_start", SETTING_TYPE_U16, &eeprom_dim_start, 0},
+    {"dim_end", SETTING_TYPE_U16, &eeprom_dim_end, 0},
     {"fahrenheit", SETTING_TYPE_U8, &eeprom_fahrenheit, 0},
     {"12hour", SETTING_TYPE_U8, &eeprom_12hour, 0},
-    {"wifi_start", SETTING_TYPE_U8, &eeprom_wifi_start, 0},
-    {"wifi_end", SETTING_TYPE_U8, &eeprom_wifi_end, 0},
+    {"wifi_start", SETTING_TYPE_U16, &eeprom_wifi_start, 0},
+    {"wifi_end", SETTING_TYPE_U16, &eeprom_wifi_end, 0},
     {"quiet_scroll", SETTING_TYPE_U8, &eeprom_quiet_scroll, 0},
     {"quiet_weather", SETTING_TYPE_U8, &eeprom_quiet_weather, 0},
     {"lead_zero", SETTING_TYPE_U8, &eeprom_show_leading_zero, 0},

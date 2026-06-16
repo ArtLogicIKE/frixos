@@ -369,20 +369,8 @@ static bool is_wifi_active_hours(void)
         return true;
     }
     
-    int current_hour = timeinfo.tm_hour;
-    
-    // WiFi is OFF if current_hour > wifi_end AND current_hour < wifi_start
-    // WiFi is ON if current_hour >= wifi_start AND current_hour <= wifi_end
-    if (eeprom_wifi_start <= eeprom_wifi_end)
-    {
-        // Normal case: start <= end (e.g., 8-14 means 8:00 to 14:59)
-        return (current_hour >= eeprom_wifi_start && current_hour <= eeprom_wifi_end);
-    }
-    else
-    {
-        // Wrap-around case: start > end (e.g., 14-8 means 14:00-23:59 and 0:00-8:59)
-        return (current_hour >= eeprom_wifi_start || current_hour <= eeprom_wifi_end);
-    }
+        int current_min = timeinfo.tm_hour * 60 + timeinfo.tm_min;
+    return is_time_in_range(eeprom_wifi_start, eeprom_wifi_end, current_min);
 }
 
 // WiFi Active Hours timer callback
