@@ -211,16 +211,29 @@
                         <h2 data-i18n="advanced.location.title">Location Settings *</h2>
                     </div>
                     <div class="section-content">
-                        <div class="form-group">
-                            <label for="lat" data-i18n="advanced.location.latitude">Latitude</label>
-                            <input type="text" id="lat" name="lat" placeholder="e.g. 40.6892494">
+                        <!-- City search row -->
+                        <div class="form-group location-search-row">
+                            <label for="city_search" data-i18n="advanced.location.city">City</label>
+                            <input type="text" id="city_search" name="city_search"
+                                data-i18n-placeholder="advanced.location.city_placeholder"
+                                autocomplete="off" spellcheck="false">
+                            <button type="button" id="btn-search-city" class="button button-sm"
+                                data-i18n="advanced.location.btn_search">Search</button>
+                            <button type="button" id="btn-geolocate" class="button button-sm button-secondary"
+                                data-i18n="advanced.location.btn_geolocate">Locate me</button>
+                        </div>
+                        <!-- Coordinates row -->
+                        <div class="form-group location-coords-row">
+                            <span class="coords-label" data-i18n="advanced.location.coordinates">Coordinates</span>
+                            <label for="lat" class="coord-sublabel" data-i18n="advanced.location.lat_short">Lat.</label>
+                            <input type="text" id="lat" name="lat" class="coord-input" placeholder="e.g. 40.6892494">
                             <span id="lat-error" class="input-error"></span>
-                        </div>
-                        <div class="form-group">
-                            <label for="lon" data-i18n="advanced.location.longitude">Longitude</label>
-                            <input type="text" id="lon" name="lon" placeholder="e.g. -74.0470807">
+                            <label for="lon" class="coord-sublabel" data-i18n="advanced.location.lon_short">Long.</label>
+                            <input type="text" id="lon" name="lon" class="coord-input" placeholder="e.g. -74.0470807">
                             <span id="lon-error" class="input-error"></span>
+                            <span id="coords-city-hint" class="coords-city-hint"></span>
                         </div>
+                        <!-- Timezone and help (unchanged below) -->
                         <div class="form-group">
                             <label for="timezone" data-i18n="advanced.location.timezone">Timezone</label>
                             <input type="text" id="timezone" name="timezone"

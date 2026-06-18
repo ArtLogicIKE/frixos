@@ -177,7 +177,22 @@
       "timezone": "Fuso orario",
       "timezone_placeholder": "Inserire il fuso orario in formato POSIX SOLO se il rilevamento automatico non funziona",
       "help_text": "È possibile trovare un elenco di fusi orari POSIX <a href=\"https://leo.leung.xyz/wiki/Timezone\" target=\"_blank\">qui</a>. Lat/Lon influenzano solo i dati meteo.",
-      "restart_note": "* La modifica delle impostazioni di posizione riavvierà il dispositivo."
+      "restart_note": "* La modifica delle impostazioni di posizione riavvierà il dispositivo.",
+      "city": "Città",
+      "city_placeholder": "Cerca per nome città…",
+      "btn_search": "Cerca",
+      "btn_geolocate": "Localizzami",
+      "coordinates": "Coordinate",
+      "lat_short": "Lat.",
+      "lon_short": "Long.",
+      "geolocate_loading": "Recupero posizione dal dispositivo…",
+      "geolocate_error": "Impossibile leggere la posizione dal dispositivo.",
+      "city_searching": "Ricerca in corso…",
+      "city_not_found": "Città non trovata.",
+      "city_search_error": "Ricerca fallita. Controlla la connessione.",
+      "city_found": "Trovata: {city}",
+      "reverse_geocode_loading": "Identificazione della città più vicina…",
+      "geolocate_no_data": "Nessuna coordinata IP disponibile sul dispositivo. Usa la ricerca per città."
     },
     "wifi_hours": {
       "title": "Ore attive WiFi",

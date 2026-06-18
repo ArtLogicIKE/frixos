@@ -179,12 +179,27 @@ const translations = {
             },
             location: {
                 title: 'Location Settings *',
+                city: 'City',
+                city_placeholder: 'Search by city name…',
+                btn_search: 'Search',
+                btn_geolocate: 'Locate me',
+                coordinates: 'Coordinates',
+                lat_short: 'Lat.',
+                lon_short: 'Long.',
                 latitude: 'Latitude',
                 longitude: 'Longitude',
                 timezone: 'Timezone',
                 timezone_placeholder: 'Enter Timezone in POSIX format ONLY if automatic detection doesn\'t work',
                 help_text: 'You can find a list of POSIX timezones <a href="https://leo.leung.xyz/wiki/Timezone" target="_blank">here</a>. Lat/Lon only affect weather data.',
-                restart_note: '* Changing location settings will restart the device.'
+                restart_note: '* Changing location settings will restart the device.',
+                geolocate_loading: 'Fetching location from device…',
+                geolocate_error: 'Failed to read location from device.',
+                geolocate_no_data: 'No IP coordinates available on device yet. Try city search.',
+                city_searching: 'Searching…',
+                city_not_found: 'City not found.',
+                city_search_error: 'Search failed. Check your connection.',
+                city_found: 'Found: {city}',
+                reverse_geocode_loading: 'Identifying nearest city…'
             },
             wifi_hours: {
                 title: 'WiFi Active Hours',
@@ -5379,6 +5394,161 @@ function updateDimmingModeSections() {
     if (timeSection) timeSection.style.display = mode === 2 ? '' : 'none';
 }
 
+// --- Location helpers (geolocation + city search) ---
+
+function locationMsg(text, cls) {
+    if (cls === 'error') {
+        showStatus(text, 'error');
+        // clear any loading hint
+        const hint = document.getElementById('coords-city-hint');
+        if (hint) { hint.textContent = ''; hint.className = 'coords-city-hint'; }
+        return;
+    }
+    const hint = document.getElementById('coords-city-hint');
+    if (!hint) return;
+    if (cls === 'loading') {
+        hint.textContent = text;
+        hint.className = 'coords-city-hint hint-loading';
+    } else {
+        // success / empty — setCityDisplay already wrote the city name; just reset class
+        hint.className = 'coords-city-hint';
+    }
+}
+
+function setCoords(lat, lon) {
+    const latEl = document.getElementById('lat');
+    const lonEl = document.getElementById('lon');
+    if (latEl) { latEl.value = lat; latEl.dispatchEvent(new Event('input')); }
+    if (lonEl) { lonEl.value = lon; lonEl.dispatchEvent(new Event('input')); }
+}
+
+function setCityDisplay(cityName) {
+    const cityEl = document.getElementById('city_search');
+    if (cityEl) cityEl.value = cityName;
+    const hint = document.getElementById('coords-city-hint');
+    if (hint) {
+        hint.textContent = cityName || '';
+        hint.className = 'coords-city-hint'; // reset any loading state
+    }
+    // Persist so city name survives page reload
+    const lat = (document.getElementById('lat')?.value || '').trim();
+    const lon = (document.getElementById('lon')?.value || '').trim();
+    try {
+        if (cityName && lat && lon) {
+            localStorage.setItem('frixos_city_hint', JSON.stringify({ lat, lon, city: cityName }));
+        } else if (!cityName) {
+            localStorage.removeItem('frixos_city_hint');
+        }
+    } catch(e) {}
+}
+
+/**
+ * Reverse-geocode coordinates to a city name using Nominatim.
+ * Returns a promise that resolves to the city string (best effort).
+ */
+function reverseGeocode(lat, lon) {
+    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=en`;
+    return fetch(url, { headers: { 'Accept-Language': navigator.language || 'en' } })
+        .then(r => r.json())
+        .then(data => {
+            const a = data.address || {};
+            return a.city || a.town || a.village || a.hamlet || a.county || a.state || '';
+        })
+        .catch(() => '');
+}
+
+/**
+ * Search a city by name using Nominatim geocoding (multilingual, uses browser locale).
+ * Returns a promise resolving to { lat, lon, displayName } or null.
+ */
+function searchCity(query) {
+    const lang = navigator.language || 'en';
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1&accept-language=${lang}`;
+    return fetch(url, { headers: { 'Accept-Language': lang } })
+        .then(r => r.json())
+        .then(data => {
+            if (!data || data.length === 0) return null;
+            const r = data[0];
+            return { lat: parseFloat(r.lat).toFixed(7), lon: parseFloat(r.lon).toFixed(7), displayName: r.display_name };
+        });
+}
+
+function setupLocationButtons() {
+    const btnSearch = document.getElementById('btn-search-city');
+    const btnGeo = document.getElementById('btn-geolocate');
+    const cityInput = document.getElementById('city_search');
+
+    if (btnSearch && !btnSearch._locationBound) {
+        btnSearch._locationBound = true;
+
+        const doSearch = () => {
+            const query = (cityInput?.value || '').trim();
+            if (!query) return;
+            const t = (key) => getNestedTranslation(translations[currentLanguage] || translations.en, `advanced.location.${key}`) || key;
+            locationMsg(t('city_searching'), 'loading');
+            btnSearch.disabled = true;
+            searchCity(query)
+                .then(result => {
+                    if (!result) {
+                        locationMsg(t('city_not_found'), 'error');
+                    } else {
+                        setCoords(result.lat, result.lon);
+                        const short = result.displayName.split(',')[0].trim();
+                        locationMsg((t('city_found') || 'Found: {city}').replace('{city}', short), 'success');
+                        setCityDisplay(short);
+                    }
+                })
+                .catch(() => locationMsg(t('city_search_error'), 'error'))
+                .finally(() => { btnSearch.disabled = false; });
+        };
+
+        btnSearch.addEventListener('click', doSearch);
+
+        if (cityInput) {
+            cityInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); doSearch(); }
+            });
+        }
+    }
+
+    if (btnGeo && !btnGeo._locationBound) {
+        btnGeo._locationBound = true;
+        btnGeo.addEventListener('click', () => {
+            const t = (key) => getNestedTranslation(translations[currentLanguage] || translations.en, `advanced.location.${key}`) || key;
+
+            locationMsg(t('geolocate_loading'), 'loading');
+            btnGeo.disabled = true;
+
+            // Read the coordinates already determined by the ESP32 via IP lookup at startup.
+            fetch('/api/status')
+                .then(r => {
+                    if (!r.ok) throw new Error('HTTP ' + r.status);
+                    return r.json();
+                })
+                .then(data => {
+                    const lat = data.latitude;
+                    const lon = data.longitude;
+                    if (!lat || !lon || lat === '' || lon === '') {
+                        locationMsg(t('geolocate_no_data'), 'error');
+                        return;
+                    }
+                    setCoords(lat, lon);
+                    locationMsg(t('reverse_geocode_loading'), 'loading');
+                    reverseGeocode(lat, lon).then(cityName => {
+                        if (cityName) {
+                            setCityDisplay(cityName);
+                            locationMsg((t('city_found') || 'Found: {city}').replace('{city}', cityName), 'success');
+                        } else {
+                            locationMsg('', '');
+                        }
+                    });
+                })
+                .catch(() => locationMsg(t('geolocate_error'), 'error'))
+                .finally(() => { btnGeo.disabled = false; });
+        });
+    }
+}
+
 function setupAdvancedSection() {
     // Setup event listeners only once
     if (!window.advancedEventListenersSet) {
@@ -5439,6 +5609,9 @@ function setupAdvancedSection() {
         });
     }
 
+    // Always re-bind location buttons (they guard themselves with _locationBound)
+    setupLocationButtons();
+
     // Populate fields if settings are loaded
     if (window.settings && window.settingsLoaded.advanced) {
         const messageInput = el('message');
@@ -5447,6 +5620,17 @@ function setupAdvancedSection() {
         if (el('ofs_y') && window.settings.p02 !== undefined) el('ofs_y').value = window.settings.p02 || 0;
         if (el('lat') && window.settings.p17 !== undefined) el('lat').value = window.settings.p17 || '';
         if (el('lon') && window.settings.p18 !== undefined) el('lon').value = window.settings.p18 || '';
+        // Restore city hint from localStorage if coords still match
+        try {
+            const saved = JSON.parse(localStorage.getItem('frixos_city_hint') || 'null');
+            if (saved && saved.city) {
+                const norm = v => parseFloat(v || '0').toFixed(7);
+                if (norm(saved.lat) === norm(window.settings.p17 || '') &&
+                    norm(saved.lon) === norm(window.settings.p18 || '')) {
+                    setCityDisplay(saved.city);
+                }
+            }
+        } catch(e) {}
         if (el('timezone') && window.settings.p19 !== undefined) el('timezone').value = window.settings.p19 || '';
         if (el('wifi_start') && window.settings.p46 !== undefined) el('wifi_start').value = window.settings.p46 || 0;
         if (el('wifi_end') && window.settings.p47 !== undefined) el('wifi_end').value = window.settings.p47 || 0;
