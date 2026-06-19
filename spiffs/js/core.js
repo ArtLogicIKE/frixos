@@ -416,6 +416,16 @@ document.addEventListener('DOMContentLoaded', function() {
             // Initialize accessibility
             initA11y();
 
+            // Initialize character counters for all inputs with maxlength and a corresponding -counter element
+            document.querySelectorAll('input[maxlength], textarea[maxlength]').forEach(input => {
+                const counter = el(input.id + '-counter');
+                if (counter) {
+                    const update = () => updateCharCounter(input, counter);
+                    input.addEventListener('input', update);
+                    update(); // Initial state
+                }
+            });
+
             setupAdvancedSection();
             setupStatusSection();
             setupFilesSection();
@@ -694,7 +704,7 @@ function toggleSection(header) {
 // Function to initialize accessibility attributes
 function initA11y() {
     // Link inputs to error labels, counters, and token masks via aria-describedby
-    const selectors = '.input-error, #message-counter, .token-mask, [data-i18n="advanced.message.scroll_delay_help"]';
+    const selectors = '.input-error, .message-counter, .token-mask, [data-i18n="advanced.message.scroll_delay_help"]';
     document.querySelectorAll(selectors).forEach(el_desc => {
         let inputId = el_desc.id ? el_desc.id.replace(/-(error|counter|mask|help)/, '') : '';
         if (el_desc.dataset.i18n === 'advanced.message.scroll_delay_help') inputId = 'scroll_delay';

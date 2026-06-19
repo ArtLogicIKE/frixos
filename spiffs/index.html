@@ -92,18 +92,21 @@
                                 <div class="connection-left">
                                     <div class="form-group">
                                         <label for="wifi_ssid" data-i18n="settings.connection.wifi_ssid">WiFi SSID</label>
-                                        <input type="text" id="wifi_ssid" name="wifi_ssid" autocomplete="username">
+                                        <input type="text" id="wifi_ssid" name="wifi_ssid" autocomplete="username" maxlength="32">
+                                        <div id="wifi_ssid-counter" class="message-counter" aria-live="polite"></div>
                                     </div>
                                     <div class="form-group">
                                         <label for="wifi_pass" data-i18n="settings.connection.wifi_password">WiFi Password</label>
                                         <div class="password-input-wrapper">
-                                            <input type="password" id="wifi_pass" name="wifi_pass" autocomplete="current-password">
+                                            <input type="password" id="wifi_pass" name="wifi_pass" autocomplete="current-password" maxlength="64">
                                             <button type="button" class="password-toggle" aria-label="Toggle password visibility">👁️</button>
                                         </div>
+                                        <div id="wifi_pass-counter" class="message-counter" aria-live="polite"></div>
                                     </div>
                                     <div class="form-group">
                                         <label for="hostname" data-i18n="settings.connection.hostname">Hostname</label>
-                                        <input type="text" id="hostname" name="hostname" required aria-required="true">
+                                        <input type="text" id="hostname" name="hostname" required aria-required="true" maxlength="32">
+                                        <div id="hostname-counter" class="message-counter" aria-live="polite"></div>
                                         <span id="hostname-error" class="input-error"></span>
                                     </div>
                                 </div>
@@ -526,6 +529,7 @@
                             <label for="eeprom_ha_url" data-i18n="integrations.ha.server_url">Server URL</label>
                             <input type="text" id="eeprom_ha_url" name="eeprom_ha_url" maxlength="200"
                                 placeholder="e.g. http://homeassistant.local:8123">
+                            <div id="eeprom_ha_url-counter" class="message-counter" aria-live="polite"></div>
                             <span id="eeprom_ha_url-error" class="input-error"></span>
                         </div>
                         <div class="form-group">
@@ -535,6 +539,7 @@
                                     data-i18n-placeholder="integrations.ha.token_placeholder">
                                 <button type="button" class="password-toggle" aria-label="Toggle password visibility">👁️</button>
                             </div>
+                            <div id="eeprom_ha_token-counter" class="message-counter" aria-live="polite"></div>
                             <span id="eeprom_ha_token-error" class="input-error"></span>
                             <span id="eeprom_ha_token-mask" class="token-mask"></span>
                         </div>
@@ -561,6 +566,7 @@
                                     data-i18n-placeholder="integrations.stock.api_key_placeholder">
                                 <button type="button" class="password-toggle" aria-label="Toggle password visibility">👁️</button>
                             </div>
+                            <div id="eeprom_stock_key-counter" class="message-counter" aria-live="polite"></div>
                             <span id="eeprom_stock_key-error" class="input-error"></span>
                             <span id="eeprom_stock_key-mask" class="token-mask"></span>
                         </div>
@@ -628,6 +634,7 @@
                                 maxlength="64"
                                 data-i18n-placeholder="integrations.glucose_monitors.username_placeholder"
                                 autocomplete="username">
+                            <div id="eeprom_glucose_username-counter" class="message-counter" aria-live="polite"></div>
                             <span id="eeprom_glucose_username-error" class="input-error"></span>
                         </div>
                         <div class="form-group">
@@ -640,6 +647,7 @@
                                     autocomplete="current-password">
                                 <button type="button" class="password-toggle" aria-label="Toggle password visibility">👁️</button>
                             </div>
+                            <div id="eeprom_glucose_password-counter" class="message-counter" aria-live="polite"></div>
                             <span id="eeprom_glucose_password-error" class="input-error"></span>
                             <span id="eeprom_glucose_password-mask" class="token-mask"></span>
                         </div>
@@ -681,6 +689,7 @@
                                 <label for="eeprom_ns_url">Nightscout URL</label>
                                 <input type="text" id="eeprom_ns_url" name="eeprom_ns_url" maxlength="100"
                                     placeholder="https://your-site.herokuapp.com">
+                                <div id="eeprom_ns_url-counter" class="message-counter" aria-live="polite"></div>
                             </div>
                         </div>
                     </div>

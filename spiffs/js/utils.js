@@ -59,10 +59,12 @@ function highlightElement(element) {
 function updateCharCounter(input, counter) {
     if (!input || !counter) return;
     const length = input.value.length;
-    const maxLength = input.getAttribute('maxlength') || 511;
+    const maxLength = parseInt(input.getAttribute('maxlength') || 511, 10);
     counter.textContent = `${length} / ${maxLength}`;
 
-    counter.classList.toggle('near-limit', length >= 450 && length < maxLength);
+    // Near limit threshold is 90% of max length
+    const nearLimitThreshold = Math.floor(maxLength * 0.9);
+    counter.classList.toggle('near-limit', length >= nearLimitThreshold && length < maxLength);
     counter.classList.toggle('at-limit', length >= maxLength);
 }
 
