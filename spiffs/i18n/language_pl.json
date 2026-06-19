@@ -182,6 +182,9 @@
       "longitude": "Długość geograficzna",
       "timezone": "Strefa czasowa",
       "timezone_placeholder": "Automatycznie wykryta, pozostaw puste",
+      "timezone_region": "Strefa czasowa (region)",
+      "timezone_region_placeholder": "np. Europe/Athens",
+      "detected": "Wykryto: {tz}",
       "help_text": "Listę stref czasowych POSIX znajdziesz <a href=\"https://leo.leung.xyz/wiki/Timezone\" target=\"_blank\">tutaj</a>.",
       "restart_note": "* Zmiana ustawień lokalizacji uruchomi urządzenie ponownie.",
       "city": "Miasto",
@@ -197,6 +200,8 @@
       "city_not_found": "Nie znaleziono miasta.",
       "city_search_error": "Wyszukiwanie nie powiodło się. Sprawdz połączenie.",
       "city_found": "Znaleziono: {city}",
+      "city_found_tz": "Znaleziono: {city} ({iana})",
+      "timezone_lookup_loading": "Wyszukiwanie strefy czasowej…",
       "reverse_geocode_loading": "Identyfikowanie najbliższego miasta…",
       "geolocate_no_data": "Brak współrzędnych IP na urządzeniu. Użyj wyszukiwania po mieście."
     },

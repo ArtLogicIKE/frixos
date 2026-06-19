@@ -85,6 +85,8 @@ static int weather_retry_attempts = 0;
 
 #define UPDATE_SERVER_BASE "http://update.artlogic.gr:8080"
 
+void str_replace_char(char *str, char find, char replace);
+
 // Add these global variables at the top with other globals
 static bool is_forecast_request = false;
 static double forecast_high = -100.0;
@@ -958,6 +960,123 @@ bool validate_timezone(const char *tz_str)
     return true;
 }
 
+bool wifi_lookup_posix_timezone(const char *iana_location, char *out, size_t out_len)
+{
+    if (!iana_location || !out || out_len == 0)
+        return false;
+
+    out[0] = '\0';
+
+    char normalized[64];
+    strncpy(normalized, iana_location, sizeof(normalized) - 1);
+    normalized[sizeof(normalized) - 1] = '\0';
+    str_replace_char(normalized, ' ', '_');
+
+    FILE *file = fopen("/spiffs/timezone.txt", "r");
+    if (file)
+    {
+        char line[192];
+        while (fgets(line, sizeof(line), file))
+        {
+            strtok(line, "\r\n");
+            str_replace_char(line, ' ', '_');
+            char *loc_part = strtok(line, ";");
+            char *tz_part = strtok(NULL, ";");
+            if (loc_part && tz_part && strcasecmp(loc_part, normalized) == 0)
+            {
+                strncpy(out, tz_part, out_len - 1);
+                out[out_len - 1] = '\0';
+                fclose(file);
+                return validate_timezone(out);
+            }
+        }
+        fclose(file);
+    }
+
+    char url[128];
+    char escaped_location[64];
+    url_encode_string(iana_location, escaped_location);
+    snprintf(url, sizeof(url), "%s/timezone?location=%s", UPDATE_SERVER_BASE, escaped_location);
+
+    esp_http_client_config_t config = {
+        .url = url,
+        .event_handler = http_event_handler,
+        .timeout_ms = 5000,
+    };
+
+    esp_http_client_handle_t client = esp_http_client_init(&config);
+    if (client == NULL)
+        return false;
+
+    esp_err_t err = esp_http_client_perform(client);
+    bool found = false;
+    if (err == ESP_OK && wifi_http_buffer != NULL)
+    {
+        char *nl = strchr(wifi_http_buffer, '\n');
+        if (nl)
+            *nl = '\0';
+        if (validate_timezone(wifi_http_buffer))
+        {
+            strncpy(out, wifi_http_buffer, out_len - 1);
+            out[out_len - 1] = '\0';
+            found = true;
+            file = fopen("/spiffs/timezone.txt", "a");
+            if (file)
+            {
+                fprintf(file, "\n%s;%s", normalized, out);
+                fclose(file);
+            }
+        }
+    }
+    esp_http_client_cleanup(client);
+    return found;
+}
+
+bool wifi_lookup_iana_from_coords(double lat, double lon, char *out, size_t out_len)
+{
+    if (!out || out_len == 0)
+        return false;
+
+    out[0] = '\0';
+
+    char url[192];
+    snprintf(url, sizeof(url),
+             "https://timeapi.io/api/TimeZone/coordinate?latitude=%.7f&longitude=%.7f",
+             lat, lon);
+
+    esp_http_client_config_t config = {
+        .url = url,
+        .event_handler = http_event_handler,
+        .timeout_ms = 8000,
+        .crt_bundle_attach = custom_crt_bundle_attach, // TLS: timeapi.io is HTTPS
+        .transport_type = HTTP_TRANSPORT_OVER_SSL,
+    };
+
+    esp_http_client_handle_t client = esp_http_client_init(&config);
+    if (client == NULL)
+        return false;
+
+    esp_err_t err = esp_http_client_perform(client);
+    bool found = false;
+    if (err == ESP_OK && wifi_http_buffer != NULL)
+    {
+        cJSON *json = cJSON_Parse(wifi_http_buffer);
+        if (json)
+        {
+            cJSON *tz = cJSON_GetObjectItem(json, "timeZone");
+            if (cJSON_IsString(tz) && tz->valuestring[0] != '\0')
+            {
+                strncpy(out, tz->valuestring, out_len - 1);
+                out[out_len - 1] = '\0';
+                found = true;
+            }
+            cJSON_Delete(json);
+        }
+    }
+    esp_http_client_cleanup(client);
+    return found;
+}
+
 /**
  * Fetch Weather Data from OpenWeatherMap (legacy, kept for reference / fallback).
  * No longer wired into the weather timer — wifi_get_metno_weather() is used instead.
@@ -1807,6 +1926,15 @@ bool wifi_get_location()
         }
     }
 
+    // Timezone priority: explicit POSIX (already in my_timezone) > human-readable
+    // IANA setting > automatic IP detection. Seed internet_location from the IANA
+    // setting so the lookup below resolves it and the IP timezone won't override.
+    if (strlen(my_timezone) == 0 && strlen(eeprom_iana_tz) > 0)
+    {
+        strncpy(internet_location, eeprom_iana_tz, sizeof(internet_location) - 1);
+        internet_location[sizeof(internet_location) - 1] = '\0';
+    }
+
     // Only perform query if needed (at least one of the values is missing)
     if (strlen(my_timezone) == 0 || strlen(my_lat) == 0 || strlen(my_lon) == 0)
     {
@@ -1870,8 +1998,8 @@ bool wifi_get_location()
                             strcpy(my_lon, "");
                         }
                     }
-                    if (timezone && strlen(my_timezone) == 0)
-                        strcpy(internet_location, timezone->valuestring); // this is e.g. Europe/Vienna
+                    if (timezone && strlen(my_timezone) == 0 && strlen(internet_location) == 0)
+                        strcpy(internet_location, timezone->valuestring); // ip-api IANA, only if user IANA unset
 
                     cJSON_Delete(json);
                 }

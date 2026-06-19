@@ -54,6 +54,8 @@ esp_err_t f_http_post(const char* url, const char* data);
 void url_encode_string(const char *input, char *output);
 bool validate_coordinate(const char *coord_str, bool is_latitude);
 bool validate_timezone(const char *tz_str);
+bool wifi_lookup_posix_timezone(const char *iana_location, char *out, size_t out_len);
+bool wifi_lookup_iana_from_coords(double lat, double lon, char *out, size_t out_len);
 
 // External variables
 extern int response_len;

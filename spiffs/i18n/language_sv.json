@@ -182,6 +182,9 @@
       "longitude": "Longitud",
       "timezone": "Tidszon",
       "timezone_placeholder": "Ange tidszon i POSIX-format ENDAST om automatisk detektering inte fungerar",
+      "timezone_region": "Tidszon (region)",
+      "timezone_region_placeholder": "t.ex. Europe/Athens",
+      "detected": "Identifierad: {tz}",
       "help_text": "Du kan hitta en lista över POSIX-tidszoner <a href=\"https://leo.leung.xyz/wiki/Timezone\" target=\"_blank\">här</a>. Lat/Lon påverkar endast väderdata.",
       "restart_note": "* Ändring av platsinställningar kommer att starta om enheten.",
       "city": "Stad",
@@ -197,6 +200,8 @@
       "city_not_found": "Stad hittades inte.",
       "city_search_error": "Sökning misslyckades. Kontrollera anslutningen.",
       "city_found": "Hittade: {city}",
+      "city_found_tz": "Hittade: {city} ({iana})",
+      "timezone_lookup_loading": "Söker tidszon…",
       "reverse_geocode_loading": "Identifierar närmaste stad…",
       "geolocate_no_data": "Inga IP-koordinater tillgängliga på enheten ännu. Använd stadssökning."
     },

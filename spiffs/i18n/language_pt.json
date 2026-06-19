@@ -182,6 +182,9 @@
       "longitude": "Longitude",
       "timezone": "Fuso horário",
       "timezone_placeholder": "Insira o fuso horário no formato POSIX APENAS se a deteção automática não funcionar",
+      "timezone_region": "Fuso horario (regiao)",
+      "timezone_region_placeholder": "ex. Europe/Athens",
+      "detected": "Detetado: {tz}",
       "help_text": "Pode encontrar uma lista de fusos horários POSIX <a href=\"https://leo.leung.xyz/wiki/Timezone\" target=\"_blank\">aqui</a>. Lat/Lon apenas afetam dados meteorológicos.",
       "restart_note": "* Alterar as definições de localização irá reiniciar o dispositivo.",
       "city": "Cidade",
@@ -197,6 +200,8 @@
       "city_not_found": "Cidade não encontrada.",
       "city_search_error": "Pesquisa falhou. Verifique a ligação.",
       "city_found": "Encontrada: {city}",
+      "city_found_tz": "Encontrada: {city} ({iana})",
+      "timezone_lookup_loading": "A procurar fuso horário…",
       "reverse_geocode_loading": "A identificar a cidade mais próxima…",
       "geolocate_no_data": "Sem coordenadas IP disponíveis no dispositivo. Use a pesquisa por cidade."
     },

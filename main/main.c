@@ -98,6 +98,7 @@ uint16_t eeprom_dim_end = 0;                                        // Time-of-d
 char eeprom_lat[12] = "", my_lat[12] = "";                         // "48.123456";
 char eeprom_lon[12] = "", my_lon[12] = "";                         // "16.123456";
 char eeprom_timezone[TZ_LENGTH] = "", my_timezone[TZ_LENGTH] = ""; // EET-2EEST,M3.5.0/3,M10.5.0/4";
+char eeprom_iana_tz[64] = "";                                      // human-readable IANA tz, e.g. "Europe/Athens"
 char eeprom_font[2][12] = {"bold", "light"};                       // [0] = day font, [1] = night font
 char eeprom_aux_font[2][12] = {"bold", "bold"};                    // [0] = day aux digit font, [1] = night aux
 float eeprom_lux_sensitivity = 6.0;
@@ -136,6 +137,7 @@ static const nvs_setting_t settings_table[] = {
     {"latitude", SETTING_TYPE_STR, eeprom_lat, sizeof(eeprom_lat)},
     {"longitude", SETTING_TYPE_STR, eeprom_lon, sizeof(eeprom_lon)},
     {"timezone", SETTING_TYPE_STR, eeprom_timezone, sizeof(eeprom_timezone)},
+    {"iana_tz", SETTING_TYPE_STR, eeprom_iana_tz, sizeof(eeprom_iana_tz)},
     {"dayfont", SETTING_TYPE_STR, eeprom_font[0], sizeof(eeprom_font[0])},
     {"nightfont", SETTING_TYPE_STR, eeprom_font[1], sizeof(eeprom_font[1])},
     {"dim_disable", SETTING_TYPE_U8, &eeprom_dim_mode, 0},

@@ -22,8 +22,11 @@ function locationMsg(text, cls) {
     if (cls === 'loading') {
         hint.textContent = text;
         hint.className = 'coords-city-hint hint-loading';
+    } else if (cls === 'success' && text) {
+        hint.textContent = text;
+        hint.className = 'coords-city-hint';
     } else {
-        // success / empty — setCityDisplay already wrote the city name; just reset class
+        // empty — setCityDisplay may have written the city name; reset class only
         hint.className = 'coords-city-hint';
     }
 }
@@ -86,6 +89,154 @@ function searchCity(query) {
         });
 }
 
+const TIMEZONE_UPDATE_SERVER = 'http://update.artlogic.gr:8080';
+let timezoneMapCache = null;
+
+function isValidPosixTimezone(tz) {
+    if (!tz) return false;
+    return !/\s/.test(tz);
+}
+
+async function loadTimezoneMap() {
+    if (timezoneMapCache) return timezoneMapCache;
+    const response = await fetch('/timezone.txt');
+    if (!response.ok) throw new Error('timezone.txt not found');
+    const text = await response.text();
+    const map = new Map();
+    for (const line of text.split('\n')) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        const sep = trimmed.indexOf(';');
+        if (sep < 0) continue;
+        const iana = trimmed.slice(0, sep).replace(/\s/g, '_');
+        const posix = trimmed.slice(sep + 1).trim();
+        if (iana && posix) map.set(iana, posix);
+    }
+    timezoneMapCache = map;
+    return map;
+}
+
+async function lookupIanaTimezone(lat, lon) {
+    const coordUrl = `https://timeapi.io/api/TimeZone/coordinate?latitude=${encodeURIComponent(lat)}&longitude=${encodeURIComponent(lon)}`;
+    try {
+        const response = await fetch(coordUrl);
+        if (response.ok) {
+            const data = await response.json();
+            if (data.timeZone) return data.timeZone;
+        }
+    } catch (e) { /* try fallback */ }
+
+    const geoUrl = `https://api.geotimezone.com/public/timezone?latitude=${encodeURIComponent(lat)}&longitude=${encodeURIComponent(lon)}`;
+    const response = await fetch(geoUrl);
+    if (!response.ok) throw new Error('timezone API failed');
+    const data = await response.json();
+    return data.iana_timezone || null;
+}
+
+async function lookupPosixFromIana(iana) {
+    if (!iana) return null;
+    const key = iana.replace(/\s/g, '_');
+    try {
+        const map = await loadTimezoneMap();
+        if (map.has(key)) return map.get(key);
+    } catch (e) { /* fall through */ }
+    try {
+        const response = await fetch(`/api/timezone?location=${encodeURIComponent(iana)}`);
+        if (response.ok) {
+            const data = await response.json();
+            if (data.posix && isValidPosixTimezone(data.posix)) return data.posix;
+        }
+    } catch (e) { /* fall through */ }
+    try {
+        const response = await fetch(
+            `${TIMEZONE_UPDATE_SERVER}/timezone?location=${encodeURIComponent(iana)}`
+        );
+        if (!response.ok) return null;
+        const posix = (await response.text()).trim().split('\n')[0].trim();
+        return isValidPosixTimezone(posix) ? posix : null;
+    } catch (e) {
+        return null;
+    }
+}
+
+async function lookupPosixTimezone(lat, lon) {
+    try {
+        const response = await fetch(
+            `/api/timezone?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`
+        );
+        if (response.ok) {
+            const data = await response.json();
+            if (data.posix && isValidPosixTimezone(data.posix)) {
+                return { iana: data.iana || '', posix: data.posix };
+            }
+        }
+    } catch (e) { /* device API unavailable — use browser fallbacks */ }
+
+    const iana = await lookupIanaTimezone(lat, lon);
+    if (!iana) return null;
+    const posix = await lookupPosixFromIana(iana);
+    return posix ? { iana, posix } : null;
+}
+
+function setTimezoneValue(posix) {
+    const tzEl = document.getElementById('timezone');
+    if (!tzEl || !posix) return false;
+    tzEl.value = posix;
+    tzEl.dispatchEvent(new Event('input'));
+    return true;
+}
+
+function setIanaValue(iana) {
+    const el = document.getElementById('tz_iana');
+    if (!el || !iana) return false;
+    el.value = iana;
+    el.dispatchEvent(new Event('input'));
+    return true;
+}
+
+// Show "Detected: <tz>" placeholders for the timezone fields when they are empty,
+// using the browser's own timezone (priority on the device is POSIX > IANA > auto).
+function applyDetectedTimezoneHints() {
+    let iana = '';
+    try { iana = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) { /* unsupported */ }
+    if (!iana) return;
+    const t = (key) => getNestedTranslation(translations[currentLanguage] || translations.en, `advanced.location.${key}`) || key;
+    const detected = (tz) => (t('detected') || 'Detected: {tz}').replace('{tz}', tz);
+
+    const ianaEl = document.getElementById('tz_iana');
+    if (ianaEl && !ianaEl.value) ianaEl.placeholder = detected(iana);
+
+    const tzEl = document.getElementById('timezone');
+    if (tzEl && !tzEl.value) {
+        lookupPosixFromIana(iana).then(posix => {
+            if (posix && !tzEl.value) tzEl.placeholder = detected(posix);
+        }).catch(() => {});
+    }
+}
+
+function applyLocationTimezone(lat, lon, cityName, t) {
+    locationMsg(t('timezone_lookup_loading'), 'loading');
+    return lookupPosixTimezone(lat, lon)
+        .then(result => {
+            if (result) { setTimezoneValue(result.posix); setIanaValue(result.iana); }
+            if (cityName) {
+                const msg = result
+                    ? (t('city_found_tz') || 'Found: {city} ({iana})')
+                        .replace('{city}', cityName)
+                        .replace('{iana}', result.iana)
+                    : (t('city_found') || 'Found: {city}').replace('{city}', cityName);
+                locationMsg(msg, 'success');
+            }
+            return result;
+        })
+        .catch(() => {
+            if (cityName) {
+                locationMsg((t('city_found') || 'Found: {city}').replace('{city}', cityName), 'success');
+            }
+            return null;
+        });
+}
+
 function setupLocationButtons() {
     const btnSearch = document.getElementById('btn-search-city');
     const btnGeo = document.getElementById('btn-geolocate');
@@ -107,8 +258,8 @@ function setupLocationButtons() {
                     } else {
                         setCoords(result.lat, result.lon);
                         const short = result.displayName.split(',')[0].trim();
-                        locationMsg((t('city_found') || 'Found: {city}').replace('{city}', short), 'success');
                         setCityDisplay(short);
+                        applyLocationTimezone(result.lat, result.lon, short, t);
                     }
                 })
                 .catch(() => locationMsg(t('city_search_error'), 'error'))
@@ -147,10 +298,19 @@ function setupLocationButtons() {
                     }
                     setCoords(lat, lon);
                     locationMsg(t('reverse_geocode_loading'), 'loading');
-                    reverseGeocode(lat, lon).then(cityName => {
+                    Promise.all([
+                        reverseGeocode(lat, lon),
+                        lookupPosixTimezone(lat, lon).catch(() => null)
+                    ]).then(([cityName, tzResult]) => {
+                        if (cityName) setCityDisplay(cityName);
+                        if (tzResult) { setTimezoneValue(tzResult.posix); setIanaValue(tzResult.iana); }
                         if (cityName) {
-                            setCityDisplay(cityName);
-                            locationMsg((t('city_found') || 'Found: {city}').replace('{city}', cityName), 'success');
+                            const msg = tzResult
+                                ? (t('city_found_tz') || 'Found: {city} ({iana})')
+                                    .replace('{city}', cityName)
+                                    .replace('{iana}', tzResult.iana)
+                                : (t('city_found') || 'Found: {city}').replace('{city}', cityName);
+                            locationMsg(msg, 'success');
                         } else {
                             locationMsg('', '');
                         }
@@ -245,6 +405,8 @@ function setupAdvancedSection() {
             }
         } catch(e) {}
         if (el('timezone') && window.settings.p19 !== undefined) el('timezone').value = window.settings.p19 || '';
+        if (el('tz_iana') && window.settings.tz_iana !== undefined) el('tz_iana').value = window.settings.tz_iana || '';
+        applyDetectedTimezoneHints();
         if (el('wifi_start') && window.settings.p46 !== undefined) el('wifi_start').value = formatMinsToTimeString(window.settings.p46);
         if (el('wifi_end') && window.settings.p47 !== undefined) el('wifi_end').value = formatMinsToTimeString(window.settings.p47);
         if (el('lux_sensitivity') && window.settings.p20 !== undefined) el('lux_sensitivity').value = window.settings.p20 || 2.5;

@@ -189,6 +189,9 @@
       "longitude": "Längengrad",
       "timezone": "Zeitzone",
       "timezone_placeholder": "Zeitzone nur im POSIX-Format eingeben, wenn automatische Erkennung nicht funktioniert",
+      "timezone_region": "Zeitzone (Region)",
+      "timezone_region_placeholder": "z. B. Europe/Athens",
+      "detected": "Erkannt: {tz}",
       "help_text": "Eine Liste von POSIX-Zeitzonen finden Sie <a href=\"https://leo.leung.xyz/wiki/Timezone\" target=\"_blank\">hier</a>. Lat/Lon beeinflussen nur Wetterdaten.",
       "restart_note": "* Änderungen der Standorteinstellungen starten das Gerät neu.",
       "city": "Stadt",
@@ -204,6 +207,8 @@
       "city_not_found": "Stadt nicht gefunden.",
       "city_search_error": "Suche fehlgeschlagen. Verbindung prüfen.",
       "city_found": "Gefunden: {city}",
+      "city_found_tz": "Gefunden: {city} ({iana})",
+      "timezone_lookup_loading": "Zeitzone wird ermittelt…",
       "reverse_geocode_loading": "Nächste Stadt wird ermittelt…",
       "geolocate_no_data": "Noch keine IP-Koordinaten auf dem Gerät verfügbar. Stadtsuche verwenden."
     },

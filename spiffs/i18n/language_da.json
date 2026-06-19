@@ -182,6 +182,9 @@
       "longitude": "Længdegrad",
       "timezone": "Tidszone",
       "timezone_placeholder": "Indtast tidszone i POSIX-format KUN hvis automatisk detektion ikke virker",
+      "timezone_region": "Tidszone (region)",
+      "timezone_region_placeholder": "f.eks. Europe/Athens",
+      "detected": "Registreret: {tz}",
       "help_text": "Du kan finde en liste over POSIX-tidszoner <a href=\"https://leo.leung.xyz/wiki/Timezone\" target=\"_blank\">her</a>. Lat/Lon påvirker kun vejrdata.",
       "restart_note": "* Ændring af placeringsindstillinger vil genstarte enheden.",
       "city": "By",
@@ -197,6 +200,8 @@
       "city_not_found": "By ikke fundet.",
       "city_search_error": "Søgning mislykkedes. Tjek forbindelsen.",
       "city_found": "Fandt: {city}",
+      "city_found_tz": "Fandt: {city} ({iana})",
+      "timezone_lookup_loading": "Slår tidszone op…",
       "reverse_geocode_loading": "Identificerer nærmeste by…",
       "geolocate_no_data": "Ingen IP-koordinater tilgængelige på enheden endnu. Brug bysøgning."
     },

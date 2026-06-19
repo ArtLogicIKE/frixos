@@ -69,6 +69,34 @@ async def get_status(logs: str = None):
 
     return JSONResponse(content=status_data)
 
+@app.get("/api/timezone")
+async def get_timezone(location: str = None, lat: str = None, lon: str = None):
+    iana = location
+    if not iana and lat and lon:
+        try:
+            import urllib.request
+            url = f"https://timeapi.io/api/TimeZone/coordinate?latitude={lat}&longitude={lon}"
+            with urllib.request.urlopen(url, timeout=10) as resp:
+                import json
+                data = json.loads(resp.read().decode())
+                iana = data.get("timeZone")
+        except Exception:
+            return JSONResponse(status_code=404, content={"message": "Timezone not found"})
+    if not iana:
+        return JSONResponse(status_code=400, content={"message": "Missing location or lat/lon"})
+    path = "spiffs/timezone.txt"
+    key = iana.replace(" ", "_")
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or ";" not in line:
+                    continue
+                loc, posix = line.split(";", 1)
+                if loc.replace(" ", "_") == key:
+                    return JSONResponse(content={"iana": iana, "posix": posix.strip()})
+    return JSONResponse(status_code=404, content={"message": "Timezone not found"})
+
 @app.get("/language_{lang}.json")
 async def get_language(lang: str):
     path = f"spiffs/language_{lang}.json"

@@ -86,6 +86,7 @@ extern uint16_t eeprom_dim_end;     // Time-of-day dimming end hour (0-23)
 extern char eeprom_lat[12], my_lat[12];                         // "48.123456";
 extern char eeprom_lon[12], my_lon[12];                         // "16.123456";
 extern char eeprom_timezone[TZ_LENGTH], my_timezone[TZ_LENGTH]; // EET-2EEST,M3.5.0/3,M10.5.0/4";
+extern char eeprom_iana_tz[64];                                 // human-readable IANA tz, e.g. "Europe/Athens" (priority below POSIX, above auto)
 extern char eeprom_font[2][12];     // [0] = day font, [1] = night font
 extern char eeprom_aux_font[2][12]; // [0] = day aux digit font, [1] = night aux
 extern float eeprom_lux_sensitivity;

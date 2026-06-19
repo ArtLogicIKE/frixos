@@ -791,6 +791,7 @@ esp_err_t send_json_settings(httpd_req_t *req)
     if (mask & (1ULL << 17)) cJSON_AddStringToObject(root, "p17", eeprom_lat);
     if (mask & (1ULL << 18)) cJSON_AddStringToObject(root, "p18", eeprom_lon);
     if (mask & (1ULL << 19)) cJSON_AddStringToObject(root, "p19", eeprom_timezone);
+    if (mask & (1ULL << 19)) cJSON_AddStringToObject(root, "tz_iana", eeprom_iana_tz);
     if (mask & (1ULL << 46)) cJSON_AddNumberToObject(root, "p46", eeprom_wifi_start);
     if (mask & (1ULL << 47)) cJSON_AddNumberToObject(root, "p47", eeprom_wifi_end);
     if (mask & (1ULL << 4)) cJSON_AddStringToObject(root, "p04", eeprom_font[0]);
@@ -1125,6 +1126,26 @@ static bool validate_json_params(cJSON *root, char *err_buf, size_t err_size)
         {
             snprintf(err_buf, err_size, "Invalid timezone: use POSIX format (e.g. GMT-2 not GMT +2)");
             return false;
+        }
+    }
+
+    /* tz_iana: human-readable IANA timezone (e.g. Europe/Athens) */
+    if ((item = cJSON_GetObjectItem(root, "tz_iana")) && cJSON_IsString(item))
+    {
+        sval = item->valuestring;
+        len = strlen(sval);
+        if (len >= sizeof(eeprom_iana_tz))
+        {
+            snprintf(err_buf, err_size, "Invalid timezone region: too long");
+            return false;
+        }
+        for (size_t i = 0; i < len; i++)
+        {
+            if (sval[i] == ';' || (unsigned char)sval[i] < 0x20)
+            {
+                snprintf(err_buf, err_size, "Invalid timezone region: bad character");
+                return false;
+            }
         }
     }
 
@@ -1565,6 +1586,7 @@ esp_err_t settings_post_handler(httpd_req_t *req)
     char orig_lat[12];
     char orig_lon[12];
     char orig_timezone[TZ_LENGTH];
+    char orig_iana_tz[64];
     char orig_message[SCROLL_MSG_LENGTH]; // Add this line
     uint32_t orig_pwm_frequency = eeprom_pwm_frequency;
 
@@ -1576,6 +1598,7 @@ esp_err_t settings_post_handler(httpd_req_t *req)
     strncpy(orig_lat, eeprom_lat, sizeof(orig_lat));
     strncpy(orig_lon, eeprom_lon, sizeof(orig_lon));
     strncpy(orig_timezone, eeprom_timezone, sizeof(orig_timezone));
+    strncpy(orig_iana_tz, eeprom_iana_tz, sizeof(orig_iana_tz));
     strncpy(orig_message, eeprom_message, sizeof(orig_message)); // Add this line
 
     // Process network settings
@@ -1737,6 +1760,13 @@ esp_err_t settings_post_handler(httpd_req_t *req)
             ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Invalid timezone received: '%s', rejecting (use POSIX format e.g. GMT-2 not GMT +2)", eeprom_timezone);
             strcpy(eeprom_timezone, "");
         }
+    }
+
+    cJSON *tz_iana = cJSON_GetObjectItem(root, "tz_iana");
+    if (cJSON_IsString(tz_iana))
+    {
+        strncpy(eeprom_iana_tz, tz_iana->valuestring, sizeof(eeprom_iana_tz) - 1);
+        eeprom_iana_tz[sizeof(eeprom_iana_tz) - 1] = '\0';
     }
 
     // Process WiFi Active Hours settings
@@ -2296,7 +2326,8 @@ esp_err_t settings_post_handler(httpd_req_t *req)
     // Check if location settings changed
     if (strcmp(orig_lat, eeprom_lat) != 0 ||
         strcmp(orig_lon, eeprom_lon) != 0 ||
-        strcmp(orig_timezone, eeprom_timezone) != 0)
+        strcmp(orig_timezone, eeprom_timezone) != 0 ||
+        strcmp(orig_iana_tz, eeprom_iana_tz) != 0)
     {
         critical_settings_changed = true;
         ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Location or timezone settings changed, device will restart");
@@ -3694,6 +3725,78 @@ esp_err_t files_rename_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+static esp_err_t timezone_lookup_send_json(httpd_req_t *req, const char *iana, const char *posix)
+{
+    cJSON *root = cJSON_CreateObject();
+    if (!root)
+    {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
+        return ESP_FAIL;
+    }
+    cJSON_AddStringToObject(root, "iana", iana);
+    cJSON_AddStringToObject(root, "posix", posix);
+    char *json = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    if (!json)
+    {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
+        return ESP_FAIL;
+    }
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-cache");
+    esp_err_t ret = httpd_resp_send(req, json, HTTPD_RESP_USE_STRLEN);
+    free(json);
+    return ret;
+}
+
+static esp_err_t timezone_lookup_handler(httpd_req_t *req)
+{
+    char location[64] = "";
+    char lat_buf[24] = "";
+    char lon_buf[24] = "";
+    char iana[64] = "";
+    char posix[TZ_LENGTH] = "";
+
+    if (get_request_query_param(req, "location", location, sizeof(location)))
+    {
+        strncpy(iana, location, sizeof(iana) - 1);
+        iana[sizeof(iana) - 1] = '\0';
+        if (!wifi_lookup_posix_timezone(iana, posix, sizeof(posix)))
+        {
+            httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "Timezone not found");
+            return ESP_FAIL;
+        }
+        return timezone_lookup_send_json(req, iana, posix);
+    }
+
+    if (get_request_query_param(req, "lat", lat_buf, sizeof(lat_buf)) &&
+        get_request_query_param(req, "lon", lon_buf, sizeof(lon_buf)))
+    {
+        if (!validate_coordinate(lat_buf, true) || !validate_coordinate(lon_buf, false))
+        {
+            httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid coordinates");
+            return ESP_FAIL;
+        }
+        double lat = strtod(lat_buf, NULL);
+        double lon = strtod(lon_buf, NULL);
+        if (!wifi_lookup_iana_from_coords(lat, lon, iana, sizeof(iana)) ||
+            !wifi_lookup_posix_timezone(iana, posix, sizeof(posix)))
+        {
+            httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "Timezone not found");
+            return ESP_FAIL;
+        }
+        return timezone_lookup_send_json(req, iana, posix);
+    }
+
+    httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing location or lat/lon");
+    return ESP_FAIL;
+}
+
+static esp_err_t timezone_lookup_wrapper(httpd_req_t *req)
+{
+    return http_mutex_wrapper(req, timezone_lookup_handler);
+}
+
 // Status handler wrapper with validation
 static esp_err_t status_handler_wrapper(httpd_req_t *req)
 {
@@ -3877,6 +3980,17 @@ esp_err_t start_webserver()
     if (ret != ESP_OK)
     {
         ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to register status handler");
+        return ret;
+    }
+
+    uri_handler.uri = "/api/timezone";
+    uri_handler.method = HTTP_GET;
+    uri_handler.handler = timezone_lookup_wrapper;
+    uri_handler.user_ctx = NULL;
+    ret = httpd_register_uri_handler(server, &uri_handler);
+    if (ret != ESP_OK)
+    {
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to register timezone handler");
         return ret;
     }
 

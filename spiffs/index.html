@@ -245,7 +245,13 @@
                             <span id="lon-error" class="input-error"></span>
                             <span id="coords-city-hint" class="coords-city-hint"></span>
                         </div>
-                        <!-- Timezone and help (unchanged below) -->
+                        <!-- Timezone region (human-readable IANA) -->
+                        <div class="form-group">
+                            <label for="tz_iana" data-i18n="advanced.location.timezone_region">Timezone region</label>
+                            <input type="text" id="tz_iana" name="tz_iana"
+                                data-i18n-placeholder="advanced.location.timezone_region_placeholder">
+                        </div>
+                        <!-- Timezone (POSIX) and help (unchanged below) -->
                         <div class="form-group">
                             <label for="timezone" data-i18n="advanced.location.timezone">Timezone</label>
                             <input type="text" id="timezone" name="timezone"
@@ -901,7 +907,7 @@
     <script src="js/wifi.js?v=2"></script>
     <!-- Status, files, OTA processing -->
     <script src="js/system.js?v=2"></script>
-    <script src="js/integrations.js?v=2"></script>
+    <script src="js/integrations.js?v=3"></script>
     <script src="js/support.js?v=2"></script>
     <!-- The complex Screen editor module -->
     <script src="js/screen-editor.js?v=2"></script>

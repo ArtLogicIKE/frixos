@@ -187,7 +187,10 @@ function handleFormSubmit(e, formId) {
         
         const timezoneEl = getFieldInForm('timezone');
         if (timezoneEl && addIfChanged(formData, 'p19', timezoneEl.value, window.settings.p19)) changedCount++;
-        
+
+        const tzIanaEl = getFieldInForm('tz_iana');
+        if (tzIanaEl && addIfChanged(formData, 'tz_iana', tzIanaEl.value, window.settings.tz_iana)) changedCount++;
+
         const wifiStartEl = getFieldInForm('wifi_start');
         if (wifiStartEl && addIfChanged(formData, 'p46', parseTimeStringToMins(wifiStartEl.value), window.settings.p46)) changedCount++;
         
