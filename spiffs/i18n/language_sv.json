@@ -43,6 +43,9 @@
     },
     "autoupdate": {
       "title": "Automatisk uppdatering"
+    },
+    "display": {
+      "title": "Visningsinställningar"
     }
   },
   "screen": {

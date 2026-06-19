@@ -50,6 +50,9 @@
     },
     "autoupdate": {
       "title": "Automatisches Update"
+    },
+    "display": {
+      "title": "Anzeigeeinstellungen"
     }
   },
   "screen": {

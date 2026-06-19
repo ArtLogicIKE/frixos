@@ -76,16 +76,16 @@ int get_moon_index()
   return calculateMoonIndex(now);
 }
 
-bool is_hour_in_range(uint8_t start_hour, uint8_t end_hour, int current_hour)
+bool is_time_in_range(uint16_t start_min, uint16_t end_min, int current_min)
 {
-  if (start_hour == 0 && end_hour == 0)
+  if (start_min == 0 && end_min == 0)
     return true;
 
-  if (start_hour == end_hour && start_hour != 0)
+  if (start_min == end_min && start_min != 0)
     return true;
 
-  if (start_hour <= end_hour)
-    return (current_hour >= (int)start_hour && current_hour <= (int)end_hour);
+  if (start_min <= end_min)
+    return (current_min >= (int)start_min && current_min <= (int)end_min);
 
-  return (current_hour >= (int)start_hour || current_hour <= (int)end_hour);
+  return (current_min >= (int)start_min || current_min <= (int)end_min);
 }

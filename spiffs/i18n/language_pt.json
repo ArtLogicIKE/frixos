@@ -43,6 +43,9 @@
     },
     "autoupdate": {
       "title": "Atualização automática"
+    },
+    "display": {
+      "title": "Configurações de exibição"
     }
   },
   "screen": {

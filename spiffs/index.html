@@ -9,7 +9,11 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Frixos</title>
-    <link rel="stylesheet" href="index.css">
+        <link rel="stylesheet" href="css/variables.css?v=2">
+    <link rel="stylesheet" href="css/layout.css?v=2">
+    <link rel="stylesheet" href="css/forms.css?v=2">
+    <link rel="stylesheet" href="css/components.css?v=2">
+    <link rel="stylesheet" href="css/screen-editor.css?v=2">
 </head>
 
 <body>
@@ -156,7 +160,7 @@
 
                 <div class="section">
                     <div class="section-header">
-                        <h2 data-i18n="settings.regional.title">Regional Settings</h2>
+                        <h2 data-i18n="settings.display.title">Display Settings</h2>
                     </div>
                     <div class="section-content">
                         <div class="form-group">
@@ -172,6 +176,14 @@
                             <input type="checkbox" id="mirroring" name="mirroring">
                             <label for="mirroring" data-i18n="advanced.display.mirror">Mirror Display</label>
                         </div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <div class="section-header">
+                        <h2 data-i18n="settings.regional.title">Regional Settings</h2>
+                    </div>
+                    <div class="section-content">
                         <div class="checkbox-container">
                             <input type="checkbox" id="fahrenheit" name="fahrenheit">
                             <label for="fahrenheit" data-i18n="settings.connection.fahrenheit">US units (F, mph, ...)</label>
@@ -252,15 +264,24 @@
                         <h2 data-i18n="advanced.wifi_hours.title">WiFi Active Hours</h2>
                     </div>
                     <div class="section-content">
-                        <div class="form-group">
-                            <label for="wifi_start" data-i18n="advanced.wifi_hours.start">Start</label>
-                            <input type="number" id="wifi_start" name="wifi_start" min="0" max="23" value="0">
-                            <span id="wifi_start-error" class="input-error"></span>
-                        </div>
-                        <div class="form-group">
-                            <label for="wifi_end" data-i18n="advanced.wifi_hours.end">End</label>
-                            <input type="number" id="wifi_end" name="wifi_end" min="0" max="23" value="0">
-                            <span id="wifi_end-error" class="input-error"></span>
+                        <div class="time-range-group">
+                            <div class="time-box">
+                                <label for="wifi_start" data-i18n="advanced.wifi_hours.start">Start</label>
+                                <div class="time-input-wrap">
+                                    <input type="time" id="wifi_start" name="wifi_start" class="time-select" required>
+                                </div>
+                                <span id="wifi_start-error" class="input-error"></span>
+                            </div>
+                            <div class="time-divider">
+                                <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                            </div>
+                            <div class="time-box">
+                                <label for="wifi_end" data-i18n="advanced.wifi_hours.end">End</label>
+                                <div class="time-input-wrap">
+                                    <input type="time" id="wifi_end" name="wifi_end" class="time-select" required>
+                                </div>
+                                <span id="wifi_end-error" class="input-error"></span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -299,15 +320,24 @@
                         </div>
                         <div id="timeofday_dimming_section">
                             <h3 data-i18n="advanced.brightness.timeofday_dimming">Time-of-day dimming</h3>
-                            <div class="form-group">
-                                <label for="dim_start" data-i18n="advanced.brightness.dim_start">Start</label>
-                                <input type="number" id="dim_start" name="dim_start" min="0" max="23" value="0">
-                                <span id="dim_start-error" class="input-error"></span>
-                            </div>
-                            <div class="form-group">
-                                <label for="dim_end" data-i18n="advanced.brightness.dim_end">End</label>
-                                <input type="number" id="dim_end" name="dim_end" min="0" max="23" value="0">
-                                <span id="dim_end-error" class="input-error"></span>
+                            <div class="time-range-group">
+                                <div class="time-box">
+                                    <label for="dim_start" data-i18n="advanced.brightness.dim_start">Start</label>
+                                    <div class="time-input-wrap">
+                                        <input type="time" id="dim_start" name="dim_start" class="time-select" required>
+                                    </div>
+                                    <span id="dim_start-error" class="input-error"></span>
+                                </div>
+                                <div class="time-divider">
+                                    <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                                </div>
+                                <div class="time-box">
+                                    <label for="dim_end" data-i18n="advanced.brightness.dim_end">End</label>
+                                    <div class="time-input-wrap">
+                                        <input type="time" id="dim_end" name="dim_end" class="time-select" required>
+                                    </div>
+                                    <span id="dim_end-error" class="input-error"></span>
+                                </div>
                             </div>
                         </div>
                         <h3 data-i18n="advanced.brightness.led_levels">LED Brightness Levels (%)</h3>
@@ -487,15 +517,11 @@
         <div id="integrations-section" class="page-section" style="display: none;">
             <form id="integrationsForm" class="settings-form">
                 <div class="section">
-                    <div class="section-header">
+                    <div class="section-header section-header-help">
                         <h2 data-i18n="integrations.ha.title">Home Assistant</h2>
+                        <a href="https://buyfrixos.com/knowledge-base/%f0%9f%93%a1-new-integration-home-assistant-frixos-smart-projections/" class="help-icon" target="_blank" rel="noopener noreferrer" aria-label="Help">?</a>
                     </div>
                     <div class="section-content">
-                        <p class="integration-kb-help"
-                            style="margin-bottom: 15px; color: #999; font-size: 0.9em;"
-                            data-i18n="integrations.ha.kb_help">For setup instructions, visit <a
-                                href="https://buyfrixos.com/knowledge-base/%f0%9f%93%a1-new-integration-home-assistant-frixos-smart-projections/"
-                                target="_blank" rel="noopener noreferrer">this KB article</a>.</p>
                         <div class="form-group">
                             <label for="eeprom_ha_url" data-i18n="integrations.ha.server_url">Server URL</label>
                             <input type="text" id="eeprom_ha_url" name="eeprom_ha_url" maxlength="200"
@@ -523,15 +549,11 @@
                 </div>
 
                 <div class="section">
-                    <div class="section-header">
+                    <div class="section-header section-header-help">
                         <h2 data-i18n="integrations.stock.title">Stock Quote Service (via Finnhub.io)</h2>
+                        <a href="https://buyfrixos.com/knowledge-base/get-stock-crypto-etf-fx-quotes-on-your-ceiling/" class="help-icon" target="_blank" rel="noopener noreferrer" aria-label="Help">?</a>
                     </div>
                     <div class="section-content">
-                        <p class="integration-kb-help"
-                            style="margin-bottom: 15px; color: #999; font-size: 0.9em;"
-                            data-i18n="integrations.stock.kb_help">For setup instructions, visit <a
-                                href="https://buyfrixos.com/knowledge-base/get-stock-crypto-etf-fx-quotes-on-your-ceiling/"
-                                target="_blank" rel="noopener noreferrer">this KB article</a>.</p>
                         <div class="form-group">
                             <label for="eeprom_stock_key" data-i18n="integrations.stock.api_key">API Key</label>
                             <div class="password-input-wrapper">
@@ -553,15 +575,11 @@
                 </div>
 
                 <div class="section">
-                    <div class="section-header">
+                    <div class="section-header section-header-help">
                         <h2 data-i18n="integrations.glucose_monitors.title">Glucose Monitoring</h2>
+                        <a href="https://buyfrixos.com/knowledge-base/blood-sugar-cgm-integration-and-projection/" class="help-icon" target="_blank" rel="noopener noreferrer" aria-label="Help">?</a>
                     </div>
                     <div class="section-content">
-                        <p class="integration-kb-help"
-                            style="margin-bottom: 15px; color: #999; font-size: 0.9em;"
-                            data-i18n="integrations.glucose_monitors.kb_help">For setup instructions, visit <a
-                                href="https://buyfrixos.com/knowledge-base/blood-sugar-cgm-integration-and-projection/"
-                                target="_blank" rel="noopener noreferrer">this KB article</a>.</p>
                         <!-- Shared Glucose Monitor Settings -->
                         <div class="form-group">
                             <label for="eeprom_glucose_refresh"
@@ -709,18 +727,17 @@
                 </div>
 
                 <div class="screen-editor">
-                    <div class="screen-left-column">
+                    <div id="screenStatus" class="screen-status" aria-live="polite" style="width: 100%; margin-bottom: -10px;"></div>
+                    <div class="screen-top-row">
                         <div class="screen-canvas-wrapper">
                             <div id="screenCanvas" class="screen-canvas" data-i18n-aria-label="screen.editor_aria" role="application" tabindex="0"></div>
-                            <div id="screenStatus" class="screen-status" aria-live="polite"></div>
                         </div>
-                        <div id="screenOptions" class="screen-options"></div>
+                        <div class="screen-palette">
+                            <h3 data-i18n="screen.palette">Palette</h3>
+                            <div id="screenPaletteItems" class="palette-items"></div>
+                        </div>
                     </div>
-
-                    <div class="screen-palette">
-                        <h3 data-i18n="screen.palette">Palette</h3>
-                        <div id="screenPaletteItems" class="palette-items"></div>
-                    </div>
+                    <div id="screenOptions" class="screen-options" style="width: 100%;"></div>
                 </div>
             </div>
         </div>
@@ -857,7 +874,37 @@
         </div>
     </div>
 
-    <script src="index.js"></script>
+
+    <!-- IMMEDIATE LOADER SCRIPT -->
+    <script>
+        (function() {
+            var hash = window.location.hash.substring(1) || 'settings';
+            var section = document.getElementById(hash + '-section');
+            if (section) {
+                section.style.display = 'block';
+                section.classList.add('is-loading');
+                var loader = document.createElement('div');
+                loader.className = 'section-loader';
+                loader.innerHTML = '<div class="spinner"></div><div class="loader-text">Loading...</div>';
+                loader.style.display = 'flex';
+                section.appendChild(loader);
+            }
+        })();
+    </script>
+        <!-- Core utilities, cache & languages -->
+
+    <script src="js/utils.js?v=2"></script>
+    <!-- Navigation, rendering and basic global processes -->
+    <script src="js/core.js?v=2"></script>
+    <script src="js/forms.js?v=2"></script>
+    <!-- Wi-Fi features -->
+    <script src="js/wifi.js?v=2"></script>
+    <!-- Status, files, OTA processing -->
+    <script src="js/system.js?v=2"></script>
+    <script src="js/integrations.js?v=2"></script>
+    <script src="js/support.js?v=2"></script>
+    <!-- The complex Screen editor module -->
+    <script src="js/screen-editor.js?v=2"></script>
 </body>
 
 </html>

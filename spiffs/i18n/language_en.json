@@ -53,6 +53,9 @@
     },
     "autoupdate": {
       "title": "Automatic Update"
+    },
+    "display": {
+      "title": "Display Settings"
     }
   },
   "screen": {

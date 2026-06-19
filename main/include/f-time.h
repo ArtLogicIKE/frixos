@@ -7,7 +7,7 @@
 int get_moon_index();
 void get_current_time(int *hour, int *minute);
 void sync_time_with_ntp(void);
-bool is_hour_in_range(uint8_t start_hour, uint8_t end_hour, int current_hour);
+bool is_time_in_range(uint16_t start_min, uint16_t end_min, int current_min);
 
 
 #endif

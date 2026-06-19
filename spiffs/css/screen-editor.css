@@ -1,0 +1,705 @@
+/* ----------------
+   Screen editor tab
+   ---------------- */
+.screen-layout-picker {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 10px 0 12px;
+}
+
+.screen-layout-select {
+    flex: 1;
+    min-width: 220px;
+    max-width: 300px;
+    padding: 6px 8px;
+    border: 1px solid var(--input-border);
+    border-radius: 4px;
+    background-color: var(--input-bg);
+    color: var(--text-color);
+    font-size: 0.9rem;
+}
+
+.screen-section-divider {
+    margin: 0 0 14px;
+    border: 0;
+    border-top: 1px solid var(--border-color);
+}
+
+.screen-intro {
+    margin: 0 0 14px;
+}
+
+.screen-toolbar {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: center;
+    margin: 10px 0 14px;
+    flex-wrap: wrap;
+}
+
+.screen-actions,
+.screen-mode-toggle {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.screen-actions {
+    gap: 8px;
+}
+
+.screen-mode-toggle {
+    gap: 0;
+    align-self: flex-end;
+    border-bottom: 1px solid var(--primary-color);
+}
+
+.screen-mode-toggle .button {
+    border-radius: 8px 8px 0 0;
+    margin-bottom: -1px;
+    border: 1px solid var(--border-color);
+    border-bottom-color: var(--primary-color);
+    background: var(--section-content-bg);
+}
+
+.screen-mode-toggle .button.active {
+    background-color: var(--primary-color);
+    color: #fff;
+    border-color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
+    box-shadow: 0 -2px 8px rgba(0, 170, 255, 0.20);
+    position: relative;
+    z-index: 1;
+}
+
+.screen-editor {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    width: 100%;
+}
+
+.screen-top-row {
+    display: flex;
+    align-items: stretch;
+    gap: 16px;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+}
+
+.screen-canvas-wrapper {
+    display: flex;
+    flex-direction: column;
+    flex: 0 0 auto;
+}
+
+.screen-status {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--text-color);
+    min-height: 1.4em;
+    padding: 0 2px;
+}
+
+.screen-canvas {
+    box-sizing: content-box;
+    position: relative;
+    width: 512px;   /* 128 * 4 */
+    height: 512px;  /* 128 * 4 */
+    border: 1px solid var(--border-color);
+    background:
+        linear-gradient(to right, rgba(255,255,255,0.06) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255,255,255,0.06) 1px, transparent 1px);
+    background-size: 16px 16px; /* 4px * 4 -> show every 4px */
+    box-shadow: var(--box-shadow);
+    border-radius: 8px;
+    overflow: hidden;
+    user-select: none;
+    touch-action: none;
+}
+
+.screen-canvas::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 93.75%;   /* 120px diameter on 128px matrix (radius 60px) */
+    height: 93.75%;
+    transform: translate(-50%, -50%);
+    border: 2px solid rgba(255, 255, 255, 0.45);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 2;
+}
+
+.screen-canvas::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 89.0625%;  /* 114px diameter — 6px smaller on the 128px matrix */
+    height: 89.0625%;
+    transform: translate(-50%, -50%);
+    border: 2px solid rgba(255, 255, 255, 0.22);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 2;
+}
+
+@media (max-width: 640px) {
+    .screen-canvas {
+        width: 256px;  /* 128 * 2 */
+        height: 256px;
+        background-size: 8px 8px;
+    }
+    .screen-palette {
+        flex: 1 1 100%;
+    }
+}
+
+.screen-palette {
+    flex: 1 1 200px;
+    min-width: 200px;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--border-color);
+    background: var(--section-content-bg);
+    border-radius: 8px;
+    padding: 10px;
+    box-shadow: var(--box-shadow);
+    /* No max-height so it stretches to match canvas exactly via align-items: stretch on parent */
+}
+.section .screen-palette h3 {
+    margin-top: 0;
+    margin-bottom: 5px;
+    flex-shrink: 0;
+}
+.palette-items {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 8px;
+    margin-top: 10px;
+    overflow-y: auto;
+    align-content: start;
+}
+
+
+
+.palette-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 4px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background: var(--card-bg-color);
+    cursor: grab;
+    text-align: center;
+    font-size: 0.72rem;
+    line-height: 1.2;
+    color: var(--text-color);
+}
+
+.palette-item:active {
+    cursor: grabbing;
+}
+
+.palette-item-disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.palette-item-selected {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 1px var(--primary-color);
+}
+
+.palette-item-toggle {
+    cursor: pointer;
+}
+
+.palette-swatch {
+    width: 50px;
+    height: 50px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    background: rgba(0,0,0,0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    color: var(--text-secondary);
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.screen-element {
+    position: absolute;
+    border: 1px dashed rgba(255,255,255,0.35);
+    border-radius: 6px;
+    background: transparent;
+    cursor: move;
+    touch-action: none;
+    overflow: hidden;
+}
+
+.screen-element.selected {
+    border: 2px solid var(--primary-color);
+}
+
+.screen-guide {
+    position: absolute;
+    pointer-events: none;
+    z-index: 4;
+}
+
+.screen-guide-matrix {
+    z-index: 20;
+}
+
+.screen-guide-center {
+    z-index: 20;
+}
+
+.screen-guide-v {
+    top: 0;
+    bottom: 0;
+    width: 0;
+}
+
+.screen-guide-h {
+    left: 0;
+    right: 0;
+    height: 0;
+}
+
+.screen-guide-matrix.screen-guide-v {
+    border-left: 1px dotted rgba(239, 68, 68, 0.85);
+}
+
+.screen-guide-matrix.screen-guide-h {
+    border-top: 1px dotted rgba(239, 68, 68, 0.85);
+}
+
+.screen-guide-center.screen-guide-v {
+    border-left: 1px dotted rgba(34, 197, 94, 0.9);
+}
+
+.screen-guide-center.screen-guide-h {
+    border-top: 1px dotted rgba(34, 197, 94, 0.9);
+}
+
+.screen-guide-selection.screen-guide-v {
+    border-left: 1px dotted rgba(34, 197, 94, 0.9);
+}
+
+.screen-guide-selection.screen-guide-h {
+    border-top: 1px dotted rgba(34, 197, 94, 0.9);
+}
+
+.screen-preview {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.screen-preview-palette {
+    flex: none;
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    max-height: 100%;
+}
+
+.screen-preview-glucose_level { aspect-ratio: 14 / 20; }
+.screen-preview-glucose_trend { aspect-ratio: 12 / 14; }
+.screen-preview-wifi_off { aspect-ratio: 20 / 20; }
+.screen-preview-weather { aspect-ratio: 32 / 22; }
+.screen-preview-moon { aspect-ratio: 14 / 14; }
+.screen-preview-time { aspect-ratio: 80 / 36; }
+.screen-preview-glucose { aspect-ratio: 70 / 36; }
+.screen-preview-ampm { aspect-ratio: 10 / 20; }
+.screen-preview-message { aspect-ratio: 128 / 9; }
+
+.screen-preview-matrix {
+    width: 100%;
+    height: 100%;
+}
+
+.screen-preview-matrix {
+    opacity: 0.35;
+}
+
+.screen-preview-sprite,
+.screen-preview-contained {
+    background-repeat: no-repeat;
+}
+
+.screen-preview-text {
+    width: 100%;
+    color: var(--text-color);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: clip;
+    line-height: 1;
+    text-align: left;
+}
+
+.screen-preview-text-time {
+    font-family: "Courier New", monospace;
+    font-size: 27px;
+    font-weight: 700;
+    letter-spacing: -1px;
+}
+
+.screen-preview-text-message {
+    font-family: "Segoe UI", Tahoma, sans-serif;
+    font-size: 8px;
+}
+
+.palette-swatch .screen-preview {
+    opacity: 0.9;
+}
+
+.screen-options {
+    border: 1px solid var(--border-color);
+    background: var(--section-content-bg);
+    border-radius: 8px;
+    padding: 12px;
+    box-shadow: var(--box-shadow);
+    overflow: visible;
+}
+
+.screen-options h3 {
+    margin-top: 0;
+}
+
+.screen-options .form-group {
+    display: grid;
+    grid-template-columns: 10.5rem minmax(0, 1fr);
+    align-items: center;
+    gap: 8px 12px;
+    flex-wrap: nowrap;
+    margin-bottom: 10px;
+}
+
+.screen-options .form-group label {
+    min-width: 0;
+    max-width: none;
+    width: auto;
+    margin-bottom: 0;
+}
+
+.screen-options .form-group input[type="number"],
+.screen-options .form-group select {
+    width: 100%;
+    max-width: 11rem;
+    min-width: 0;
+    flex: unset;
+    justify-self: start;
+}
+
+.screen-options .form-group input[type="color"] {
+    width: 2.75rem;
+    height: 2rem;
+    padding: 1px;
+    border: 1px solid var(--input-border);
+    border-radius: 4px;
+    background-color: var(--input-bg);
+    justify-self: start;
+    flex: unset;
+    max-width: none;
+}
+
+.screen-options .form-group input[type="checkbox"] {
+    width: 1.1rem;
+    height: 1.1rem;
+    margin: 0;
+    justify-self: start;
+    flex: unset;
+}
+
+.screen-options .form-group:has(textarea) {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+}
+
+.screen-options .form-group:has(textarea) label {
+    margin-bottom: 4px;
+}
+
+.screen-options textarea {
+    width: 100%;
+    max-width: none;
+    min-height: 56px;
+    resize: vertical;
+}
+
+.textarea-token-wrap {
+    position: relative;
+    width: 100%;
+}
+
+.textarea-token-highlight,
+.textarea-token-wrap .textarea-token-input {
+    margin: 0;
+    padding: 6px 8px;
+    border: 1px solid var(--input-border);
+    border-radius: 4px;
+    font-size: 0.9rem;
+    font-family: inherit;
+    font-weight: normal;
+    line-height: 1.4;
+    letter-spacing: normal;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    box-sizing: border-box;
+}
+
+.textarea-token-highlight {
+    position: absolute;
+    inset: 0;
+    overflow: auto;
+    pointer-events: none;
+    color: var(--text-color);
+    background-color: var(--input-bg);
+    border-color: transparent;
+    scrollbar-width: none;
+}
+
+.textarea-token-highlight::-webkit-scrollbar {
+    display: none;
+}
+
+.textarea-token-wrap .textarea-token-input {
+    position: relative;
+    z-index: 1;
+    display: block;
+    width: 100%;
+    background: transparent;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    caret-color: var(--text-color);
+    resize: vertical;
+}
+
+.textarea-token-wrap .textarea-token-input::selection {
+    background: rgba(0, 170, 255, 0.35);
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+}
+
+.token-in-text {
+    color: var(--token-text-color);
+}
+
+.screen-token-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    overflow: visible;
+}
+
+.screen-message-tokens {
+    overflow: visible;
+}
+
+.screen-message-tokens h4 {
+    margin: 10px 0 6px;
+}
+
+.screen-display-schedule {
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-color);
+}
+
+.screen-display-schedule h4 {
+    margin: 0 0 8px;
+}
+
+.display-schedule-list {
+    margin-bottom: 10px;
+}
+
+.schedule-slot-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+}
+
+.schedule-slot-row select {
+    flex: 0 0 auto;
+}
+
+.schedule-slot-row input[type="number"] {
+    width: 70px;
+    flex: 0 0 auto;
+}
+
+.schedule-slot-row .schedule-slot-sec {
+    flex: 0 0 auto;
+    color: var(--text-secondary);
+    font-size: 0.9em;
+}
+
+.schedule-slot-row input[type="text"] {
+    flex: 1 1 120px;
+    min-width: 100px;
+}
+
+.schedule-slot-row input.schedule-slot-entity {
+    flex: 1 1 160px;
+    min-width: 120px;
+}
+
+.schedule-slot-row input.schedule-slot-unit {
+    width: 70px;
+    flex: 0 0 auto;
+}
+
+.schedule-slot-row input.schedule-slot-label {
+    flex: 0 0 auto;
+    width: 22ch;
+    max-width: 22ch;
+    min-width: 0;
+}
+
+.schedule-slot-row button {
+    flex: 0 0 auto;
+    cursor: pointer;
+    padding: 2px 8px;
+}
+
+.screen-schedule-add {
+    margin-top: 4px;
+}
+
+.screen-options-mode-note {
+    margin: 0 0 10px;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.screen-options .screen-font-samples {
+    grid-column: 1 / -1;
+    margin-top: 4px;
+}
+
+.screen-options .screen-font-samples h4 {
+    margin: 10px 0 8px;
+    font-size: 0.95rem;
+}
+
+.screen-font-samples-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+    gap: 8px;
+}
+
+.screen-font-sample-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 6px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--card-bg-color);
+    cursor: pointer;
+}
+
+.screen-font-sample-box.selected {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 1px var(--primary-color);
+}
+
+.screen-font-sample-name {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    text-transform: capitalize;
+}
+
+.screen-font-sample-thumb {
+    width: 100%;
+    max-width: 90px;
+    height: 36px;
+    background-color: #000;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    flex-shrink: 0;
+}
+
+.screen-font-sample-thumb-missing {
+    background-image: none !important;
+}
+
+.screen-preview-text-message,
+.screen-preview-text-text,
+.screen-preview-text-text_1,
+.screen-preview-text-text_2,
+.screen-preview-text-text_3,
+.screen-preview-text-text_4,
+.screen-preview-text-text_5,
+.screen-preview-text-text_6,
+.screen-preview-text-text_7,
+.screen-preview-text-text_8,
+.screen-preview-text-digit_label,
+.screen-preview-text-digit_label_aux {
+    font-family: "Segoe UI", Tahoma, sans-serif;
+    font-size: 8px;
+    text-align: left;
+}
+
+.screen-preview-matrix.screen-preview-message,
+.screen-preview-matrix.screen-preview-text_1,
+.screen-preview-matrix.screen-preview-text_2,
+.screen-preview-matrix.screen-preview-text_3,
+.screen-preview-matrix.screen-preview-text_4,
+.screen-preview-matrix.screen-preview-text_5,
+.screen-preview-matrix.screen-preview-text_6,
+.screen-preview-matrix.screen-preview-text_7,
+.screen-preview-matrix.screen-preview-text_8,
+.screen-preview-matrix.screen-preview-digit_label,
+.screen-preview-matrix.screen-preview-digit_label_aux {
+    align-items: flex-start;
+    justify-content: flex-start;
+}
+
+.screen-preview.screen-preview-palette-static-label {
+    overflow: visible;
+}
+
+.screen-preview-text-palette-static {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    width: auto;
+    max-width: none;
+    font-family: "Segoe UI", Tahoma, sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    text-align: center;
+    white-space: nowrap;
+    line-height: 1;
+    overflow: visible;
+}
+
+.screen-preview-text-digit {
+    font-size: 2em;
+    line-height: 1;
+}
+

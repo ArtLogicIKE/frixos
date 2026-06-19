@@ -1129,9 +1129,9 @@ static bool validate_json_params(cJSON *root, char *err_buf, size_t err_size)
 
     /* p46 wifi_start, p47 wifi_end */
     if ((item = cJSON_GetObjectItem(root, "p46")) && cJSON_IsNumber(item))
-        CHECK_RANGE("wifi_start", item->valueint, 0, 23);
+        CHECK_RANGE("wifi_start", item->valueint, 0, 1439);
     if ((item = cJSON_GetObjectItem(root, "p47")) && cJSON_IsNumber(item))
-        CHECK_RANGE("wifi_end", item->valueint, 0, 23);
+        CHECK_RANGE("wifi_end", item->valueint, 0, 1439);
 
     /* p23 brightness_LED array - exactly 2 elements [day, night], each 1-100 */
     if ((item = cJSON_GetObjectItem(root, "p23")) && cJSON_IsArray(item))
@@ -1185,9 +1185,9 @@ static bool validate_json_params(cJSON *root, char *err_buf, size_t err_size)
 
     /* p55 dim_start, p56 dim_end */
     if ((item = cJSON_GetObjectItem(root, "p55")) && cJSON_IsNumber(item))
-        CHECK_RANGE("dim_start", item->valueint, 0, 23);
+        CHECK_RANGE("dim_start", item->valueint, 0, 1439);
     if ((item = cJSON_GetObjectItem(root, "p56")) && cJSON_IsNumber(item))
-        CHECK_RANGE("dim_end", item->valueint, 0, 23);
+        CHECK_RANGE("dim_end", item->valueint, 0, 1439);
 
     /* p16 message */
     if ((item = cJSON_GetObjectItem(root, "p16")) && cJSON_IsString(item))
@@ -1745,11 +1745,11 @@ esp_err_t settings_post_handler(httpd_req_t *req)
         int start_value = wifi_start->valueint;
         if (start_value >= 0 && start_value <= 23)
         {
-            eeprom_wifi_start = (uint8_t)start_value;
+            eeprom_wifi_start = (uint16_t)start_value;
         }
         else
         {
-            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Invalid wifi_start value: %d, must be 0-23", start_value);
+            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Invalid wifi_start value: %d, must be 0-1439", start_value);
         }
     }
 
@@ -1759,11 +1759,11 @@ esp_err_t settings_post_handler(httpd_req_t *req)
         int end_value = wifi_end->valueint;
         if (end_value >= 0 && end_value <= 23)
         {
-            eeprom_wifi_end = (uint8_t)end_value;
+            eeprom_wifi_end = (uint16_t)end_value;
         }
         else
         {
-            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Invalid wifi_end value: %d, must be 0-23", end_value);
+            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Invalid wifi_end value: %d, must be 0-1439", end_value);
         }
     }
 
@@ -1824,9 +1824,9 @@ esp_err_t settings_post_handler(httpd_req_t *req)
     {
         int start_value = dim_start->valueint;
         if (start_value >= 0 && start_value <= 23)
-            eeprom_dim_start = (uint8_t)start_value;
+            eeprom_dim_start = (uint16_t)start_value;
         else
-            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Invalid dim_start value: %d, must be 0-23", start_value);
+            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Invalid dim_start value: %d, must be 0-1439", start_value);
     }
 
     cJSON *dim_end = cJSON_GetObjectItem(root, "p56");
@@ -1834,9 +1834,9 @@ esp_err_t settings_post_handler(httpd_req_t *req)
     {
         int end_value = dim_end->valueint;
         if (end_value >= 0 && end_value <= 23)
-            eeprom_dim_end = (uint8_t)end_value;
+            eeprom_dim_end = (uint16_t)end_value;
         else
-            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Invalid dim_end value: %d, must be 0-23", end_value);
+            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Invalid dim_end value: %d, must be 0-1439", end_value);
     }
 
     cJSON *message = cJSON_GetObjectItem(root, "p16");

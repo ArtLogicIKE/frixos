@@ -79,10 +79,10 @@ extern char eeprom_static_ip[16];   // p60: Static IP (empty = DHCP)
 extern char eeprom_static_gw[16];   // p61: Default gateway
 extern char eeprom_static_nm[16];   // p62: Subnet mask
 extern char eeprom_static_dns[40];  // p63: DNS servers, comma-separated
-extern uint8_t eeprom_wifi_start;  // WiFi Active Hours Start (0-23)
-extern uint8_t eeprom_wifi_end;    // WiFi Active Hours End (0-23)
-extern uint8_t eeprom_dim_start;   // Time-of-day dimming start hour (0-23)
-extern uint8_t eeprom_dim_end;     // Time-of-day dimming end hour (0-23)
+extern uint16_t eeprom_wifi_start;  // WiFi Active Hours Start (0-23)
+extern uint16_t eeprom_wifi_end;    // WiFi Active Hours End (0-23)
+extern uint16_t eeprom_dim_start;   // Time-of-day dimming start hour (0-23)
+extern uint16_t eeprom_dim_end;     // Time-of-day dimming end hour (0-23)
 extern char eeprom_lat[12], my_lat[12];                         // "48.123456";
 extern char eeprom_lon[12], my_lon[12];                         // "16.123456";
 extern char eeprom_timezone[TZ_LENGTH], my_timezone[TZ_LENGTH]; // EET-2EEST,M3.5.0/3,M10.5.0/4";
