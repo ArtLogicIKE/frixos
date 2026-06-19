@@ -47,7 +47,7 @@ TEXT_DESCRIPTIONS: tuple[TextEntityDescription, ...] = (
     ),
     TextEntityDescription(
         key=PARAM_TIMEZONE,
-        name="Timezone",
+        name="Timezone (POSIX)",
         icon="mdi:map-clock",
         entity_category=EntityCategory.CONFIG,
     ),

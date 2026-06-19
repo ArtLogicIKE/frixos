@@ -189,7 +189,22 @@
       "timezone": "Timezone",
       "timezone_placeholder": "Enter Timezone in POSIX format ONLY if automatic detection doesn't work",
       "help_text": "You can find a list of POSIX timezones <a href=\"https://leo.leung.xyz/wiki/Timezone\" target=\"_blank\">here</a>. Lat/Lon only affect weather data.",
-      "restart_note": "* Changing location settings will restart the device."
+      "restart_note": "* Changing location settings will restart the device.",
+      "city": "City",
+      "city_placeholder": "Search by city name…",
+      "btn_search": "Search",
+      "btn_geolocate": "Locate me",
+      "coordinates": "Coordinates",
+      "lat_short": "Lat.",
+      "lon_short": "Long.",
+      "geolocate_loading": "Fetching location from device…",
+      "geolocate_error": "Failed to read location from device.",
+      "city_searching": "Searching…",
+      "city_not_found": "City not found.",
+      "city_search_error": "Search failed. Check your connection.",
+      "city_found": "Found: {city}",
+      "reverse_geocode_loading": "Identifying nearest city…",
+      "geolocate_no_data": "No IP coordinates available on device yet. Try city search."
     },
     "wifi_hours": {
       "title": "WiFi Active Hours",

@@ -75,6 +75,91 @@
     background-color: #d32f2f;
 }
 
+/* Location settings – city search & coords layout */
+.location-search-row,
+.location-coords-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+}
+
+.location-search-row label {
+    min-width: 120px;
+    max-width: 200px;
+    flex-shrink: 0;
+    font-size: 0.9rem;
+}
+
+.location-search-row input[type="text"] {
+    flex: 1;
+    min-width: 140px;
+    max-width: 220px;
+}
+
+.coords-label {
+    min-width: 120px;
+    max-width: 200px;
+    flex-shrink: 0;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.coord-sublabel {
+    min-width: auto !important;
+    max-width: none !important;
+    flex-shrink: 0;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.coord-input {
+    flex: 0 0 auto;
+    width: 120px !important;
+    min-width: 100px !important;
+    max-width: 140px !important;
+}
+
+.button-sm {
+    padding: 6px 10px;
+    font-size: 0.85rem;
+    white-space: nowrap;
+}
+
+.button-secondary {
+    background-color: var(--secondary-color, #607d8b);
+}
+.button-secondary:hover {
+    background-color: var(--secondary-hover, #455a64);
+}
+
+.coords-city-hint {
+    display: none;
+    font-size: 0.78rem;
+    color: var(--text-muted, #888);
+    background: rgba(128, 128, 128, 0.12);
+    border-radius: 10px;
+    padding: 2px 9px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.coords-city-hint:not(:empty) {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.coords-city-hint::before {
+    content: '\229B';
+    font-size: 0.72rem;
+    font-style: normal;
+    opacity: 0.65;
+}
+.coords-city-hint.hint-loading {
+    font-style: italic;
+    opacity: 0.65;
+}
+
 /* Status messages */
 .status {
     padding: 12px;

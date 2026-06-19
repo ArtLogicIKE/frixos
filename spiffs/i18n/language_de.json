@@ -187,7 +187,22 @@
       "timezone": "Zeitzone",
       "timezone_placeholder": "Zeitzone nur im POSIX-Format eingeben, wenn automatische Erkennung nicht funktioniert",
       "help_text": "Eine Liste von POSIX-Zeitzonen finden Sie <a href=\"https://leo.leung.xyz/wiki/Timezone\" target=\"_blank\">hier</a>. Lat/Lon beeinflussen nur Wetterdaten.",
-      "restart_note": "* Änderungen der Standorteinstellungen starten das Gerät neu."
+      "restart_note": "* Änderungen der Standorteinstellungen starten das Gerät neu.",
+      "city": "Stadt",
+      "city_placeholder": "Stadtname suchen…",
+      "btn_search": "Suchen",
+      "btn_geolocate": "Mein Standort",
+      "coordinates": "Koordinaten",
+      "lat_short": "Br.",
+      "lon_short": "Lä.",
+      "geolocate_loading": "Standort vom Gerät abrufen…",
+      "geolocate_error": "Standort konnte nicht vom Gerät gelesen werden.",
+      "city_searching": "Suche läuft…",
+      "city_not_found": "Stadt nicht gefunden.",
+      "city_search_error": "Suche fehlgeschlagen. Verbindung prüfen.",
+      "city_found": "Gefunden: {city}",
+      "reverse_geocode_loading": "Nächste Stadt wird ermittelt…",
+      "geolocate_no_data": "Noch keine IP-Koordinaten auf dem Gerät verfügbar. Stadtsuche verwenden."
     },
     "wifi_hours": {
       "title": "WiFi-Aktive Stunden",

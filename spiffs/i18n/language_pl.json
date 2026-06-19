@@ -180,7 +180,22 @@
       "timezone": "Strefa czasowa",
       "timezone_placeholder": "Automatycznie wykryta, pozostaw puste",
       "help_text": "Listę stref czasowych POSIX znajdziesz <a href=\"https://leo.leung.xyz/wiki/Timezone\" target=\"_blank\">tutaj</a>.",
-      "restart_note": "* Zmiana ustawień lokalizacji uruchomi urządzenie ponownie."
+      "restart_note": "* Zmiana ustawień lokalizacji uruchomi urządzenie ponownie.",
+      "city": "Miasto",
+      "city_placeholder": "Szukaj po nazwie miasta…",
+      "btn_search": "Szukaj",
+      "btn_geolocate": "Zlokalizuj mnie",
+      "coordinates": "Współrzędne",
+      "lat_short": "Szer.",
+      "lon_short": "Dług.",
+      "geolocate_loading": "Pobieranie lokalizacji z urządzenia…",
+      "geolocate_error": "Nie można odczytać lokalizacji z urządzenia.",
+      "city_searching": "Szukanie…",
+      "city_not_found": "Nie znaleziono miasta.",
+      "city_search_error": "Wyszukiwanie nie powiodło się. Sprawdz połączenie.",
+      "city_found": "Znaleziono: {city}",
+      "reverse_geocode_loading": "Identyfikowanie najbliższego miasta…",
+      "geolocate_no_data": "Brak współrzędnych IP na urządzeniu. Użyj wyszukiwania po mieście."
     },
     "wifi_hours": {
       "title": "Aktywne godziny WiFi",
