@@ -214,6 +214,26 @@ function applyDetectedTimezoneHints() {
     }
 }
 
+// Show "Detected: <value>" placeholders for empty Lat/Long fields, using the
+// coordinates the device determined via IP geolocation (from /api/status).
+function applyDetectedLatLonHints() {
+    const latEl = document.getElementById('lat');
+    const lonEl = document.getElementById('lon');
+    const latNeeded = latEl && !latEl.value;
+    const lonNeeded = lonEl && !lonEl.value;
+    if (!latNeeded && !lonNeeded) return;
+    const t = (key) => getNestedTranslation(translations[currentLanguage] || translations.en, `advanced.location.${key}`) || key;
+    const detected = (v) => (t('detected') || 'Detected: {tz}').replace('{tz}', v);
+    fetch('/api/status')
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+            if (!data) return;
+            if (latEl && !latEl.value && data.latitude) latEl.placeholder = detected(data.latitude);
+            if (lonEl && !lonEl.value && data.longitude) lonEl.placeholder = detected(data.longitude);
+        })
+        .catch(() => {});
+}
+
 function applyLocationTimezone(lat, lon, cityName, t) {
     locationMsg(t('timezone_lookup_loading'), 'loading');
     return lookupPosixTimezone(lat, lon)
@@ -407,6 +427,7 @@ function setupAdvancedSection() {
         if (el('timezone') && window.settings.p19 !== undefined) el('timezone').value = window.settings.p19 || '';
         if (el('tz_iana') && window.settings.tz_iana !== undefined) el('tz_iana').value = window.settings.tz_iana || '';
         applyDetectedTimezoneHints();
+        applyDetectedLatLonHints();
         if (el('wifi_start') && window.settings.p46 !== undefined) el('wifi_start').value = formatMinsToTimeString(window.settings.p46);
         if (el('wifi_end') && window.settings.p47 !== undefined) el('wifi_end').value = formatMinsToTimeString(window.settings.p47);
         if (el('lux_sensitivity') && window.settings.p20 !== undefined) el('lux_sensitivity').value = window.settings.p20 || 2.5;
