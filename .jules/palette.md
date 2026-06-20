@@ -19,3 +19,7 @@
 ## 2025-05-16 - [Visual Samples as Interactive Controls]
 **Learning:** When visual samples (such as fonts) correspond to underlying configuration settings, they should be implemented as accessible, interactive controls. This reduces cognitive load by allowing users to directly interact with what they see, rather than translating a visual preference into a dropdown selection.
 **Action:** Implement `role="button"`, `tabindex="0"`, and localized `aria-label` for all visual sample boxes to ensure they are discoverable and usable as primary input mechanisms.
+
+## 2025-05-16 - [Dynamic State Feedback for Accessible Toggles]
+**Learning:** For toggle buttons (like password visibility) that change the state of another element, localizing the initial ARIA label is insufficient. The label must be dynamically updated during the interaction to provide immediate and accurate feedback to screen reader users about the resulting state.
+**Action:** In interaction handlers for toggle elements, always re-apply localized labels from the `translations` object to ensure the accessibility state remains in sync with the visual state change.

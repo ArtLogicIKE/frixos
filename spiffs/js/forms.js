@@ -7,6 +7,11 @@ $$('.pw .eye').forEach(b => b.addEventListener('click', () => {
   const inp = b.parentElement.querySelector('input');
   inp.type = inp.type === 'password' ? 'text' : 'password';
   b.style.opacity = inp.type === 'text' ? '1' : '';
+
+  const t = translations[currentLanguage] || translations.en;
+  const key = inp.type === 'password' ? 'common.show_password' : 'common.hide_password';
+  const label = getNestedTranslation(t, key) || (inp.type === 'password' ? 'Show password' : 'Hide password');
+  b.setAttribute('aria-label', label);
 }));
 
 function bindSwitch(id) { const g = el(id); if (g) g.addEventListener('click', () => g.classList.toggle('on')); return el(id); }

@@ -101,6 +101,11 @@ function applyI18n(lang) {
   const t = translations[lang] || {};
   $$('[data-i18n]').forEach(node => { const v = getNestedTranslation(t, node.getAttribute('data-i18n')); if (v != null) node.innerHTML = v; });
   $$('[data-i18n-placeholder]').forEach(node => { const v = getNestedTranslation(t, node.getAttribute('data-i18n-placeholder')); if (v != null) node.placeholder = v; });
+  $$('[data-i18n-aria-label]').forEach(node => {
+    const v = getNestedTranslation(t, node.getAttribute('data-i18n-aria-label'));
+    if (v != null) node.setAttribute('aria-label', v);
+  });
+  $$('[data-i18n-title]').forEach(node => { const v = getNestedTranslation(t, node.getAttribute('data-i18n-title')); if (v != null) node.setAttribute('title', v); });
 }
 async function setLanguage(lang, persist) {
   currentLanguage = lang;
