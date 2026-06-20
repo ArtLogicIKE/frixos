@@ -33,3 +33,7 @@
 ## 2026-05-19 - Lazy Element Caching for Translation System
 **Learning:** The `translate()` function was performing multiple global `document.querySelectorAll` calls (for `[data-i18n]`, `.password-toggle`, `.token-code`, and `.language-option`) on every language switch. In a ~130KB single-page application with hundreds of translatable elements, these redundant DOM queries add significant script execution overhead.
 **Action:** Implement lazy-initialized module-level caches for these `NodeList` results. Populating the cache on first use and reusing it reduces `translate()` execution time by ~10%. Crucially, implement and call an `invalidateI18nCache()` helper in functions that dynamically inject or replace translatable DOM elements (e.g., WiFi network lists or support buttons) to prevent functional regressions and ensure new elements are correctly translated.
+
+## 2026-05-20 - Animation Throttling Edge Case in Drag Operations
+**Learning:** Throttling high-frequency rendering events (e.g., during element dragging) with `requestAnimationFrame` can introduce a race condition where the final "pointerup" event occurs before the last throttled frame executes. If the handle is simply cancelled, the UI may remain in a stale, second-to-last state.
+**Action:** In "pointerup" or "dragend" handlers, always check for a pending throttled frame. If present, cancel the frame and immediately execute the rendering logic to ensure the component reflects the final intended state.

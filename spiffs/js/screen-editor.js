@@ -564,6 +564,9 @@ const SCREEN_ELEMENT_DEFS = [
     { id: 'text_8', label: 'Text 8', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.text_8 }
 ];
 
+// Optimization: O(1) Map lookup for element definitions to eliminate O(N) linear search
+const SCREEN_ELEMENT_DEFS_MAP = new Map(SCREEN_ELEMENT_DEFS.map(def => [def.id, def]));
+
 const SCREEN_TEXT_SLOT_IDS = ['text_1', 'text_2', 'text_3', 'text_4', 'text_5', 'text_6', 'text_7', 'text_8'];
 
 const SCREEN_PALETTE_TEXT_DEF = {
@@ -1030,6 +1033,7 @@ window.screenEditor = {
     mode: 'day', // 'day' | 'night'
     scale: 4,
     dragging: null, // { id, originX, originY, startLeft, startTop, fromPalette }
+    dragRafHandle: null, // Optimization: Handle for requestAnimationFrame throttling
     selectedId: null,
     cursorX: null,
     cursorY: null
@@ -1050,7 +1054,7 @@ function findElementDef(id) {
     if (id === 'text') return SCREEN_PALETTE_TEXT_DEF;
     if (id === 'screen_settings') return SCREEN_PALETTE_SETTINGS_DEF;
     if (id === 'screen_grid') return SCREEN_PALETTE_GRID_DEF;
-    return SCREEN_ELEMENT_DEFS.find(d => d.id === id) || null;
+    return SCREEN_ELEMENT_DEFS_MAP.get(id) || null;
 }
 
 function evenPx(value) {
@@ -2413,7 +2417,10 @@ function beginDrag(id, pointerEvent, fromPalette) {
         startLeft,
         startTop,
         fromPalette,
-        moved: false
+        moved: false,
+        // Optimization: Cache bounding rectangle and scale to eliminate O(1) reflow-triggering lookups in onScreenPointerMove
+        rect: canvas.getBoundingClientRect(),
+        scale
     };
     updateScreenStatusLine();
 }
@@ -2442,7 +2449,8 @@ function onScreenPointerMove(e) {
     const profile = getProfileObj(window.screenEditor.mode);
     if (!profile) return;
     const elem = ensureElementInProfile(profile, d.id);
-    const scale = window.screenEditor.scale || getScreenScale();
+    // Optimization: Use cached scale from drag state
+    const scale = d.scale || window.screenEditor.scale || getScreenScale();
 
     const dx = e.clientX - d.originX;
     const dy = e.clientY - d.originY;
@@ -2455,7 +2463,8 @@ function onScreenPointerMove(e) {
             elem.enabled = 1;
         }
         d.moved = true;
-        const rect = canvas.getBoundingClientRect();
+        // Optimization: Use cached bounding rectangle from drag state
+        const rect = d.rect || canvas.getBoundingClientRect();
         const def = findElementDef(d.id);
         const elementId = def ? def.id : d.id;
         elem.x = clamp(Math.round((e.clientX - rect.left - 10) / scale), 0, SCREEN_SIZE - 1);
@@ -2471,12 +2480,26 @@ function onScreenPointerMove(e) {
         elem.y = visualYToLayoutY(visualY, elementId);
     }
 
-    renderScreenCanvas();
+    // Optimization: Throttle canvas re-rendering using requestAnimationFrame
+    if (!window.screenEditor.dragRafHandle) {
+        window.screenEditor.dragRafHandle = requestAnimationFrame(() => {
+            window.screenEditor.dragRafHandle = null;
+            renderScreenCanvas();
+        });
+    }
 }
 
 function onScreenPointerUp(e) {
     const d = window.screenEditor.dragging;
     if (!d) return;
+
+    // Optimization: If a render is pending, execute it now to ensure final state is correct
+    if (window.screenEditor.dragRafHandle) {
+        cancelAnimationFrame(window.screenEditor.dragRafHandle);
+        window.screenEditor.dragRafHandle = null;
+        renderScreenCanvas();
+    }
+
     const placedFromPalette = d.fromPalette && d.moved && isScreenStaticTextElement(d.id);
     window.screenEditor.dragging = null;
     updateScreenStatusLine();
