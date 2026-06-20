@@ -1,682 +1,117 @@
-// Status section functionality
-function setupStatusSection() {
-    // Add refresh button handler
-    const refreshButton = el('refreshButton');
-    if (refreshButton) {
-        refreshButton.addEventListener('click', () => fetchStatus(true));
-    }
-    
-    // Status data will be fetched when the section is shown (in navigateToSection)
+/* ============================================================
+   system.js — Status, Files, Update, Restart tabs. Depends on core.js.
+   ============================================================ */
+
+/* ---------- STATUS ---------- */
+async function loadStatus() {
+  const res = await apiGet('/api/status?logs=1');
+  const d = res.data; if (!d) return;
+  const txt = (id, v) => { const e = el(id); if (e) e.textContent = (v === undefined || v === null || v === '') ? '—' : v; };
+  txt('lux', d.lux != null ? Number(d.lux).toFixed(1) : '—');
+  txt('last_time_update', d.last_time_update ? ago(d.last_time_update) : '—');
+  txt('timezone_val', d.timezone);
+  txt('moon_status', MOON[d.moon_icon_index] || '—');
+  txt('last_weather_update', d.last_weather_update ? ago(d.last_weather_update) : '—');
+  txt('latitude', d.latitude); txt('longitude', d.longitude);
+  txt('uptime', d.uptime != null ? formatUptime(d.uptime) : '—');
+  txt('app', d.app); txt('version', d.version); txt('fwversion', d.fwversion);
+  txt('poh', d.poh != null ? formatPOH(d.poh) : '—');
+  txt('mac_address', (d.mac_address || '').replace(/(..)(?=.)/g, '$1:'));
+  txt('ip_address', d.ip_address); txt('chip_revision', d.chip_revision);
+  txt('flash_size', d.flash_size != null ? formatBytes(d.flash_size) : '—');
+  txt('cpu_freq', d.cpu_freq != null ? (d.cpu_freq / 1e6) + ' MHz' : '—');
+  txt('compile_time', d.compile_time);
+  txt('free_heap', d.free_heap != null ? formatBytes(d.free_heap) : '—');
+  txt('min_free_heap', d.min_free_heap != null ? formatBytes(d.min_free_heap) : '—');
+  if (el('system_logs')) el('system_logs').value = Array.isArray(d.system_logs) ? d.system_logs.join('\n') : '';
+  if (el('ha_status_textarea')) el('ha_status_textarea').value = Array.isArray(d.ha_tokens) ? d.ha_tokens.join('\n') : '';
+  window.statusData = d;
 }
+sectionLoaders.status = loadStatus;
+el('refreshStatus').addEventListener('click', () => { loadStatus(); toast('Status refreshed', 'ok'); });
+el('supportCopy').addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText(JSON.stringify(window.statusData || {}, null, 2)); toast('Copied to clipboard', 'ok'); }
+  catch (e) { toast('Copy failed', 'err'); }
+});
+el('supportEmail').addEventListener('click', () => {
+  const b = encodeURIComponent('Frixos diagnostics:\n\n' + JSON.stringify(window.statusData || {}, null, 2));
+  location.href = 'mailto:support@buyfrixos.com?subject=Frixos%20support&body=' + b;
+});
 
-// Setup support buttons (send email and copy to clipboard)
-function setupSupportButtons() {
-    invalidateI18nCache();
-    const sendToSupportButton = el('sendToSupportButton');
-    const copyToClipboardButton = el('copyToClipboardButton');
-    
-    if (sendToSupportButton) {
-        // Remove any existing listeners by cloning the button
-        const newButton = sendToSupportButton.cloneNode(true);
-        sendToSupportButton.parentNode.replaceChild(newButton, sendToSupportButton);
-        domCache.delete('sendToSupportButton');
-        
-        newButton.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            sendSystemInfoToSupport();
-        });
-    } else {
-        console.warn('sendToSupportButton not found in DOM');
-    }
-    
-    if (copyToClipboardButton) {
-        // Remove any existing listeners by cloning the button
-        const newButton = copyToClipboardButton.cloneNode(true);
-        copyToClipboardButton.parentNode.replaceChild(newButton, copyToClipboardButton);
-        domCache.delete('copyToClipboardButton');
-        
-        newButton.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            copySystemInfoToClipboard();
-        });
-    } else {
-        console.warn('copyToClipboardButton not found in DOM');
-    }
+/* ---------- FILES ---------- */
+let FILES = [], sortKey = 'name', sortAsc = true;
+async function loadFiles() {
+  const res = await apiGet('/api/files');
+  FILES = (res.data && res.data.files) || [];
+  renderFiles();
 }
-
-function fetchStatus(includeLogs = false) {
-    const url = includeLogs ? '/api/status?logs=1' : '/api/status';
-    const refreshBtn = el('refreshButton');
-    if (includeLogs) toggleLoading(refreshBtn, true);
-
-    return fetch(url)
-        .then(response => response.json())
-        .then(data => {
-            // Update time & weather status
-            const timeUpdateStatus = el('time_update_status');
-            const weatherUpdateStatus = el('weather_update_status');
-
-            // Update time status
-            if (data.time_status) {
-                const timestamp = new Date(data.last_time_update * 1000).toLocaleString();
-                timeUpdateStatus.innerHTML = `<span class="status-icon status-success"></span> ${timestamp}`;
-            } else {
-                timeUpdateStatus.innerHTML = '<span class="status-icon status-error"></span> Not synced';
-            }
-
-            // Update weather status
-            if (data.weather_status) {
-                const timestamp = new Date(data.last_weather_update * 1000).toLocaleString();
-                weatherUpdateStatus.innerHTML = `<span class="status-icon status-success"></span> ${timestamp}`;
-            } else {
-                weatherUpdateStatus.innerHTML = '<span class="status-icon status-error"></span> Not synced';
-            }
-
-            // Update other weather-related info
-            el('moon_status').textContent = data.moon_icon_index !== undefined ? getMoonPhaseName(data.moon_icon_index) : '-';
-            el('latitude').textContent = data.latitude || '-';
-            el('longitude').textContent = data.longitude || '-';
-            el('timezone_val').textContent = data.timezone || '-';
-
-            // Update system information
-            el('app').textContent = data.app || '-';
-            el('version').textContent = data.version || '-';
-            el('fwversion').textContent = data.fwversion || '-';
-            el('poh').textContent = data.poh !== undefined ? formatPOH(data.poh) : '-';
-            el('mac_address').textContent = data.mac_address || '-';
-            el('ip_address').textContent = data.ip_address || '-';
-            el('chip_revision').textContent = data.chip_revision || '-';
-            el('flash_size').textContent = data.flash_size ? formatBytes(data.flash_size) : '-';
-            el('cpu_freq').textContent = data.cpu_freq ? `${(data.cpu_freq / 1000000)} MHz` : '-';
-            el('compile_time').textContent = data.compile_time || '-';
-            el('free_heap').textContent = data.free_heap ? formatBytes(data.free_heap) : '-';
-            el('min_free_heap').textContent = data.min_free_heap ? formatBytes(data.min_free_heap) : '-';
-
-            // Update sensor data
-            el('lux').textContent = data.lux !== undefined ? data.lux.toFixed(1) : '-';
-            if (data.uptime !== undefined) {
-                el('uptime').textContent = formatUptime(data.uptime);
-            } else {
-                el('uptime').textContent = '-';
-            }
-
-            // Update system logs
-            const logsTextarea = el('system_logs');
-            if (data.system_logs && Array.isArray(data.system_logs)) {
-                logsTextarea.value = data.system_logs.join('\n');
-            } else {
-                logsTextarea.value = 'No logs available';
-            }
-
-            // Update HA Status textarea
-            if (data.ha_tokens && Array.isArray(data.ha_tokens)) {
-                el('ha_status_textarea').value = data.ha_tokens.join('\n');
-            } else {
-                el('ha_status_textarea').value = 'No Integrations active';
-            }
-
-            window.statusData = data;
-            return data; // Return the data for other functions to use
-        })
-        .catch(error => {
-            console.error('Error fetching status:', error);
-            showStatus(getMessage('failed_fetch_status'), 'error');
-            throw error; // Re-throw the error for other functions to handle
-        })
-        .finally(() => {
-            if (includeLogs) toggleLoading(refreshBtn, false);
-        });
+sectionLoaders.files = loadFiles;
+function renderFiles() {
+  FILES.sort((a, b) => { const r = sortKey === 'size' ? a.size - b.size : a.name.localeCompare(b.name); return sortAsc ? r : -r; });
+  el('filesBody').innerHTML = FILES.map(f => `<tr><td class="cbx"><input type="checkbox" class="fcb" data-name="${(f.name || '').replace(/"/g, '&quot;')}"></td><td><a href="/${encodeURIComponent(f.name)}" download>${f.name}</a></td><td class="size">${formatBytes(f.size)}</td></tr>`).join('');
+  $$('.fcb').forEach(cb => cb.addEventListener('change', () => { cb.closest('tr').classList.toggle('sel', cb.checked); updFileBtns(); }));
+  el('filesSummary').textContent = FILES.length + ' files · ' + formatBytes(FILES.reduce((s, f) => s + (f.size || 0), 0)) + ' total';
+  el('selAll').checked = false; updFileBtns();
 }
+function selectedNames() { return $$('.fcb:checked').map(cb => cb.dataset.name); }
+function updFileBtns() { const n = selectedNames().length; el('filesDelete').disabled = n === 0; el('filesRename').disabled = n !== 1; el('selAll').checked = n === FILES.length && n > 0; }
+el('selAll').addEventListener('change', e => { $$('.fcb').forEach(cb => { cb.checked = e.target.checked; cb.closest('tr').classList.toggle('sel', e.target.checked); }); updFileBtns(); });
+$$('th[data-sort] button').forEach(b => b.addEventListener('click', () => {
+  const k = b.dataset.sort; if (k === sortKey) sortAsc = !sortAsc; else { sortKey = k; sortAsc = true; }
+  $$('th[data-sort] button').forEach(x => { x.textContent = x.textContent.replace(/[ ↑↓]+$/, ''); if (x.dataset.sort === sortKey) x.textContent += sortAsc ? ' ↑' : ' ↓'; });
+  renderFiles();
+}));
+el('filesRefresh').addEventListener('click', () => { loadFiles(); toast('Files refreshed', 'ok'); });
+el('filesDelete').addEventListener('click', async () => {
+  const names = selectedNames(); if (!names.length) return;
+  const res = await apiPostJson('/api/files/delete', { files: names });
+  if (res.data && res.data.status === 'ok') { toast('Deleted ' + (res.data.deleted || names.length) + ' file(s)', 'ok'); loadFiles(); }
+  else toast('Delete failed', 'err');
+});
+el('filesRename').addEventListener('click', async () => {
+  const names = selectedNames(); if (names.length !== 1) return;
+  const newName = prompt('Rename "' + names[0] + '" to:', names[0]); if (!newName || newName === names[0]) return;
+  const res = await apiPostJson('/api/files/rename', { oldName: names[0], newName });
+  if (res.data && res.data.status === 'ok') { toast('File renamed', 'ok'); loadFiles(); }
+  else toast((res.data && res.data.message) || 'Rename failed', 'err');
+});
 
-function formatBytes(bytes, decimals = 2) {
-    if (!bytes) return '0 Bytes';
-    
-    const k = 1024;
-    const dm = decimals < 0 ? 0 : decimals;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
-}
+/* ---------- UPDATE ---------- */
+const fwFile = el('fwFile'), uploadBtn = el('uploadBtn');
+fwFile.addEventListener('change', () => { uploadBtn.disabled = !fwFile.files.length; });
+uploadBtn.addEventListener('click', () => {
+  const file = fwFile.files[0]; if (!file) return;
+  const wrap = el('progressWrap'), fill = el('progressFill'), txt = el('progressTxt');
+  wrap.style.display = 'block'; uploadBtn.disabled = true;
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', '/api/ota', true);
+  xhr.setRequestHeader('X-Filename', file.name);
+  xhr.upload.addEventListener('progress', e => { if (e.lengthComputable) { const p = Math.round(e.loaded / e.total * 100); fill.style.width = p + '%'; txt.textContent = p + '%'; } });
+  xhr.addEventListener('load', () => {
+    let d = {}; try { d = JSON.parse(xhr.responseText); } catch (e) { }
+    if (xhr.status >= 200 && xhr.status < 300 && d.status === 'ok') {
+      if ((d.message || '').toLowerCase().includes('reboot')) { txt.textContent = 'Done — restarting…'; toast('Firmware uploaded — restarting', 'ok'); setTimeout(() => location.reload(), 8000); }
+      else { txt.textContent = 'Done'; toast(d.message || 'Upload complete', 'ok'); }
+    } else { toast((d.message) || 'Upload failed', 'err'); }
+    uploadBtn.disabled = false;
+  });
+  xhr.addEventListener('error', () => { toast('Upload failed', 'err'); uploadBtn.disabled = false; });
+  xhr.send(file);
+});
+el('reinstall').addEventListener('click', async () => {
+  const res = await apiPostJson('/api/ota/reinstall', {});
+  if (res.data && res.data.status === 'ok') toast('Reinstall started', 'ok');
+  else toast((res.data && res.data.message) || 'Reinstall failed', 'err');
+});
 
-function getMoonPhaseName(index) {
-    const phases = [
-        'New Moon',
-        'Waxing Crescent',
-        'First Quarter',
-        'Waxing Gibbous',
-        'Full Moon',
-        'Waning Gibbous',
-        'Last Quarter',
-        'Waning Crescent'
-    ];
-    
-    if (index >= 0 && index < phases.length) {
-        return phases[index];
-    } else {
-        return 'Unknown (' + index + ')';
-    }
-}
-
-// Files section functionality
-function setupFilesSection() {
-    if (window.filesEventListenersSet) return;
-    window.filesEventListenersSet = true;
-
-    const refreshButton = el('refreshFilesButton');
-    const deleteButton = el('deleteFilesButton');
-    const renameButton = el('renameFileButton');
-    const selectAll = el('selectAllFiles');
-    const sortButtons = document.querySelectorAll('#files-section .table-sort-button');
-
-    if (refreshButton) {
-        refreshButton.addEventListener('click', fetchFiles);
-    }
-
-    if (deleteButton) {
-        deleteButton.addEventListener('click', deleteSelectedFiles);
-    }
-
-    if (renameButton) {
-        renameButton.addEventListener('click', renameSelectedFile);
-    }
-
-    if (selectAll) {
-        const trans = translations[currentLanguage] || translations.en;
-        selectAll.setAttribute('aria-label', getNestedTranslation(trans, 'files.select_all') || 'Select all files');
-        selectAll.addEventListener('change', function() {
-            window.selectedFiles.clear();
-            if (selectAll.checked) {
-                window.spiffsFiles.forEach(file => window.selectedFiles.add(file.name));
-            }
-            renderFilesTable(window.spiffsFiles);
-        });
-    }
-
-    sortButtons.forEach(button => {
-        button.addEventListener('click', function() {
-            const sortKey = button.dataset.sortKey;
-            if (!sortKey) return;
-
-            if (window.filesSort.key === sortKey) {
-                window.filesSort.direction = window.filesSort.direction === 'asc' ? 'desc' : 'asc';
-            } else {
-                window.filesSort.key = sortKey;
-                window.filesSort.direction = 'asc';
-            }
-
-            renderFilesTable(window.spiffsFiles);
-        });
-    });
-
-    updateFilesSortHeaders();
-}
-
-function fetchFiles() {
-    const refreshButton = el('refreshFilesButton');
-    toggleLoading(refreshButton, true);
-    renderFilesLoading();
-
-    return fetch('/api/files')
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(response.statusText || response.status);
-            }
-            return response.json();
-        })
-        .then(data => {
-            window.spiffsFiles = Array.isArray(data.files) ? data.files : [];
-            window.screenSpiffsFileSet = new Set(window.spiffsFiles.map(f => f.name));
-            window.selectedFiles.clear();
-            window.filesLoaded = true;
-            renderFilesTable(window.spiffsFiles);
-            return data;
-        })
-        .catch(error => {
-            console.error('Error fetching files:', error);
-            showStatus(getMessage('failed_fetch_files'), 'error');
-            renderFilesError();
-        })
-        .finally(() => {
-            toggleLoading(refreshButton, false);
-        });
-}
-
-function renderFilesLoading() {
-    const tbody = el('filesTableBody');
-    if (!tbody) return;
-    const trans = translations[currentLanguage] || translations.en;
-    tbody.innerHTML = '';
-    const row = document.createElement('tr');
-    const cell = document.createElement('td');
-    cell.colSpan = 3;
-    cell.className = 'files-empty';
-    cell.textContent = getNestedTranslation(trans, 'files.loading') || 'Loading files...';
-    row.appendChild(cell);
-    tbody.appendChild(row);
-}
-
-function renderFilesError() {
-    const tbody = el('filesTableBody');
-    if (!tbody) return;
-    tbody.innerHTML = '';
-    const row = document.createElement('tr');
-    const cell = document.createElement('td');
-    cell.colSpan = 3;
-    cell.className = 'files-empty error';
-    cell.textContent = getMessage('failed_fetch_files');
-    row.appendChild(cell);
-    tbody.appendChild(row);
-    updateFilesActions();
-}
-
-function renderFilesTable(files) {
-    const tbody = el('filesTableBody');
-    const summary = el('files-summary');
-    const selectAll = el('selectAllFiles');
-    if (!tbody) return;
-
-    const trans = translations[currentLanguage] || translations.en;
-    const sortedFiles = getSortedFiles(files || []);
-    tbody.innerHTML = '';
-
-    if (sortedFiles.length === 0) {
-        const row = document.createElement('tr');
-        const cell = document.createElement('td');
-        cell.colSpan = 3;
-        cell.className = 'files-empty';
-        cell.textContent = getNestedTranslation(trans, 'files.empty') || 'No files found';
-        row.appendChild(cell);
-        tbody.appendChild(row);
-    } else {
-        sortedFiles.forEach(file => {
-            const row = document.createElement('tr');
-            const selected = window.selectedFiles.has(file.name);
-            row.className = selected ? 'is-selected' : '';
-
-            const selectCell = document.createElement('td');
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.checked = selected;
-            checkbox.setAttribute('aria-label', file.name);
-            checkbox.addEventListener('change', function() {
-                if (checkbox.checked) {
-                    window.selectedFiles.add(file.name);
-                } else {
-                    window.selectedFiles.delete(file.name);
-                }
-                renderFilesTable(window.spiffsFiles);
-            });
-            selectCell.appendChild(checkbox);
-
-            const nameCell = document.createElement('td');
-            const nameLink = document.createElement('a');
-            nameLink.href = '/' + encodeURIComponent(file.name || '');
-            nameLink.download = file.name || '';
-            nameLink.textContent = file.name || '';
-            nameCell.appendChild(nameLink);
-
-            const sizeCell = document.createElement('td');
-            sizeCell.textContent = formatBytes(file.size || 0);
-
-            row.appendChild(selectCell);
-            row.appendChild(nameCell);
-            row.appendChild(sizeCell);
-            tbody.appendChild(row);
-        });
-    }
-
-    if (summary) {
-        const countLabel = getNestedTranslation(trans, 'files.count') || ' files';
-        const selectedLabel = getNestedTranslation(trans, 'files.selected') || ' selected';
-        summary.textContent = `${sortedFiles.length}${countLabel}, ${window.selectedFiles.size}${selectedLabel}`;
-    }
-
-    if (selectAll) {
-        selectAll.checked = sortedFiles.length > 0 && window.selectedFiles.size === sortedFiles.length;
-        selectAll.indeterminate = window.selectedFiles.size > 0 && window.selectedFiles.size < sortedFiles.length;
-    }
-
-    updateFilesSortHeaders();
-    updateFilesActions();
-}
-
-function getSortedFiles(files) {
-    const direction = window.filesSort.direction === 'desc' ? -1 : 1;
-    const key = window.filesSort.key;
-
-    return [...files].sort((a, b) => {
-        if (key === 'size') {
-            return (((a.size || 0) - (b.size || 0)) * direction) ||
-                String(a.name || '').localeCompare(String(b.name || ''));
-        }
-
-        return String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' }) * direction;
-    });
-}
-
-function updateFilesSortHeaders() {
-    const headers = {
-        name: el('filesNameHeader'),
-        size: el('filesSizeHeader')
-    };
-    const buttons = document.querySelectorAll('#files-section .table-sort-button');
-
-    Object.keys(headers).forEach(key => {
-        const header = headers[key];
-        if (!header) return;
-        const isActive = window.filesSort.key === key;
-        header.setAttribute('aria-sort', isActive ? (window.filesSort.direction === 'asc' ? 'ascending' : 'descending') : 'none');
-    });
-
-    buttons.forEach(button => {
-        const isActive = button.dataset.sortKey === window.filesSort.key;
-        button.classList.toggle('is-active', isActive);
-        button.dataset.sortDirection = isActive ? window.filesSort.direction : '';
-    });
-}
-
-function updateFilesActions() {
-    const selectedCount = window.selectedFiles.size;
-    const deleteButton = el('deleteFilesButton');
-    const renameButton = el('renameFileButton');
-    if (deleteButton) deleteButton.disabled = selectedCount === 0;
-    if (renameButton) renameButton.disabled = selectedCount !== 1;
-}
-
-function deleteSelectedFiles() {
-    const selected = Array.from(window.selectedFiles);
-    if (selected.length === 0) return;
-
-    const trans = translations[currentLanguage] || translations.en;
-    const confirmMessage = getNestedTranslation(trans, 'files.delete_confirm') || 'Delete selected files?';
-    if (!window.confirm(`${confirmMessage}\n\n${selected.join('\n')}`)) {
-        return;
-    }
-
-    const deleteButton = el('deleteFilesButton');
-    toggleLoading(deleteButton, true);
-
-    fetch('/api/files/delete', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ files: selected })
-    })
-    .then(response => response.json().then(data => ({ ok: response.ok, data })))
-    .then(({ ok, data }) => {
-        if (!ok || !data || data.status !== 'ok') {
-            throw new Error(data && data.message ? data.message : 'Delete failed');
-        }
-        showStatus(getMessage('files_deleted'), 'success');
-        return fetchFiles();
-    })
-    .catch(error => {
-        console.error('Error deleting files:', error);
-        showStatus(getMessage('failed_delete_files') + error.message, 'error');
-    })
-    .finally(() => {
-        toggleLoading(deleteButton, false);
-        updateFilesActions();
-    });
-}
-
-function renameSelectedFile() {
-    const selected = Array.from(window.selectedFiles);
-    if (selected.length !== 1) {
-        const trans = translations[currentLanguage] || translations.en;
-        showStatus(getNestedTranslation(trans, 'files.only_one_rename') || 'Select exactly one file to rename', 'error');
-        return;
-    }
-
-    const oldName = selected[0];
-    const trans = translations[currentLanguage] || translations.en;
-    const promptText = getNestedTranslation(trans, 'files.rename_prompt') || 'Enter a new filename for ';
-    const newName = window.prompt(promptText + oldName, oldName);
-    if (!newName || newName === oldName) {
-        return;
-    }
-
-    const renameButton = el('renameFileButton');
-    toggleLoading(renameButton, true);
-
-    fetch('/api/files/rename', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ oldName, newName: newName.trim() })
-    })
-    .then(response => response.json().then(data => ({ ok: response.ok, data })))
-    .then(({ ok, data }) => {
-        if (!ok || !data || data.status !== 'ok') {
-            throw new Error(data && data.message ? data.message : 'Rename failed');
-        }
-        showStatus(getMessage('file_renamed'), 'success');
-        return fetchFiles();
-    })
-    .catch(error => {
-        console.error('Error renaming file:', error);
-        showStatus(getMessage('failed_rename_file') + error.message, 'error');
-    })
-    .finally(() => {
-        toggleLoading(renameButton, false);
-        updateFilesActions();
-    });
-}
-
-// Update (OTA) section functionality
-function setupUpdateSection() {
-    const reinstallButton = el('reinstallButton');
-    if (reinstallButton) {
-        reinstallButton.addEventListener('click', reinstallCurrentFirmware);
-    }
-
-    const uploadForm = el('uploadForm');
-    const firmwareFile = el('firmwareFile');
-    const uploadButton = el('uploadButton');
-    const progressContainer = el('progressContainer');
-    const progressBar = el('progress');
-    const progressText = el('progressText');
-    
-    // Enable upload button when file is selected
-    firmwareFile.addEventListener('change', function() {
-        uploadButton.disabled = !firmwareFile.files.length;
-    });
-    
-    // Handle form submission
-    uploadForm.addEventListener('submit', function(e) {
-        e.preventDefault();
-        
-        if (!firmwareFile.files.length) {
-            showStatus(getMessage('select_firmware_file'), 'error');
-            return;
-        }
-        
-        const file = firmwareFile.files[0];
-                
-        // Disable form elements during upload
-        firmwareFile.disabled = true;
-        uploadButton.disabled = true;
-        
-        // Show progress container
-        progressContainer.style.display = 'block';
-        progressBar.style.width = '0%';
-        progressText.textContent = '0%';
-        
-        // Show uploading status
-        showStatus(getMessage('uploading_file'), 'info');
-        toggleLoading(uploadButton, true);
-        
-        // Create FormData and append file
-        const formData = new FormData();
-        formData.append('firmware', file);
-        
-        // Upload file using XMLHttpRequest to track progress
-        const xhr = new XMLHttpRequest();
-        
-        xhr.upload.addEventListener('progress', function(e) {
-            if (e.lengthComputable) {
-                const percentComplete = Math.round((e.loaded / e.total) * 100);
-                progressBar.style.width = percentComplete + '%';
-                progressText.textContent = percentComplete + '%';
-            }
-        });
-        
-        xhr.addEventListener('load', function() {
-            if (xhr.status === 200) {
-                try {
-                    const response = JSON.parse(xhr.responseText);
-                    if (response.status === 'ok') {
-                        // Check if this was a firmware update or regular file upload
-                        if (response.message && response.message.includes('rebooting')) {
-                            // This was a firmware update
-                            showStatus(getMessage('firmware_update_success'), 'success');
-                            // Redirect to status page after a delay
-                            setTimeout(function() {
-                                window.location.hash = 'status';
-                                navigateToSection();
-                            }, 5000);
-                        } else {
-                            // This was a regular file upload
-                            showStatus(getMessage('file_upload_success'), 'success');
-                            resetForm();
-                        }
-                    } else {
-                        showStatus(getMessage('update_failed') + (response.message || 'Unknown error'), 'error');
-                        resetForm();
-                    }
-                } catch (error) {
-                    showStatus(getMessage('invalid_response'), 'error');
-                    resetForm();
-                }
-            } else {
-                showStatus(getMessage('upload_failed_status') + xhr.status, 'error');
-                resetForm();
-            }
-        });
-        
-        xhr.addEventListener('error', function() {
-            showStatus(getMessage('network_error_upload'), 'error');
-            resetForm();
-        });
-        
-        xhr.addEventListener('abort', function() {
-            showStatus(getMessage('upload_aborted'), 'error');
-            resetForm();
-        });
-        
-        // Open and send the request
-        xhr.open('POST', '/api/ota', true);
-        xhr.setRequestHeader('X-Filename', file.name);
-        xhr.send(formData);
-    });
-    
-    function resetForm() {
-        firmwareFile.disabled = false;
-        toggleLoading(uploadButton, false);
-        uploadButton.disabled = true;
-        firmwareFile.value = '';
-        progressContainer.style.display = 'none';
-    }
-}
-
-function reinstallCurrentFirmware() {
-    const reinstallButton = el('reinstallButton');
-    toggleLoading(reinstallButton, true);
-    showStatus(getMessage('reinstall_sending'), 'info');
-
-    fetch('/api/ota/reinstall', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({}),
-    })
-    .then(response => response.json())
-    .then(data => {
-        toggleLoading(reinstallButton, false);
-        if (data.status === 'ok') {
-            showStatus(getMessage('reinstall_started'), 'success');
-            setTimeout(function() {
-                window.location.hash = 'status';
-                navigateToSection();
-            }, 3000);
-            return;
-        }
-
-        let message = data.message || 'Unknown error';
-        if (message.includes('WiFi not connected')) {
-            message = getMessage('reinstall_wifi_required');
-        } else if (message.includes('already in progress')) {
-            message = getMessage('reinstall_in_progress');
-        }
-        showStatus(getMessage('reinstall_failed') + message, 'error');
-    })
-    .catch(() => {
-        toggleLoading(reinstallButton, false);
-        showStatus(getMessage('reinstall_failed') + getMessage('error_reset_connection'), 'error');
-    });
-}
-
-// Restart section functionality
-function setupRestartSection() {
-    const resetButton = el('resetButton');
-    const resetModal = el('resetModal');
-    const cancelButton = el('cancelButton');
-    const confirmButton = el('confirmButton');
-    let lastFocusedElement;
-
-    const openModal = () => {
-        lastFocusedElement = document.activeElement;
-        resetModal.style.display = 'flex';
-        cancelButton.focus();
-    };
-
-    const closeModal = () => {
-        resetModal.style.display = 'none';
-        if (lastFocusedElement) {
-            lastFocusedElement.focus();
-        }
-    };
-    
-    // Show modal when reset button is clicked
-    resetButton.addEventListener('click', openModal);
-    
-    // Hide modal when cancel button is clicked
-    cancelButton.addEventListener('click', closeModal);
-    
-    // Handle device reset when confirm button is clicked
-    confirmButton.addEventListener('click', () => {
-        resetModal.style.display = 'none';
-        resetDevice();
-        if (lastFocusedElement) {
-            lastFocusedElement.focus();
-        }
-    });
-
-    // Keyboard navigation for modal
-    resetModal.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') {
-            closeModal();
-        } else if (e.key === 'Tab') {
-            // Basic focus trap between Cancel and Restart buttons
-            if (e.shiftKey) { // Shift + Tab
-                if (document.activeElement === cancelButton) {
-                    e.preventDefault();
-                    confirmButton.focus();
-                }
-            } else { // Tab
-                if (document.activeElement === confirmButton) {
-                    e.preventDefault();
-                    cancelButton.focus();
-                }
-            }
-        }
-    });
-}
-
+/* ---------- RESTART ---------- */
+const modal = el('resetModal');
+el('restartBtn').addEventListener('click', () => modal.classList.add('open'));
+el('cancelReset').addEventListener('click', () => modal.classList.remove('open'));
+modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('open'); });
+el('confirmReset').addEventListener('click', async () => {
+  modal.classList.remove('open');
+  await apiPostJson('/api/reset', {});
+  toast('Device restarting…', 'ok');
+  setTimeout(() => location.reload(), 8000);
+});

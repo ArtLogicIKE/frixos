@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Frixos</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body class="theme-light">
+
+<div class="wrap">
+
+  <!-- ===== HEADER ===== -->
+  <header class="topbar">
+    <span class="disc"><img src="img/logo.jpg" alt="Frixos"></span>
+    <span class="brand">Frixos</span>
+    <span class="spring"></span>
+    <div class="lang-wrap">
+      <button class="ctrl lang" id="langBtn" aria-haspopup="listbox" aria-expanded="false">
+        <span id="langName">English</span><span class="caret">▾</span>
+      </button>
+      <div class="lang-menu" id="langMenu" role="listbox">
+        <div class="lang-opt sel" data-lang="en">English</div>
+        <div class="lang-opt" data-lang="de">Deutsch</div>
+        <div class="lang-opt" data-lang="fr">Français</div>
+        <div class="lang-opt" data-lang="it">Italiano</div>
+        <div class="lang-opt" data-lang="pt">Português</div>
+        <div class="lang-opt" data-lang="sv">Svenska</div>
+        <div class="lang-opt" data-lang="da">Dansk</div>
+        <div class="lang-opt" data-lang="pl">Polski</div>
+        <div class="lang-opt" data-lang="es">Español</div>
+      </div>
+    </div>
+    <button class="ctrl" id="themeBtn" aria-label="Toggle theme" title="Toggle light / dark"><span id="themeIcon">☾</span></button>
+  </header>
+
+  <!-- ===== NAV ===== -->
+  <nav class="nav" id="nav">
+    <a data-tab="settings" class="active">Settings</a>
+    <a data-tab="advanced">Advanced</a>
+    <a data-tab="layout">Layout</a>
+    <a data-tab="integrations">Integrations</a>
+    <a data-tab="status">Status</a>
+    <a data-tab="files">Files</a>
+    <a data-tab="update">Update</a>
+    <a data-tab="restart">Restart</a>
+  </nav>
+
+  <!-- ===================== SETTINGS ===================== -->
+  <section class="tab-page active" id="tab-settings" data-screen-label="Settings">
+    <div class="hero">
+      <span class="obj"><img src="img/logo.jpg" alt=""></span>
+      <div class="ht">
+        <div class="nm">Frixos</div>
+        <div class="st">frixos.local · firmware up to date</div>
+      </div>
+      <span class="jewel"><span class="g"></span> Online</span>
+    </div>
+
+    <div class="panel">
+      <div class="ptitle"><h2>Connection</h2><span class="rule"></span></div>
+      <div class="conn-grid">
+        <div class="conn-fields">
+          <div class="field"><label>WiFi SSID</label><input type="text" id="wifi_ssid" autocomplete="username" placeholder="Network name"></div>
+          <div class="field"><label>WiFi password</label>
+            <div class="pw"><input type="password" id="wifi_pass" autocomplete="current-password" placeholder="••••••••"><button class="eye" type="button" aria-label="Show password">👁</button></div>
+          </div>
+          <div class="field"><label>Hostname <span class="req">*</span></label>
+            <input type="text" id="hostname" value="frixos" required><span class="err" id="hostname-err">Hostname is required.</span>
+          </div>
+        </div>
+        <div class="conn-nets">
+          <label class="mini-label">Available networks</label>
+          <div id="netlist" class="netbox"><div class="net-empty">Tap scan to find nearby networks.</div></div>
+          <button class="scan-btn block-scan" id="scanBtn">↻ Scan available networks</button>
+        </div>
+      </div>
+
+      <div class="staticip">
+        <div class="toggle staticip-head">
+          <div class="tx"><div class="tt">Use static IP</div><div class="ts">Assign a fixed address instead of DHCP</div></div>
+          <button class="gswitch" id="staticToggle" aria-label="Use static IP"></button>
+        </div>
+        <div class="staticip-panel" id="staticPanel" hidden>
+          <div class="grid2">
+            <div class="field"><label>IP address</label><input type="text" inputmode="decimal" placeholder="192.168.1.100"></div>
+            <div class="field"><label>Gateway</label><input type="text" inputmode="decimal" placeholder="192.168.1.1"></div>
+            <div class="field"><label>Subnet mask</label><input type="text" inputmode="decimal" placeholder="255.255.255.0"></div>
+            <div class="field"><label>DNS servers <span class="opt">(optional)</span></label>
+              <div class="dns-pair">
+                <div class="dns-f"><span class="dns-b">1</span><input type="text" inputmode="decimal" placeholder="8.8.8.8"></div>
+                <div class="dns-f"><span class="dns-b">2</span><input type="text" inputmode="decimal" placeholder="8.8.4.4"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="note left">* Changing connection settings will restart the device.</p>
+    </div>
+
+    <div class="panel">
+      <div class="ptitle"><h2>Display</h2><span class="rule"></span></div>
+      <div class="field"><label>Display rotation</label>
+        <select><option>0°</option><option>90°</option><option>180°</option><option>270°</option></select>
+      </div>
+      <div class="toggle"><div class="tx"><div class="tt">Mirror display</div></div><button class="gswitch" aria-label="Mirror"></button></div>
+    </div>
+
+    <div class="panel">
+      <div class="ptitle"><h2>Regional</h2><span class="rule"></span></div>
+      <div class="toggle"><div class="tx"><div class="tt">US units</div><div class="ts">Fahrenheit, mph, inches</div></div><button class="gswitch" aria-label="US units"></button></div>
+      <div class="toggle"><div class="tx"><div class="tt">12-hour clock</div><div class="ts">Display time with AM / PM</div></div><button class="gswitch on" aria-label="12-hour clock"></button></div>
+    </div>
+
+    <div class="panel">
+      <div class="ptitle"><h2>Automatic update</h2><span class="rule"></span></div>
+      <div class="toggle"><div class="tx"><div class="tt">Check for firmware updates</div><div class="ts">Install new firmware automatically</div></div><button class="gswitch on" aria-label="Auto update"></button></div>
+    </div>
+
+    <button class="btn block" data-save="Settings saved">Save settings</button>
+  </section>
+
+  <!-- ===================== ADVANCED ===================== -->
+  <section class="tab-page" id="tab-advanced" data-screen-label="Advanced">
+    <div class="panel">
+      <div class="ptitle"><h2>Location</h2><span class="rule"></span></div>
+      <div class="field"><label>City</label>
+        <div class="city-row">
+          <input type="text" id="city_search" placeholder="Search for a city" autocomplete="off" spellcheck="false">
+          <button class="btn sm ghost" id="citySearch">Search</button>
+          <button class="btn sm ghost" id="geolocate">Locate me</button>
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Latitude</label><input type="text" id="lat" placeholder="e.g. 40.6892494"></div>
+        <div class="field"><label>Longitude</label><input type="text" id="lon" placeholder="e.g. -74.0470807"></div>
+      </div>
+      <div class="field"><label>Timezone region</label><input type="text" id="tz_iana" placeholder="e.g. America/New_York"></div>
+      <div class="field"><label>Timezone (POSIX)</label><input type="text" id="timezone" placeholder="e.g. EST5EDT,M3.2.0,M11.1.0"></div>
+      <p class="muted-p">Find POSIX timezones <a href="https://leo.leung.xyz/wiki/Timezone" target="_blank" rel="noopener">here</a>. Lat/Lon only affect weather data.</p>
+      <p class="note left">* Changing location settings will restart the device.</p>
+    </div>
+
+    <div class="panel">
+      <div class="ptitle"><h2>WiFi active hours</h2><span class="rule"></span></div>
+      <div class="time-range">
+        <div class="time-box"><label>Start</label><input type="time" value="00:00"></div>
+        <span class="time-arrow">→</span>
+        <div class="time-box"><label>End</label><input type="time" value="00:00"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="ptitle"><h2>Projection brightness</h2><span class="rule"></span></div>
+      <div class="field"><label>Dimming mode</label>
+        <select id="dimMode">
+          <option value="full">Always full brightness</option>
+          <option value="bright" selected>Based on brightness</option>
+          <option value="time">Based on time-of-day</option>
+        </select>
+      </div>
+
+      <div id="dimBright" class="dim-sub">
+        <div class="subtitle">Brightness-based dimming</div>
+        <div class="grid2">
+          <div class="field"><label>Day threshold (lux)</label><input type="number" step="0.1" min="0" max="500" value="12.0"></div>
+          <div class="field"><label>Sensitivity (lux)</label><input type="number" step="0.1" min="0" max="50" value="3.0"></div>
+        </div>
+        <p class="muted-p">Sensitivity avoids unwanted brightness changes. Dark = Threshold − Sensitivity, Bright = Threshold + Sensitivity.</p>
+      </div>
+
+      <div id="dimTime" class="dim-sub" hidden>
+        <div class="subtitle">Time-of-day dimming</div>
+        <div class="time-range">
+          <div class="time-box"><label>Start</label><input type="time" value="07:00"></div>
+          <span class="time-arrow">→</span>
+          <div class="time-box"><label>End</label><input type="time" value="22:00"></div>
+        </div>
+      </div>
+
+      <div class="subtitle">LED levels (%)</div>
+      <div class="grid2">
+        <div class="field"><label>Brightness (day)</label><input type="number" min="1" max="100" value="80"></div>
+        <div class="field"><label>Brightness (night)</label><input type="number" min="1" max="100" value="25"></div>
+        <div class="field"><label>PWM frequency</label><input type="number" min="60" max="50000" value="133"></div>
+        <div class="field"><label>Max power</label><input type="number" min="1" max="1023" value="1023"></div>
+      </div>
+    </div>
+
+    <button class="btn block" data-save="Advanced settings saved">Save settings</button>
+  </section>
+
+  <!-- ===================== LAYOUT (screen editor) ===================== -->
+  <section class="tab-page" id="tab-layout" data-screen-label="Layout">
+    <div class="panel">
+      <div class="ptitle"><h2>Layout</h2><span class="rule"></span></div>
+
+      <div class="layout-picker">
+        <select id="layoutFile"><option value="">Select a layout file</option><option>default.layout</option><option>holiday.layout</option><option>minimal.layout</option></select>
+        <button class="btn sm ghost" id="loadSystem">Load system layout</button>
+        <button class="btn sm ghost" id="restoreDefault">Restore default</button>
+      </div>
+
+      <p class="muted-p" style="margin-top:14px">Place elements on the 128×128 display — elements can overlap. Drag items from the palette onto the grid, or drag a placed element to move it.</p>
+
+      <div class="layout-toolbar">
+        <div class="seg" role="group" aria-label="Day / Night">
+          <button class="seg-btn active" id="modeDay">Day</button>
+          <button class="seg-btn" id="modeNight">Night</button>
+        </div>
+        <div class="layout-actions">
+          <button class="btn sm ghost" id="copyNight">Copy to Night</button>
+          <button class="btn sm ghost" id="saveFile">Save to file</button>
+          <button class="btn sm ghost" id="loadFile">Load from file</button>
+          <button class="btn sm" id="saveLayout">Save</button>
+        </div>
+      </div>
+
+      <div class="screen-status" id="screenStatus">Selected: &lt;None&gt; @ (—,—)</div>
+
+      <div class="editor-row">
+        <div class="canvas-wrap">
+          <div class="canvas" id="canvas" tabindex="0"></div>
+        </div>
+        <div class="palette">
+          <div class="mini-label">Palette</div>
+          <div class="palette-items" id="paletteItems"></div>
+        </div>
+      </div>
+
+      <div class="options" id="screenOptions"><p class="muted-p" style="margin:0">Select an element to edit its options.</p></div>
+    </div>
+  </section>
+
+  <!-- ===================== INTEGRATIONS ===================== -->
+  <section class="tab-page" id="tab-integrations" data-screen-label="Integrations">
+    <div class="panel">
+      <div class="ptitle"><h2>Home Assistant</h2><span class="rule"></span><a class="help" href="#" target="_blank" rel="noopener" aria-label="Help">?</a></div>
+      <div class="field"><label>Server URL</label><input type="text" maxlength="200" placeholder="e.g. http://homeassistant.local:8123"></div>
+      <div class="field"><label>Long-lived access token</label>
+        <div class="pw"><input type="password" maxlength="255" placeholder="Paste token"><button class="eye" type="button" aria-label="Show token">👁</button></div>
+      </div>
+      <div class="field"><label>Refresh (min.)</label><input type="number" min="1" max="7200" value="1"></div>
+    </div>
+
+    <div class="panel">
+      <div class="ptitle"><h2>Stock quotes</h2><span class="rule"></span><a class="help" href="#" target="_blank" rel="noopener" aria-label="Help">?</a></div>
+      <p class="muted-p tight">Via Finnhub.io.</p>
+      <div class="field"><label>API key</label>
+        <div class="pw"><input type="password" maxlength="64" placeholder="Paste API key"><button class="eye" type="button" aria-label="Show key">👁</button></div>
+      </div>
+      <div class="field"><label>Refresh (min.)</label><input type="number" min="1" max="1440" value="5"></div>
+    </div>
+
+    <div class="panel">
+      <div class="ptitle"><h2>Glucose monitoring</h2><span class="rule"></span><a class="help" href="#" target="_blank" rel="noopener" aria-label="Help">?</a></div>
+      <div class="grid2">
+        <div class="field"><label>Refresh (min.)</label><input type="number" min="1" max="60" value="5"></div>
+        <div class="field"><label>Display unit</label><select><option>mg/dL</option><option>mmol/L</option></select></div>
+        <div class="field"><label>High (mg/dL)</label><input type="number" min="1" max="400" value="175"></div>
+        <div class="field"><label>Low (mg/dL)</label><input type="number" min="1" max="400" value="70"></div>
+      </div>
+      <div class="field"><label>Validity (min.)</label><input type="number" min="10" max="360" value="30"></div>
+      <div class="field"><label>Username</label><input type="text" maxlength="64" autocomplete="username" placeholder="Account username"></div>
+      <div class="field"><label>Password</label>
+        <div class="pw"><input type="password" maxlength="64" autocomplete="current-password" placeholder="••••••••"><button class="eye" type="button" aria-label="Show password">👁</button></div>
+      </div>
+      <div class="subtitle">CGM device</div>
+      <div class="field"><label>Dexcom</label><select><option>Disabled</option><option>US</option><option>Japan</option><option>Rest of World</option></select></div>
+      <div class="field"><label>FreeStyle Libre</label><select><option>Disabled</option><option>United States</option><option>Europe</option><option>Germany</option><option>France</option><option>Japan</option><option>Australia</option><option>Global / Rest of World</option></select></div>
+      <div class="field"><label>Nightscout URL</label><input type="text" maxlength="100" placeholder="https://your-site.herokuapp.com"></div>
+    </div>
+
+    <button class="btn block" data-save="Integration settings saved">Save settings</button>
+  </section>
+
+  <!-- ===================== STATUS ===================== -->
+  <section class="tab-page" id="tab-status" data-screen-label="Status">
+    <div class="panel">
+      <div class="ptitle"><h2>Support</h2><span class="rule"></span></div>
+      <p class="muted-p">Share device diagnostics with our team to help troubleshoot.</p>
+      <div class="btn-row">
+        <button class="btn sm" data-save="Opening your email client…">Send email</button>
+        <button class="btn sm ghost" data-save="Copied to clipboard">Copy to clipboard</button>
+      </div>
+      <p class="muted-p" style="margin-top:12px">If email doesn't open, copy the info and send it to <a href="mailto:support@buyfrixos.com">support@buyfrixos.com</a>.</p>
+    </div>
+
+    <div class="panel">
+      <div class="ptitle"><h2>Sensor data</h2><span class="rule"></span></div>
+      <div class="info-grid">
+        <div class="info"><div class="l">Light level (lux)</div><div class="v">14.2</div></div>
+        <div class="info"><div class="l">Last time update</div><div class="v"><span class="dot ok"></span>2 min ago</div></div>
+        <div class="info"><div class="l">Timezone</div><div class="v">EST5EDT</div></div>
+        <div class="info"><div class="l">Moon phase</div><div class="v">Waxing gibbous</div></div>
+        <div class="info"><div class="l">Last weather update</div><div class="v"><span class="dot ok"></span>6 min ago</div></div>
+        <div class="info"><div class="l">Latitude</div><div class="v">40.6892</div></div>
+        <div class="info"><div class="l">Longitude</div><div class="v">-74.0471</div></div>
+        <div class="info"><div class="l">Uptime</div><div class="v">3d 04:12</div></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="ptitle"><h2>System information</h2><span class="rule"></span></div>
+      <div class="info-grid">
+        <div class="info"><div class="l">Application</div><div class="v">Frixos</div></div>
+        <div class="info"><div class="l">Version</div><div class="v">2.4.1</div></div>
+        <div class="info"><div class="l">Firmware</div><div class="v">2.4.1-rc3</div></div>
+        <div class="info"><div class="l">Power-on hours</div><div class="v">412</div></div>
+        <div class="info"><div class="l">MAC address</div><div class="v">A4:CF:12:9E:0B:77</div></div>
+        <div class="info"><div class="l">IP address</div><div class="v">192.168.1.42</div></div>
+        <div class="info"><div class="l">Chip revision</div><div class="v">ESP32 rev3</div></div>
+        <div class="info"><div class="l">SPI flash size</div><div class="v">8 MB</div></div>
+        <div class="info"><div class="l">CPU frequency</div><div class="v">240 MHz</div></div>
+        <div class="info"><div class="l">Compile time</div><div class="v">Jun 18 2026</div></div>
+        <div class="info"><div class="l">Free heap</div><div class="v">142 KB</div></div>
+        <div class="info"><div class="l">Min free heap</div><div class="v">98 KB</div></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="ptitle"><h2>System logs</h2><span class="rule"></span></div>
+      <textarea class="logbox" readonly>[12:01:14] WiFi connected — RSSI -42dB
+[12:01:15] NTP sync OK (EST5EDT)
+[12:05:48] Weather updated — 21°C, clear
+[12:06:02] HA entity sensor.living_room refreshed
+[12:10:33] Ambient 14.2 lux — day mode</textarea>
+    </div>
+
+    <div class="panel">
+      <div class="ptitle"><h2>Integration status</h2><span class="rule"></span></div>
+      <textarea class="logbox" readonly>Home Assistant ........ connected
+Stock (Finnhub) ....... idle
+Dexcom ................ disabled
+FreeStyle Libre ....... disabled
+Nightscout ............ disabled</textarea>
+    </div>
+
+    <button class="btn block" id="refreshStatus">Refresh status</button>
+  </section>
+
+  <!-- ===================== FILES ===================== -->
+  <section class="tab-page" id="tab-files" data-screen-label="Files">
+    <div class="panel">
+      <div class="ptitle"><h2>SPIFFS files</h2><span class="rule"></span></div>
+      <p class="muted-p">Manage files stored on the device filesystem.</p>
+      <div class="btn-row" style="margin-bottom:14px">
+        <button class="btn sm ghost" id="filesRefresh">↻ Refresh</button>
+        <button class="btn sm ghost" id="filesRename" disabled>Rename</button>
+        <button class="btn sm danger" id="filesDelete" disabled>Delete selected</button>
+      </div>
+      <div class="tbl-wrap">
+        <table class="files">
+          <thead><tr>
+            <th class="cbx"><input type="checkbox" id="selAll" aria-label="Select all"></th>
+            <th><button data-sort="name">Filename ↑</button></th>
+            <th class="size"><button data-sort="size">Size</button></th>
+          </tr></thead>
+          <tbody id="filesBody"></tbody>
+        </table>
+      </div>
+      <p class="note left" id="filesSummary"></p>
+    </div>
+  </section>
+
+  <!-- ===================== UPDATE ===================== -->
+  <section class="tab-page" id="tab-update" data-screen-label="Update">
+    <div class="panel">
+      <div class="ptitle"><h2>Reinstall</h2><span class="rule"></span></div>
+      <p class="muted-p">Re-download and install the current firmware and files (SPIFFS).</p>
+      <button class="btn ghost" id="reinstall">Reinstall current firmware</button>
+    </div>
+
+    <div class="panel">
+      <div class="ptitle"><h2>Upload firmware / files</h2><span class="rule"></span></div>
+      <p class="muted-p">Your device installs new firmware automatically. Use this only if support asked you to install a specific build, or to upload a custom font.</p>
+      <div class="field"><label>File</label><input type="file" id="fwFile"></div>
+      <button class="btn block" id="uploadBtn" disabled>Upload file</button>
+      <div class="progress-wrap" id="progressWrap" style="display:none">
+        <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+        <div class="progress-txt" id="progressTxt">0%</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="ptitle"><h2>Firmware update</h2><span class="rule"></span></div>
+      <ol class="steps">
+        <li>Choose the firmware file (.bin) from your computer.</li>
+        <li>Press “Upload file” to start the update.</li>
+        <li>Wait for completion — don't power off or disconnect the device.</li>
+        <li>The device restarts automatically when done.</li>
+      </ol>
+      <div class="callout"><b>Warning</b> — uploading incorrect firmware may stop the device from working. Use only the firmware built for your model.</div>
+    </div>
+
+    <div class="panel">
+      <div class="ptitle"><h2>User file upload</h2><span class="rule"></span></div>
+      <ol class="steps">
+        <li>Choose the file (e.g. user-font.jpg) from your computer.</li>
+        <li>Press “Upload file” to start.</li>
+        <li>Wait for completion — don't power off or disconnect the device.</li>
+        <li>Upload another file, or close this window.</li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- ===================== RESTART ===================== -->
+  <section class="tab-page" id="tab-restart" data-screen-label="Restart">
+    <div class="panel">
+      <div class="ptitle"><h2>Device reset</h2><span class="rule"></span></div>
+      <p class="muted-p">Restart your Frixos device. It will be unavailable for a short moment while it reboots.</p>
+      <button class="btn danger block" id="restartBtn">Restart device</button>
+    </div>
+  </section>
+
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="modal" id="resetModal">
+  <div class="box">
+    <h2>Confirm restart</h2>
+    <p>Are you sure you want to restart the device?</p>
+    <p>It will become temporarily unavailable during restart.</p>
+    <div class="btn-row">
+      <button class="btn ghost" id="cancelReset">Cancel</button>
+      <button class="btn danger" id="confirmReset">Restart</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

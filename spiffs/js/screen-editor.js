@@ -1198,8 +1198,8 @@ function ensureElementInProfile(profile, id) {
 }
 
 function isScreenSectionVisible() {
-    const section = el('screen-section');
-    return !!(section && section.style.display !== 'none');
+    const section = el('tab-layout');
+    return !!(section && section.classList.contains('active'));
 }
 
 function focusScreenCanvas() {
@@ -2521,11 +2521,22 @@ function resetDevice() {
     })
     .catch(error => {
         showStatus(getMessage('error_reset_connection'), 'error');
-        
+
         // Even if we got an error, likely the device is rebooting, so try to reconnect
         setTimeout(function() {
             window.location.reload();
         }, 15000);
     });
 }
+
+/* ---------- wire the editor into the glass tab system ----------
+   Loaded once when the Layout tab is first opened (showTab guards via
+   loadedSections), so unsaved edits survive switching tabs. */
+sectionLoaders.layout = function () {
+    if (!window.sectionsInitialized.screen) {
+        window.sectionsInitialized.screen = true;
+        setupScreenSection();
+    }
+    fetchScreenLayout();
+};
 

@@ -1,60 +1,84 @@
-/* ESP32 Web Interface - Modern Dark Theme Stylesheet with Light Mode Option */
+/* ============================================================
+   FRIXOS DEVICE UI — "Polished Glass"  (theme tokens)
+   Gallery-light & smoked-glass dark themes. Chrome + cyan jewel.
+   Jost (display) · Inter (body) · Space Mono (technical/data).
+   ============================================================ */
 
+@import url('https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600&family=Inter:wght@400;450;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+
+/* ---------- THEME TOKENS ---------- */
+:root, .theme-light {
+  --cyan:#00aaff; --cyan-deep:#0088cc; --cyan-press:#006699;
+  --proj-orange:#f5821f; --proj-amber:#ffb429; --proj-green:#3fae5a;
+  --proj-red:#e23b2e; --proj-blue:#2f6fdb;
+  --jost:'Jost',sans-serif;
+  --ui:'Inter',-apple-system,'Segoe UI',sans-serif;
+  --mono:'Space Mono',ui-monospace,Menlo,monospace;
+
+  --bg:radial-gradient(125% 85% at 50% -12%, #ffffff 0%, #eef0f3 52%, #e4e7ec 100%);
+  --bg-solid:#eef0f3;
+  --ink:#2a2d33; --ink-2:#5a6068; --muted:#9298a2;
+  --glass:rgba(255,255,255,.6);
+  --glass-2:rgba(255,255,255,.5);
+  --glass-border:rgba(255,255,255,.92);
+  --glass-shadow:0 1px 0 rgba(255,255,255,.9) inset, 0 22px 44px -24px rgba(40,44,52,.42);
+  --hairline:rgba(150,158,170,.4);
+  --hairline-soft:rgba(150,158,170,.22);
+  --rule:linear-gradient(90deg, rgba(120,130,145,.45), transparent);
+  --input-bg:linear-gradient(180deg, rgba(255,255,255,.5), rgba(255,255,255,.9));
+  --input-border:rgba(150,158,170,.42);
+  --tabs-bg:rgba(255,255,255,.55);
+  --tabs-border:rgba(255,255,255,.85);
+  --tab-ink:#7b818b; --tab-active-ink:#0a4a63; --tab-active-bg:#fff;
+  --disc:radial-gradient(58% 58% at 34% 26%, #ffffff, #cfd4db 58%, #9aa1ac);
+  --switch-off:rgba(140,148,160,.32);
+  --knob:radial-gradient(60% 60% at 38% 30%, #ffffff, #dde0e5);
+  --net-bg:rgba(255,255,255,.45);
+  --net-border:rgba(255,255,255,.72);
+  --ctrl-bg:rgba(255,255,255,.6);
+  --code-bg:rgba(255,255,255,.6);
+  --reflect:rgba(202,168,106,.5);
+  --scrim:rgba(40,44,52,.45);
+}
+.theme-dark {
+  --bg:radial-gradient(125% 85% at 50% -10%, #121826 0%, #0a0c10 62%);
+  --bg-solid:#0a0c10;
+  --ink:#eef1f5; --ink-2:#aeb4bd; --muted:#7a828f;
+  --glass:linear-gradient(180deg, rgba(46,60,84,.4), rgba(16,22,32,.46));
+  --glass-2:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
+  --glass-border:rgba(255,255,255,.1);
+  --glass-shadow:0 1px 0 rgba(255,255,255,.1) inset, 0 24px 46px -24px rgba(0,0,0,.7);
+  --hairline:rgba(255,255,255,.1);
+  --hairline-soft:rgba(255,255,255,.07);
+  --rule:linear-gradient(90deg, rgba(255,255,255,.16), transparent);
+  --input-bg:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
+  --input-border:#232a34;
+  --tabs-bg:rgba(255,255,255,.04);
+  --tabs-border:rgba(255,255,255,.08);
+  --tab-ink:#7a828f; --tab-active-ink:#04222e; --tab-active-bg:var(--cyan);
+  --disc:radial-gradient(58% 58% at 34% 26%, #f2f5f8, #aeb6c0 58%, #6a717b);
+  --switch-off:#252b34;
+  --knob:radial-gradient(60% 60% at 38% 30%, #ffffff, #cfd4db);
+  --net-bg:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.015));
+  --net-border:rgba(255,255,255,.08);
+  --ctrl-bg:rgba(255,255,255,.05);
+  --code-bg:rgba(255,255,255,.05);
+  --reflect:rgba(0,170,255,.5);
+  --scrim:rgba(0,0,0,.6);
+}
+
+/* ---------- COMPAT ALIASES (screen-editor module) ----------
+   screen-editor.css predates the glass token set; map its variable
+   names onto the glass tokens so the editor themes correctly in both
+   light and dark. Custom properties resolve lazily, so one :root
+   definition adapts per theme through the inherited glass tokens. */
 :root {
-    /* Dark theme variables */
-    --bg-color: #121212;
-    --card-bg-color: #1e1e1e;
-    --border-color: #333;
-    --text-color: #e0e0e0;
-    --text-secondary: #aaaaaa;
-    --primary-color: #00aaff;
-    --primary-hover: #0088cc;
-    --success-color: #4CAF50;
-    --warning-color: #FFC107;
-    --error-color: #F44336;
-    --input-bg: #2a2a2a;
-    --input-border: #444;
-    --box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    --transition-speed: 0.3s;
-    --section-header-bg: rgba(0, 0, 0, 0.1);
-    --section-content-bg: rgba(0, 0, 0, 0.05);
-    --token-text-color: #7ec8ff;
+  --text-color:var(--ink);
+  --text-secondary:var(--muted);
+  --border-color:var(--hairline);
+  --primary-color:var(--cyan);
+  --section-content-bg:var(--net-bg);
+  --card-bg-color:var(--net-bg);
+  --box-shadow:var(--glass-shadow);
+  --token-text-color:var(--proj-amber);
 }
-
-.light-theme {
-    /* Light theme variables */
-    --bg-color: #f5f5f5;
-    --card-bg-color: #ffffff;
-    --border-color: #e0e0e0;
-    --text-color: #333333;
-    --text-secondary: #666666;
-    --primary-color: #0088cc;
-    --primary-hover: #006699;
-    --success-color: #2E7D32;
-    --warning-color: #FF8F00;
-    --error-color: #C62828;
-    --input-bg: #f9f9f9;
-    --input-border: #cccccc;
-    --box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-    --token-text-color: #1976d2;
-}
-
-/* Base styles */
-* {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-    transition: background-color var(--transition-speed), color var(--transition-speed), border-color var(--transition-speed);
-}
-
-body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    line-height: 1.4;
-    margin: 0;
-    padding: 0;
-    color: var(--text-color);
-    background-color: var(--bg-color);
-    min-height: 100vh;
-    font-size: 14px;
-}
-

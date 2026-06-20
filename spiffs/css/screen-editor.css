@@ -1,79 +1,7 @@
-/* ----------------
-   Screen editor tab
-   ---------------- */
-.screen-layout-picker {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin: 10px 0 12px;
-}
-
-.screen-layout-select {
-    flex: 1;
-    min-width: 220px;
-    max-width: 300px;
-    padding: 6px 8px;
-    border: 1px solid var(--input-border);
-    border-radius: 4px;
-    background-color: var(--input-bg);
-    color: var(--text-color);
-    font-size: 0.9rem;
-}
-
-.screen-section-divider {
-    margin: 0 0 14px;
-    border: 0;
-    border-top: 1px solid var(--border-color);
-}
-
-.screen-intro {
-    margin: 0 0 14px;
-}
-
-.screen-toolbar {
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
-    align-items: center;
-    margin: 10px 0 14px;
-    flex-wrap: wrap;
-}
-
-.screen-actions,
-.screen-mode-toggle {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-}
-
-.screen-actions {
-    gap: 8px;
-}
-
-.screen-mode-toggle {
-    gap: 0;
-    align-self: flex-end;
-    border-bottom: 1px solid var(--primary-color);
-}
-
-.screen-mode-toggle .button {
-    border-radius: 8px 8px 0 0;
-    margin-bottom: -1px;
-    border: 1px solid var(--border-color);
-    border-bottom-color: var(--primary-color);
-    background: var(--section-content-bg);
-}
-
-.screen-mode-toggle .button.active {
-    background-color: var(--primary-color);
-    color: #fff;
-    border-color: var(--primary-color);
-    border-bottom-color: var(--primary-color);
-    box-shadow: 0 -2px 8px rgba(0, 170, 255, 0.20);
-    position: relative;
-    z-index: 1;
-}
+/* ============================================================
+   Layout / screen editor — glass-themed
+   Variable names map to glass tokens via the aliases in variables.css.
+   ============================================================ */
 
 .screen-editor {
     display: flex;
@@ -90,19 +18,27 @@
     justify-content: flex-start;
 }
 
+/* dark "device screen" frame so the canvas reads like the real display */
 .screen-canvas-wrapper {
     display: flex;
     flex-direction: column;
     flex: 0 0 auto;
+    padding: 14px;
+    border-radius: 18px;
+    background: radial-gradient(120% 120% at 50% 0%, #1a1f2b, #06070a);
+    box-shadow: 0 1px 0 rgba(255,255,255,.08) inset, 0 18px 38px -20px rgba(0,0,0,.7);
 }
 
 .screen-status {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    font-size: 13px;
+    font-family: var(--mono);
+    font-size: 12px;
     line-height: 1.4;
-    color: var(--text-color);
+    color: var(--ink-2);
+    background: var(--net-bg);
+    border: 1px solid var(--net-border);
+    border-radius: 10px;
+    padding: 8px 12px;
     min-height: 1.4em;
-    padding: 0 2px;
 }
 
 .screen-canvas {
@@ -110,16 +46,21 @@
     position: relative;
     width: 512px;   /* 128 * 4 */
     height: 512px;  /* 128 * 4 */
-    border: 1px solid var(--border-color);
-    background:
-        linear-gradient(to right, rgba(255,255,255,0.06) 1px, transparent 1px),
-        linear-gradient(to bottom, rgba(255,255,255,0.06) 1px, transparent 1px);
+    border: 1px solid rgba(255,255,255,0.10);
+    background-color: #05060a;
+    background-image:
+        linear-gradient(to right, rgba(0,170,255,0.07) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(0,170,255,0.07) 1px, transparent 1px);
     background-size: 16px 16px; /* 4px * 4 -> show every 4px */
-    box-shadow: var(--box-shadow);
     border-radius: 8px;
     overflow: hidden;
     user-select: none;
     touch-action: none;
+    outline: none;
+}
+
+.screen-canvas:focus-visible {
+    box-shadow: 0 0 0 2px var(--cyan);
 }
 
 .screen-canvas::before {
@@ -166,17 +107,20 @@
     min-width: 200px;
     display: flex;
     flex-direction: column;
-    border: 1px solid var(--border-color);
-    background: var(--section-content-bg);
-    border-radius: 8px;
-    padding: 10px;
-    box-shadow: var(--box-shadow);
-    /* No max-height so it stretches to match canvas exactly via align-items: stretch on parent */
+    border: 1px solid var(--net-border);
+    background: var(--net-bg);
+    border-radius: 16px;
+    padding: 12px;
 }
-.section .screen-palette h3 {
+.screen-palette h3 {
     margin-top: 0;
     margin-bottom: 5px;
     flex-shrink: 0;
+    font-family: var(--jost);
+    font-weight: 500;
+    font-size: 14px;
+    letter-spacing: .03em;
+    color: var(--ink);
 }
 .palette-items {
     display: grid;
@@ -187,23 +131,24 @@
     align-content: start;
 }
 
-
-
 .palette-item {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 4px;
     padding: 6px 4px;
-    border-radius: 6px;
-    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    border: 1px solid var(--net-border);
     background: var(--card-bg-color);
     cursor: grab;
     text-align: center;
     font-size: 0.72rem;
     line-height: 1.2;
-    color: var(--text-color);
+    color: var(--ink);
+    transition: border-color .2s;
 }
+
+.palette-item:hover { border-color: var(--cyan); }
 
 .palette-item:active {
     cursor: grabbing;
@@ -227,9 +172,9 @@
 .palette-swatch {
     width: 50px;
     height: 50px;
-    border-radius: 4px;
-    border: 1px solid var(--border-color);
-    background: rgba(0,0,0,0.25);
+    border-radius: 8px;
+    border: 1px solid var(--net-border);
+    background: #06070a;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -251,6 +196,7 @@
 
 .screen-element.selected {
     border: 2px solid var(--primary-color);
+    box-shadow: 0 0 0 1px var(--primary-color), 0 0 10px rgba(0,170,255,.5);
 }
 
 .screen-guide {
@@ -259,49 +205,18 @@
     z-index: 4;
 }
 
-.screen-guide-matrix {
-    z-index: 20;
-}
+.screen-guide-matrix { z-index: 20; }
+.screen-guide-center { z-index: 20; }
 
-.screen-guide-center {
-    z-index: 20;
-}
+.screen-guide-v { top: 0; bottom: 0; width: 0; }
+.screen-guide-h { left: 0; right: 0; height: 0; }
 
-.screen-guide-v {
-    top: 0;
-    bottom: 0;
-    width: 0;
-}
-
-.screen-guide-h {
-    left: 0;
-    right: 0;
-    height: 0;
-}
-
-.screen-guide-matrix.screen-guide-v {
-    border-left: 1px dotted rgba(239, 68, 68, 0.85);
-}
-
-.screen-guide-matrix.screen-guide-h {
-    border-top: 1px dotted rgba(239, 68, 68, 0.85);
-}
-
-.screen-guide-center.screen-guide-v {
-    border-left: 1px dotted rgba(34, 197, 94, 0.9);
-}
-
-.screen-guide-center.screen-guide-h {
-    border-top: 1px dotted rgba(34, 197, 94, 0.9);
-}
-
-.screen-guide-selection.screen-guide-v {
-    border-left: 1px dotted rgba(34, 197, 94, 0.9);
-}
-
-.screen-guide-selection.screen-guide-h {
-    border-top: 1px dotted rgba(34, 197, 94, 0.9);
-}
+.screen-guide-matrix.screen-guide-v { border-left: 1px dotted rgba(239, 68, 68, 0.85); }
+.screen-guide-matrix.screen-guide-h { border-top: 1px dotted rgba(239, 68, 68, 0.85); }
+.screen-guide-center.screen-guide-v { border-left: 1px dotted rgba(34, 197, 94, 0.9); }
+.screen-guide-center.screen-guide-h { border-top: 1px dotted rgba(34, 197, 94, 0.9); }
+.screen-guide-selection.screen-guide-v { border-left: 1px dotted rgba(34, 197, 94, 0.9); }
+.screen-guide-selection.screen-guide-h { border-top: 1px dotted rgba(34, 197, 94, 0.9); }
 
 .screen-preview {
     width: 100%;
@@ -335,9 +250,6 @@
 .screen-preview-matrix {
     width: 100%;
     height: 100%;
-}
-
-.screen-preview-matrix {
     opacity: 0.35;
 }
 
@@ -373,16 +285,20 @@
 }
 
 .screen-options {
-    border: 1px solid var(--border-color);
-    background: var(--section-content-bg);
-    border-radius: 8px;
-    padding: 12px;
-    box-shadow: var(--box-shadow);
+    border: 1px solid var(--net-border);
+    background: var(--net-bg);
+    border-radius: 16px;
+    padding: 16px;
     overflow: visible;
 }
 
 .screen-options h3 {
     margin-top: 0;
+    font-family: var(--jost);
+    font-weight: 500;
+    font-size: 15px;
+    letter-spacing: .03em;
+    color: var(--ink);
 }
 
 .screen-options .form-group {
@@ -399,6 +315,8 @@
     max-width: none;
     width: auto;
     margin-bottom: 0;
+    font-size: 12px;
+    color: var(--ink-2);
 }
 
 .screen-options .form-group input[type="number"],
@@ -406,16 +324,17 @@
     width: 100%;
     max-width: 11rem;
     min-width: 0;
+    height: 40px;
     flex: unset;
     justify-self: start;
 }
 
 .screen-options .form-group input[type="color"] {
     width: 2.75rem;
-    height: 2rem;
-    padding: 1px;
+    height: 2.25rem;
+    padding: 2px;
     border: 1px solid var(--input-border);
-    border-radius: 4px;
+    border-radius: 10px;
     background-color: var(--input-bg);
     justify-self: start;
     flex: unset;
@@ -446,6 +365,15 @@
     resize: vertical;
 }
 
+.checkbox-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+.checkbox-container input[type="checkbox"] { width: 1.1rem; height: 1.1rem; margin: 0; }
+.checkbox-container label { font-size: 13px; color: var(--ink-2); margin: 0; }
+
 .textarea-token-wrap {
     position: relative;
     width: 100%;
@@ -454,9 +382,9 @@
 .textarea-token-highlight,
 .textarea-token-wrap .textarea-token-input {
     margin: 0;
-    padding: 6px 8px;
+    padding: 12px 16px;
     border: 1px solid var(--input-border);
-    border-radius: 4px;
+    border-radius: 16px;
     font-size: 0.9rem;
     font-family: inherit;
     font-weight: normal;
@@ -474,7 +402,7 @@
     overflow: auto;
     pointer-events: none;
     color: var(--text-color);
-    background-color: var(--input-bg);
+    background: var(--input-bg);
     border-color: transparent;
     scrollbar-width: none;
 }
@@ -503,7 +431,44 @@
 
 .token-in-text {
     color: var(--token-text-color);
+    font-weight: 700;
 }
+
+.token-code {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--cyan-deep);
+    background: var(--code-bg);
+    border: 1px solid var(--hairline);
+    padding: 5px 9px;
+    border-radius: 8px;
+    cursor: pointer;
+    position: relative;
+    transition: all .15s;
+}
+.token-code:hover { background: var(--cyan); color: #fff; border-color: var(--cyan); }
+.token-tooltip {
+    display: none;
+    position: absolute;
+    left: 0;
+    top: calc(100% + 6px);
+    z-index: 30;
+    min-width: 180px;
+    max-width: 260px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: var(--glass);
+    backdrop-filter: blur(18px);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+    color: var(--ink);
+    font-family: var(--ui);
+    white-space: normal;
+}
+.token-code:hover .token-tooltip,
+.token-code:focus .token-tooltip { display: block; }
+.token-tooltip-example { display: block; font-family: var(--mono); font-size: 11px; color: var(--cyan-deep); margin-bottom: 4px; }
+.token-tooltip-desc { display: block; font-size: 11.5px; color: var(--ink-2); }
 
 .screen-token-list {
     display: flex;
@@ -512,13 +477,8 @@
     overflow: visible;
 }
 
-.screen-message-tokens {
-    overflow: visible;
-}
-
-.screen-message-tokens h4 {
-    margin: 10px 0 6px;
-}
+.screen-message-tokens { overflow: visible; }
+.screen-message-tokens h4 { margin: 10px 0 6px; font-size: 0.92rem; color: var(--ink); }
 
 .screen-display-schedule {
     margin-top: 16px;
@@ -526,13 +486,9 @@
     border-top: 1px solid var(--border-color);
 }
 
-.screen-display-schedule h4 {
-    margin: 0 0 8px;
-}
+.screen-display-schedule h4 { margin: 0 0 8px; font-size: 0.92rem; color: var(--ink); }
 
-.display-schedule-list {
-    margin-bottom: 10px;
-}
+.display-schedule-list { margin-bottom: 10px; }
 
 .schedule-slot-row {
     display: flex;
@@ -542,51 +498,20 @@
     flex-wrap: wrap;
 }
 
-.schedule-slot-row select {
-    flex: 0 0 auto;
-}
-
-.schedule-slot-row input[type="number"] {
-    width: 70px;
-    flex: 0 0 auto;
-}
-
-.schedule-slot-row .schedule-slot-sec {
-    flex: 0 0 auto;
-    color: var(--text-secondary);
-    font-size: 0.9em;
-}
-
-.schedule-slot-row input[type="text"] {
-    flex: 1 1 120px;
-    min-width: 100px;
-}
-
-.schedule-slot-row input.schedule-slot-entity {
-    flex: 1 1 160px;
-    min-width: 120px;
-}
-
-.schedule-slot-row input.schedule-slot-unit {
-    width: 70px;
-    flex: 0 0 auto;
-}
-
-.schedule-slot-row input.schedule-slot-label {
-    flex: 0 0 auto;
-    width: 22ch;
-    max-width: 22ch;
-    min-width: 0;
-}
-
+.schedule-slot-row select { flex: 0 0 auto; height: 40px; width: auto; }
+.schedule-slot-row input[type="number"] { width: 70px; flex: 0 0 auto; height: 40px; }
+.schedule-slot-row .schedule-slot-sec { flex: 0 0 auto; color: var(--text-secondary); font-size: 0.9em; }
+.schedule-slot-row input[type="text"] { flex: 1 1 120px; min-width: 100px; height: 40px; }
+.schedule-slot-row input.schedule-slot-entity { flex: 1 1 160px; min-width: 120px; }
+.schedule-slot-row input.schedule-slot-unit { width: 70px; flex: 0 0 auto; }
+.schedule-slot-row input.schedule-slot-label { flex: 0 0 auto; width: 22ch; max-width: 22ch; min-width: 0; }
 .schedule-slot-row button {
-    flex: 0 0 auto;
-    cursor: pointer;
-    padding: 2px 8px;
+    flex: 0 0 auto; cursor: pointer; padding: 6px 12px; height: 40px;
+    border: 1px solid var(--hairline); border-radius: 999px; background: var(--ctrl-bg); color: var(--proj-red);
 }
-
 .screen-schedule-add {
-    margin-top: 4px;
+    margin-top: 4px; cursor: pointer; padding: 8px 16px;
+    border: 1px solid var(--hairline); border-radius: 999px; background: var(--ctrl-bg); color: var(--cyan-deep); font-weight: 500;
 }
 
 .screen-options-mode-note {
@@ -603,6 +528,7 @@
 .screen-options .screen-font-samples h4 {
     margin: 10px 0 8px;
     font-size: 0.95rem;
+    color: var(--ink);
 }
 
 .screen-font-samples-grid {
@@ -617,8 +543,8 @@
     align-items: center;
     gap: 4px;
     padding: 6px;
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
+    border: 1px solid var(--net-border);
+    border-radius: 10px;
     background: var(--card-bg-color);
     cursor: pointer;
 }
@@ -639,8 +565,8 @@
     max-width: 90px;
     height: 36px;
     background-color: #000;
-    border-radius: 4px;
-    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    border: 1px solid var(--net-border);
     flex-shrink: 0;
 }
 
@@ -703,4 +629,3 @@
     font-size: 2em;
     line-height: 1;
 }
-
