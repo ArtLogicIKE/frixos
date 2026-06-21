@@ -137,7 +137,7 @@
       "text_6": "Tekst 6",
       "text_7": "Tekst 7",
       "text_8": "Tekst 8",
-      "screen_grid": "Skærmgitter",
+      "screen_grid": "Vis skærmgitter",
       "screen_settings": "Skærmindstillinger"
     }
   },
@@ -243,6 +243,11 @@
       "token_day": "Aktuel ugedag",
       "token_date": "Aktuel dato",
       "token_mon": "Aktuel måned",
+      "token_time": "Aktuel tid i valgt format (12- eller 24-timers)",
+      "token_hour12": "Aktuel time (12-timers format, 1–12)",
+      "token_hour24": "Aktuel time (24-timers format, 00–23)",
+      "token_min": "Aktuelt minut",
+      "token_ampm": "AM/PM-indikator (tom i 24-timers format)",
       "token_temp": "Aktuel temperatur",
       "token_hum": "Aktuel luftfugtighed",
       "token_high": "Dagens højeste temperatur",

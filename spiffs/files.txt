@@ -1,10 +1,17 @@
 bold-font.jpg
 bold.jpg
+bold-digit-label.jpg
+palette-moon.jpg
+palette-wifi-off.png
+palette-glucose.png
+palette-trend.png
+palette-message.png
 default-ampm.jpg
 default-dot.jpg
 default-font.jpg
 default-glucose.jpg
 default-grid.jpg
+default-settings.jpg
 default-moon.jpg
 default-trend.jpg
 default-units.jpg

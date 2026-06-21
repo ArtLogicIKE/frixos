@@ -145,7 +145,7 @@
     font-size: 0.72rem;
     line-height: 1.2;
     color: var(--ink);
-    transition: border-color .2s;
+    transition: background-color .2s, border-color .2s, color .2s;
 }
 
 .palette-item:hover { border-color: var(--cyan); }
@@ -160,8 +160,21 @@
 }
 
 .palette-item-selected {
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 1px var(--primary-color);
+    background: var(--primary-color);
+    border-color: var(--cyan-deep);
+    color: #fff;
+}
+
+.palette-item-selected:hover {
+    border-color: var(--cyan-press);
+}
+
+.palette-item-selected .palette-swatch {
+    border-color: rgba(255, 255, 255, 0.35);
+}
+
+.palette-item-on:not(.palette-item-selected) .palette-swatch {
+    box-shadow: inset 0 0 0 2px var(--proj-green);
 }
 
 .palette-item-toggle,
@@ -341,12 +354,10 @@
     max-width: none;
 }
 
-.screen-options .form-group input[type="checkbox"] {
-    width: 1.1rem;
-    height: 1.1rem;
-    margin: 0;
+.screen-options .form-group .gswitch {
+    order: 0;
+    margin-top: 0;
     justify-self: start;
-    flex: unset;
 }
 
 .screen-options .form-group:has(textarea) {
@@ -364,15 +375,6 @@
     min-height: 56px;
     resize: vertical;
 }
-
-.checkbox-container {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 10px;
-}
-.checkbox-container input[type="checkbox"] { width: 1.1rem; height: 1.1rem; margin: 0; }
-.checkbox-container label { font-size: 13px; color: var(--ink-2); margin: 0; }
 
 .textarea-token-wrap {
     position: relative;
@@ -401,10 +403,14 @@
     inset: 0;
     overflow: auto;
     pointer-events: none;
-    color: var(--text-color);
+    color: #000;
     background: var(--input-bg);
     border-color: transparent;
     scrollbar-width: none;
+}
+
+.theme-dark .textarea-token-highlight {
+    color: #fff;
 }
 
 .textarea-token-highlight::-webkit-scrollbar {
@@ -419,8 +425,12 @@
     background: transparent;
     color: transparent;
     -webkit-text-fill-color: transparent;
-    caret-color: var(--text-color);
+    caret-color: #000;
     resize: vertical;
+}
+
+.theme-dark .textarea-token-wrap .textarea-token-input {
+    caret-color: #fff;
 }
 
 .textarea-token-wrap .textarea-token-input::selection {
@@ -619,6 +629,7 @@
     font-family: "Segoe UI", Tahoma, sans-serif;
     font-size: 12px;
     font-weight: 600;
+    color: #fff;
     text-align: center;
     white-space: nowrap;
     line-height: 1;

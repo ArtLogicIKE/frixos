@@ -3,7 +3,7 @@
 // ----------------
 const SCREEN_SIZE = 128;
 const SCREEN_DRAG_THRESHOLD = 3;
-const SCREEN_PREVIEW_MESSAGE = 'Customize your frixos projection clock';
+const SCREEN_PREVIEW_MESSAGE = 'Welcome to frixos';
 // LVGL label object line heights on device (frixos_* fonts).
 const SCREEN_MESSAGE_FONT_LINE_HEIGHTS = {
     0: 12,
@@ -78,7 +78,8 @@ const SCREEN_DEFAULT_STATIC_TEXTS = {
 const SCREEN_TEXT_SLOT_MAX = 8;
 const SCREEN_PALETTE_LABEL_MAX = 24;
 const SCREEN_TOKEN_CODES = [
-    '[device]', '[greeting]', '[day]', '[date]', '[mon]', '[temp]', '[hum]', '[high]', '[low]',
+    '[device]', '[greeting]', '[day]', '[date]', '[mon]', '[time]', '[hour12]', '[hour24]', '[min]', '[ampm]',
+    '[temp]', '[hum]', '[high]', '[low]',
     '[rise]', '[set]', '[wind]', '[gust]', '[precip]', '[uv]', '[pressure]', '[3high]', '[3low]',
     '[HA:entity_id:path]', '[$:symbol]', '[CGM:glucose]', '[CGM:reading]', '[CGM:time]'
 ];
@@ -88,6 +89,11 @@ const TOKEN_HELP = {
     '[day]': { i18nKey: 'advanced.message.token_day', example: 'Saturday' },
     '[date]': { i18nKey: 'advanced.message.token_date', example: 'Jun 6' },
     '[mon]': { i18nKey: 'advanced.message.token_mon', example: 'June' },
+    '[time]': { i18nKey: 'advanced.message.token_time', example: '3:45pm' },
+    '[hour12]': { i18nKey: 'advanced.message.token_hour12', example: '3' },
+    '[hour24]': { i18nKey: 'advanced.message.token_hour24', example: '15' },
+    '[min]': { i18nKey: 'advanced.message.token_min', example: '45' },
+    '[ampm]': { i18nKey: 'advanced.message.token_ampm', example: 'pm' },
     '[temp]': { i18nKey: 'advanced.message.token_temp', example: '72°F' },
     '[hum]': { i18nKey: 'advanced.message.token_hum', example: '45%' },
     '[high]': { i18nKey: 'advanced.message.token_high', example: '78°F' },
@@ -344,6 +350,32 @@ function appendScreenLayerRow(container, element) {
     container.appendChild(layerRow);
 }
 
+function isScreenSwitchOn(id) {
+    const sw = el(id);
+    return !!(sw && sw.classList.contains('on'));
+}
+
+function appendScreenSwitchRow(container, { id, label, checked, onChange }) {
+    const row = document.createElement('div');
+    row.className = 'form-group';
+    const labelEl = document.createElement('label');
+    labelEl.htmlFor = id;
+    labelEl.textContent = label;
+    const sw = document.createElement('button');
+    sw.type = 'button';
+    sw.className = 'gswitch' + (checked ? ' on' : '');
+    sw.id = id;
+    sw.setAttribute('aria-label', label);
+    sw.addEventListener('click', () => {
+        sw.classList.toggle('on');
+        if (onChange) onChange(sw.classList.contains('on'));
+    });
+    row.appendChild(labelEl);
+    row.appendChild(sw);
+    container.appendChild(row);
+    return sw;
+}
+
 function refreshScreenEditorI18n() {
     if (!window.sectionsInitialized.screen) return;
     updateScreenModeButtons();
@@ -373,15 +405,6 @@ function updateScreenStatusLine() {
     const trans = translations[currentLanguage] || translations.en;
     const profile = getProfileObj(window.screenEditor.mode);
     const selectedId = window.screenEditor.selectedId;
-
-    if (selectedId === 'screen_grid') {
-        const name = getScreenElementLabel('screen_grid');
-        const state = getScreenGridEnabled()
-            ? (getScreenTranslation('screen.enabled', 'Enabled'))
-            : (getScreenTranslation('screen.disabled', 'Disabled'));
-        status.textContent = `Selected: ${name} (${state})`;
-        return;
-    }
 
     if (selectedId === 'screen_settings') {
         status.textContent = `Selected: ${getScreenElementLabel('screen_settings')}`;
@@ -527,6 +550,7 @@ function getScreenAuxFont(mode) {
 }
 
 function getPreviewImageUrl(def, inMatrix) {
+    if (!inMatrix && def.paletteImg) return def.paletteImg;
     if (def.id === 'time') {
         const font = inMatrix ? getScreenTimeFont(window.screenEditor.mode) : 'bold';
         return resolveTimeFontPreviewUrl(font);
@@ -543,17 +567,17 @@ function getPreviewImageUrl(def, inMatrix) {
 }
 
 const SCREEN_ELEMENT_DEFS = [
-    { id: 'glucose_level', label: 'Glucose Level', w: 14, h: 20, img: 'default-glucose.jpg' },
-    { id: 'glucose_trend', label: 'Glucose Trend', w: 12, h: 14, img: 'default-trend.jpg' },
-    { id: 'wifi_off', label: 'WiFi off', w: 20, h: 20, img: 'default-wifi-off.jpg' },
+    { id: 'glucose_level', label: 'Glucose Level', w: 14, h: 20, img: 'default-glucose.jpg', paletteImg: 'palette-glucose.png', paletteFitFullImage: true, spriteSheet: { index: 2, frames: 4 } },
+    { id: 'glucose_trend', label: 'Glucose Trend', w: 12, h: 14, img: 'default-trend.jpg', paletteImg: 'palette-trend.png', paletteFitFullImage: true, spriteSheet: { index: 2, frames: 5 } },
+    { id: 'wifi_off', label: 'WiFi off', w: 20, h: 20, img: 'default-wifi-off.jpg', paletteImg: 'palette-wifi-off.png', paletteFitFullImage: true },
     { id: 'weather', label: 'Weather', w: 32, h: 22, img: 'default-weather.jpg' },
-    { id: 'moon', label: 'Moon', w: 14, h: 14, img: 'default-moon.jpg' },
+    { id: 'moon', label: 'Moon', w: 14, h: 14, img: 'default-moon.jpg', paletteImg: 'palette-moon.jpg', paletteFitFullImage: true, spriteSheet: { index: 2, frames: 8 } },
     { id: 'time', label: 'Digit Display', w: 80, h: 36, img: 'bold.jpg', paletteFitFullImage: true },
-    { id: 'digit_label', label: 'Digit Label', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.digit_label },
+    { id: 'digit_label', label: 'Digit Label', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.digit_label, img: 'bold-digit-label.jpg', paletteFitFullImage: true },
     { id: 'time_aux', label: 'Digit Display (Aux)', w: 80, h: 36, img: 'bold.jpg', paletteFitFullImage: true },
-    { id: 'digit_label_aux', label: 'Digit Label (Aux)', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.digit_label_aux },
+    { id: 'digit_label_aux', label: 'Digit Label (Aux)', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.digit_label_aux, img: 'bold-digit-label.jpg', paletteFitFullImage: true },
     { id: 'ampm', label: 'AM/PM', w: 10, h: 20, img: 'default-ampm.jpg' },
-    { id: 'message', label: 'Scrolling Message', w: 128, h: 8, dynamicHeight: true, text: SCREEN_PREVIEW_MESSAGE },
+    { id: 'message', label: 'Scrolling Message', w: 128, h: 8, dynamicHeight: true, text: SCREEN_PREVIEW_MESSAGE, paletteImg: 'palette-message.png', paletteFitFullImage: true },
     { id: 'text_1', label: 'Text 1', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.text_1 },
     { id: 'text_2', label: 'Text 2', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.text_2 },
     { id: 'text_3', label: 'Text 3', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.text_3 },
@@ -579,20 +603,9 @@ const SCREEN_PALETTE_SETTINGS_DEF = {
     label: 'Screen settings',
     w: 32,
     h: 32,
-    img: 'bold.jpg',
+    img: 'default-settings.jpg',
     paletteFitFullImage: true,
     paletteMeta: true
-};
-
-const SCREEN_PALETTE_GRID_DEF = {
-    id: 'screen_grid',
-    label: 'Screen Grid',
-    w: 32,
-    h: 32,
-    img: 'default-grid.jpg',
-    paletteFitFullImage: true,
-    paletteMeta: true,
-    paletteToggle: true
 };
 
 const SCREEN_PALETTE_ORDER = [
@@ -608,7 +621,6 @@ const SCREEN_PALETTE_ORDER = [
     'wifi_off',
     'glucose_level',
     'glucose_trend',
-    'screen_grid',
     'text'
 ];
 
@@ -644,6 +656,10 @@ function getScreenPaletteItemLabel(def, profile) {
     return getScreenElementLabel(def.id);
 }
 
+function isPaletteItemSelected(def) {
+    return window.screenEditor.selectedId === def.id;
+}
+
 function getNextTextSlot(profile) {
     if (!profile || !profile.elements) return SCREEN_TEXT_SLOT_IDS[0];
     for (const id of SCREEN_TEXT_SLOT_IDS) {
@@ -660,10 +676,6 @@ function getScreenPaletteDefs() {
     SCREEN_PALETTE_ORDER.forEach(id => {
         if (id === 'screen_settings') {
             items.push(SCREEN_PALETTE_SETTINGS_DEF);
-            return;
-        }
-        if (id === 'screen_grid') {
-            items.push(SCREEN_PALETTE_GRID_DEF);
             return;
         }
         if (id === 'text') {
@@ -691,16 +703,12 @@ function getScreenPaletteDefs() {
     return items;
 }
 
-function isScreenGridElement(id) {
-    return id === 'screen_grid';
-}
-
 function isScreenSettingsElement(id) {
     return id === 'screen_settings';
 }
 
 function isScreenMetaElement(id) {
-    return isScreenGridElement(id) || isScreenSettingsElement(id);
+    return isScreenSettingsElement(id);
 }
 
 function getScreenGridEnabled() {
@@ -1049,7 +1057,6 @@ function getProfileObj(mode) {
 function findElementDef(id) {
     if (id === 'text') return SCREEN_PALETTE_TEXT_DEF;
     if (id === 'screen_settings') return SCREEN_PALETTE_SETTINGS_DEF;
-    if (id === 'screen_grid') return SCREEN_PALETTE_GRID_DEF;
     return SCREEN_ELEMENT_DEFS.find(d => d.id === id) || null;
 }
 
@@ -1336,13 +1343,21 @@ function updateScreenModeButtons() {
 }
 
 const PALETTE_SWATCH_SIZE = 56;
+// Aspect of bold-digit-label.jpg (must match tools/gen_palette_icons.py).
+const DIGIT_LABEL_PALETTE_ASPECT = 94 / 154;
 
 function getPalettePreviewSize(def) {
     if (isScreenStaticTextElement(def.id)) {
         return { w: PALETTE_SWATCH_SIZE, h: PALETTE_SWATCH_SIZE };
     }
+    if (def.paletteFitFullImage && isScreenDigitLabelElement(def.id)) {
+        return { w: PALETTE_SWATCH_SIZE, h: evenPx(PALETTE_SWATCH_SIZE * DIGIT_LABEL_PALETTE_ASPECT) };
+    }
+    if (def.paletteFitFullImage && (def.id === 'time' || def.id === 'time_aux')) {
+        return { w: PALETTE_SWATCH_SIZE, h: evenPx(PALETTE_SWATCH_SIZE * 36 / 80) };
+    }
     if (def.id === 'message') {
-        return { w: PALETTE_SWATCH_SIZE, h: 8 };
+        return { w: PALETTE_SWATCH_SIZE, h: evenPx(PALETTE_SWATCH_SIZE * 60 / 160) };
     }
 
     const frameW = def.w;
@@ -1369,14 +1384,18 @@ function applyPalettePreviewSize(preview, def) {
     return size;
 }
 
-function setupSpriteBackground(preview, imgUrl, nativeH, displayW, displayH) {
+function setupSpriteBackground(preview, imgUrl, nativeH, displayW, displayH, spriteIndex = 0, spriteFrames = 1) {
     const scale = displayH / nativeH;
     const sheet = new Image();
     sheet.onload = () => {
-        preview.style.backgroundImage = `url(${imgUrl})`;
+        const frames = Math.max(1, spriteFrames);
+        const frameW = sheet.naturalWidth / frames;
+        const scaledSheetW = sheet.naturalWidth * scale;
+        const xOffset = -(spriteIndex * frameW * scale);
+        preview.style.backgroundImage = `url("${imgUrl}")`;
         preview.style.backgroundRepeat = 'no-repeat';
-        preview.style.backgroundPosition = 'left top';
-        preview.style.backgroundSize = `${sheet.naturalWidth * scale}px ${displayH}px`;
+        preview.style.backgroundPosition = `${xOffset}px top`;
+        preview.style.backgroundSize = `${scaledSheetW}px ${displayH}px`;
     };
     sheet.src = imgUrl;
 }
@@ -1414,7 +1433,12 @@ function createFontSamplePreview(font) {
 
 function setupPaletteSpriteBackground(preview, def, imgUrl) {
     const size = applyPalettePreviewSize(preview, def);
-    setupSpriteBackground(preview, imgUrl || def.img, def.h, size.w, size.h);
+    const sheet = def.spriteSheet;
+    setupSpriteBackground(
+        preview, imgUrl || def.img, def.h, size.w, size.h,
+        sheet ? sheet.index : 0,
+        sheet ? sheet.frames : 1
+    );
 }
 
 function setupPaletteContainedBackground(preview, def) {
@@ -1435,7 +1459,13 @@ function createScreenPreview(def, inMatrix, elementState, matrixScale) {
             const pxW = size.w * matrixScale;
             const pxH = size.h * matrixScale;
             preview.setAttribute('aria-label', def.label);
-            if (def.paletteFitFullImage) {
+            if (def.spriteSheet) {
+                preview.classList.add('screen-preview-sprite');
+                setupSpriteBackground(
+                    preview, previewImg, def.h, pxW, pxH,
+                    def.spriteSheet.index, def.spriteSheet.frames
+                );
+            } else if (def.paletteFitFullImage) {
                 preview.classList.add('screen-preview-contained');
                 setupContainedBackground(preview, previewImg);
             } else {
@@ -1528,15 +1558,11 @@ function renderScreenPalette() {
         } else {
             item.tabIndex = 0;
         }
-        if (window.screenEditor.selectedId === def.id ||
-            (def.id === 'screen_grid' && getScreenGridEnabled())) {
+        if (isPaletteItemSelected(def)) {
             item.classList.add('palette-item-selected');
         }
         if (def.paletteMeta) {
             item.classList.add('palette-item-meta');
-        }
-        if (def.paletteToggle) {
-            item.classList.add('palette-item-toggle');
         }
 
         const swatch = document.createElement('div');
@@ -1553,16 +1579,12 @@ function renderScreenPalette() {
         if (!unavailable) {
             const selectPaletteItem = () => {
                 if (def.paletteMeta) {
-                    if (def.paletteToggle && def.id === 'screen_grid') {
-                        setScreenGridEnabled(!getScreenGridEnabled());
-                    }
                     window.screenEditor.selectedId = def.id;
                     renderScreenCanvas();
                     renderScreenOptions();
                     renderScreenPalette();
                     updateScreenStatusLine();
                     focusScreenCanvas();
-                    if (def.paletteToggle) saveScreenTimeDisplaySettings();
                     return;
                 }
                 const activeProfile = getProfileObj(window.screenEditor.mode);
@@ -1661,8 +1683,14 @@ async function saveScreenTimeDisplaySettings() {
     if (window.settings && gridEnabled !== (window.settings.p08 || 0)) {
         formData.p08 = gridEnabled;
     }
-    if (leading) formData.p24 = leading.checked ? 1 : 0;
-    if (dots) formData.p50 = dots.checked ? 1 : 0;
+    if (leading) {
+        const p24 = isScreenSwitchOn('screen_show_leading_zero') ? 1 : 0;
+        if (p24 !== (window.settings && window.settings.p24 || 0)) formData.p24 = p24;
+    }
+    if (dots) {
+        const p50 = isScreenSwitchOn('screen_dots_breathe') ? 1 : 0;
+        if (p50 !== (window.settings && window.settings.p50 || 0)) formData.p50 = p50;
+    }
     if (scheduleList) {
         const newSched = serializeDisplaySchedule('display-schedule-list');
         if (newSched !== (window.settings.p58 || '')) {
@@ -1952,6 +1980,7 @@ function renderScreenCanvas() {
             beginDrag(e.id, ev, false);
             renderScreenCanvas();
             renderScreenOptions();
+            renderScreenPalette();
         });
 
         canvas.appendChild(box);
@@ -2016,6 +2045,20 @@ async function appendScreenThemeFilterOptions(container, trans) {
     container.appendChild(filterRow);
 
     await appendScreenFontSamples(container, window.screenLayout[fontKey] || 'bold', fontKey);
+}
+
+function appendScreenGridOption(container, trans) {
+    appendScreenSwitchRow(container, {
+        id: 'screen_show_grid',
+        label: getScreenElementLabel('screen_grid'),
+        checked: getScreenGridEnabled(),
+        onChange: (on) => {
+            setScreenGridEnabled(on);
+            renderScreenCanvas();
+            updateScreenStatusLine();
+            saveScreenTimeDisplaySettings();
+        }
+    });
 }
 
 async function appendScreenFontSamples(container, selectedFont, fontLayoutKey) {
@@ -2086,36 +2129,12 @@ function renderScreenOptions() {
 
     const trans = translations[currentLanguage] || translations.en;
 
-    if (isScreenGridElement(window.screenEditor.selectedId)) {
-        const title = document.createElement('h3');
-        title.textContent = (getNestedTranslation(trans, 'screen.options') || 'Options') + `: ${getScreenElementLabel('screen_grid')}`;
-        opt.appendChild(title);
-
-        const enabledRow = document.createElement('div');
-        enabledRow.className = 'form-group';
-        const enabledLabel = document.createElement('label');
-        enabledLabel.textContent = getNestedTranslation(trans, 'screen.enabled') || 'Enabled';
-        const enabledInput = document.createElement('input');
-        enabledInput.type = 'checkbox';
-        enabledInput.checked = getScreenGridEnabled();
-        enabledInput.addEventListener('change', () => {
-            setScreenGridEnabled(enabledInput.checked);
-            renderScreenCanvas();
-            renderScreenPalette();
-            updateScreenStatusLine();
-            saveScreenTimeDisplaySettings();
-        });
-        enabledRow.appendChild(enabledLabel);
-        enabledRow.appendChild(enabledInput);
-        opt.appendChild(enabledRow);
-        return;
-    }
-
     if (isScreenSettingsElement(window.screenEditor.selectedId)) {
         const title = document.createElement('h3');
         title.textContent = (getNestedTranslation(trans, 'screen.options') || 'Options') + `: ${getScreenElementLabel('screen_settings')}`;
         opt.appendChild(title);
         appendScreenThemeFilterOptions(opt, trans);
+        appendScreenGridOption(opt, trans);
         return;
     }
 
@@ -2140,50 +2159,31 @@ function renderScreenOptions() {
         return;
     }
 
-    const enabledRow = document.createElement('div');
-    enabledRow.className = 'form-group';
-    const enabledLabel = document.createElement('label');
-    enabledLabel.textContent = getNestedTranslation(trans, 'screen.enabled') || 'Enabled';
-    const enabledInput = document.createElement('input');
-    enabledInput.type = 'checkbox';
-    enabledInput.checked = e.enabled !== 0;
-    enabledInput.addEventListener('change', () => {
-        e.enabled = enabledInput.checked ? 1 : 0;
-        renderScreenCanvas();
-        if (isScreenStaticTextElement(e.id)) renderScreenPalette();
+    appendScreenSwitchRow(opt, {
+        id: 'screen_element_enabled',
+        label: getNestedTranslation(trans, 'screen.enabled') || 'Enabled',
+        checked: e.enabled !== 0,
+        onChange: (on) => {
+            e.enabled = on ? 1 : 0;
+            renderScreenCanvas();
+            if (isScreenStaticTextElement(e.id)) renderScreenPalette();
+        }
     });
-    enabledRow.appendChild(enabledLabel);
-    enabledRow.appendChild(enabledInput);
-    opt.appendChild(enabledRow);
 
     if (e.id === 'time') {
-        const leadingRow = document.createElement('div');
-        leadingRow.className = 'checkbox-container';
-        const leadingInput = document.createElement('input');
-        leadingInput.type = 'checkbox';
-        leadingInput.id = 'screen_show_leading_zero';
-        leadingInput.checked = !!(window.settings && window.settings.p24);
-        const leadingLabel = document.createElement('label');
-        leadingLabel.htmlFor = 'screen_show_leading_zero';
-        leadingLabel.textContent = getNestedTranslation(trans, 'screen.show_leading_zero')
-            || 'Show 0 for single digit hour';
-        leadingRow.appendChild(leadingInput);
-        leadingRow.appendChild(leadingLabel);
-        opt.appendChild(leadingRow);
+        appendScreenSwitchRow(opt, {
+            id: 'screen_show_leading_zero',
+            label: getNestedTranslation(trans, 'screen.show_leading_zero') || 'Show 0 for single digit hour',
+            checked: !!(window.settings && window.settings.p24),
+            onChange: () => saveScreenTimeDisplaySettings()
+        });
 
-        const breatheRow = document.createElement('div');
-        breatheRow.className = 'checkbox-container';
-        const breatheInput = document.createElement('input');
-        breatheInput.type = 'checkbox';
-        breatheInput.id = 'screen_dots_breathe';
-        breatheInput.checked = !!(window.settings && window.settings.p50);
-        const breatheLabel = document.createElement('label');
-        breatheLabel.htmlFor = 'screen_dots_breathe';
-        breatheLabel.textContent = getNestedTranslation(trans, 'screen.disable_dots_breathe')
-            || 'Disable breathing time dots';
-        breatheRow.appendChild(breatheInput);
-        breatheRow.appendChild(breatheLabel);
-        opt.appendChild(breatheRow);
+        appendScreenSwitchRow(opt, {
+            id: 'screen_dots_breathe',
+            label: getNestedTranslation(trans, 'screen.disable_dots_breathe') || 'Disable breathing time dots',
+            checked: !!(window.settings && window.settings.p50),
+            onChange: () => saveScreenTimeDisplaySettings()
+        });
 
         appendDisplayScheduleSection(opt, {
             listId: 'display-schedule-list',
@@ -2403,6 +2403,7 @@ function beginDrag(id, pointerEvent, fromPalette) {
         window.screenEditor.selectedId = id;
         renderScreenCanvas();
         renderScreenOptions();
+        renderScreenPalette();
     }
 
     canvas.setPointerCapture(pointerEvent.pointerId);
@@ -2429,6 +2430,7 @@ function onScreenPointerDown(e) {
         window.screenEditor.selectedId = null;
         renderScreenCanvas();
         renderScreenOptions();
+        renderScreenPalette();
     } else {
         updateScreenStatusLine();
     }

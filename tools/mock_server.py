@@ -11,16 +11,22 @@ settings = {
     "p00": "frixos",
     "p34": "MockSSID",
     "p35": "MockPass",
-    "p36": 1,
-    "p37": 1,
+    "p16": "Hello [temp] test message",
+    "p36": 0,
+    "p37": 0,
     "p39": 1,
     "p40": 1,
     "p41": 0,
     "p01": 22,
     "p02": 22,
-    "p03": 3,
+    "p03": 1,
     "p04": "bold",
     "p05": "light",
+    "p09": 0,
+    "p60": "",
+    "p61": "",
+    "p62": "255.255.255.0",
+    "p63": "",
 }
 
 @app.get("/")
@@ -29,8 +35,27 @@ async def read_index():
         return HTMLResponse(content=f.read())
 
 @app.get("/api/settings")
-async def get_settings(group: str = None):
+async def get_settings(group: str = None, params: str = None):
+    if group == "theme":
+        return JSONResponse(content={k: settings[k] for k in settings if k in ("p40", "p41")})
+    if group == "settings":
+        keys = {f"p{i:02d}" for i in [0, 3, 9, 16, 34, 35, 36, 37, 39, 60, 61, 62, 63]}
+        keys.update({"p00", "p03", "p09", "p16", "p34", "p35", "p36", "p37", "p39", "p60", "p61", "p62", "p63"})
+        return JSONResponse(content={k: settings[k] for k in keys if k in settings})
     return JSONResponse(content=settings)
+
+@app.post("/api/settings")
+async def post_settings(request: Request):
+    body = await request.json()
+    settings.update({k: v for k, v in body.items() if k != "status"})
+    return JSONResponse(content={"status": "ok", "message": "Settings saved"})
+
+@app.get("/i18n/language_{lang}.json")
+async def get_i18n_language(lang: str):
+    path = f"spiffs/i18n/language_{lang}.json"
+    if os.path.exists(path):
+        return FileResponse(path)
+    return JSONResponse(status_code=404, content={"message": "Not found"})
 
 @app.get("/api/status")
 async def get_status(logs: str = None):
@@ -98,11 +123,8 @@ async def get_timezone(location: str = None, lat: str = None, lon: str = None):
     return JSONResponse(status_code=404, content={"message": "Timezone not found"})
 
 @app.get("/language_{lang}.json")
-async def get_language(lang: str):
-    path = f"spiffs/language_{lang}.json"
-    if os.path.exists(path):
-        return FileResponse(path)
-    return JSONResponse(status_code=404, content={"message": "Not found"})
+async def get_language_legacy(lang: str):
+    return await get_i18n_language(lang)
 
 @app.get("/{filename}")
 async def get_static(filename: str):

@@ -713,8 +713,8 @@ static uint64_t calculate_include_mask(const char *group, const char *params)
         }
         else if (strcmp(group, "settings") == 0)
         {
-            // p00, p03, p09, p34-p37, p39, p60-p63
-            mask |= (1ULL << 0) | (1ULL << 3) | (1ULL << 9) |
+            // p00, p03, p09, p16, p34-p37, p39, p60-p63
+            mask |= (1ULL << 0) | (1ULL << 3) | (1ULL << 9) | (1ULL << 16) |
                     (1ULL << 34) | (1ULL << 35) |
                     (1ULL << 36) | (1ULL << 37) | (1ULL << 39) |
                     (1ULL << 60) | (1ULL << 61) | (1ULL << 62) | (1ULL << 63);
@@ -1583,10 +1583,9 @@ esp_err_t settings_post_handler(httpd_req_t *req)
     char orig_wifi_ssid[33];
     char orig_wifi_pass[64];
     char orig_static_ip[16];
-    char orig_lat[12];
-    char orig_lon[12];
-    char orig_timezone[TZ_LENGTH];
-    char orig_iana_tz[64];
+    char orig_static_gw[16];
+    char orig_static_nm[16];
+    char orig_static_dns[40];
     char orig_message[SCROLL_MSG_LENGTH]; // Add this line
     uint32_t orig_pwm_frequency = eeprom_pwm_frequency;
 
@@ -1595,10 +1594,9 @@ esp_err_t settings_post_handler(httpd_req_t *req)
     strncpy(orig_wifi_ssid, eeprom_wifi_ssid, sizeof(orig_wifi_ssid));
     strncpy(orig_wifi_pass, eeprom_wifi_pass, sizeof(orig_wifi_pass));
     strncpy(orig_static_ip, eeprom_static_ip, sizeof(orig_static_ip));
-    strncpy(orig_lat, eeprom_lat, sizeof(orig_lat));
-    strncpy(orig_lon, eeprom_lon, sizeof(orig_lon));
-    strncpy(orig_timezone, eeprom_timezone, sizeof(orig_timezone));
-    strncpy(orig_iana_tz, eeprom_iana_tz, sizeof(orig_iana_tz));
+    strncpy(orig_static_gw, eeprom_static_gw, sizeof(orig_static_gw));
+    strncpy(orig_static_nm, eeprom_static_nm, sizeof(orig_static_nm));
+    strncpy(orig_static_dns, eeprom_static_dns, sizeof(orig_static_dns));
     strncpy(orig_message, eeprom_message, sizeof(orig_message)); // Add this line
 
     // Process network settings
@@ -2317,20 +2315,13 @@ esp_err_t settings_post_handler(httpd_req_t *req)
     if (strcmp(orig_wifi_ssid, eeprom_wifi_ssid) != 0 ||
         strcmp(orig_wifi_pass, eeprom_wifi_pass) != 0 ||
         strcmp(orig_hostname, eeprom_hostname) != 0 ||
-        strcmp(orig_static_ip, eeprom_static_ip) != 0)
+        strcmp(orig_static_ip, eeprom_static_ip) != 0 ||
+        strcmp(orig_static_gw, eeprom_static_gw) != 0 ||
+        strcmp(orig_static_nm, eeprom_static_nm) != 0 ||
+        strcmp(orig_static_dns, eeprom_static_dns) != 0)
     {
         critical_settings_changed = true;
         ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Network settings changed, device will restart");
-    }
-
-    // Check if location settings changed
-    if (strcmp(orig_lat, eeprom_lat) != 0 ||
-        strcmp(orig_lon, eeprom_lon) != 0 ||
-        strcmp(orig_timezone, eeprom_timezone) != 0 ||
-        strcmp(orig_iana_tz, eeprom_iana_tz) != 0)
-    {
-        critical_settings_changed = true;
-        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Location or timezone settings changed, device will restart");
     }
 
     // Check if message has changed and call parse_integrations if it has

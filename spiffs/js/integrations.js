@@ -29,7 +29,8 @@ el('saveIntegrations').addEventListener('click', () => {
   const secrets = ['eeprom_ha_token', 'eeprom_stock_key', 'eeprom_glucose_password'];
   for (const [id, key] of Object.entries(INT_MAP)) {
     const e = el(id); if (!e) continue;
-    const v = (e.tagName === 'SELECT') ? (parseInt(e.value, 10) || 0) : e.value;
+    const v = (e.tagName === 'SELECT') ? (parseInt(e.value, 10) || 0)
+      : (e.type === 'number') ? (parseInt(e.value, 10) || 0) : e.value;
     if (secrets.includes(id)) changedSecret(p, key, v); else changed(p, key, v);
   }
   saveSettings(p, []);

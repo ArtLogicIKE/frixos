@@ -5,4 +5,5 @@ sdkconfig.old
 main/include/config.h
 
 # Environment file with API keys (copy from env.example)
+.envtools/__pycache__/
 .env

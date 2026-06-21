@@ -137,7 +137,7 @@
       "text_6": "Text 6",
       "text_7": "Text 7",
       "text_8": "Text 8",
-      "screen_grid": "Skärmsrutnät",
+      "screen_grid": "Visa skärmsrutnät",
       "screen_settings": "Skärminställningar"
     }
   },
@@ -243,6 +243,11 @@
       "token_day": "Aktuell veckodag",
       "token_date": "Aktuellt datum",
       "token_mon": "Aktuell månad",
+      "token_time": "Aktuell tid i valt format (12- eller 24-timmars)",
+      "token_hour12": "Aktuell timme (12-timmarsformat, 1–12)",
+      "token_hour24": "Aktuell timme (24-timmarsformat, 00–23)",
+      "token_min": "Aktuell minut",
+      "token_ampm": "AM/PM-indikator (tom i 24-timmarsformat)",
       "token_temp": "Aktuell temperatur",
       "token_hum": "Aktuell luftfuktighet",
       "token_high": "Dagens högsta temperatur",

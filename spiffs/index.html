@@ -69,8 +69,8 @@
       <div class="ptitle"><h2>Connection</h2><span class="rule"></span></div>
       <div class="conn-grid">
         <div class="conn-fields">
-          <div class="field"><label>WiFi SSID</label><input type="text" id="wifi_ssid" autocomplete="username" placeholder="Network name"></div>
-          <div class="field"><label>WiFi password</label>
+          <div class="field"><label>WiFi SSID <span class="req">*</span></label><input type="text" id="wifi_ssid" autocomplete="username" placeholder="Network name"></div>
+          <div class="field"><label>WiFi password <span class="req">*</span></label>
             <div class="pw"><input type="password" id="wifi_pass" autocomplete="current-password" placeholder="••••••••"><button class="eye" type="button" aria-label="Show password">👁</button></div>
           </div>
           <div class="field"><label>Hostname <span class="req">*</span></label>
@@ -86,15 +86,15 @@
 
       <div class="staticip">
         <div class="toggle staticip-head">
-          <div class="tx"><div class="tt">Use static IP</div><div class="ts">Assign a fixed address instead of DHCP</div></div>
+          <div class="tx"><div class="tt">Use static IP <span class="req">*</span></div><div class="ts">Assign a fixed address instead of DHCP</div></div>
           <button class="gswitch" id="staticToggle" aria-label="Use static IP"></button>
         </div>
         <div class="staticip-panel" id="staticPanel" hidden>
           <div class="grid2">
-            <div class="field"><label>IP address</label><input type="text" id="static_ip" inputmode="decimal" placeholder="192.168.1.100"></div>
-            <div class="field"><label>Gateway</label><input type="text" id="static_gw" inputmode="decimal" placeholder="192.168.1.1"></div>
-            <div class="field"><label>Subnet mask</label><input type="text" id="static_nm" inputmode="decimal" placeholder="255.255.255.0"></div>
-            <div class="field"><label>DNS servers <span class="opt">(optional)</span></label>
+            <div class="field"><label>IP address <span class="req">*</span></label><input type="text" id="static_ip" inputmode="decimal" placeholder="192.168.1.100"></div>
+            <div class="field"><label>Gateway <span class="req">*</span></label><input type="text" id="static_gw" inputmode="decimal" placeholder="192.168.1.1"></div>
+            <div class="field"><label>Subnet mask <span class="req">*</span></label><input type="text" id="static_nm" inputmode="decimal" placeholder="255.255.255.0"></div>
+            <div class="field"><label>DNS servers <span class="req">*</span> <span class="opt">(optional)</span></label>
               <div class="dns-pair">
                 <div class="dns-f"><span class="dns-b">1</span><input type="text" id="static_dns1" inputmode="decimal" placeholder="8.8.8.8"></div>
                 <div class="dns-f"><span class="dns-b">2</span><input type="text" id="static_dns2" inputmode="decimal" placeholder="8.8.4.4"></div>
@@ -103,7 +103,7 @@
           </div>
         </div>
       </div>
-      <p class="note left">* Changing connection settings will restart the device.</p>
+      <p class="note left">* Changing these connection settings will restart the device.</p>
     </div>
 
     <div class="panel">
@@ -152,7 +152,6 @@
       <div class="field"><label>Timezone region</label><input type="text" id="tz_iana" placeholder="e.g. America/New_York"></div>
       <div class="field"><label>Timezone (POSIX)</label><input type="text" id="timezone" placeholder="e.g. EST5EDT,M3.2.0,M11.1.0"></div>
       <p class="muted-p">Find POSIX timezones <a href="https://leo.leung.xyz/wiki/Timezone" target="_blank" rel="noopener">here</a>. Lat/Lon only affect weather data.</p>
-      <p class="note left">* Changing location settings will restart the device.</p>
     </div>
 
     <div class="panel">

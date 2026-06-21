@@ -68,7 +68,11 @@ async function loadGroup(query) {
   return window.settings;
 }
 function changed(payload, key, newVal) { if (S()[key] === undefined) return; if (String(S()[key]) !== String(newVal)) payload[key] = newVal; }
-function changedSecret(payload, key, newVal) { const o = S()[key]; if (o === undefined) { if (newVal) payload[key] = newVal; return; } if (String(o) !== String(newVal)) payload[key] = newVal; }
+function changedSecret(payload, key, newVal) {
+  if (!newVal) return; // blank secret field means unchanged
+  const o = S()[key];
+  if (o === undefined || String(o) !== String(newVal)) payload[key] = newVal;
+}
 
 async function saveSettings(payload, networkKeys) {
   if (Object.keys(payload).length === 0) { toast('No changes to save', 'ok'); return; }
@@ -93,7 +97,9 @@ function applyTheme(dark) {
 el('themeBtn').addEventListener('click', () => {
   const dark = !body.classList.contains('theme-dark');
   applyTheme(dark);
-  apiPostJson('/api/settings', { p40: dark ? 1 : 0 });
+  const p40 = dark ? 1 : 0;
+  window.settings.p40 = p40;
+  apiPostJson('/api/settings', { p40 });
 });
 
 /* ---------- i18n apply ---------- */

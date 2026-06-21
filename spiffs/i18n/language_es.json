@@ -141,7 +141,7 @@
       "text_6": "Texto 6",
       "text_7": "Texto 7",
       "text_8": "Texto 8",
-      "screen_grid": "Cuadrícula de pantalla",
+      "screen_grid": "Mostrar cuadrícula de pantalla",
       "screen_settings": "Ajustes de pantalla"
     }
   },
@@ -247,6 +247,11 @@
       "token_day": "Día actual de la semana",
       "token_date": "Fecha actual",
       "token_mon": "Mes actual",
+      "token_time": "Hora actual en el formato seleccionado (12 o 24 horas)",
+      "token_hour12": "Hora actual (formato 12 horas, 1–12)",
+      "token_hour24": "Hora actual (formato 24 horas, 00–23)",
+      "token_min": "Minuto actual",
+      "token_ampm": "Indicador AM/PM (vacío en formato 24 horas)",
       "token_temp": "Temperatura actual",
       "token_hum": "Humedad actual",
       "token_high": "Temperatura máxima de hoy",

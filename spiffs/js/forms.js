@@ -22,15 +22,20 @@ if (msg) msg.addEventListener('input', () => { msgCounter.textContent = msg.valu
 
 /* ---------- SETTINGS ---------- */
 async function loadSettings() {
-  await loadGroup('group=settings&params=p03,p09');
+  await loadGroup('group=settings&params=p03,p09,p16');
+  delete window.settings.p35; // never keep WiFi password in memory
   const s = S();
   setVal('hostname', s.p00); setVal('wifi_ssid', s.p34);
   if (s.p03 !== undefined) el('rotation').value = String(s.p03);
   setSw('mirroring', s.p09); setSw('fahrenheit', s.p36); setSw('hour12', s.p37); setSw('update_firmware', s.p39);
-  setVal('static_ip', s.p60); setVal('static_gw', s.p61); setVal('static_nm', s.p62);
-  if (s.p63 !== undefined) { const d = String(s.p63 || '').split(','); setVal('static_dns1', d[0] || ''); setVal('static_dns2', d[1] || ''); }
   const useStatic = !!(s.p60 && String(s.p60).trim());
   setSw('staticToggle', useStatic); staticPanel.hidden = !useStatic;
+  if (useStatic) {
+    setVal('static_ip', s.p60); setVal('static_gw', s.p61); setVal('static_nm', s.p62);
+    if (s.p63 !== undefined) { const d = String(s.p63 || '').split(','); setVal('static_dns1', d[0] || ''); setVal('static_dns2', d[1] || ''); }
+  } else {
+    setVal('static_ip', ''); setVal('static_gw', ''); setVal('static_nm', ''); setVal('static_dns1', ''); setVal('static_dns2', '');
+  }
   if (s.p16 !== undefined && msg) { msg.value = s.p16 || ''; msgCounter.textContent = msg.value.length + ' / 511'; }
 }
 sectionLoaders.settings = loadSettings;
@@ -48,14 +53,20 @@ el('saveSettings').addEventListener('click', () => {
   changed(p, 'p37', swOn('hour12') ? 1 : 0);
   changed(p, 'p39', swOn('update_firmware') ? 1 : 0);
   if (msg) changed(p, 'p16', msg.value);
+  const wasStatic = !!(S().p60 && String(S().p60).trim());
   const useStatic = swOn('staticToggle');
-  changed(p, 'p60', useStatic ? el('static_ip').value.trim() : '');
   if (useStatic) {
+    changed(p, 'p60', el('static_ip').value.trim());
     changed(p, 'p61', el('static_gw').value.trim());
     changed(p, 'p62', el('static_nm').value.trim());
     changed(p, 'p63', [el('static_dns1').value.trim(), el('static_dns2').value.trim()].filter(Boolean).join(','));
+  } else if (wasStatic) {
+    changed(p, 'p60', '');
+    changed(p, 'p61', '');
+    changed(p, 'p62', '');
+    changed(p, 'p63', '');
   }
-  saveSettings(p, ['p00', 'p34', 'p35', 'p60']);
+  saveSettings(p, ['p00', 'p34', 'p35', 'p60', 'p61', 'p62', 'p63']);
 });
 el('hostname').addEventListener('input', () => { if (el('hostname').value.trim()) { el('hostname').removeAttribute('aria-invalid'); el('hostname-err').classList.remove('show'); } });
 
@@ -100,5 +111,5 @@ el('saveAdvanced').addEventListener('click', () => {
   changed(p, 'p43', parseInt(el('max_power').value, 10) || 0);
   changed(p, 'p55', parseTimeStringToMins(el('dim_start').value));
   changed(p, 'p56', parseTimeStringToMins(el('dim_end').value));
-  saveSettings(p, []); // location changes restart server-side
+  saveSettings(p, []); // non-connection settings apply live without reboot
 });

@@ -2443,6 +2443,11 @@ static const token_t base_tokens[] = {
     {"[pressure]", NULL, 16, TOKEN_TYPE_WEATHER, 10},
     {"[3high]", NULL, 17, TOKEN_TYPE_WEATHER, 7},
     {"[3low]", NULL, 18, TOKEN_TYPE_WEATHER, 6},
+    {"[time]", NULL, 19, TOKEN_TYPE_TIME, 6},
+    {"[hour12]", NULL, 20, TOKEN_TYPE_TIME, 8},
+    {"[hour24]", NULL, 21, TOKEN_TYPE_TIME, 8},
+    {"[min]", NULL, 22, TOKEN_TYPE_TIME, 5},
+    {"[ampm]", NULL, 23, TOKEN_TYPE_TIME, 6},
     {NULL, NULL, 0, TOKEN_TYPE_BASE, 0} // End marker
 };
 
@@ -2466,7 +2471,7 @@ void prepare_tokens(void)
 
   // Start with base tokens
   prepared_tokens = base_tokens;
-  prepared_tokens_count = 18; // Base tokens count (incl. met.no extended weather: wind/gust/precip/uv/pressure/3high/3low)
+  prepared_tokens_count = 23; // Base tokens count (incl. time tokens and met.no extended weather)
 
   // Allocate space for all tokens
   int tokencount = 0;
@@ -2496,7 +2501,7 @@ void prepare_tokens(void)
     ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Token alloc failed, free heap %u",
                 (unsigned)esp_get_free_heap_size());
     prepared_tokens = base_tokens;
-    prepared_tokens_count = 18;
+    prepared_tokens_count = 23;
     return;
   }
 
@@ -2734,6 +2739,21 @@ void replace_placeholders(const char *input, char *output, size_t output_size)
               break;
             case 5: // [mon]
               strlcpy(replacement, month_names[lang_index][timeinfo.tm_mon], sizeof(replacement));
+              break;
+            case 19: // [time]
+              format_local_time(replacement, sizeof(replacement), &timeinfo);
+              break;
+            case 20: // [hour12]
+              snprintf(replacement, sizeof(replacement), "%d", time_hour12(&timeinfo));
+              break;
+            case 21: // [hour24]
+              snprintf(replacement, sizeof(replacement), "%02d", timeinfo.tm_hour);
+              break;
+            case 22: // [min]
+              snprintf(replacement, sizeof(replacement), "%02d", timeinfo.tm_min);
+              break;
+            case 23: // [ampm]
+              strlcpy(replacement, time_localized_ampm(&timeinfo), sizeof(replacement));
               break;
             }
             break;

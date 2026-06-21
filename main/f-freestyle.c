@@ -11,6 +11,7 @@
 #include "f-freestyle.h"
 #include "f-integrations.h"
 #include "f-membuffer.h"
+#include "f-time.h"
 
 static const char *TAG = "f-freestyle";
 #define LIBRE_CLIENT_VERSION "4.20.0"
@@ -1000,49 +1001,6 @@ bool fetch_freestyle_glucose(void)
     ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Freestyle fetch failed (retry)");
     cleanup_freestyle_client();
     return false;
-}
-
-// Language-specific AM/PM suffixes for 12-hour time display
-// Language index: 0=en, 1=de, 2=fr, 3=it, 4=pt, 5=sv, 6=da, 7=pl, 8=es
-static const char *ampm_suffix[9][2] = {
-    {"am", "pm"},        // English
-    {"vorm.", "nachm."}, // German
-    {"mat.", "apr."},    // French
-    {"matt.", "pom."},   // Italian
-    {"man.", "tar."},    // Portuguese
-    {"fm", "em"},        // Swedish
-    {"fm", "em"},        // Danish
-    {"AM", "PM"},        // Polish
-    {"a.m.", "p.m."},    // Spanish
-};
-
-static void format_local_time(char *buffer, size_t buffer_size, const struct tm *timeinfo)
-{
-    uint8_t lang_index = eeprom_language;
-    if (lang_index >= 9)
-    {
-        lang_index = 0;
-    }
-
-    if (eeprom_12hour)
-    {
-        bool is_pm = timeinfo->tm_hour >= 12;
-        int hour = timeinfo->tm_hour;
-        if (hour == 0)
-        {
-            hour = 12;
-        }
-        else if (hour > 12)
-        {
-            hour -= 12;
-        }
-        snprintf(buffer, buffer_size, "%d:%02d%s", hour, timeinfo->tm_min,
-                 ampm_suffix[lang_index][is_pm ? 1 : 0]);
-    }
-    else
-    {
-        snprintf(buffer, buffer_size, "%02d:%02d", timeinfo->tm_hour, timeinfo->tm_min);
-    }
 }
 
 void format_glucose_time_token(char *buffer, size_t buffer_size)
