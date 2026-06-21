@@ -175,6 +175,13 @@ uint8_t calculateMoonPhase(uint16_t year, uint8_t month, uint8_t day) {
    return moonData;
  }
 
+ /*
+  * Accurate elongation-based moon phase, added to fix the icon switching to
+  * the principal phases (especially Last/Third Quarter) a couple of days too
+  * early. Issue reported and the elongation + tolerance-band approach proposed
+  * by Dave Shackleton (Wirral, England).
+  */
+
  /* Normalize an angle to [0, 360). */
  static double moon_norm360(double x) {
    x = fmod(x, 360.0);
