@@ -44,6 +44,20 @@ function toggleLoading(btn, isLoading) {
   else { btn.classList.remove('is-loading'); btn.disabled = false; btn.removeAttribute('aria-busy'); }
 }
 
+/* ---------- character counters ---------- */
+function updateCharCounter(input) {
+  const counter = el(input.id + '-counter');
+  if (!counter) return;
+  const len = input.value.length;
+  const max = parseInt(input.getAttribute('maxlength'), 10) || 0;
+  counter.textContent = len + (max ? ' / ' + max : '');
+  if (max) {
+    const ratio = len / max;
+    counter.classList.toggle('warn', ratio >= 0.9 && ratio < 1);
+    counter.classList.toggle('max', ratio >= 1);
+  }
+}
+
 /* ---------- i18n ----------
    The English base also serves as the fallback for getMessage() and for
    the layout editor's getNestedTranslation(...) || 'English' lookups.

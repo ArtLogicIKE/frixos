@@ -57,6 +57,32 @@ async def get_i18n_language(lang: str):
         return FileResponse(path)
     return JSONResponse(status_code=404, content={"message": "Not found"})
 
+@app.get("/api/screen")
+async def get_screen():
+    # Compact binary wire format for /api/screen (must match f-screen-layout-bin.h).
+    # SCREEN_BIN_WIRE_SIZE = 14464
+    size = 14464
+    buf = bytearray(size)
+    # MAGIC: 0x4653584C
+    buf[0:4] = (0x4653584C).to_bytes(4, 'little')
+    # FORMAT: 1
+    buf[4] = 1
+    # VERSION: 9
+    buf[5] = 9
+    # W/H: 128
+    buf[60:62] = (128).to_bytes(2, 'little')
+    buf[62:64] = (128).to_bytes(2, 'little')
+
+    # Enable message element (index 6 in SCREEN_WIRE_ELEM_IDS)
+    # Each widget is 13 bytes.
+    off = 64 + 6 * 13
+    buf[off] = 1 # enabled
+    buf[off+1] = 0 # x
+    buf[off+2] = 86 # y
+    buf[off+3] = 0 # z
+
+    return HTMLResponse(content=buf, media_type="application/octet-stream")
+
 @app.get("/api/status")
 async def get_status(logs: str = None):
     status_data = {
@@ -126,12 +152,12 @@ async def get_timezone(location: str = None, lat: str = None, lon: str = None):
 async def get_language_legacy(lang: str):
     return await get_i18n_language(lang)
 
-@app.get("/{filename}")
-async def get_static(filename: str):
-    path = f"spiffs/{filename}"
-    if os.path.exists(path):
-        return FileResponse(path)
-    return JSONResponse(status_code=404, content={"message": "Not found"})
+@app.get("/{path:path}")
+async def get_static(path: str):
+    full_path = f"spiffs/{path}"
+    if os.path.exists(full_path) and os.path.isfile(full_path):
+        return FileResponse(full_path)
+    return JSONResponse(status_code=404, content={"message": f"Not found: {path}"})
 
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=8080)

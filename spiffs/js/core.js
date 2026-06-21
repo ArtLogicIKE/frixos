@@ -48,6 +48,17 @@ function mergeSettingsData(data) {
 
 /* ---------- toast + status shim ---------- */
 let _toastT;
+
+function initCounters() {
+  $$('input[maxlength], textarea[maxlength]').forEach(inp => {
+    const counter = el(inp.id + '-counter');
+    if (counter) {
+      inp.addEventListener('input', () => updateCharCounter(inp));
+      updateCharCounter(inp);
+    }
+  });
+}
+
 function toast(msg, kind) {
   const t = el('toast'); if (!t) return;
   t.textContent = msg; t.className = 'toast show' + (kind ? ' ' + kind : '');
@@ -159,6 +170,7 @@ async function boot() {
 
   loadedSections.settings = true;
   if (sectionLoaders.settings) await sectionLoaders.settings();
+  initCounters();
 
   const st = await apiGet('/api/status'); const d = st.data || {};
   el('heroStatus').textContent = (d.ip_address ? d.ip_address : 'frixos.local') + (d.version ? ' · v' + d.version : '');

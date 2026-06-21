@@ -69,12 +69,12 @@
       <div class="ptitle"><h2>Connection</h2><span class="rule"></span></div>
       <div class="conn-grid">
         <div class="conn-fields">
-          <div class="field"><label>WiFi SSID <span class="req">*</span></label><input type="text" id="wifi_ssid" autocomplete="off" placeholder="Network name"></div>
+          <div class="field"><label>WiFi SSID <span class="req">*</span></label><input type="text" id="wifi_ssid" autocomplete="off" placeholder="Network name" maxlength="32"><div class="counter" id="wifi_ssid-counter">0 / 32</div></div>
           <div class="field"><label>WiFi password <span class="req">*</span></label>
             <div class="pw"><input type="password" id="wifi_pass" autocomplete="new-password" placeholder="Leave blank to keep current"><button class="eye" type="button" aria-label="Show password">👁</button></div>
           </div>
           <div class="field"><label>Hostname <span class="req">*</span></label>
-            <input type="text" id="hostname" value="frixos" required maxlength="32"><span class="err" id="hostname-err">Hostname is required.</span>
+            <input type="text" id="hostname" value="frixos" required maxlength="32"><div class="counter" id="hostname-counter">0 / 32</div><span class="err" id="hostname-err">Hostname is required.</span>
           </div>
         </div>
         <div class="conn-nets">
@@ -242,9 +242,10 @@
   <section class="tab-page" id="tab-integrations" data-screen-label="Integrations">
     <div class="panel">
       <div class="ptitle"><h2>Home Assistant</h2><span class="rule"></span></div>
-      <div class="field"><label>Server URL</label><input type="text" id="eeprom_ha_url" maxlength="200" placeholder="e.g. http://homeassistant.local:8123"></div>
+      <div class="field"><label>Server URL</label><input type="text" id="eeprom_ha_url" maxlength="200" placeholder="e.g. http://homeassistant.local:8123"><div class="counter" id="eeprom_ha_url-counter">0 / 200</div></div>
       <div class="field"><label>Long-lived access token</label>
         <div class="pw"><input type="password" id="eeprom_ha_token" maxlength="255" placeholder="Paste token"><button class="eye" type="button" aria-label="Show token">👁</button></div>
+        <div class="counter" id="eeprom_ha_token-counter">0 / 255</div>
       </div>
       <div class="field"><label>Refresh (min.)</label><input type="number" id="eeprom_ha_refresh_mins" min="1" max="7200" value="1"></div>
     </div>
@@ -254,6 +255,7 @@
       <p class="muted-p tight">Via Finnhub.io.</p>
       <div class="field"><label>API key</label>
         <div class="pw"><input type="password" id="eeprom_stock_key" maxlength="64" placeholder="Paste API key"><button class="eye" type="button" aria-label="Show key">👁</button></div>
+        <div class="counter" id="eeprom_stock_key-counter">0 / 64</div>
       </div>
       <div class="field"><label>Refresh (min.)</label><input type="number" id="eeprom_stock_refresh_mins" min="1" max="1440" value="5"></div>
     </div>
@@ -267,14 +269,15 @@
         <div class="field"><label>Low (mg/dL)</label><input type="number" id="eeprom_glucose_low" min="1" max="400" value="70"></div>
       </div>
       <div class="field"><label>Validity (min.)</label><input type="number" id="glucose_validity_duration" min="10" max="360" value="30"></div>
-      <div class="field"><label>Username</label><input type="text" id="eeprom_glucose_username" maxlength="64" autocomplete="username" placeholder="Account username"></div>
+      <div class="field"><label>Username</label><input type="text" id="eeprom_glucose_username" maxlength="64" autocomplete="username" placeholder="Account username"><div class="counter" id="eeprom_glucose_username-counter">0 / 64</div></div>
       <div class="field"><label>Password</label>
         <div class="pw"><input type="password" id="eeprom_glucose_password" maxlength="64" autocomplete="current-password" placeholder="••••••••"><button class="eye" type="button" aria-label="Show password">👁</button></div>
+        <div class="counter" id="eeprom_glucose_password-counter">0 / 64</div>
       </div>
       <div class="subtitle">CGM device</div>
       <div class="field"><label>Dexcom</label><select id="eeprom_dexcom_region"><option value="0">Disabled</option><option value="1">US</option><option value="2">Japan</option><option value="3">Rest of World</option></select></div>
       <div class="field"><label>FreeStyle Libre</label><select id="eeprom_libre_region"><option value="0">Disabled</option><option value="1">United States</option><option value="2">Europe</option><option value="3">Germany</option><option value="4">France</option><option value="5">Japan</option><option value="6">Australia</option><option value="7">Global / Rest of World</option></select></div>
-      <div class="field"><label>Nightscout URL</label><input type="text" id="eeprom_ns_url" maxlength="100" placeholder="https://your-site.herokuapp.com"></div>
+      <div class="field"><label>Nightscout URL</label><input type="text" id="eeprom_ns_url" maxlength="100" placeholder="https://your-site.herokuapp.com"><div class="counter" id="eeprom_ns_url-counter">0 / 100</div></div>
     </div>
 
     <button class="btn block" id="saveIntegrations">Save settings</button>

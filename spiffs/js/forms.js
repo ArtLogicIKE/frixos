@@ -17,8 +17,7 @@ const setSw = (id, on) => { const g = el(id); if (g) g.classList.toggle('on', !!
 const staticToggle = el('staticToggle'), staticPanel = el('staticPanel');
 staticToggle.addEventListener('click', () => { staticToggle.classList.toggle('on'); staticPanel.hidden = !staticToggle.classList.contains('on'); });
 
-const msg = el('message'), msgCounter = el('message-counter');
-if (msg) msg.addEventListener('input', () => { msgCounter.textContent = msg.value.length + ' / 511'; });
+const msg = el('message');
 
 /* Only treat the WiFi password as changed when the user actually edits it.
    Without this, a browser/password-manager autofill leaves a value in the
@@ -47,7 +46,7 @@ async function loadSettings() {
   } else {
     setVal('static_ip', ''); setVal('static_gw', ''); setVal('static_nm', ''); setVal('static_dns1', ''); setVal('static_dns2', '');
   }
-  if (s.p16 !== undefined && msg) { msg.value = s.p16 || ''; msgCounter.textContent = msg.value.length + ' / 511'; }
+  if (s.p16 !== undefined && msg) { msg.value = s.p16 || ''; updateCharCounter(msg); }
 }
 sectionLoaders.settings = loadSettings;
 

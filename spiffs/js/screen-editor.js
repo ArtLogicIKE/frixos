@@ -2479,14 +2479,21 @@ function renderScreenOptions() {
         const textLabel = document.createElement('label');
         textLabel.textContent = getNestedTranslation(trans, 'screen.message_text') || 'Text';
         const textArea = document.createElement('textarea');
+        textArea.id = 'editor-textarea';
         const maxLen = e.id === 'message' ? 511 : 96;
         textArea.maxLength = maxLen;
         textArea.rows = e.id === 'message' ? 3 : 2;
+
+        const counter = document.createElement('div');
+        counter.className = 'counter';
+        counter.id = 'editor-textarea-counter';
+
         if (e.id === 'message') {
             textArea.value = profile.scroll_text || '';
             textArea.addEventListener('input', () => {
                 profile.scroll_text = textArea.value;
                 renderScreenCanvas();
+                updateCharCounter(textArea);
             });
         } else {
             if (!profile.static_texts) profile.static_texts = { ...SCREEN_DEFAULT_STATIC_TEXTS };
@@ -2495,11 +2502,14 @@ function renderScreenOptions() {
             textArea.addEventListener('input', () => {
                 profile.static_texts[textKey] = textArea.value;
                 renderScreenCanvas();
+                updateCharCounter(textArea);
                 if (isScreenStaticTextElement(e.id)) renderScreenPalette();
             });
         }
         textRow.appendChild(textLabel);
         textRow.appendChild(textArea);
+        textRow.appendChild(counter);
+        updateCharCounter(textArea);
         setupTokenHighlightTextarea(textArea);
         opt.appendChild(textRow);
         appendScreenTokenButtons(opt, textArea);
