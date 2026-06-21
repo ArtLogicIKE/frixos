@@ -125,6 +125,9 @@ lv_obj_t *label_static[SCREEN_STATIC_TEXT_COUNT] = {NULL};
 lv_obj_t *graph_canvas = NULL;
 static uint8_t *graph_canvas_buf = NULL;
 static size_t graph_canvas_buf_size = 0;
+// Set by display_changed() so the next update_graph() redraws immediately on a
+// config edit instead of waiting for the next sample.
+static bool graph_force_redraw = false;
 lv_obj_t *label_digit = NULL;
 lv_obj_t *label_digit_aux = NULL;
 static lv_obj_t *label_degree = NULL;
@@ -1662,9 +1665,11 @@ void update_graph(void)
   uint16_t interval_min = g->interval_min ? g->interval_min : 1;
   int n = graph_snapshot(samp, GRAPH_MAX_POINTS, &last_sample, &interval_min);
 
-  // Nothing new since last render and already shown -> skip (no flicker).
-  if (last_render_shown && last_sample == last_render_sample)
+  // Nothing new since last render and already shown -> skip (no flicker),
+  // unless a config edit asked for an immediate redraw.
+  if (!graph_force_redraw && last_render_shown && last_sample == last_render_sample)
     return;
+  graph_force_redraw = false;
 
   int gw = (int)g->width;
   if (gw < GRAPH_MIN_W) gw = GRAPH_MIN_W;
@@ -1685,7 +1690,7 @@ void update_graph(void)
   lv_color_t col_warn = lv_color_make(g->warn_r, g->warn_g, g->warn_b);
   lv_color_t col_axis = lv_color_make(g->axis_r, g->axis_g, g->axis_b);
 
-  int left_m = show_axis ? 16 : 1;
+  int left_m = show_axis ? 19 : 1; // room for 3-digit Y labels
   int top_m = 1;
   int right_m = 1;
   int bot_m = show_axis ? 8 : 1;
@@ -1819,7 +1824,7 @@ void update_graph(void)
     char xnow[6] = "now";
     lb.align = LV_TEXT_ALIGN_RIGHT;
     lb.text = xnow;
-    lv_area_t xar = {px2 - 16, py2 + 1, px2, gh - 1};
+    lv_area_t xar = {px2 - 22, py2, px2 - 6, gh - 2}; // 6px left, raised 1px
     lv_draw_label(&layer, &lb, &xar);
 
     long span_min = (long)slots * (long)interval_min;
@@ -1830,7 +1835,7 @@ void update_graph(void)
       snprintf(xleft, sizeof(xleft), "-%ldm", span_min);
     lb.align = LV_TEXT_ALIGN_LEFT;
     lb.text = xleft;
-    lv_area_t xal = {px1, py2 + 1, px1 + 22, gh - 1};
+    lv_area_t xal = {px1, py2, px1 + 22, gh - 2}; // raised 1px
     lv_draw_label(&layer, &lb, &xal);
   }
 
@@ -2058,6 +2063,7 @@ void display_changed(void)
     const screen_layout_profile_t *gp = &eeprom_screen_layout.profile[font_index];
     graph_configure(&gp->graph, gp->widget[SCREEN_ELEM_GRAPH].enabled != 0);
   }
+  graph_force_redraw = true; // a layout/config edit just landed -> redraw now
   update_graph();
 }
 
