@@ -1,9 +1,14 @@
 # Design: Generic On-Screen Graph Widget
 
-Status: **Draft for review** · Author: design notes · Target: `master`
+Status: **Implemented** (Phases 1–6 complete, incl. HA backfill) · Target: `master`
 Generalises the CGM-specific graph contributed by **Benoit Poirier** in PR #180
 (`features/graph-glucose`). The rendering approach and plotting maths originate from that
 work; this design extends it from CGM-only to any numeric token. Credit to Benoit Poirier.
+
+> Implementation notes: `GRAPH_TOKEN_LEN` is 64 (HA tokens are long); the screen wire size is
+> **3704** bytes (graph cfg 88 B/profile). Self-sampling + HA `/api/history` backfill are live and
+> verified on-device. CGM-batch backfill remains a follow-up (this build keeps no shared CGM
+> history array). Colour format is RGB565 (LVGL 9.5 can't draw to I4 — see §6.1).
 
 ---
 
@@ -209,7 +214,7 @@ at the cost of colour.)
 
 ```c
 typedef struct __attribute__((packed)) {
-    char     token[32];        // selected token string (stable across HA/stock reindex)
+    char     token[64];        // selected token string (stable across HA/stock reindex; 64 fits [HA:...] tokens)
     uint16_t interval_min;     // 1..1440
     uint8_t  points;           // 2..100
     uint8_t  width;            // 60..90
@@ -329,6 +334,8 @@ Deferred (later):
 1. **Colour format** — **I4 indexed** (§6.1). Max canvas 90×60 ≈ 2.76 KB.
 2. **Fixed-point scale** — **`int16_t` raw values, no scale factor.** Sub-unit precision not needed;
    values that are naturally fractional (e.g. temp) are rounded to the nearest integer for plotting.
-3. **HA backfill size** — request history and **consume as much as fits one HTTP buffer, discard the
-   rest** (oldest-beyond-buffer dropped). Use `minimal_response`; resample what we got into the bins.
+3. **HA backfill size** — request history and **consume as much as fits one HTTP buffer**. Implemented
+   with a keep-tail event handler so the *newest* records survive truncation (the oldest beyond the
+   buffer are dropped). Uses `minimal_response` + `end_time`; objects are parsed and resampled into the
+   bins via `graph_backfill()`. Verified on-device: 50 points backfilled from `sensor.living_kitchen_power`.
 4. **Boolean mapping** — HA `"on"/"true"` → **1**, `"off"/"false"` → **0**; plotted as a step.

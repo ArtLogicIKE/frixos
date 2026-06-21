@@ -53,8 +53,11 @@ int graph_snapshot(int16_t *out_v, int max, time_t *last_sample, uint16_t *inter
 bool graph_is_active(void);
 
 // --- Backfill helpers (Phase 5) -----------------------------------------
-// True if the active graph wants backfilling and its ring is still empty.
-bool graph_take_backfill_request(char *token_out, size_t token_len);
+// True if the active graph wants backfilling and its ring is still empty;
+// consumes the request (one-shot) and returns the token + window (interval and
+// point count) so the caller can size its history query.
+bool graph_take_backfill_request(char *token_out, size_t token_len,
+                                  uint16_t *interval_min, uint8_t *points);
 // Replace ring contents from an externally-collected, time-stamped series,
 // resampling into the active interval bins anchored at `now`. Points with
 // value GRAPH_VAL_UNSET are treated as gaps. Safe to call from any task.

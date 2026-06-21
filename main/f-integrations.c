@@ -1,4 +1,5 @@
 #include <string.h>
+#include <strings.h> // strcasecmp (graph backfill state parsing)
 #include <stdlib.h>
 #include <stdbool.h>
 #include <time.h>
@@ -477,22 +478,245 @@ static bool fetch_ha_entity(integration_token_t *token)
 // Task function for integration updates
 /*
  * Generic graph backfill. When a graph element is first enabled with backfill
- * requested and an empty ring, seed history from a source that has it. CGM
- * history lives only in the per-vendor fetchers (no shared history array in
- * this build), and HA exposes /api/history; both are best-effort. If no
- * backfill source applies, the request is consumed and the ring fills by
- * self-sampling from here on.
- *
- * NOTE: HA /api/history backfill (nested-array JSON + ISO8601 timestamps) is a
- * follow-up; for now we consume the request so the sampler proceeds cleanly.
+ * requested and an empty ring, seed history from Home Assistant's
+ * /api/history/period endpoint (best-effort, one-shot). Tokens without a
+ * history source (weather/stock/CGM in this build) just self-sample.
  */
+
+// Days from civil date (Howard Hinnant's algorithm), then to Unix epoch (UTC).
+static time_t graph_civil_to_epoch(int y, int m, int d, int hh, int mm, int ss)
+{
+    y -= (m <= 2);
+    int era = (y >= 0 ? y : y - 399) / 400;
+    unsigned yoe = (unsigned)(y - era * 400);
+    unsigned doy = (unsigned)((153 * (m + (m > 2 ? -3 : 9)) + 2) / 5 + d - 1);
+    unsigned doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    long days = (long)(era * 146097 + (int)doe - 719468);
+    return (time_t)days * 86400 + hh * 3600 + mm * 60 + ss;
+}
+
+// Parse an HA ISO8601 timestamp ("2026-06-21T12:34:56.789+00:00" / "...Z").
+// Returns UTC epoch, or 0 on parse failure.
+static time_t graph_parse_iso8601(const char *s)
+{
+    int y, mo, d, hh, mi, ss;
+    if (sscanf(s, "%d-%d-%dT%d:%d:%d", &y, &mo, &d, &hh, &mi, &ss) != 6)
+        return 0;
+    time_t t = graph_civil_to_epoch(y, mo, d, hh, mi, ss);
+    // Apply the timezone offset if present (so the result is true UTC).
+    const char *p = strchr(s, 'T');
+    if (p)
+    {
+        const char *z = strpbrk(p, "+-");
+        if (z)
+        {
+            int oh = 0, om = 0;
+            if (sscanf(z + 1, "%d:%d", &oh, &om) >= 1)
+            {
+                long off = (long)oh * 3600 + (long)om * 60;
+                t += (*z == '+') ? -off : off;
+            }
+        }
+    }
+    return t;
+}
+
+// Convert an HA state string to a number for plotting. Booleans -> 1/0.
+// Returns false for unavailable/unknown/non-numeric (treated as a gap).
+static bool graph_parse_state(const char *s, float *out)
+{
+    if (!s || !s[0] || !strcmp(s, "-") || !strcasecmp(s, "unavailable") || !strcasecmp(s, "unknown"))
+        return false;
+    if (!strcasecmp(s, "on") || !strcasecmp(s, "true") || !strcasecmp(s, "open") || !strcasecmp(s, "home"))
+    {
+        *out = 1.0f;
+        return true;
+    }
+    if (!strcasecmp(s, "off") || !strcasecmp(s, "false") || !strcasecmp(s, "closed") || !strcasecmp(s, "away"))
+    {
+        *out = 0.0f;
+        return true;
+    }
+    char *end = NULL;
+    float v = strtof(s, &end);
+    if (end == s)
+        return false;
+    *out = v;
+    return true;
+}
+
+// Keep-tail HTTP event handler: when the response exceeds the buffer, drop the
+// OLDEST bytes so the most recent history survives (graph_backfill bins by
+// timestamp, so the newest window is what we want to keep).
+static esp_err_t graph_hist_event_handler(esp_http_client_event_t *evt)
+{
+    if (evt->event_id != HTTP_EVENT_ON_DATA || ha_response_buffer == NULL)
+        return ESP_OK;
+    int cap = HTTP_BUFFER_SIZE - 1;
+    const char *src = (const char *)evt->data;
+    int n = evt->data_len;
+    if (n <= 0)
+        return ESP_OK;
+    if (n >= cap)
+    {
+        src += (n - cap);
+        n = cap;
+    }
+    if (ha_response_len + n > cap)
+    {
+        int overflow = ha_response_len + n - cap;
+        memmove(ha_response_buffer, ha_response_buffer + overflow, ha_response_len - overflow);
+        ha_response_len -= overflow;
+    }
+    memcpy(ha_response_buffer + ha_response_len, src, n);
+    ha_response_len += n;
+    ha_response_buffer[ha_response_len] = '\0';
+    return ESP_OK;
+}
+
+// Fetch HA history for `entity` over the window and feed it to graph_backfill().
+static void graph_backfill_from_ha(const char *entity, uint16_t interval_min, uint8_t points, time_t now)
+{
+    static float bf_vals[GRAPH_MAX_POINTS];
+    static time_t bf_times[GRAPH_MAX_POINTS];
+
+    if (!eeprom_ha_url[0] || !eeprom_ha_token[0])
+        return;
+
+    long window = (long)points * (long)interval_min * 60;
+    time_t start = now - window;
+    char start_iso[24], end_iso[24];
+    struct tm tmv;
+    gmtime_r(&start, &tmv);
+    strftime(start_iso, sizeof(start_iso), "%Y-%m-%dT%H:%M:%SZ", &tmv);
+    gmtime_r(&now, &tmv);
+    strftime(end_iso, sizeof(end_iso), "%Y-%m-%dT%H:%M:%SZ", &tmv);
+
+    if (!acquire_ssl_semaphore("graph_backfill"))
+        return;
+    ha_response_buffer = get_shared_buffer(HTTP_BUFFER_SIZE, "GRAPH_HIST");
+    if (ha_response_buffer == NULL)
+    {
+        release_ssl_semaphore();
+        return;
+    }
+    ha_response_len = 0;
+    ha_response_buffer[0] = '\0';
+
+    char url[URL_BUFFER_SIZE];
+    snprintf(url, sizeof(url),
+             "%s/api/history/period/%s?filter_entity_id=%s&minimal_response&end_time=%s",
+             eeprom_ha_url, start_iso, entity, end_iso);
+
+    esp_http_client_config_t config = {
+        .url = url,
+        .event_handler = graph_hist_event_handler,
+        .timeout_ms = 8000,
+        .buffer_size = HTTP_BUFFER_SIZE,
+        .buffer_size_tx = HTTP_BUFFER_SIZE,
+        .transport_type = HTTP_TRANSPORT_OVER_SSL,
+        .crt_bundle_attach = custom_crt_bundle_attach,
+        .tls_version = ESP_TLS_VER_TLS_1_2,
+    };
+    esp_http_client_handle_t client = esp_http_client_init(&config);
+    if (client)
+    {
+        char auth[AUTH_BUFFER_SIZE];
+        snprintf(auth, sizeof(auth), "Bearer %.240s", eeprom_ha_token);
+        esp_http_client_set_header(client, "Authorization", auth);
+        esp_http_client_set_header(client, "Content-Type", "application/json");
+        esp_http_client_set_header(client, "Connection", "close");
+
+        esp_err_t err = esp_http_client_perform(client);
+        int status = err == ESP_OK ? esp_http_client_get_status_code(client) : -1;
+        if (status == 200 && ha_response_len > 0)
+        {
+            // Walk complete {...} state objects; pull state + last_changed.
+            int n = 0;
+            char *p = ha_response_buffer;
+            while (n < GRAPH_MAX_POINTS && (p = strchr(p, '{')) != NULL)
+            {
+                int depth = 0;
+                char *q = p;
+                while (*q)
+                {
+                    if (*q == '{') depth++;
+                    else if (*q == '}') { depth--; if (depth == 0) { q++; break; } }
+                    q++;
+                }
+                if (depth != 0)
+                    break; // incomplete trailing object
+                char saved = *q;
+                *q = '\0';
+                char sval[40], tval[40];
+                get_value_from_JSON_string(p, "state", sval, sizeof(sval), NULL);
+                get_value_from_JSON_string(p, "last_changed", tval, sizeof(tval), NULL);
+                *q = saved;
+                float v;
+                time_t ts = graph_parse_iso8601(tval);
+                if (ts > 0 && graph_parse_state(sval, &v))
+                {
+                    bf_vals[n] = v;
+                    bf_times[n] = ts;
+                    n++;
+                }
+                p = q;
+            }
+            if (n > 0)
+            {
+                graph_backfill(bf_vals, bf_times, n, now);
+                ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Graph backfilled %d points from HA %s", n, entity);
+            }
+            else
+            {
+                ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Graph backfill: no usable points for %s", entity);
+            }
+        }
+        else
+        {
+            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Graph backfill HTTP %d for %s", status, entity);
+        }
+        esp_http_client_cleanup(client);
+    }
+
+    release_shared_buffer(ha_response_buffer);
+    ha_response_buffer = NULL;
+    ha_response_len = 0;
+    release_ssl_semaphore();
+}
+
 static void graph_service_backfill(void)
 {
     char token[GRAPH_TOKEN_LEN];
-    if (!graph_take_backfill_request(token, sizeof(token)))
+    uint16_t interval_min = 5;
+    uint8_t points = 60;
+    if (!graph_take_backfill_request(token, sizeof(token), &interval_min, &points))
         return;
-    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Graph backfill requested for %s (self-sampling for now)", token);
-    // TODO(graph): HA /api/history/period and CGM batch backfill -> graph_backfill().
+
+    // Only HA tokens ([HA:entity:path]) have a history source here.
+    if (strncmp(token, "[HA:", 4) != 0)
+    {
+        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Graph backfill: %s self-samples (no history source)", token);
+        return;
+    }
+    // Extract the entity id (between "HA:" and the next ':' or ']').
+    char entity[96];
+    const char *s = token + 4;
+    const char *e = s;
+    while (*e && *e != ':' && *e != ']')
+        e++;
+    size_t len = (size_t)(e - s);
+    if (len == 0 || len >= sizeof(entity))
+    {
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Graph backfill: bad HA token %s", token);
+        return;
+    }
+    memcpy(entity, s, len);
+    entity[len] = '\0';
+
+    if (!is_wifi_connected())
+        return;
+    graph_backfill_from_ha(entity, interval_min, points, time(NULL));
 }
 
 static void integration_update_task(void *pvParameters)
@@ -716,11 +940,11 @@ static void integration_update_task(void *pvParameters)
                 ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "WiFi not connected, skipping integration update");
             }
 
-            // Generic graph widget: sample the selected token on its configured
-            // interval (records a gap if the token has no value), and backfill
-            // history from HA/CGM on first enable.
-            graph_sampler_tick(time(NULL));
+            // Generic graph widget: backfill history on first enable (before
+            // sampling, so the one-shot request isn't pre-empted by a sample),
+            // then sample the selected token on its configured interval.
             graph_service_backfill();
+            graph_sampler_tick(time(NULL));
         }
         else
         {

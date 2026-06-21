@@ -139,11 +139,15 @@ bool graph_is_active(void)
   return a;
 }
 
-bool graph_take_backfill_request(char *token_out, size_t token_len)
+bool graph_take_backfill_request(char *token_out, size_t token_len,
+                                 uint16_t *interval_min, uint8_t *points)
 {
   bool req = false;
   GRAPH_LOCK();
-  if (ring.needs_backfill && ring.active && ring.count == 0)
+  // needs_backfill is one-shot, set only when the ring was just (re)shaped, so
+  // it is the correct gate; don't also require count==0 (the sampler may have
+  // pushed a point first, and graph_backfill() replaces the ring regardless).
+  if (ring.needs_backfill && ring.active)
   {
     req = true;
     ring.needs_backfill = false; // consume the request; caller will fill
@@ -152,6 +156,10 @@ bool graph_take_backfill_request(char *token_out, size_t token_len)
       strncpy(token_out, ring.token, token_len - 1);
       token_out[token_len - 1] = '\0';
     }
+    if (interval_min)
+      *interval_min = ring.interval_min;
+    if (points)
+      *points = ring.cap;
   }
   GRAPH_UNLOCK();
   return req;

@@ -804,7 +804,8 @@ const SCREEN_BIN_WIDGET_COUNT = 20; // includes SCREEN_ELEM_GRAPH
 const SCREEN_BIN_SCROLL_LEN = 512;
 const SCREEN_BIN_STATIC_TEXT_LEN = 96;
 const SCREEN_BIN_STATIC_TEXT_COUNT = 8;
-const SCREEN_BIN_GRAPH_SIZE = 56; // screen_graph_cfg_t
+const SCREEN_BIN_GRAPH_SIZE = 88; // screen_graph_cfg_t (token[64] + 24)
+const SCREEN_BIN_GRAPH_TOKEN_LEN = 64;
 const SCREEN_BIN_HEADER_SIZE = 64;
 const SCREEN_BIN_PROFILE_SIZE =
     SCREEN_BIN_WIDGET_COUNT * SCREEN_BIN_WIDGET_SIZE +
@@ -900,39 +901,43 @@ function screenWriteWidget(view, offset, elem) {
 
 // Read/write the per-profile screen_graph_cfg_t (56 bytes, packed LE) into an
 // editor-friendly options object. GRAPH_VAL_UNSET maps to null.
+// Field offsets within screen_graph_cfg_t (after the token[64] block).
+const GCFG = { TOKEN: 0, INTERVAL: 64, POINTS: 66, WIDTH: 67, HEIGHT: 68, FLAGS: 69,
+    BAND_LOW: 70, BAND_HIGH: 72, Y_MIN: 74, Y_MAX: 76, BAND_RGB: 78, WARN_RGB: 81, AXIS_RGB: 84 };
+
 function screenReadGraphCfg(view, off) {
     const i16 = (o) => { const v = view.getInt16(o, true); return v === GRAPH_VAL_UNSET ? null : v; };
-    const flags = view.getUint8(off + 37);
+    const flags = view.getUint8(off + GCFG.FLAGS);
     return {
-        token: screenReadFixedString(view, off, 32),
-        interval_min: view.getUint16(off + 32, true) || 5,
-        points: view.getUint8(off + 34) || 60,
-        gwidth: view.getUint8(off + 35) || 90,
-        gheight: view.getUint8(off + 36) || 40,
+        token: screenReadFixedString(view, off + GCFG.TOKEN, SCREEN_BIN_GRAPH_TOKEN_LEN),
+        interval_min: view.getUint16(off + GCFG.INTERVAL, true) || 5,
+        points: view.getUint8(off + GCFG.POINTS) || 60,
+        gwidth: view.getUint8(off + GCFG.WIDTH) || 90,
+        gheight: view.getUint8(off + GCFG.HEIGHT) || 40,
         autoscale: !!(flags & GRAPH_FLAG.AUTOSCALE),
         show_axis: !!(flags & GRAPH_FLAG.SHOW_AXIS),
         band_on: !!(flags & GRAPH_FLAG.BAND),
         backfill: !!(flags & GRAPH_FLAG.BACKFILL),
         show_value: !!(flags & GRAPH_FLAG.SHOW_VALUE),
         boolean: !!(flags & GRAPH_FLAG.BOOLEAN),
-        band_low: i16(off + 38),
-        band_high: i16(off + 40),
-        y_min: i16(off + 42),
-        y_max: i16(off + 44),
-        band_color: screenRgbToHex(view.getUint8(off + 46), view.getUint8(off + 47), view.getUint8(off + 48)),
-        warn_color: screenRgbToHex(view.getUint8(off + 49), view.getUint8(off + 50), view.getUint8(off + 51)),
-        axis_color: screenRgbToHex(view.getUint8(off + 52), view.getUint8(off + 53), view.getUint8(off + 54))
+        band_low: i16(off + GCFG.BAND_LOW),
+        band_high: i16(off + GCFG.BAND_HIGH),
+        y_min: i16(off + GCFG.Y_MIN),
+        y_max: i16(off + GCFG.Y_MAX),
+        band_color: screenRgbToHex(view.getUint8(off + GCFG.BAND_RGB), view.getUint8(off + GCFG.BAND_RGB + 1), view.getUint8(off + GCFG.BAND_RGB + 2)),
+        warn_color: screenRgbToHex(view.getUint8(off + GCFG.WARN_RGB), view.getUint8(off + GCFG.WARN_RGB + 1), view.getUint8(off + GCFG.WARN_RGB + 2)),
+        axis_color: screenRgbToHex(view.getUint8(off + GCFG.AXIS_RGB), view.getUint8(off + GCFG.AXIS_RGB + 1), view.getUint8(off + GCFG.AXIS_RGB + 2))
     };
 }
 
 function screenWriteGraphCfg(view, off, o) {
     o = o || {};
     const i16 = (v) => (v == null ? GRAPH_VAL_UNSET : (v | 0));
-    screenWriteFixedString(view, off, 32, o.token || '');
-    view.setUint16(off + 32, o.interval_min != null ? o.interval_min : 5, true);
-    view.setUint8(off + 34, o.points != null ? o.points : 60);
-    view.setUint8(off + 35, o.gwidth != null ? o.gwidth : 90);
-    view.setUint8(off + 36, o.gheight != null ? o.gheight : 40);
+    screenWriteFixedString(view, off + GCFG.TOKEN, SCREEN_BIN_GRAPH_TOKEN_LEN, o.token || '');
+    view.setUint16(off + GCFG.INTERVAL, o.interval_min != null ? o.interval_min : 5, true);
+    view.setUint8(off + GCFG.POINTS, o.points != null ? o.points : 60);
+    view.setUint8(off + GCFG.WIDTH, o.gwidth != null ? o.gwidth : 90);
+    view.setUint8(off + GCFG.HEIGHT, o.gheight != null ? o.gheight : 40);
     let flags = 0;
     if (o.autoscale) flags |= GRAPH_FLAG.AUTOSCALE;
     if (o.show_axis) flags |= GRAPH_FLAG.SHOW_AXIS;
@@ -940,18 +945,18 @@ function screenWriteGraphCfg(view, off, o) {
     if (o.backfill) flags |= GRAPH_FLAG.BACKFILL;
     if (o.show_value) flags |= GRAPH_FLAG.SHOW_VALUE;
     if (o.boolean) flags |= GRAPH_FLAG.BOOLEAN;
-    view.setUint8(off + 37, flags);
-    view.setInt16(off + 38, i16(o.band_low), true);
-    view.setInt16(off + 40, i16(o.band_high), true);
-    view.setInt16(off + 42, i16(o.y_min), true);
-    view.setInt16(off + 44, i16(o.y_max), true);
+    view.setUint8(off + GCFG.FLAGS, flags);
+    view.setInt16(off + GCFG.BAND_LOW, i16(o.band_low), true);
+    view.setInt16(off + GCFG.BAND_HIGH, i16(o.band_high), true);
+    view.setInt16(off + GCFG.Y_MIN, i16(o.y_min), true);
+    view.setInt16(off + GCFG.Y_MAX, i16(o.y_max), true);
     const bc = screenHexToRgb(o.band_color, { r: 40, g: 60, b: 40 });
     const wc = screenHexToRgb(o.warn_color, { r: 255, g: 80, b: 80 });
     const ac = screenHexToRgb(o.axis_color, { r: 120, g: 120, b: 120 });
-    view.setUint8(off + 46, bc.r); view.setUint8(off + 47, bc.g); view.setUint8(off + 48, bc.b);
-    view.setUint8(off + 49, wc.r); view.setUint8(off + 50, wc.g); view.setUint8(off + 51, wc.b);
-    view.setUint8(off + 52, ac.r); view.setUint8(off + 53, ac.g); view.setUint8(off + 54, ac.b);
-    view.setUint8(off + 55, 0); // reserved
+    view.setUint8(off + GCFG.BAND_RGB, bc.r); view.setUint8(off + GCFG.BAND_RGB + 1, bc.g); view.setUint8(off + GCFG.BAND_RGB + 2, bc.b);
+    view.setUint8(off + GCFG.WARN_RGB, wc.r); view.setUint8(off + GCFG.WARN_RGB + 1, wc.g); view.setUint8(off + GCFG.WARN_RGB + 2, wc.b);
+    view.setUint8(off + GCFG.AXIS_RGB, ac.r); view.setUint8(off + GCFG.AXIS_RGB + 1, ac.g); view.setUint8(off + GCFG.AXIS_RGB + 2, ac.b);
+    view.setUint8(off + 87, 0); // reserved
 }
 
 function screenWireProfileToJson(view, offset) {

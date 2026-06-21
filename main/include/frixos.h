@@ -289,7 +289,7 @@ typedef struct
 } screen_widget_t;
 
 // --- Generic graph widget (SCREEN_ELEM_GRAPH) ----------------------------
-#define GRAPH_TOKEN_LEN 32
+#define GRAPH_TOKEN_LEN 64 // fits HA tokens like "[HA:sensor.living_kitchen_power:state]"
 #define GRAPH_MAX_POINTS 100
 #define GRAPH_MIN_W 60
 #define GRAPH_MAX_W 90
@@ -322,7 +322,7 @@ typedef struct __attribute__((packed))
   uint8_t warn_r, warn_g, warn_b; // out-of-band / alert colour
   uint8_t axis_r, axis_g, axis_b; // axis + label colour
   uint8_t reserved[1];
-} screen_graph_cfg_t;          // 56 bytes
+} screen_graph_cfg_t;          // 88 bytes (token[64] + 24)
 
 typedef struct
 {
