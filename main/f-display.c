@@ -1592,6 +1592,9 @@ static void apply_screen_layout_positions(void)
 // under the graph mutex, then draws under the LVGL lock (the two locks are
 // never held together). Skips the redraw when nothing changed to avoid
 // per-minute flicker.
+//
+// The canvas drawing approach (band/polyline/axis markers) is derived from the
+// CGM glucose graph contributed by Benoit Poirier in PR #180.
 void update_graph(void)
 {
   if (!graph_canvas)

@@ -1,3 +1,9 @@
+/*
+ * Generic graph widget. Generalised from the CGM glucose-graph contributed by
+ * Benoit Poirier in PR #180 (features/graph-glucose) — the canvas rendering
+ * approach and much of the plotting maths originate from that work; this module
+ * extends it to sample and plot any numeric token.
+ */
 #include "f-graph.h"
 #include <string.h>
 #include <math.h>

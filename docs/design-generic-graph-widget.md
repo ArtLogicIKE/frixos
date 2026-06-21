@@ -1,7 +1,9 @@
 # Design: Generic On-Screen Graph Widget
 
 Status: **Draft for review** · Author: design notes · Target: `master`
-Supersedes the CGM-specific graph in PR #180 (`features/graph-glucose`) by generalising it.
+Generalises the CGM-specific graph contributed by **Benoit Poirier** in PR #180
+(`features/graph-glucose`). The rendering approach and plotting maths originate from that
+work; this design extends it from CGM-only to any numeric token. Credit to Benoit Poirier.
 
 ---
 
