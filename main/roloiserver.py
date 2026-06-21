@@ -176,8 +176,7 @@ class UpdateHTTPRequestHandler(RobustHTTPRequestHandler):
 
     def __check_header(self):
         ex_headers_templ = ['x-*-STA-MAC', 'x-*-AP-MAC', 'x-*-FREE-SPACE', 'x-*-SKETCH-SIZE', 'x-*-SKETCH-MD5', 'x-*-CHIP-SIZE', 'x-*-SDK-VERSION']
-        ex_headers = []
-        for ex_header in ex_headers:
+        for ex_header in ex_headers_templ:
             if ex_header not in self.headers:
                 # logger.info('Missing header {0} to identify a legitimate request'.format(ex_header))
                 return False
@@ -242,7 +241,7 @@ def get_MD5(filename):
         f = open(filename, 'rb')
         bin_file = f.read()
         f.close()
-        md5 = hashlib.md5(bin_file).hexdigest()
+        md5 = hashlib.sha256(bin_file).hexdigest()
         return md5
     except Exception as e:
         logger.error(str(e))
