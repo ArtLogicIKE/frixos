@@ -43,7 +43,11 @@ Moon Age (Days)	Phase Name	Integer Value
  uint8_t calculateMoonIndex(time_t timestamp) {
    struct tm* timeInfo;
    timeInfo = localtime(&timestamp);
-   return calculateMoonPhase(timeInfo->tm_year + 1900, timeInfo->tm_mon + 1, timeInfo->tm_mday);
+   // Use the accurate elongation-based index so the four principal phases
+   // (new/quarters/full) are only shown near their true instant, instead of
+   // the simplified 8-equal-segment model in calculateMoonPhase() which
+   // switched a couple of days early at the quarter boundaries.
+   return calculateMoonIndexAccurate(timeInfo->tm_year + 1900, timeInfo->tm_mon + 1, timeInfo->tm_mday);
  }
  
  
@@ -167,7 +171,75 @@ uint8_t calculateMoonPhase(uint16_t year, uint8_t month, uint8_t day) {
  
    moonData.phase = ki;
    moonData.illumination = k;
- 
+
    return moonData;
+ }
+
+ /* Normalize an angle to [0, 360). */
+ static double moon_norm360(double x) {
+   x = fmod(x, 360.0);
+   if (x < 0) x += 360.0;
+   return x;
+ }
+
+ /**
+  * Accurate Sun-Moon elongation for the given civil date (evaluated at
+  * local noon, i.e. day + 0.5), in degrees:
+  *   0   = New Moon
+  *   90  = First Quarter (waxing)
+  *   180 = Full Moon
+  *   270 = Last / Third Quarter (waning)
+  *
+  * Uses the same Meeus (Astronomical Algorithms, ch. 47/48) mean-argument
+  * polynomials as calculateMoonData(), so it accounts for the Moon's
+  * orbital perturbations rather than assuming uniform motion. The
+  * elongation is derived from the phase angle as e = 180 - i, which keeps
+  * the waxing/waning direction unambiguous.
+  */
+ double moonElongationDeg(uint16_t year, uint8_t month, uint8_t day) {
+   int y = year;
+   int m = month;
+   if (m < 3) { y -= 1; m += 12; }
+   double A = floor(y / 100.0);
+   double B = 2 - A + floor(A / 4.0);
+   // Julian Day at 0h UT, then + 0.5 to evaluate at local noon of the day.
+   double jd = floor(365.25 * (y + 4716)) + floor(30.6001 * (m + 1)) + day + B - 1524.5 + 0.5;
+   double t = (jd - 2451545.0) / 36525.0;  // Julian centuries since J2000.0
+
+   // Mean elongation of the Moon, Sun's mean anomaly, Moon's mean anomaly.
+   double D  = 297.8501921 + t * (445267.1114034 + t * (-0.0018819 + t * (1.0 / 545868 - t / 113065000)));
+   double M  = 357.5291092 + t * (35999.0502909 + t * (-0.0001536 + t / 24490000));
+   double MM = 134.9633964 + t * (477198.8675055 + t * (0.0087414 + t * (1.0 / 69699 - t / 14712000)));
+
+   // Phase angle (48.4 p.346): 0 = full, 180 = new.
+   double i = 180 - D
+              - 6.289 * sin(MM * RPD)
+              + 2.100 * sin(M * RPD)
+              - 1.274 * sin((2 * D - MM) * RPD)
+              - 0.658 * sin(2 * D * RPD)
+              - 0.214 * sin(2 * MM * RPD)
+              - 0.110 * sin(D * RPD);
+
+   return moon_norm360(180.0 - moon_norm360(i));
+ }
+
+ /**
+  * 0..7 phase icon index from the accurate elongation, with narrow
+  * tolerance bands around the four principal phases so that e.g. "Last
+  * Quarter" is only shown within ~TOL of the true quarter instead of for
+  * a ~3.7-day centered slice of the month.
+  */
+ uint8_t calculateMoonIndexAccurate(uint16_t year, uint8_t month, uint8_t day) {
+   double e = moonElongationDeg(year, month, day);
+   const double TOL = 8.0;  // degrees (~0.65 day); widen/narrow 6-12 to taste
+
+   if (e < TOL || e >= 360.0 - TOL) return 0;  // New Moon
+   if (fabs(e -  90.0) < TOL)       return 2;  // First Quarter
+   if (fabs(e - 180.0) < TOL)       return 4;  // Full Moon
+   if (fabs(e - 270.0) < TOL)       return 6;  // Last / Third Quarter
+   if (e <  90.0)                   return 1;  // Waxing Crescent
+   if (e < 180.0)                   return 3;  // Waxing Gibbous
+   if (e < 270.0)                   return 5;  // Waning Gibbous
+   return 7;                                    // Waning Crescent
  }
  
