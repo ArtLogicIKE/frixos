@@ -42,9 +42,12 @@ static void graph_lock_init(void)
 
 static graph_ring_t ring;
 
+// Samples are stored as fixed-point deci-units (value x 10) so decimals (e.g.
+// 26.3 °C) survive. int16 x10 covers -3276.7 .. 3276.7, ample for temperature,
+// glucose, power, etc. The renderer divides by 10 for display.
 static int16_t clamp_sample(float v)
 {
-  long r = lroundf(v);
+  long r = lroundf(v * 10.0f);
   if (r > 32767)
     r = 32767;
   if (r < -32767) // keep -32768 (GRAPH_VAL_UNSET) reserved as the gap sentinel

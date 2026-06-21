@@ -575,8 +575,13 @@ static esp_err_t graph_hist_event_handler(esp_http_client_event_t *evt)
 }
 
 // Fetch HA history for `entity` over the window and feed it to graph_backfill().
-static void graph_backfill_from_ha(const char *entity, uint16_t interval_min, uint8_t points, time_t now)
+static void graph_backfill_from_ha(const char *entity, const char *path, uint16_t interval_min, uint8_t points, time_t now)
 {
+    // "state" lives at the top level -> minimal_response is enough and compact.
+    // Any other path is an attribute (e.g. current_temperature) which only
+    // appears in the FULL response, so omit minimal_response in that case.
+    bool want_state = (!path || !path[0] || strcmp(path, "state") == 0);
+    const char *value_key = want_state ? "state" : path;
     static float bf_vals[GRAPH_MAX_POINTS];
     static time_t bf_times[GRAPH_MAX_POINTS];
 
@@ -605,8 +610,8 @@ static void graph_backfill_from_ha(const char *entity, uint16_t interval_min, ui
 
     char url[URL_BUFFER_SIZE];
     snprintf(url, sizeof(url),
-             "%s/api/history/period/%s?filter_entity_id=%s&minimal_response&end_time=%s",
-             eeprom_ha_url, start_iso, entity, end_iso);
+             "%s/api/history/period/%s?filter_entity_id=%s%s&end_time=%s",
+             eeprom_ha_url, start_iso, entity, want_state ? "&minimal_response" : "", end_iso);
 
     esp_http_client_config_t config = {
         .url = url,
@@ -649,7 +654,7 @@ static void graph_backfill_from_ha(const char *entity, uint16_t interval_min, ui
                 char saved = *q;
                 *q = '\0';
                 char sval[40], tval[40];
-                get_value_from_JSON_string(p, "state", sval, sizeof(sval), NULL);
+                get_value_from_JSON_string(p, value_key, sval, sizeof(sval), NULL);
                 get_value_from_JSON_string(p, "last_changed", tval, sizeof(tval), NULL);
                 *q = saved;
                 float v;
@@ -719,8 +724,8 @@ static void graph_service_backfill(void)
         ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Graph backfill: %s self-samples (no history source)", token);
         return;
     }
-    // Extract the entity id (between "HA:" and the next ':' or ']').
-    char entity[96];
+    // Parse [HA:entity:path] -> entity, path.
+    char entity[96], path[48];
     const char *s = token + 4;
     const char *e = s;
     while (*e && *e != ':' && *e != ']')
@@ -734,9 +739,23 @@ static void graph_service_backfill(void)
     memcpy(entity, s, len);
     entity[len] = '\0';
 
+    path[0] = '\0';
+    if (*e == ':')
+    {
+        const char *ps = e + 1, *pe = ps;
+        while (*pe && *pe != ']')
+            pe++;
+        size_t plen = (size_t)(pe - ps);
+        if (plen > 0 && plen < sizeof(path))
+        {
+            memcpy(path, ps, plen);
+            path[plen] = '\0';
+        }
+    }
+
     if (!is_wifi_connected())
         return;
-    graph_backfill_from_ha(entity, interval_min, points, time(NULL));
+    graph_backfill_from_ha(entity, path, interval_min, points, time(NULL));
 }
 
 static void integration_update_task(void *pvParameters)
@@ -1236,6 +1255,17 @@ void build_integration_message_corpus(char *out, size_t out_size)
                 out[used] = '\0';
             }
         }
+
+        // Include the graph widget's token so its HA/stock entity is registered
+        // for fetching (it isn't part of any message/text).
+        const size_t gtok_len = strnlen(p->graph.token, GRAPH_TOKEN_LEN);
+        if (gtok_len > 0 && used + gtok_len + 2 < out_size)
+        {
+            memcpy(out + used, p->graph.token, gtok_len);
+            used += gtok_len;
+            out[used++] = '\n';
+            out[used] = '\0';
+        }
     }
 
     if (used == 0 && eeprom_message[0] != '\0')
@@ -1247,7 +1277,8 @@ void build_integration_message_corpus(char *out, size_t out_size)
 
 #define INTEGRATION_MESSAGE_CORPUS_SIZE \
     (SCROLL_MSG_LENGTH * FRIXOS_SCREEN_LAYOUT_PROFILES + \
-     SCREEN_STATIC_TEXT_COUNT * SCREEN_STATIC_TEXT_LENGTH * FRIXOS_SCREEN_LAYOUT_PROFILES + 32)
+     SCREEN_STATIC_TEXT_COUNT * SCREEN_STATIC_TEXT_LENGTH * FRIXOS_SCREEN_LAYOUT_PROFILES + \
+     GRAPH_TOKEN_LEN * FRIXOS_SCREEN_LAYOUT_PROFILES + 32)
 
 void parse_integrations(void)
 {

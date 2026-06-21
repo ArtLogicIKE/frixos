@@ -1607,6 +1607,16 @@ static void apply_screen_layout_positions(void)
 // writes. lv_draw_line does not render thin diagonal lines visibly on this
 // RGB565 canvas (anti-aliased coverage fades out), so the trend line is drawn
 // by hand. thick=true gives a 2px line, else 1px. Pixels clamped to bounds.
+// Format a ring value (x10) for display. One decimal when the visible range is
+// small (e.g. temperature), whole numbers otherwise (e.g. glucose/power).
+static void graph_fmt(char *buf, size_t sz, float ring_val, bool dec)
+{
+  if (dec)
+    snprintf(buf, sz, "%.1f", ring_val / 10.0f);
+  else
+    snprintf(buf, sz, "%d", (int)lroundf(ring_val / 10.0f));
+}
+
 static void graph_px_line(lv_obj_t *cv, int x0, int y0, int x1, int y1, int w, int h, lv_color_t c, bool thick)
 {
   int dx = abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
@@ -1717,27 +1727,33 @@ void update_graph(void)
     if (v > dmax) dmax = v;
   }
 
+  // ymin/ymax are in ring units (value x10), matching samp[]. Config values
+  // (y_min/y_max, band) are real units, so they are x10 where used.
   float ymin, ymax;
   if (boolean)
   {
     ymin = 0.0f;
-    ymax = 1.0f;
+    ymax = 10.0f; // 1 x10
   }
   else if (!autoscale && g->y_min != GRAPH_VAL_UNSET && g->y_max != GRAPH_VAL_UNSET && g->y_max > g->y_min)
   {
-    ymin = (float)g->y_min;
-    ymax = (float)g->y_max;
+    ymin = (float)g->y_min * 10.0f;
+    ymax = (float)g->y_max * 10.0f;
   }
   else if (valid > 0)
   {
     ymin = dmin;
     ymax = dmax;
-    if (ymax <= ymin) ymax = ymin + 1.0f;
+    if (ymax <= ymin) // single / flat value -> pad +-1 real unit so it's centred
+    {
+      ymin -= 10.0f;
+      ymax += 10.0f;
+    }
   }
   else
   {
     ymin = 0.0f;
-    ymax = 1.0f;
+    ymax = 10.0f;
   }
   float yrange = ymax - ymin;
   if (yrange < 1e-6f) yrange = 1.0f;
@@ -1776,8 +1792,8 @@ void update_graph(void)
   // 1. Low/high band.
   if (band_on && g->band_low != GRAPH_VAL_UNSET && g->band_high != GRAPH_VAL_UNSET && g->band_high > g->band_low)
   {
-    int yh = CY(V2Y(g->band_high));
-    int yl = CY(V2Y(g->band_low));
+    int yh = CY(V2Y(g->band_high * 10));
+    int yl = CY(V2Y(g->band_low * 10));
     if (yl > yh)
     {
       lv_draw_rect_dsc_t bd;
@@ -1812,9 +1828,10 @@ void update_graph(void)
     lb.opa = LV_OPA_COVER;
     lb.text_local = 1; // deferred draw: strdup the stack strings
 
+    bool ydec = (yrange < 200.0f); // real range < 20 -> show 1 decimal
     char ymax_s[8], ymin_s[8];
-    snprintf(ymax_s, sizeof(ymax_s), "%d", (int)lroundf(ymax));
-    snprintf(ymin_s, sizeof(ymin_s), "%d", (int)lroundf(ymin));
+    graph_fmt(ymax_s, sizeof(ymax_s), ymax, ydec);
+    graph_fmt(ymin_s, sizeof(ymin_s), ymin, ydec);
     lb.align = LV_TEXT_ALIGN_RIGHT;
     lb.text = ymax_s;
     lv_area_t yat = {0, py1, px1 - 2, py1 + 8};
@@ -1827,13 +1844,14 @@ void update_graph(void)
     lb.align = LV_TEXT_ALIGN_RIGHT;
     lb.text = xnow;
     // Wide enough that "now" never overflows (the w was clipping), right edge
-    // 6px in from the plot edge; +1px of height.
-    lv_area_t xar = {px2 - 28, py2, px2 - 6, gh - 1};
+    // 6px in from the plot edge; raised 1px above the other x label.
+    lv_area_t xar = {px2 - 28, py2 - 1, px2 - 6, gh - 1};
     lv_draw_label(&layer, &lb, &xar);
 
-    long span_min = (long)slots * (long)interval_min;
+    // Window duration label, e.g. 60 points x 1 min -> "-1h", x 5 min -> "-5h".
+    long span_min = (long)g->points * (long)interval_min;
     char xleft[10];
-    if (span_min >= 120)
+    if (span_min >= 60)
       snprintf(xleft, sizeof(xleft), "-%ldh", span_min / 60);
     else
       snprintf(xleft, sizeof(xleft), "-%ldm", span_min);
@@ -1854,7 +1872,7 @@ void update_graph(void)
     vb.text_local = 1;
     vb.align = LV_TEXT_ALIGN_RIGHT;
     char vt[12];
-    snprintf(vt, sizeof(vt), "%d", (int)last_valid);
+    graph_fmt(vt, sizeof(vt), (float)last_valid, (yrange < 200.0f));
     vb.text = vt;
     lv_area_t va = {px1, py1, px2, py1 + 8};
     lv_draw_label(&layer, &vb, &va);
@@ -1882,8 +1900,8 @@ void update_graph(void)
         lv_color_t c = col_line;
         if (band_on && g->band_low != GRAPH_VAL_UNSET && g->band_high != GRAPH_VAL_UNSET)
         {
-          float avg = (v1 + v2) * 0.5f;
-          if (avg < (float)g->band_low || avg > (float)g->band_high)
+          float avg = (v1 + v2) * 0.5f; // ring units (x10); band is real -> x10
+          if (avg < (float)g->band_low * 10.0f || avg > (float)g->band_high * 10.0f)
             c = col_warn;
         }
         int x1 = I2X(prev), x2 = I2X(i);
@@ -1899,6 +1917,24 @@ void update_graph(void)
         }
       }
       prev = i;
+    }
+  }
+  else if (valid == 1)
+  {
+    // A single reading can't form a line -> draw a 3x3 marker so it's visible.
+    for (int i = 0; i < n; i++)
+    {
+      if (samp[i] == GRAPH_VAL_UNSET)
+        continue;
+      int mx = I2X(i), my = CY(V2Y(samp[i]));
+      for (int ox = -1; ox <= 1; ox++)
+        for (int oy = -1; oy <= 1; oy++)
+        {
+          int px = mx + ox, py = my + oy;
+          if (px >= 0 && px < gw && py >= 0 && py < gh)
+            lv_canvas_set_px(graph_canvas, px, py, col_line, LV_OPA_COVER);
+        }
+      break;
     }
   }
 
