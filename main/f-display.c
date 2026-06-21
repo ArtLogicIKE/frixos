@@ -1755,39 +1755,51 @@ void update_graph(void)
     }
   }
 
-  // 2. Polyline (or boolean step), breaking across gaps.
+  // 2. Polyline (or boolean step). Connect each valid sample to the PREVIOUS
+  // valid one, skipping empty bins between them — CGM/history is often sparser
+  // than the bin interval (e.g. 15-min readings in 5-min bins), so adjacent
+  // bins are rarely both filled. Lift the pen only across a genuinely long gap
+  // so a real data outage isn't bridged with a straight line.
   if (valid >= 2)
   {
     lv_draw_line_dsc_t ld;
     lv_draw_line_dsc_init(&ld);
     ld.width = 2;
-    for (int i = 0; i < n - 1; i++)
+    int max_gap = g->points / 4; // empty-bin run to bridge before it's an outage
+    if (max_gap < 4)
+      max_gap = 4;
+    int prev = -1; // index of the last valid sample
+    for (int i = 0; i < n; i++)
     {
-      if (samp[i] == GRAPH_VAL_UNSET || samp[i + 1] == GRAPH_VAL_UNSET)
-        continue; // gap: pen up
-      float v1 = samp[i], v2 = samp[i + 1];
-      bool warn = false;
-      if (band_on && g->band_low != GRAPH_VAL_UNSET && g->band_high != GRAPH_VAL_UNSET)
+      if (samp[i] == GRAPH_VAL_UNSET)
+        continue;
+      if (prev >= 0 && (i - prev) <= max_gap)
       {
-        float avg = (v1 + v2) * 0.5f;
-        if (avg < (float)g->band_low || avg > (float)g->band_high)
-          warn = true;
+        float v1 = samp[prev], v2 = samp[i];
+        bool warn = false;
+        if (band_on && g->band_low != GRAPH_VAL_UNSET && g->band_high != GRAPH_VAL_UNSET)
+        {
+          float avg = (v1 + v2) * 0.5f;
+          if (avg < (float)g->band_low || avg > (float)g->band_high)
+            warn = true;
+        }
+        ld.color = warn ? col_warn : col_line;
+        int x1 = I2X(prev), x2 = I2X(i);
+        int y1 = CY(V2Y(v1)), y2 = CY(V2Y(v2));
+        if (boolean)
+        {
+          ld.p1.x = x1; ld.p1.y = y1; ld.p2.x = x2; ld.p2.y = y1; // horizontal hold
+          lv_draw_line(&layer, &ld);
+          ld.p1.x = x2; ld.p1.y = y1; ld.p2.x = x2; ld.p2.y = y2; // vertical step
+          lv_draw_line(&layer, &ld);
+        }
+        else
+        {
+          ld.p1.x = x1; ld.p1.y = y1; ld.p2.x = x2; ld.p2.y = y2;
+          lv_draw_line(&layer, &ld);
+        }
       }
-      ld.color = warn ? col_warn : col_line;
-      int x1 = I2X(i), x2 = I2X(i + 1);
-      int y1 = CY(V2Y(v1)), y2 = CY(V2Y(v2));
-      if (boolean)
-      {
-        ld.p1.x = x1; ld.p1.y = y1; ld.p2.x = x2; ld.p2.y = y1; // horizontal hold
-        lv_draw_line(&layer, &ld);
-        ld.p1.x = x2; ld.p1.y = y1; ld.p2.x = x2; ld.p2.y = y2; // vertical step
-        lv_draw_line(&layer, &ld);
-      }
-      else
-      {
-        ld.p1.x = x1; ld.p1.y = y1; ld.p2.x = x2; ld.p2.y = y2;
-        lv_draw_line(&layer, &ld);
-      }
+      prev = i;
     }
   }
 
