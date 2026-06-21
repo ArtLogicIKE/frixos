@@ -817,7 +817,7 @@ const SCREEN_BIN_WIRE_SIZE = SCREEN_BIN_HEADER_SIZE + SCREEN_BIN_PROFILE_SIZE * 
 const SCREEN_BIN_MIME = 'application/vnd.frixos.screen-layout+1';
 
 const GRAPH_VAL_UNSET = -32768; // int16 sentinel for "not set"
-const GRAPH_FLAG = { AUTOSCALE: 0x01, SHOW_AXIS: 0x02, BAND: 0x04, BACKFILL: 0x08, SHOW_VALUE: 0x10, BOOLEAN: 0x20 };
+const GRAPH_FLAG = { AUTOSCALE: 0x01, SHOW_AXIS: 0x02, BAND: 0x04, BACKFILL: 0x08, SHOW_VALUE: 0x10, BOOLEAN: 0x20, THICK: 0x40 };
 
 /* Firmware widget[] index order (screen_element_id_t). */
 const SCREEN_WIRE_ELEM_IDS = [
@@ -920,6 +920,7 @@ function screenReadGraphCfg(view, off) {
         backfill: !!(flags & GRAPH_FLAG.BACKFILL),
         show_value: !!(flags & GRAPH_FLAG.SHOW_VALUE),
         boolean: !!(flags & GRAPH_FLAG.BOOLEAN),
+        thick: !!(flags & GRAPH_FLAG.THICK),
         band_low: i16(off + GCFG.BAND_LOW),
         band_high: i16(off + GCFG.BAND_HIGH),
         y_min: i16(off + GCFG.Y_MIN),
@@ -945,6 +946,7 @@ function screenWriteGraphCfg(view, off, o) {
     if (o.backfill) flags |= GRAPH_FLAG.BACKFILL;
     if (o.show_value) flags |= GRAPH_FLAG.SHOW_VALUE;
     if (o.boolean) flags |= GRAPH_FLAG.BOOLEAN;
+    if (o.thick) flags |= GRAPH_FLAG.THICK;
     view.setUint8(off + GCFG.FLAGS, flags);
     view.setInt16(off + GCFG.BAND_LOW, i16(o.band_low), true);
     view.setInt16(off + GCFG.BAND_HIGH, i16(o.band_high), true);
@@ -2210,7 +2212,7 @@ function ensureScreenGraphOptions(e) {
     const d = {
         token: '', interval_min: 5, points: 60, gwidth: 80, gheight: 36,
         autoscale: true, show_axis: true, show_value: true, backfill: true,
-        band_on: false, boolean: false,
+        band_on: false, boolean: false, thick: false,
         band_low: null, band_high: null, y_min: null, y_max: null,
         color: '#00dcff', bg_color: '#000000',
         band_color: '#283c28', warn_color: '#ff5050', axis_color: '#787878'
@@ -2563,6 +2565,7 @@ function renderScreenOptions() {
         appendScreenSwitchRow(opt, { id: 'graph_axis', label: T('screen.graph_axis', 'Show axis & time labels'), checked: !!o.show_axis, onChange: (on) => { o.show_axis = on; renderScreenOptions(); } });
         appendScreenSwitchRow(opt, { id: 'graph_value', label: T('screen.graph_value', 'Show current value'), checked: !!o.show_value, onChange: (on) => { o.show_value = on; renderScreenCanvas(); } });
         appendScreenSwitchRow(opt, { id: 'graph_boolean', label: T('screen.graph_boolean', 'Boolean (step 0/1)'), checked: !!o.boolean, onChange: (on) => { o.boolean = on; renderScreenCanvas(); } });
+        appendScreenSwitchRow(opt, { id: 'graph_thick', label: T('screen.graph_thick', 'Thick line (2px)'), checked: !!o.thick, onChange: (on) => { o.thick = on; renderScreenCanvas(); } });
         appendScreenSwitchRow(opt, { id: 'graph_backfill', label: T('screen.graph_backfill', 'Backfill history (HA/CGM)'), checked: !!o.backfill, onChange: (on) => { o.backfill = on; } });
         appendScreenSwitchRow(opt, { id: 'graph_band', label: T('screen.graph_band', 'Show low/high band'), checked: !!o.band_on, onChange: (on) => { o.band_on = on; renderScreenOptions(); } });
         if (o.band_on) {

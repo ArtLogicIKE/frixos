@@ -303,6 +303,7 @@ typedef struct
 #define GRAPH_FLAG_BACKFILL 0x08  // seed history from HA/CGM on enable
 #define GRAPH_FLAG_SHOW_VALUE 0x10 // draw current value readout
 #define GRAPH_FLAG_BOOLEAN 0x20    // treat token as boolean (step plot, 0/1)
+#define GRAPH_FLAG_THICK 0x40      // 2px trend line (default 1px)
 
 // Per-graph config; lives in the layout profile. Packed for a stable wire size.
 // The graph LINE colour reuses the widget's color_*; the graph BACKGROUND reuses bg_*.

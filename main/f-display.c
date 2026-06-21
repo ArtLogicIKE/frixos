@@ -1603,19 +1603,20 @@ static void apply_screen_layout_positions(void)
 // The canvas drawing approach (band/axis markers) is derived from the CGM
 // glucose graph contributed by Benoit Poirier in PR #180.
 
-// Draw a 2px crisp line into the canvas buffer with Bresenham + direct pixel
+// Draw a crisp line into the canvas buffer with Bresenham + direct pixel
 // writes. lv_draw_line does not render thin diagonal lines visibly on this
 // RGB565 canvas (anti-aliased coverage fades out), so the trend line is drawn
-// by hand. Pixels are clamped to the canvas bounds.
-static void graph_px_line(lv_obj_t *cv, int x0, int y0, int x1, int y1, int w, int h, lv_color_t c)
+// by hand. thick=true gives a 2px line, else 1px. Pixels clamped to bounds.
+static void graph_px_line(lv_obj_t *cv, int x0, int y0, int x1, int y1, int w, int h, lv_color_t c, bool thick)
 {
   int dx = abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
   int dy = -abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
   int err = dx + dy;
+  int omax = thick ? 1 : 0;
   for (;;)
   {
-    for (int ox = 0; ox <= 1; ox++)
-      for (int oy = 0; oy <= 1; oy++)
+    for (int ox = 0; ox <= omax; ox++)
+      for (int oy = 0; oy <= omax; oy++)
       {
         int px = x0 + ox, py = y0 + oy;
         if (px >= 0 && px < w && py >= 0 && py < h)
@@ -1683,6 +1684,7 @@ void update_graph(void)
   const bool band_on = (g->flags & GRAPH_FLAG_BAND) != 0;
   const bool boolean = (g->flags & GRAPH_FLAG_BOOLEAN) != 0;
   const bool autoscale = (g->flags & GRAPH_FLAG_AUTOSCALE) != 0;
+  const bool thick = (g->flags & GRAPH_FLAG_THICK) != 0;
 
   lv_color_t col_line = lv_color_make(w->color_r, w->color_g, w->color_b);
   lv_color_t col_bg = lv_color_make(w->bg_r, w->bg_g, w->bg_b);
@@ -1824,7 +1826,9 @@ void update_graph(void)
     char xnow[6] = "now";
     lb.align = LV_TEXT_ALIGN_RIGHT;
     lb.text = xnow;
-    lv_area_t xar = {px2 - 22, py2, px2 - 6, gh - 2}; // 6px left, raised 1px
+    // Wide enough that "now" never overflows (the w was clipping), right edge
+    // 6px in from the plot edge; +1px of height.
+    lv_area_t xar = {px2 - 28, py2, px2 - 6, gh - 1};
     lv_draw_label(&layer, &lb, &xar);
 
     long span_min = (long)slots * (long)interval_min;
@@ -1835,7 +1839,7 @@ void update_graph(void)
       snprintf(xleft, sizeof(xleft), "-%ldm", span_min);
     lb.align = LV_TEXT_ALIGN_LEFT;
     lb.text = xleft;
-    lv_area_t xal = {px1, py2, px1 + 22, gh - 2}; // raised 1px
+    lv_area_t xal = {px1, py2, px1 + 22, gh - 1}; // +1px of height
     lv_draw_label(&layer, &lb, &xal);
   }
 
@@ -1886,12 +1890,12 @@ void update_graph(void)
         int y1 = CY(V2Y(v1)), y2 = CY(V2Y(v2));
         if (boolean)
         {
-          graph_px_line(graph_canvas, x1, y1, x2, y1, gw, gh, c); // hold
-          graph_px_line(graph_canvas, x2, y1, x2, y2, gw, gh, c); // step
+          graph_px_line(graph_canvas, x1, y1, x2, y1, gw, gh, c, thick); // hold
+          graph_px_line(graph_canvas, x2, y1, x2, y2, gw, gh, c, thick); // step
         }
         else
         {
-          graph_px_line(graph_canvas, x1, y1, x2, y2, gw, gh, c);
+          graph_px_line(graph_canvas, x1, y1, x2, y2, gw, gh, c, thick);
         }
       }
       prev = i;
