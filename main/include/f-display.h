@@ -18,6 +18,7 @@ esp_err_t startup_lcd(void);
 esp_err_t startup_lvgl(void);
 void startup_display(void);
 void display_changed(void);
+void update_graph(void); // render the generic graph widget
 void show_qr_code(void);
 void display_digit(int position, int digit);
 void display_task(void *pvParameters);

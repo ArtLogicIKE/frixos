@@ -6,6 +6,7 @@ idf_component_register(SRCS
     "f-screen-layout-bin.c"
     "f-wifi.c"
     "f-display.c"
+    "f-graph.c"
     "f-time.c"
     "f-pwm.c"
     "ltr303.c"  
@@ -55,4 +56,18 @@ idf_component_register(SRCS
     REQUIRES teriyakigod__esp_lcd_st7735)
 
     target_compile_options(${COMPONENT_LIB} PRIVATE "-fno-jump-tables" "-fno-tree-switch-conversion")
+
+# Always-fresh build timestamp. The custom target runs on every build and
+# regenerates build_time.h; whenever its content (the timestamp) changes, any
+# source that includes it (f-settings.c) recompiles. This guarantees the
+# reported compile_time reflects the actual build, unlike __DATE__/__TIME__ or
+# the app descriptor, which only refresh when their own source recompiles.
+set(BUILD_TIME_HEADER "${CMAKE_CURRENT_BINARY_DIR}/build_time.h")
+add_custom_target(frixos_build_time ALL
+    BYPRODUCTS "${BUILD_TIME_HEADER}"
+    COMMAND ${CMAKE_COMMAND} "-DOUTFILE=${BUILD_TIME_HEADER}" -P "${CMAKE_CURRENT_SOURCE_DIR}/gen_build_time.cmake"
+    COMMENT "Generating build timestamp"
+    VERBATIM)
+add_dependencies(${COMPONENT_LIB} frixos_build_time)
+target_include_directories(${COMPONENT_LIB} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
 

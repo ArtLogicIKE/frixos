@@ -1,0 +1,209 @@
+#include "f-graph.h"
+#include <string.h>
+#include <math.h>
+
+/*
+ * Lock abstraction: real FreeRTOS mutex on-device; no-op under the host test
+ * harness (single-threaded) so f-graph.c can be compiled and exercised on a
+ * dev machine (see tools/test_graph.c).
+ */
+#ifdef GRAPH_HOST_TEST
+#define GRAPH_LOCK() ((void)0)
+#define GRAPH_UNLOCK() ((void)0)
+static void graph_lock_init(void) {}
+#else
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
+static SemaphoreHandle_t graph_mtx;
+static void graph_lock_init(void)
+{
+  if (!graph_mtx)
+    graph_mtx = xSemaphoreCreateMutex();
+}
+#define GRAPH_LOCK()                              \
+  do                                              \
+  {                                               \
+    if (graph_mtx)                                \
+      xSemaphoreTake(graph_mtx, portMAX_DELAY);   \
+  } while (0)
+#define GRAPH_UNLOCK()       \
+  do                         \
+  {                          \
+    if (graph_mtx)           \
+      xSemaphoreGive(graph_mtx); \
+  } while (0)
+#endif
+
+static graph_ring_t ring;
+
+static int16_t clamp_sample(float v)
+{
+  long r = lroundf(v);
+  if (r > 32767)
+    r = 32767;
+  if (r < -32767) // keep -32768 (GRAPH_VAL_UNSET) reserved as the gap sentinel
+    r = -32767;
+  return (int16_t)r;
+}
+
+// Push one sample into the ring (caller holds the lock).
+static void ring_push(int16_t val)
+{
+  if (ring.cap == 0)
+    return;
+  ring.v[ring.head] = val;
+  ring.head = (uint8_t)((ring.head + 1) % ring.cap);
+  if (ring.count < ring.cap)
+    ring.count++;
+}
+
+void graph_init(void)
+{
+  graph_lock_init();
+  memset(&ring, 0, sizeof(ring));
+}
+
+void graph_configure(const screen_graph_cfg_t *cfg, bool widget_enabled)
+{
+  if (!cfg)
+    return;
+
+  uint16_t iv = cfg->interval_min ? cfg->interval_min : 1;
+  uint8_t cap = cfg->points ? cfg->points : 2;
+  if (cap > GRAPH_MAX_POINTS)
+    cap = GRAPH_MAX_POINTS;
+  bool want = widget_enabled && cfg->token[0] != '\0';
+
+  GRAPH_LOCK();
+  bool reshape = (strncmp(ring.token, cfg->token, GRAPH_TOKEN_LEN) != 0) ||
+                 iv != ring.interval_min || cap != ring.cap;
+  if (reshape)
+  {
+    memset(ring.v, 0, sizeof(ring.v));
+    ring.count = 0;
+    ring.head = 0;
+    ring.last_sample = 0;
+    strncpy(ring.token, cfg->token, GRAPH_TOKEN_LEN - 1);
+    ring.token[GRAPH_TOKEN_LEN - 1] = '\0';
+    ring.interval_min = iv;
+    ring.cap = cap;
+    ring.needs_backfill = want && (cfg->flags & GRAPH_FLAG_BACKFILL);
+  }
+  ring.active = want;
+  GRAPH_UNLOCK();
+}
+
+void graph_sampler_tick(time_t now)
+{
+  GRAPH_LOCK();
+  if (ring.active && ring.cap && ring.interval_min &&
+      (ring.last_sample == 0 || (now - ring.last_sample) >= (time_t)ring.interval_min * 60))
+  {
+    float v;
+    int16_t s = token_numeric_value(ring.token, &v) ? clamp_sample(v) : GRAPH_VAL_UNSET;
+    ring_push(s);
+    ring.last_sample = now;
+  }
+  GRAPH_UNLOCK();
+}
+
+int graph_snapshot(int16_t *out_v, int max, time_t *last_sample, uint16_t *interval_min)
+{
+  GRAPH_LOCK();
+  int n = ring.count;
+  if (n > max)
+    n = max;
+  uint8_t cap = ring.cap ? ring.cap : 1;
+  int oldest = (ring.head + cap - ring.count) % cap;
+  for (int i = 0; i < n; i++)
+    out_v[i] = ring.v[(oldest + i) % cap];
+  if (last_sample)
+    *last_sample = ring.last_sample;
+  if (interval_min)
+    *interval_min = ring.interval_min;
+  GRAPH_UNLOCK();
+  return n;
+}
+
+bool graph_is_active(void)
+{
+  GRAPH_LOCK();
+  bool a = ring.active;
+  GRAPH_UNLOCK();
+  return a;
+}
+
+bool graph_take_backfill_request(char *token_out, size_t token_len)
+{
+  bool req = false;
+  GRAPH_LOCK();
+  if (ring.needs_backfill && ring.active && ring.count == 0)
+  {
+    req = true;
+    ring.needs_backfill = false; // consume the request; caller will fill
+    if (token_out && token_len)
+    {
+      strncpy(token_out, ring.token, token_len - 1);
+      token_out[token_len - 1] = '\0';
+    }
+  }
+  GRAPH_UNLOCK();
+  return req;
+}
+
+void graph_backfill(const float *vals, const time_t *times, int n, time_t now)
+{
+  GRAPH_LOCK();
+  uint8_t cap = ring.cap;
+  uint16_t iv = ring.interval_min;
+  if (cap == 0 || iv == 0 || n <= 0 || !vals || !times)
+  {
+    GRAPH_UNLOCK();
+    return;
+  }
+
+  // Bin the time-stamped series into the most recent `cap` interval slots
+  // ending at `now`. Slot k (0=oldest .. cap-1=newest) covers the wall-time
+  // window centred on now-(cap-1-k)*interval. Last value wins within a bin.
+  const long bin = (long)iv * 60;
+  bool filled[GRAPH_MAX_POINTS] = {0};
+  for (int k = 0; k < cap; k++)
+    ring.v[k] = GRAPH_VAL_UNSET;
+
+  for (int i = 0; i < n; i++)
+  {
+    long age = (long)(now - times[i]);
+    if (age < 0)
+      age = 0;
+    int slot = (cap - 1) - (int)(age / bin);
+    if (slot < 0 || slot >= cap)
+      continue; // older than the window — discarded
+    if (vals[i] == (float)GRAPH_VAL_UNSET)
+      continue;
+    ring.v[slot] = clamp_sample(vals[i]);
+    filled[slot] = true;
+  }
+
+  // Determine count = span from oldest filled slot to newest (cap-1).
+  int oldest = cap;
+  for (int k = 0; k < cap; k++)
+    if (filled[k]) { oldest = k; break; }
+  if (oldest == cap)
+  {
+    GRAPH_UNLOCK();
+    return; // nothing landed in the window
+  }
+  // Compact so the ring reads chronologically: head past the newest slot.
+  ring.count = (uint8_t)(cap - oldest);
+  // Shift filled region down to index 0.
+  if (oldest > 0)
+  {
+    for (int k = 0; k < ring.count; k++)
+      ring.v[k] = ring.v[oldest + k];
+    for (int k = ring.count; k < cap; k++)
+      ring.v[k] = GRAPH_VAL_UNSET;
+  }
+  ring.head = (uint8_t)(ring.count % cap);
+  ring.last_sample = now;
+  GRAPH_UNLOCK();
+}

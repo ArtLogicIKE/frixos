@@ -17,6 +17,7 @@
 #include "f-settings.h"
 #include "f-integrations.h"
 #include "f-dexcom.h"
+#include "f-graph.h"
 
 #include "time.h"
 #include "math.h"
@@ -116,6 +117,10 @@ lv_obj_t *img_digits_sprite = NULL,
 lv_obj_t *label_msg = NULL;
 lv_obj_t *label_msg_loop = NULL; // second label for seamless infinite scrolling
 lv_obj_t *label_static[SCREEN_STATIC_TEXT_COUNT] = {NULL};
+
+// Generic graph widget canvas (RGB565, allocated once at max GRAPH_MAX_W x GRAPH_MAX_H).
+lv_obj_t *graph_canvas = NULL;
+static uint8_t *graph_canvas_buf = NULL;
 lv_obj_t *label_digit = NULL;
 lv_obj_t *label_digit_aux = NULL;
 static lv_obj_t *label_degree = NULL;
@@ -788,6 +793,7 @@ void set_scroll_message(const char *msg)
 void startup_display(void)
 {
   ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Display startup");
+  graph_init(); // graph ring mutex + zeroed state, before any sampler/render
   lv_obj_t *scr = lv_scr_act();
 
   lvgl_port_lock(0);
@@ -850,6 +856,12 @@ void startup_display(void)
   img_glucose = lv_image_create(lv_scr_act());
   img_glucose_trend = lv_image_create(lv_scr_act());
   img_wifi = lv_image_create(lv_scr_act());
+
+  // Generic graph: create the canvas object but DON'T allocate its ~10.8 KB
+  // RGB565 buffer yet. The buffer is allocated lazily the first time a graph
+  // element is enabled (update_graph), so devices without a graph pay nothing.
+  graph_canvas = lv_canvas_create(lv_scr_act());
+  lv_obj_add_flag(graph_canvas, LV_OBJ_FLAG_HIDDEN);
   img_mgdl = lv_image_create(lv_scr_act());
   img_mgdl_aux = lv_image_create(lv_scr_act());
   img_ampm = lv_image_create(lv_scr_act()); // AMPM indicator
@@ -1487,6 +1499,9 @@ static void screen_layout_collect_elem_objects(screen_element_id_t id, lv_obj_t 
   case SCREEN_ELEM_DIGIT_LABEL_AUX:
     screen_layout_push_obj(label_digit_aux, objs, count, 12);
     break;
+  case SCREEN_ELEM_GRAPH:
+    screen_layout_push_obj(graph_canvas, objs, count, 12);
+    break;
   default:
     if (screen_elem_is_static_text(id))
       screen_layout_push_obj(label_static[screen_static_text_index(id)], objs, count, 12);
@@ -1562,10 +1577,287 @@ static void apply_screen_layout_positions(void)
   lv_obj_align(aux_dots[0], LV_ALIGN_TOP_LEFT, layout_abs_x(w_time_aux) + 2 * 18 + 1, layout_abs_y(w_time_aux) + 10);
   lv_obj_align(aux_dots[1], LV_ALIGN_TOP_LEFT, layout_abs_x(w_time_aux) + 2 * 18 + 1, layout_abs_y(w_time_aux) + 26);
   lv_obj_set_pos(label_msg, layout_abs_x(w_msg), layout_abs_y(w_msg));
+  if (graph_canvas)
+  {
+    const screen_widget_t *w_graph = &layout->widget[SCREEN_ELEM_GRAPH];
+    lv_obj_align(graph_canvas, LV_ALIGN_TOP_LEFT, layout_abs_x(w_graph), layout_abs_y(w_graph));
+  }
   update_static_text_labels();
   update_digit_label_widgets();
   apply_screen_layout_z_order(layout);
   lvgl_port_unlock();
+}
+
+// Render the generic graph widget into its RGB565 canvas. Snapshots the ring
+// under the graph mutex, then draws under the LVGL lock (the two locks are
+// never held together). Skips the redraw when nothing changed to avoid
+// per-minute flicker.
+void update_graph(void)
+{
+  if (!graph_canvas)
+    return;
+
+  const screen_layout_profile_t *layout_p = &eeprom_screen_layout.profile[font_index];
+  const screen_widget_t *w = &layout_p->widget[SCREEN_ELEM_GRAPH];
+  const screen_graph_cfg_t *g = &layout_p->graph;
+
+  static time_t last_render_sample = -1;
+  static bool last_render_shown = false;
+
+  if (!w->enabled || g->token[0] == '\0')
+  {
+    if (last_render_shown || graph_canvas_buf)
+    {
+      lvgl_port_lock(0);
+      lv_obj_add_flag(graph_canvas, LV_OBJ_FLAG_HIDDEN);
+      if (graph_canvas_buf) // hidden -> not drawn, safe to release the buffer
+      {
+        free(graph_canvas_buf);
+        graph_canvas_buf = NULL;
+      }
+      lvgl_port_unlock();
+      last_render_shown = false;
+      last_render_sample = -1;
+    }
+    return;
+  }
+
+  // Lazily allocate the RGB565 buffer at the maximum configured size on first
+  // enable; the sampler/render path never reallocates after this.
+  if (!graph_canvas_buf)
+  {
+    size_t cap = (size_t)GRAPH_MAX_W * GRAPH_MAX_H * 2;
+    graph_canvas_buf = malloc(cap);
+    if (!graph_canvas_buf)
+    {
+      ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "graph_canvas_buf alloc %u failed", (unsigned)cap);
+      return;
+    }
+    memset(graph_canvas_buf, 0, cap);
+    last_render_sample = -1; // force a redraw now that we have a buffer
+  }
+
+  int16_t samp[GRAPH_MAX_POINTS];
+  time_t last_sample = 0;
+  uint16_t interval_min = g->interval_min ? g->interval_min : 1;
+  int n = graph_snapshot(samp, GRAPH_MAX_POINTS, &last_sample, &interval_min);
+
+  // Nothing new since last render and already shown -> skip (no flicker).
+  if (last_render_shown && last_sample == last_render_sample)
+    return;
+
+  int gw = (int)g->width;
+  if (gw < GRAPH_MIN_W) gw = GRAPH_MIN_W;
+  if (gw > GRAPH_MAX_W) gw = GRAPH_MAX_W;
+  int gh = (int)g->height;
+  if (gh < GRAPH_MIN_H) gh = GRAPH_MIN_H;
+  if (gh > GRAPH_MAX_H) gh = GRAPH_MAX_H;
+
+  const bool show_axis = (g->flags & GRAPH_FLAG_SHOW_AXIS) != 0;
+  const bool show_value = (g->flags & GRAPH_FLAG_SHOW_VALUE) != 0;
+  const bool band_on = (g->flags & GRAPH_FLAG_BAND) != 0;
+  const bool boolean = (g->flags & GRAPH_FLAG_BOOLEAN) != 0;
+  const bool autoscale = (g->flags & GRAPH_FLAG_AUTOSCALE) != 0;
+
+  lv_color_t col_line = lv_color_make(w->color_r, w->color_g, w->color_b);
+  lv_color_t col_bg = lv_color_make(w->bg_r, w->bg_g, w->bg_b);
+  lv_color_t col_band = lv_color_make(g->band_r, g->band_g, g->band_b);
+  lv_color_t col_warn = lv_color_make(g->warn_r, g->warn_g, g->warn_b);
+  lv_color_t col_axis = lv_color_make(g->axis_r, g->axis_g, g->axis_b);
+
+  int left_m = show_axis ? 16 : 1;
+  int top_m = 1;
+  int right_m = 1;
+  int bot_m = show_axis ? 8 : 1;
+  int px1 = left_m, px2 = gw - right_m - 1;
+  int py1 = top_m, py2 = gh - bot_m - 1;
+  int pw = px2 - px1 + 1, ph = py2 - py1 + 1;
+  if (pw < 2 || ph < 2)
+    return;
+
+  // Data range over valid samples.
+  float dmin = 1e9f, dmax = -1e9f;
+  int valid = 0;
+  int16_t last_valid = GRAPH_VAL_UNSET;
+  for (int i = 0; i < n; i++)
+  {
+    if (samp[i] == GRAPH_VAL_UNSET)
+      continue;
+    valid++;
+    last_valid = samp[i];
+    float v = samp[i];
+    if (v < dmin) dmin = v;
+    if (v > dmax) dmax = v;
+  }
+
+  float ymin, ymax;
+  if (boolean)
+  {
+    ymin = 0.0f;
+    ymax = 1.0f;
+  }
+  else if (!autoscale && g->y_min != GRAPH_VAL_UNSET && g->y_max != GRAPH_VAL_UNSET && g->y_max > g->y_min)
+  {
+    ymin = (float)g->y_min;
+    ymax = (float)g->y_max;
+  }
+  else if (valid > 0)
+  {
+    ymin = dmin;
+    ymax = dmax;
+    if (ymax <= ymin) ymax = ymin + 1.0f;
+  }
+  else
+  {
+    ymin = 0.0f;
+    ymax = 1.0f;
+  }
+  float yrange = ymax - ymin;
+  if (yrange < 1e-6f) yrange = 1.0f;
+
+  // Fixed window: newest sample at px2, one slot left per older sample.
+  int slots = (g->points > 1) ? (g->points - 1) : 1;
+  float px_per_slot = (float)(pw - 1) / (float)slots;
+
+#define V2Y(v) (py2 - (int)(((float)(v) - ymin) / yrange * (float)(ph - 1)))
+#define CY(y) ((y) < py1 ? py1 : ((y) > py2 ? py2 : (y)))
+#define I2X(i) (px2 - (int)((float)((n - 1) - (i)) * px_per_slot))
+
+  lvgl_port_lock(0);
+  lv_obj_add_flag(graph_canvas, LV_OBJ_FLAG_HIDDEN);
+  lv_canvas_set_buffer(graph_canvas, graph_canvas_buf, gw, gh, LV_COLOR_FORMAT_RGB565);
+  lv_canvas_fill_bg(graph_canvas, col_bg, LV_OPA_COVER);
+  lv_layer_t layer;
+  lv_canvas_init_layer(graph_canvas, &layer);
+
+  // 1. Low/high band.
+  if (band_on && g->band_low != GRAPH_VAL_UNSET && g->band_high != GRAPH_VAL_UNSET && g->band_high > g->band_low)
+  {
+    int yh = CY(V2Y(g->band_high));
+    int yl = CY(V2Y(g->band_low));
+    if (yl > yh)
+    {
+      lv_draw_rect_dsc_t bd;
+      lv_draw_rect_dsc_init(&bd);
+      bd.bg_color = col_band;
+      bd.bg_opa = LV_OPA_COVER;
+      bd.border_width = 0;
+      lv_area_t ba = {px1, yh, px2, yl};
+      lv_draw_rect(&layer, &bd, &ba);
+    }
+  }
+
+  // 2. Polyline (or boolean step), breaking across gaps.
+  if (valid >= 2)
+  {
+    lv_draw_line_dsc_t ld;
+    lv_draw_line_dsc_init(&ld);
+    ld.width = 2;
+    for (int i = 0; i < n - 1; i++)
+    {
+      if (samp[i] == GRAPH_VAL_UNSET || samp[i + 1] == GRAPH_VAL_UNSET)
+        continue; // gap: pen up
+      float v1 = samp[i], v2 = samp[i + 1];
+      bool warn = false;
+      if (band_on && g->band_low != GRAPH_VAL_UNSET && g->band_high != GRAPH_VAL_UNSET)
+      {
+        float avg = (v1 + v2) * 0.5f;
+        if (avg < (float)g->band_low || avg > (float)g->band_high)
+          warn = true;
+      }
+      ld.color = warn ? col_warn : col_line;
+      int x1 = I2X(i), x2 = I2X(i + 1);
+      int y1 = CY(V2Y(v1)), y2 = CY(V2Y(v2));
+      if (boolean)
+      {
+        ld.p1.x = x1; ld.p1.y = y1; ld.p2.x = x2; ld.p2.y = y1; // horizontal hold
+        lv_draw_line(&layer, &ld);
+        ld.p1.x = x2; ld.p1.y = y1; ld.p2.x = x2; ld.p2.y = y2; // vertical step
+        lv_draw_line(&layer, &ld);
+      }
+      else
+      {
+        ld.p1.x = x1; ld.p1.y = y1; ld.p2.x = x2; ld.p2.y = y2;
+        lv_draw_line(&layer, &ld);
+      }
+    }
+  }
+
+  // 3. Axis + relative time labels.
+  if (show_axis)
+  {
+    lv_draw_line_dsc_t al;
+    lv_draw_line_dsc_init(&al);
+    al.width = 1;
+    al.color = col_axis;
+    al.p1.x = px1 - 1; al.p1.y = py1; al.p2.x = px1 - 1; al.p2.y = py2 + 1;
+    lv_draw_line(&layer, &al);
+    al.p1.x = px1 - 1; al.p1.y = py2 + 1; al.p2.x = px2; al.p2.y = py2 + 1;
+    lv_draw_line(&layer, &al);
+
+    lv_draw_label_dsc_t lb;
+    lv_draw_label_dsc_init(&lb);
+    lb.font = &frixos_8;
+    lb.color = col_axis;
+    lb.opa = LV_OPA_COVER;
+    lb.text_local = 1; // deferred draw: strdup the stack strings
+
+    char ymax_s[8], ymin_s[8];
+    snprintf(ymax_s, sizeof(ymax_s), "%d", (int)lroundf(ymax));
+    snprintf(ymin_s, sizeof(ymin_s), "%d", (int)lroundf(ymin));
+    lb.align = LV_TEXT_ALIGN_RIGHT;
+    lb.text = ymax_s;
+    lv_area_t yat = {0, py1, px1 - 2, py1 + 8};
+    lv_draw_label(&layer, &lb, &yat);
+    lb.text = ymin_s;
+    lv_area_t yab = {0, py2 - 8, px1 - 2, py2};
+    lv_draw_label(&layer, &lb, &yab);
+
+    char xnow[6] = "now";
+    lb.align = LV_TEXT_ALIGN_RIGHT;
+    lb.text = xnow;
+    lv_area_t xar = {px2 - 16, py2 + 1, px2, gh - 1};
+    lv_draw_label(&layer, &lb, &xar);
+
+    long span_min = (long)slots * (long)interval_min;
+    char xleft[10];
+    if (span_min >= 120)
+      snprintf(xleft, sizeof(xleft), "-%ldh", span_min / 60);
+    else
+      snprintf(xleft, sizeof(xleft), "-%ldm", span_min);
+    lb.align = LV_TEXT_ALIGN_LEFT;
+    lb.text = xleft;
+    lv_area_t xal = {px1, py2 + 1, px1 + 22, gh - 1};
+    lv_draw_label(&layer, &lb, &xal);
+  }
+
+  // 4. Current value readout (top-right of plot).
+  if (show_value && last_valid != GRAPH_VAL_UNSET)
+  {
+    lv_draw_label_dsc_t vb;
+    lv_draw_label_dsc_init(&vb);
+    vb.font = &frixos_8;
+    vb.color = col_line;
+    vb.opa = LV_OPA_COVER;
+    vb.text_local = 1;
+    vb.align = LV_TEXT_ALIGN_RIGHT;
+    char vt[12];
+    snprintf(vt, sizeof(vt), "%d", (int)last_valid);
+    vb.text = vt;
+    lv_area_t va = {px1, py1, px2, py1 + 8};
+    lv_draw_label(&layer, &vb, &va);
+  }
+
+  lv_canvas_finish_layer(graph_canvas, &layer);
+  lv_obj_clear_flag(graph_canvas, LV_OBJ_FLAG_HIDDEN);
+  lvgl_port_unlock();
+
+  last_render_sample = last_sample;
+  last_render_shown = true;
+
+#undef V2Y
+#undef CY
+#undef I2X
 }
 
 static void handle_screen_layout_on_wifi(void)
@@ -1715,6 +2007,14 @@ void display_changed(void)
   {
     set_scroll_message(last_scroll_msg);
   }
+
+  // (Re)configure the generic graph sampler from the active profile. Keeps the
+  // ring/history when token+interval+points are unchanged (e.g. day<->night).
+  {
+    const screen_layout_profile_t *gp = &eeprom_screen_layout.profile[font_index];
+    graph_configure(&gp->graph, gp->widget[SCREEN_ELEM_GRAPH].enabled != 0);
+  }
+  update_graph();
 }
 
 // allow -1 to display nothing
@@ -2268,6 +2568,7 @@ void display_task(void *pvParameters)
     handle_wifi_status_icon();
     handle_integration_and_messages();
     handle_als_and_brightness(loop_counter);
+    update_graph(); // self-guards: only redraws when a new sample arrived
 
     bool should_update_display = false;
     handle_alternate_mode_switching(now, loop_counter, &should_update_display);
@@ -2454,6 +2755,94 @@ static const token_t base_tokens[] = {
 // Global token list that persists between calls
 static const token_t *prepared_tokens = NULL;
 static int prepared_tokens_count = 0;
+
+// Case-insensitive equality for short literals (boolean token mapping).
+static bool ci_eq(const char *a, const char *b)
+{
+  for (; *a && *b; a++, b++)
+  {
+    char ca = (*a >= 'A' && *a <= 'Z') ? (char)(*a + 32) : *a;
+    char cb = (*b >= 'A' && *b <= 'Z') ? (char)(*b + 32) : *b;
+    if (ca != cb)
+      return false;
+  }
+  return *a == '\0' && *b == '\0';
+}
+
+// Parse an HA/stock string value to a number. Booleans -> 1/0. Numeric strings
+// (optionally with a trailing unit, e.g. "21.3 °C") parse via strtof.
+static bool parse_string_value(const char *s, float *out)
+{
+  if (!s || !s[0])
+    return false;
+  if (ci_eq(s, "on") || ci_eq(s, "true") || ci_eq(s, "open") || ci_eq(s, "yes") || ci_eq(s, "home"))
+  {
+    *out = 1.0f;
+    return true;
+  }
+  if (ci_eq(s, "off") || ci_eq(s, "false") || ci_eq(s, "closed") || ci_eq(s, "no") || ci_eq(s, "away"))
+  {
+    *out = 0.0f;
+    return true;
+  }
+  char *end = NULL;
+  float v = strtof(s, &end);
+  if (end == s)
+    return false; // no leading number
+  *out = v;
+  return true;
+}
+
+// Resolve a token string to its current numeric value, for the graph widget.
+// Returns false if the token is unknown or has no numeric value right now.
+bool token_numeric_value(const char *tok, float *out)
+{
+  if (!tok || !out || !prepared_tokens)
+    return false;
+  for (int i = 0; i < prepared_tokens_count; i++)
+  {
+    const token_t *t = &prepared_tokens[i];
+    if (!t->token || strcmp(t->token, tok) != 0)
+      continue;
+    switch (t->type)
+    {
+    case TOKEN_TYPE_WEATHER:
+    {
+      double v;
+      switch (t->id)
+      {
+      case 6: v = eeprom_fahrenheit ? (weather_temp * 9.0 / 5.0) + 32 : weather_temp; break;       // [temp]
+      case 7: v = weather_humidity; break;                                                          // [hum]
+      case 8: v = eeprom_fahrenheit ? (weather_high * 9.0 / 5.0) + 32 : weather_high; break;        // [high]
+      case 9: v = eeprom_fahrenheit ? (weather_low * 9.0 / 5.0) + 32 : weather_low; break;          // [low]
+      case 12: v = weather_wind_speed_mps; break;                                                   // [wind]
+      case 13: v = weather_gust_mps; break;                                                         // [gust]
+      case 14: v = weather_precip_mm; break;                                                        // [precip]
+      case 15: v = weather_uv; break;                                                               // [uv]
+      case 16: v = weather_pressure_hpa; break;                                                     // [pressure]
+      case 17: v = eeprom_fahrenheit ? (weather_3day_high * 9.0 / 5.0) + 32 : weather_3day_high; break; // [3high]
+      case 18: v = eeprom_fahrenheit ? (weather_3day_low * 9.0 / 5.0) + 32 : weather_3day_low; break;   // [3low]
+      default: return false;                                                                        // rise/set are times
+      }
+      *out = (float)v;
+      return true;
+    }
+    case TOKEN_TYPE_GLUCOSE:
+      if (glucose_data.current_gl_mgdl > 0)
+      {
+        *out = glucose_data.current_gl_mgdl;
+        return true;
+      }
+      return false;
+    case TOKEN_TYPE_HA:
+    case TOKEN_TYPE_STOCK:
+      return parse_string_value(t->value, out);
+    default:
+      return false; // BASE / TIME tokens are not graphable
+    }
+  }
+  return false;
+}
 
 // Function to prepare tokens - called when tokens change
 void prepare_tokens(void)

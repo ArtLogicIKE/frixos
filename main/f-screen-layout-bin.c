@@ -6,9 +6,10 @@
 static const char *TAG = "f-screen-bin";
 
 _Static_assert(sizeof(screen_widget_t) == 13, "screen_widget_t wire size changed");
-_Static_assert(sizeof(screen_layout_profile_t) == 1719, "screen_layout_profile_t wire size changed");
+_Static_assert(sizeof(screen_graph_cfg_t) == 56, "screen_graph_cfg_t wire size changed");
+_Static_assert(sizeof(screen_layout_profile_t) == 1788, "screen_layout_profile_t wire size changed");
 _Static_assert(sizeof(screen_layout_bin_header_t) == 64, "screen_layout_bin_header_t size changed");
-_Static_assert(FRIXOS_SCREEN_LAYOUT_WIRE_SIZE == 3502, "screen_layout_wire_t size changed");
+_Static_assert(FRIXOS_SCREEN_LAYOUT_WIRE_SIZE == 3640, "screen_layout_wire_t size changed");
 
 static int clamp_int(int v, int lo, int hi)
 {
@@ -44,6 +45,16 @@ static void sanitize_widget(screen_widget_t *w, screen_element_id_t id)
     }
 }
 
+static void sanitize_graph(screen_graph_cfg_t *g)
+{
+    g->token[GRAPH_TOKEN_LEN - 1] = '\0';
+    g->interval_min = (uint16_t)clamp_int(g->interval_min, 1, 1440);
+    g->points = (uint8_t)clamp_int(g->points, 2, GRAPH_MAX_POINTS);
+    g->width = (uint8_t)clamp_int(g->width, GRAPH_MIN_W, GRAPH_MAX_W);
+    g->height = (uint8_t)clamp_int(g->height, GRAPH_MIN_H, GRAPH_MAX_H);
+    // band_low/high and y_min/y_max are signed graph-unit values (GRAPH_VAL_UNSET allowed) — no clamp.
+}
+
 static void sanitize_profile(screen_layout_profile_t *profile)
 {
     for (int i = 0; i < SCREEN_ELEM_COUNT; i++)
@@ -54,6 +65,7 @@ static void sanitize_profile(screen_layout_profile_t *profile)
         profile->static_text[i][SCREEN_STATIC_TEXT_LENGTH - 1] = '\0';
     profile->digit_label_text[SCREEN_STATIC_TEXT_LENGTH - 1] = '\0';
     profile->digit_label_aux_text[SCREEN_STATIC_TEXT_LENGTH - 1] = '\0';
+    sanitize_graph(&profile->graph);
 }
 
 static void copy_font_field(char *dst, size_t dst_len, const char *src)

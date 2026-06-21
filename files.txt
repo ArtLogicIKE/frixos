@@ -4,6 +4,7 @@ default-ampm.jpg
 default-dot.jpg
 default-font.jpg
 default-glucose.jpg
+default-graph.jpg
 default-grid.jpg
 default-moon.jpg
 default-trend.jpg

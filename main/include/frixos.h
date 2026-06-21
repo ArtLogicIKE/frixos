@@ -267,6 +267,7 @@ typedef enum
   SCREEN_ELEM_TIME_AUX = 16,
   SCREEN_ELEM_DIGIT_LABEL = 17,
   SCREEN_ELEM_DIGIT_LABEL_AUX = 18,
+  SCREEN_ELEM_GRAPH = 19, // generic single-token time-series graph
   SCREEN_ELEM_COUNT
 } screen_element_id_t;
 
@@ -287,6 +288,42 @@ typedef struct
   uint8_t bg_b;
 } screen_widget_t;
 
+// --- Generic graph widget (SCREEN_ELEM_GRAPH) ----------------------------
+#define GRAPH_TOKEN_LEN 32
+#define GRAPH_MAX_POINTS 100
+#define GRAPH_MIN_W 60
+#define GRAPH_MAX_W 90
+#define GRAPH_MIN_H 28
+#define GRAPH_MAX_H 60
+#define GRAPH_VAL_UNSET ((int16_t)0x8000) // sentinel: threshold/scale not set, or missing sample
+
+#define GRAPH_FLAG_AUTOSCALE 0x01 // auto Y-range from windowed min/max (else use y_min/y_max)
+#define GRAPH_FLAG_SHOW_AXIS 0x02 // draw axis + relative time labels
+#define GRAPH_FLAG_BAND 0x04      // draw low/high band
+#define GRAPH_FLAG_BACKFILL 0x08  // seed history from HA/CGM on enable
+#define GRAPH_FLAG_SHOW_VALUE 0x10 // draw current value readout
+#define GRAPH_FLAG_BOOLEAN 0x20    // treat token as boolean (step plot, 0/1)
+
+// Per-graph config; lives in the layout profile. Packed for a stable wire size.
+// The graph LINE colour reuses the widget's color_*; the graph BACKGROUND reuses bg_*.
+typedef struct __attribute__((packed))
+{
+  char token[GRAPH_TOKEN_LEN]; // selected token string, NUL-terminated, e.g. "[temp]"
+  uint16_t interval_min;       // 1..1440 sample interval (minutes)
+  uint8_t points;              // 2..100 points in window
+  uint8_t width;               // 60..90 px
+  uint8_t height;              // 28..60 px
+  uint8_t flags;               // GRAPH_FLAG_*
+  int16_t band_low;            // low threshold (graph units); GRAPH_VAL_UNSET = none
+  int16_t band_high;           // high threshold; GRAPH_VAL_UNSET = none
+  int16_t y_min;               // manual Y min (used when AUTOSCALE off); GRAPH_VAL_UNSET = auto
+  int16_t y_max;               // manual Y max
+  uint8_t band_r, band_g, band_b; // band fill colour
+  uint8_t warn_r, warn_g, warn_b; // out-of-band / alert colour
+  uint8_t axis_r, axis_g, axis_b; // axis + label colour
+  uint8_t reserved[1];
+} screen_graph_cfg_t;          // 56 bytes
+
 typedef struct
 {
   screen_widget_t widget[SCREEN_ELEM_COUNT];
@@ -294,6 +331,7 @@ typedef struct
   char static_text[SCREEN_STATIC_TEXT_COUNT][SCREEN_STATIC_TEXT_LENGTH];
   char digit_label_text[SCREEN_STATIC_TEXT_LENGTH];
   char digit_label_aux_text[SCREEN_STATIC_TEXT_LENGTH];
+  screen_graph_cfg_t graph;
 } screen_layout_profile_t;
 
 typedef struct
@@ -314,6 +352,11 @@ static inline bool screen_elem_is_static_text(screen_element_id_t id)
 static inline bool screen_elem_is_digit_label(screen_element_id_t id)
 {
   return id == SCREEN_ELEM_DIGIT_LABEL || id == SCREEN_ELEM_DIGIT_LABEL_AUX;
+}
+
+static inline bool screen_elem_is_graph(screen_element_id_t id)
+{
+  return id == SCREEN_ELEM_GRAPH;
 }
 
 static inline bool screen_elem_is_text(screen_element_id_t id)

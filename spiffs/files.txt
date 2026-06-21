@@ -6,10 +6,12 @@ palette-wifi-off.png
 palette-glucose.png
 palette-trend.png
 palette-message.png
+palette-graph.png
 default-ampm.jpg
 default-dot.jpg
 default-font.jpg
 default-glucose.jpg
+default-graph.jpg
 default-grid.jpg
 default-settings.jpg
 default-moon.jpg

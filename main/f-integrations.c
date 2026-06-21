@@ -23,6 +23,7 @@
 #include "f-stocks.h"
 #include "f-freestyle.h"
 #include "f-nightscout.h"
+#include "f-graph.h"
 
 static const char *TAG = "f-integrations";
 
@@ -474,6 +475,26 @@ static bool fetch_ha_entity(integration_token_t *token)
 }
 
 // Task function for integration updates
+/*
+ * Generic graph backfill. When a graph element is first enabled with backfill
+ * requested and an empty ring, seed history from a source that has it. CGM
+ * history lives only in the per-vendor fetchers (no shared history array in
+ * this build), and HA exposes /api/history; both are best-effort. If no
+ * backfill source applies, the request is consumed and the ring fills by
+ * self-sampling from here on.
+ *
+ * NOTE: HA /api/history backfill (nested-array JSON + ISO8601 timestamps) is a
+ * follow-up; for now we consume the request so the sampler proceeds cleanly.
+ */
+static void graph_service_backfill(void)
+{
+    char token[GRAPH_TOKEN_LEN];
+    if (!graph_take_backfill_request(token, sizeof(token)))
+        return;
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Graph backfill requested for %s (self-sampling for now)", token);
+    // TODO(graph): HA /api/history/period and CGM batch backfill -> graph_backfill().
+}
+
 static void integration_update_task(void *pvParameters)
 {
     bool update_ok[AVAILABLE_INTEGRATIONS] = {false, false};
@@ -694,6 +715,12 @@ static void integration_update_task(void *pvParameters)
             {
                 ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "WiFi not connected, skipping integration update");
             }
+
+            // Generic graph widget: sample the selected token on its configured
+            // interval (records a gap if the token has no value), and backfill
+            // history from HA/CGM on first enable.
+            graph_sampler_tick(time(NULL));
+            graph_service_backfill();
         }
         else
         {

@@ -585,7 +585,8 @@ const SCREEN_ELEMENT_DEFS = [
     { id: 'text_5', label: 'Text 5', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.text_5 },
     { id: 'text_6', label: 'Text 6', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.text_6 },
     { id: 'text_7', label: 'Text 7', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.text_7 },
-    { id: 'text_8', label: 'Text 8', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.text_8 }
+    { id: 'text_8', label: 'Text 8', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.text_8 },
+    { id: 'graph', label: 'Graph', w: 90, h: 40, img: 'default-graph.jpg', paletteImg: 'palette-graph.png', paletteFitFullImage: true }
 ];
 
 const SCREEN_TEXT_SLOT_IDS = ['text_1', 'text_2', 'text_3', 'text_4', 'text_5', 'text_6', 'text_7', 'text_8'];
@@ -621,6 +622,7 @@ const SCREEN_PALETTE_ORDER = [
     'wifi_off',
     'glucose_level',
     'glucose_trend',
+    'graph',
     'text'
 ];
 
@@ -798,24 +800,29 @@ const SCREEN_BIN_MAGIC = 0x4653584C;
 const SCREEN_BIN_FORMAT = 1;
 const SCREEN_BIN_FONT_LEN = 12;
 const SCREEN_BIN_WIDGET_SIZE = 13;
-const SCREEN_BIN_WIDGET_COUNT = 19;
+const SCREEN_BIN_WIDGET_COUNT = 20; // includes SCREEN_ELEM_GRAPH
 const SCREEN_BIN_SCROLL_LEN = 512;
 const SCREEN_BIN_STATIC_TEXT_LEN = 96;
 const SCREEN_BIN_STATIC_TEXT_COUNT = 8;
+const SCREEN_BIN_GRAPH_SIZE = 56; // screen_graph_cfg_t
 const SCREEN_BIN_HEADER_SIZE = 64;
 const SCREEN_BIN_PROFILE_SIZE =
     SCREEN_BIN_WIDGET_COUNT * SCREEN_BIN_WIDGET_SIZE +
     SCREEN_BIN_SCROLL_LEN +
     SCREEN_BIN_STATIC_TEXT_COUNT * SCREEN_BIN_STATIC_TEXT_LEN +
-    SCREEN_BIN_STATIC_TEXT_LEN * 2;
+    SCREEN_BIN_STATIC_TEXT_LEN * 2 +
+    SCREEN_BIN_GRAPH_SIZE;
 const SCREEN_BIN_WIRE_SIZE = SCREEN_BIN_HEADER_SIZE + SCREEN_BIN_PROFILE_SIZE * 2;
 const SCREEN_BIN_MIME = 'application/vnd.frixos.screen-layout+1';
+
+const GRAPH_VAL_UNSET = -32768; // int16 sentinel for "not set"
+const GRAPH_FLAG = { AUTOSCALE: 0x01, SHOW_AXIS: 0x02, BAND: 0x04, BACKFILL: 0x08, SHOW_VALUE: 0x10, BOOLEAN: 0x20 };
 
 /* Firmware widget[] index order (screen_element_id_t). */
 const SCREEN_WIRE_ELEM_IDS = [
     'glucose_level', 'glucose_trend', 'wifi_off', 'weather', 'moon', 'time', 'message',
     'text_1', 'text_2', 'text_3', 'text_4', 'text_5', 'text_6', 'text_7', 'text_8',
-    'ampm', 'time_aux', 'digit_label', 'digit_label_aux'
+    'ampm', 'time_aux', 'digit_label', 'digit_label_aux', 'graph'
 ];
 
 function screenHexToRgb(hex, fallback) {
@@ -891,6 +898,62 @@ function screenWriteWidget(view, offset, elem) {
     view.setUint8(offset + 12, bg.b);
 }
 
+// Read/write the per-profile screen_graph_cfg_t (56 bytes, packed LE) into an
+// editor-friendly options object. GRAPH_VAL_UNSET maps to null.
+function screenReadGraphCfg(view, off) {
+    const i16 = (o) => { const v = view.getInt16(o, true); return v === GRAPH_VAL_UNSET ? null : v; };
+    const flags = view.getUint8(off + 37);
+    return {
+        token: screenReadFixedString(view, off, 32),
+        interval_min: view.getUint16(off + 32, true) || 5,
+        points: view.getUint8(off + 34) || 60,
+        gwidth: view.getUint8(off + 35) || 90,
+        gheight: view.getUint8(off + 36) || 40,
+        autoscale: !!(flags & GRAPH_FLAG.AUTOSCALE),
+        show_axis: !!(flags & GRAPH_FLAG.SHOW_AXIS),
+        band_on: !!(flags & GRAPH_FLAG.BAND),
+        backfill: !!(flags & GRAPH_FLAG.BACKFILL),
+        show_value: !!(flags & GRAPH_FLAG.SHOW_VALUE),
+        boolean: !!(flags & GRAPH_FLAG.BOOLEAN),
+        band_low: i16(off + 38),
+        band_high: i16(off + 40),
+        y_min: i16(off + 42),
+        y_max: i16(off + 44),
+        band_color: screenRgbToHex(view.getUint8(off + 46), view.getUint8(off + 47), view.getUint8(off + 48)),
+        warn_color: screenRgbToHex(view.getUint8(off + 49), view.getUint8(off + 50), view.getUint8(off + 51)),
+        axis_color: screenRgbToHex(view.getUint8(off + 52), view.getUint8(off + 53), view.getUint8(off + 54))
+    };
+}
+
+function screenWriteGraphCfg(view, off, o) {
+    o = o || {};
+    const i16 = (v) => (v == null ? GRAPH_VAL_UNSET : (v | 0));
+    screenWriteFixedString(view, off, 32, o.token || '');
+    view.setUint16(off + 32, o.interval_min != null ? o.interval_min : 5, true);
+    view.setUint8(off + 34, o.points != null ? o.points : 60);
+    view.setUint8(off + 35, o.gwidth != null ? o.gwidth : 90);
+    view.setUint8(off + 36, o.gheight != null ? o.gheight : 40);
+    let flags = 0;
+    if (o.autoscale) flags |= GRAPH_FLAG.AUTOSCALE;
+    if (o.show_axis) flags |= GRAPH_FLAG.SHOW_AXIS;
+    if (o.band_on) flags |= GRAPH_FLAG.BAND;
+    if (o.backfill) flags |= GRAPH_FLAG.BACKFILL;
+    if (o.show_value) flags |= GRAPH_FLAG.SHOW_VALUE;
+    if (o.boolean) flags |= GRAPH_FLAG.BOOLEAN;
+    view.setUint8(off + 37, flags);
+    view.setInt16(off + 38, i16(o.band_low), true);
+    view.setInt16(off + 40, i16(o.band_high), true);
+    view.setInt16(off + 42, i16(o.y_min), true);
+    view.setInt16(off + 44, i16(o.y_max), true);
+    const bc = screenHexToRgb(o.band_color, { r: 40, g: 60, b: 40 });
+    const wc = screenHexToRgb(o.warn_color, { r: 255, g: 80, b: 80 });
+    const ac = screenHexToRgb(o.axis_color, { r: 120, g: 120, b: 120 });
+    view.setUint8(off + 46, bc.r); view.setUint8(off + 47, bc.g); view.setUint8(off + 48, bc.b);
+    view.setUint8(off + 49, wc.r); view.setUint8(off + 50, wc.g); view.setUint8(off + 51, wc.b);
+    view.setUint8(off + 52, ac.r); view.setUint8(off + 53, ac.g); view.setUint8(off + 54, ac.b);
+    view.setUint8(off + 55, 0); // reserved
+}
+
 function screenWireProfileToJson(view, offset) {
     const profile = {
         elements: [],
@@ -913,6 +976,12 @@ function screenWireProfileToJson(view, offset) {
                 elem.options.width = w.width;
                 elem.options.align = w.align;
             }
+        } else if (id === 'graph') {
+            // line colour reuses the widget colour, background reuses bg
+            elem.options = {
+                color: screenRgbToHex(w.color_r, w.color_g, w.color_b),
+                bg_color: screenRgbToHex(w.bg_r, w.bg_g, w.bg_b)
+            };
         }
         profile.elements.push(elem);
     });
@@ -927,6 +996,12 @@ function screenWireProfileToJson(view, offset) {
     off += SCREEN_BIN_STATIC_TEXT_LEN;
     profile.static_texts.digit_label_aux = screenReadFixedString(view, off, SCREEN_BIN_STATIC_TEXT_LEN);
     off += SCREEN_BIN_STATIC_TEXT_LEN;
+
+    // Per-profile graph config -> merge into the graph element's options.
+    const gcfg = screenReadGraphCfg(view, off);
+    off += SCREEN_BIN_GRAPH_SIZE;
+    const gelem = profile.elements.find(e => e && e.id === 'graph');
+    if (gelem) gelem.options = Object.assign({}, gelem.options || {}, gcfg);
 
     return { profile, offset: off };
 }
@@ -1011,6 +1086,9 @@ function encodeScreenLayoutBinary(layout) {
         screenWriteFixedString(view, off, SCREEN_BIN_STATIC_TEXT_LEN,
             profile.static_texts && profile.static_texts.digit_label_aux != null ? profile.static_texts.digit_label_aux : '');
         off += SCREEN_BIN_STATIC_TEXT_LEN;
+        const gelem = screenFindProfileElement(profile, 'graph');
+        screenWriteGraphCfg(view, off, gelem && gelem.options ? gelem.options : {});
+        off += SCREEN_BIN_GRAPH_SIZE;
     });
 
     return bytes;
@@ -2121,6 +2199,45 @@ function appendScreenTokenButtons(container, textarea) {
     container.appendChild(tokenWrap);
 }
 
+// Default options for a freshly placed graph element.
+function ensureScreenGraphOptions(e) {
+    if (!e.options) e.options = {};
+    const d = {
+        token: '', interval_min: 5, points: 60, gwidth: 90, gheight: 40,
+        autoscale: true, show_axis: true, show_value: true, backfill: true,
+        band_on: false, boolean: false,
+        band_low: null, band_high: null, y_min: null, y_max: null,
+        color: '#00dcff', bg_color: '#000000',
+        band_color: '#283c28', warn_color: '#ff5050', axis_color: '#787878'
+    };
+    for (const k in d) if (e.options[k] === undefined) e.options[k] = d[k];
+    return e.options;
+}
+
+// Suggested numeric tokens for the graph picker. Free text is also allowed
+// (e.g. an [HA:...] token), so this is only a convenience datalist.
+function getGraphNumericTokens() {
+    const base = ['[temp]', '[hum]', '[high]', '[low]', '[wind]', '[gust]',
+        '[precip]', '[uv]', '[pressure]', '[3high]', '[3low]', '[CGM:reading]'];
+    const found = new Set(base);
+    // Scrape [HA:...] and stock-style tokens from the configured message + texts.
+    const scrape = (s) => {
+        if (!s) return;
+        const m = String(s).match(/\[[^\]]+\]/g);
+        if (m) m.forEach(t => found.add(t));
+    };
+    try {
+        if (window.settings && window.settings.p16) scrape(window.settings.p16);
+        ['day', 'night'].forEach(mode => {
+            const p = window.screenLayout && window.screenLayout.profiles && window.screenLayout.profiles[mode];
+            if (!p) return;
+            scrape(p.scroll_text);
+            if (p.static_texts) Object.values(p.static_texts).forEach(scrape);
+        });
+    } catch (_) { /* best effort */ }
+    return Array.from(found);
+}
+
 function renderScreenOptions() {
     const opt = el('screenOptions');
     if (!opt) return;
@@ -2379,6 +2496,79 @@ function renderScreenOptions() {
         setupTokenHighlightTextarea(textArea);
         opt.appendChild(textRow);
         appendScreenTokenButtons(opt, textArea);
+    }
+
+    if (e.id === 'graph') {
+        const o = ensureScreenGraphOptions(e);
+        const T = (k, d) => getNestedTranslation(trans, k) || d;
+
+        const mkRow = (labelText, control) => {
+            const row = document.createElement('div');
+            row.className = 'form-group';
+            const lab = document.createElement('label');
+            lab.textContent = labelText;
+            row.appendChild(lab);
+            row.appendChild(control);
+            opt.appendChild(row);
+            return control;
+        };
+        const mkNumber = (labelText, val, min, max, onCh) => {
+            const inp = document.createElement('input');
+            inp.type = 'number';
+            inp.min = String(min);
+            inp.max = String(max);
+            inp.value = (val == null ? '' : String(val));
+            inp.addEventListener('change', () => { onCh(inp.value); renderScreenCanvas(); });
+            return mkRow(labelText, inp);
+        };
+        const mkColor = (labelText, val, onCh) => {
+            const inp = document.createElement('input');
+            inp.type = 'color';
+            inp.value = val;
+            inp.addEventListener('input', () => { onCh(inp.value); renderScreenCanvas(); });
+            return mkRow(labelText, inp);
+        };
+
+        // Token picker (datalist suggestions; free text allows any token).
+        const tokenInput = document.createElement('input');
+        tokenInput.type = 'text';
+        tokenInput.setAttribute('list', 'graphTokenList');
+        tokenInput.placeholder = '[temp]';
+        tokenInput.value = o.token || '';
+        const dl = document.createElement('datalist');
+        dl.id = 'graphTokenList';
+        getGraphNumericTokens().forEach(t => { const op = document.createElement('option'); op.value = t; dl.appendChild(op); });
+        tokenInput.addEventListener('change', () => { o.token = tokenInput.value.trim(); renderScreenCanvas(); });
+        mkRow(T('screen.graph_token', 'Token to plot'), tokenInput);
+        opt.appendChild(dl);
+
+        mkColor(T('screen.graph_line_color', 'Line color'), o.color || '#00dcff', v => o.color = v);
+        mkColor(T('screen.background_color', 'Background Color'), o.bg_color || '#000000', v => o.bg_color = v);
+
+        mkNumber(T('screen.graph_interval', 'Sample interval (min)'), o.interval_min, 1, 1440, v => o.interval_min = clamp(parseInt(v, 10) || 5, 1, 1440));
+        mkNumber(T('screen.graph_points', 'Data points'), o.points, 2, 100, v => o.points = clamp(parseInt(v, 10) || 60, 2, 100));
+        mkNumber(T('screen.graph_width', 'Width (px)'), o.gwidth, 60, 90, v => o.gwidth = clamp(parseInt(v, 10) || 90, 60, 90));
+        mkNumber(T('screen.graph_height', 'Height (px)'), o.gheight, 28, 60, v => o.gheight = clamp(parseInt(v, 10) || 40, 28, 60));
+
+        appendScreenSwitchRow(opt, { id: 'graph_autoscale', label: T('screen.graph_autoscale', 'Auto Y-scale'), checked: !!o.autoscale, onChange: (on) => { o.autoscale = on; renderScreenOptions(); } });
+        if (!o.autoscale) {
+            mkNumber(T('screen.graph_ymin', 'Y min'), o.y_min, -32767, 32767, v => o.y_min = (v === '' ? null : (parseInt(v, 10) || 0)));
+            mkNumber(T('screen.graph_ymax', 'Y max'), o.y_max, -32767, 32767, v => o.y_max = (v === '' ? null : (parseInt(v, 10) || 0)));
+        }
+        appendScreenSwitchRow(opt, { id: 'graph_axis', label: T('screen.graph_axis', 'Show axis & time labels'), checked: !!o.show_axis, onChange: (on) => { o.show_axis = on; renderScreenOptions(); } });
+        appendScreenSwitchRow(opt, { id: 'graph_value', label: T('screen.graph_value', 'Show current value'), checked: !!o.show_value, onChange: (on) => { o.show_value = on; renderScreenCanvas(); } });
+        appendScreenSwitchRow(opt, { id: 'graph_boolean', label: T('screen.graph_boolean', 'Boolean (step 0/1)'), checked: !!o.boolean, onChange: (on) => { o.boolean = on; renderScreenCanvas(); } });
+        appendScreenSwitchRow(opt, { id: 'graph_backfill', label: T('screen.graph_backfill', 'Backfill history (HA/CGM)'), checked: !!o.backfill, onChange: (on) => { o.backfill = on; } });
+        appendScreenSwitchRow(opt, { id: 'graph_band', label: T('screen.graph_band', 'Show low/high band'), checked: !!o.band_on, onChange: (on) => { o.band_on = on; renderScreenOptions(); } });
+        if (o.band_on) {
+            mkNumber(T('screen.graph_band_low', 'Band low'), o.band_low, -32767, 32767, v => o.band_low = (v === '' ? null : (parseInt(v, 10) || 0)));
+            mkNumber(T('screen.graph_band_high', 'Band high'), o.band_high, -32767, 32767, v => o.band_high = (v === '' ? null : (parseInt(v, 10) || 0)));
+            mkColor(T('screen.graph_band_color', 'Band color'), o.band_color || '#283c28', v => o.band_color = v);
+            mkColor(T('screen.graph_warn_color', 'Out-of-band color'), o.warn_color || '#ff5050', v => o.warn_color = v);
+        }
+        if (o.show_axis) {
+            mkColor(T('screen.graph_axis_color', 'Axis color'), o.axis_color || '#787878', v => o.axis_color = v);
+        }
     }
 }
 
