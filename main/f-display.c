@@ -1597,8 +1597,35 @@ static void apply_screen_layout_positions(void)
 // never held together). Skips the redraw when nothing changed to avoid
 // per-minute flicker.
 //
-// The canvas drawing approach (band/polyline/axis markers) is derived from the
-// CGM glucose graph contributed by Benoit Poirier in PR #180.
+// The canvas drawing approach (band/axis markers) is derived from the CGM
+// glucose graph contributed by Benoit Poirier in PR #180.
+
+// Draw a 2px crisp line into the canvas buffer with Bresenham + direct pixel
+// writes. lv_draw_line does not render thin diagonal lines visibly on this
+// RGB565 canvas (anti-aliased coverage fades out), so the trend line is drawn
+// by hand. Pixels are clamped to the canvas bounds.
+static void graph_px_line(lv_obj_t *cv, int x0, int y0, int x1, int y1, int w, int h, lv_color_t c)
+{
+  int dx = abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
+  int dy = -abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
+  int err = dx + dy;
+  for (;;)
+  {
+    for (int ox = 0; ox <= 1; ox++)
+      for (int oy = 0; oy <= 1; oy++)
+      {
+        int px = x0 + ox, py = y0 + oy;
+        if (px >= 0 && px < w && py >= 0 && py < h)
+          lv_canvas_set_px(cv, px, py, c, LV_OPA_COVER);
+      }
+    if (x0 == x1 && y0 == y1)
+      break;
+    int e2 = 2 * err;
+    if (e2 >= dy) { err += dy; x0 += sx; }
+    if (e2 <= dx) { err += dx; y0 += sy; }
+  }
+}
+
 void update_graph(void)
 {
   if (!graph_canvas)
@@ -1756,53 +1783,8 @@ void update_graph(void)
     }
   }
 
-  // 2. Polyline (or boolean step). Connect each valid sample to the PREVIOUS
-  // valid one, skipping empty bins between them — CGM/history is often sparser
-  // than the bin interval (e.g. 15-min readings in 5-min bins), so adjacent
-  // bins are rarely both filled. Lift the pen only across a genuinely long gap
-  // so a real data outage isn't bridged with a straight line.
-  if (valid >= 2)
-  {
-    lv_draw_line_dsc_t ld;
-    lv_draw_line_dsc_init(&ld);
-    ld.width = 2;
-    int max_gap = g->points / 2; // empty-bin run to bridge before it's an outage
-    if (max_gap < 4)
-      max_gap = 4;
-    int prev = -1; // index of the last valid sample
-    for (int i = 0; i < n; i++)
-    {
-      if (samp[i] == GRAPH_VAL_UNSET)
-        continue;
-      if (prev >= 0 && (i - prev) <= max_gap)
-      {
-        float v1 = samp[prev], v2 = samp[i];
-        bool warn = false;
-        if (band_on && g->band_low != GRAPH_VAL_UNSET && g->band_high != GRAPH_VAL_UNSET)
-        {
-          float avg = (v1 + v2) * 0.5f;
-          if (avg < (float)g->band_low || avg > (float)g->band_high)
-            warn = true;
-        }
-        ld.color = warn ? col_warn : col_line;
-        int x1 = I2X(prev), x2 = I2X(i);
-        int y1 = CY(V2Y(v1)), y2 = CY(V2Y(v2));
-        if (boolean)
-        {
-          ld.p1.x = x1; ld.p1.y = y1; ld.p2.x = x2; ld.p2.y = y1; // horizontal hold
-          lv_draw_line(&layer, &ld);
-          ld.p1.x = x2; ld.p1.y = y1; ld.p2.x = x2; ld.p2.y = y2; // vertical step
-          lv_draw_line(&layer, &ld);
-        }
-        else
-        {
-          ld.p1.x = x1; ld.p1.y = y1; ld.p2.x = x2; ld.p2.y = y2;
-          lv_draw_line(&layer, &ld);
-        }
-      }
-      prev = i;
-    }
-  }
+  // (The trend polyline is drawn after finish_layer with direct pixels — see
+  // graph_px_line — because lv_draw_line doesn't render thin diagonals here.)
 
   // 3. Axis + relative time labels.
   if (show_axis)
@@ -1870,6 +1852,47 @@ void update_graph(void)
   }
 
   lv_canvas_finish_layer(graph_canvas, &layer);
+
+  // 5. Trend polyline (direct pixels, on top of the band/axes). Connect each
+  // valid sample to the PREVIOUS valid one, skipping empty bins between them
+  // (CGM history is sparser than the bin interval); break only across a long
+  // gap so a real outage isn't bridged with a straight line.
+  if (valid >= 2)
+  {
+    int max_gap = g->points / 2;
+    if (max_gap < 4)
+      max_gap = 4;
+    int prev = -1;
+    for (int i = 0; i < n; i++)
+    {
+      if (samp[i] == GRAPH_VAL_UNSET)
+        continue;
+      if (prev >= 0 && (i - prev) <= max_gap)
+      {
+        float v1 = samp[prev], v2 = samp[i];
+        lv_color_t c = col_line;
+        if (band_on && g->band_low != GRAPH_VAL_UNSET && g->band_high != GRAPH_VAL_UNSET)
+        {
+          float avg = (v1 + v2) * 0.5f;
+          if (avg < (float)g->band_low || avg > (float)g->band_high)
+            c = col_warn;
+        }
+        int x1 = I2X(prev), x2 = I2X(i);
+        int y1 = CY(V2Y(v1)), y2 = CY(V2Y(v2));
+        if (boolean)
+        {
+          graph_px_line(graph_canvas, x1, y1, x2, y1, gw, gh, c); // hold
+          graph_px_line(graph_canvas, x2, y1, x2, y2, gw, gh, c); // step
+        }
+        else
+        {
+          graph_px_line(graph_canvas, x1, y1, x2, y2, gw, gh, c);
+        }
+      }
+      prev = i;
+    }
+  }
+
   lv_obj_clear_flag(graph_canvas, LV_OBJ_FLAG_HIDDEN);
   lvgl_port_unlock();
 
