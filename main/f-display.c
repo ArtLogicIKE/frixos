@@ -1912,23 +1912,59 @@ void update_graph(void)
       if (prev >= 0 && (i - prev) <= max_gap)
       {
         float v1 = samp[prev], v2 = samp[i];
-        lv_color_t c = col_line;
-        if (band_on && g->band_low != GRAPH_VAL_UNSET && g->band_high != GRAPH_VAL_UNSET)
-        {
-          float avg = (v1 + v2) * 0.5f; // ring units (x10); band is real -> x10
-          if (avg < (float)g->band_low * 10.0f || avg > (float)g->band_high * 10.0f)
-            c = col_warn;
-        }
         int x1 = I2X(prev), x2 = I2X(i);
         int y1 = CY(V2Y(v1)), y2 = CY(V2Y(v2));
+        const bool have_band = band_on && g->band_low != GRAPH_VAL_UNSET && g->band_high != GRAPH_VAL_UNSET;
         if (boolean)
         {
+          lv_color_t c = col_line;
+          if (have_band)
+          {
+            float avg = (v1 + v2) * 0.5f; // ring units (x10); band is real -> x10
+            if (avg < (float)g->band_low * 10.0f || avg > (float)g->band_high * 10.0f)
+              c = col_warn;
+          }
           graph_px_line(graph_canvas, x1, y1, x2, y1, gw, gh, c, thick); // hold
           graph_px_line(graph_canvas, x2, y1, x2, y2, gw, gh, c, thick); // step
         }
+        else if (have_band)
+        {
+          // Split the segment at each band-threshold crossing so the warn colour
+          // covers exactly the out-of-band part: colouring by the segment average
+          // flipped the whole segment up to half a step before the real crossing.
+          const float lo10 = (float)g->band_low * 10.0f;
+          const float hi10 = (float)g->band_high * 10.0f;
+          const float dv = v2 - v1;
+          float ts[2];
+          int nts = 0;
+          if (fabsf(dv) > 1e-6f)
+          {
+            const float cand[2] = {lo10, hi10};
+            for (int k = 0; k < 2; k++)
+            {
+              float t = (cand[k] - v1) / dv;
+              if (t > 0.0f && t < 1.0f) ts[nts++] = t;
+            }
+            if (nts == 2 && ts[0] > ts[1]) { float tmp = ts[0]; ts[0] = ts[1]; ts[1] = tmp; }
+          }
+          float prevT = 0.0f;
+          int ax = x1, ay = y1;
+          for (int s = 0; s <= nts; s++)
+          {
+            float curT = (s < nts) ? ts[s] : 1.0f;
+            float midV = v1 + dv * ((prevT + curT) * 0.5f);
+            lv_color_t c = (midV < lo10 || midV > hi10) ? col_warn : col_line;
+            int bx = x1 + (int)lroundf((float)(x2 - x1) * curT);
+            int by = y1 + (int)lroundf((float)(y2 - y1) * curT);
+            graph_px_line(graph_canvas, ax, ay, bx, by, gw, gh, c, thick);
+            ax = bx;
+            ay = by;
+            prevT = curT;
+          }
+        }
         else
         {
-          graph_px_line(graph_canvas, x1, y1, x2, y2, gw, gh, c, thick);
+          graph_px_line(graph_canvas, x1, y1, x2, y2, gw, gh, col_line, thick);
         }
       }
       prev = i;
