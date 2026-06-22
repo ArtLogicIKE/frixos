@@ -11,7 +11,7 @@ def verify_translations(page: Page):
     print("Screenshot of English taken.")
 
     # Toggle language dropdown
-    page.click("#language-toggle")
+    page.click("#langBtn")
     page.wait_for_timeout(500)
 
     # Change to German (de)
@@ -22,11 +22,7 @@ def verify_translations(page: Page):
     page.screenshot(path="/home/jules/verification/german.png")
     print("Screenshot of German taken.")
 
-    # Navigate to Advanced section
-    page.click('a[href="#advanced"]')
-    page.wait_for_timeout(500)
-
-    # Enter some text to verify counter
+    # Enter some text to verify counter (on Settings tab)
     page.fill("#message", "Hello Frixos!")
     page.wait_for_timeout(500)
 

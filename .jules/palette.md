@@ -19,3 +19,7 @@
 ## 2025-05-16 - [Visual Samples as Interactive Controls]
 **Learning:** When visual samples (such as fonts) correspond to underlying configuration settings, they should be implemented as accessible, interactive controls. This reduces cognitive load by allowing users to directly interact with what they see, rather than translating a visual preference into a dropdown selection.
 **Action:** Implement `role="button"`, `tabindex="0"`, and localized `aria-label` for all visual sample boxes to ensure they are discoverable and usable as primary input mechanisms.
+
+## 2026-06-22 - [Accessible Menu State Management]
+**Learning:** When implementing interactive menus in vanilla JS, failing to reset the `aria-expanded` attribute to `false` when the menu closes via item selection or clicking outside creates a confusing experience for screen reader users. Ensuring this state is always synchronized with the visual visibility of the menu is a high-impact micro-UX win for accessibility.
+**Action:** Always include explicit `aria-expanded` reset logic in both item selection handlers and "click-outside" document listeners for accessible menus.
