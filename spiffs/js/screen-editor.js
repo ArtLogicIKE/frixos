@@ -589,6 +589,8 @@ const SCREEN_ELEMENT_DEFS = [
     { id: 'graph', label: 'Graph', w: 80, h: 36, img: 'default-graph.jpg', paletteImg: 'palette-graph.png', paletteFitFullImage: true }
 ];
 
+const SCREEN_ELEMENT_DEFS_MAP = new Map(SCREEN_ELEMENT_DEFS.map(d => [d.id, d]));
+
 const SCREEN_TEXT_SLOT_IDS = ['text_1', 'text_2', 'text_3', 'text_4', 'text_5', 'text_6', 'text_7', 'text_8'];
 
 const SCREEN_PALETTE_TEXT_DEF = {
@@ -1122,6 +1124,7 @@ window.screenLayout = null;
 window.screenEditor = {
     mode: 'day', // 'day' | 'night'
     scale: 4,
+    dragRafHandle: null,
     dragging: null, // { id, originX, originY, startLeft, startTop, fromPalette }
     selectedId: null,
     cursorX: null,
@@ -1142,7 +1145,7 @@ function getProfileObj(mode) {
 function findElementDef(id) {
     if (id === 'text') return SCREEN_PALETTE_TEXT_DEF;
     if (id === 'screen_settings') return SCREEN_PALETTE_SETTINGS_DEF;
-    return SCREEN_ELEMENT_DEFS.find(d => d.id === id) || null;
+    return SCREEN_ELEMENT_DEFS_MAP.get(id) || null;
 }
 
 function evenPx(value) {
@@ -2612,7 +2615,11 @@ function beginDrag(id, pointerEvent, fromPalette) {
         startLeft,
         startTop,
         fromPalette,
-        moved: false
+        moved: false,
+        // Cache the canvas bounding rectangle and scale to eliminate layout-thrashing
+        // getBoundingClientRect() calls during high-frequency pointer moves.
+        rect: canvas.getBoundingClientRect(),
+        scale
     };
     updateScreenStatusLine();
 }
@@ -2642,7 +2649,7 @@ function onScreenPointerMove(e) {
     const profile = getProfileObj(window.screenEditor.mode);
     if (!profile) return;
     const elem = ensureElementInProfile(profile, d.id);
-    const scale = window.screenEditor.scale || getScreenScale();
+    const scale = d.scale;
 
     const dx = e.clientX - d.originX;
     const dy = e.clientY - d.originY;
@@ -2655,7 +2662,7 @@ function onScreenPointerMove(e) {
             elem.enabled = 1;
         }
         d.moved = true;
-        const rect = canvas.getBoundingClientRect();
+        const rect = d.rect;
         const def = findElementDef(d.id);
         const elementId = def ? def.id : d.id;
         elem.x = clamp(Math.round((e.clientX - rect.left - 10) / scale), 0, SCREEN_SIZE - 1);
@@ -2671,14 +2678,26 @@ function onScreenPointerMove(e) {
         elem.y = visualYToLayoutY(visualY, elementId);
     }
 
-    renderScreenCanvas();
+    // Throttle rendering to the display's refresh rate (typically 60Hz) using RAF.
+    // This prevents redundant DOM re-renders and reduces CPU/GPU load during dragging.
+    if (!window.screenEditor.dragRafHandle) {
+        window.screenEditor.dragRafHandle = requestAnimationFrame(() => {
+            window.screenEditor.dragRafHandle = null;
+            renderScreenCanvas();
+        });
+    }
 }
 
 function onScreenPointerUp(e) {
     const d = window.screenEditor.dragging;
     if (!d) return;
+    if (window.screenEditor.dragRafHandle) {
+        cancelAnimationFrame(window.screenEditor.dragRafHandle);
+        window.screenEditor.dragRafHandle = null;
+    }
     const placedFromPalette = d.fromPalette && d.moved && isScreenStaticTextElement(d.id);
     window.screenEditor.dragging = null;
+    renderScreenCanvas();
     updateScreenStatusLine();
     if (placedFromPalette) renderScreenPalette();
 }
