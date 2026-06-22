@@ -20,6 +20,7 @@ default-units.jpg
 default-weather.jpg
 default-wifi-off.jpg
 default.layout
+diabetic.layout
 favicon.ico
 ficasso-ampm.jpg
 ficasso-dot.jpg
