@@ -69,7 +69,13 @@ const json = vm.runInContext(
        show_axis: true,
        show_value: true,
        backfill: true,
-       band_on: false,
+       // Standard CGM target range. [CGM:glucose] is always mg/dL
+       // (current_gl_mgdl), so 70-180 is correct regardless of display unit.
+       // The line turns warn-coloured outside this band, the thresholds are
+       // drawn, and the Y axis always keeps both in view.
+       band_on: true,
+       band_low: 70,
+       band_high: 180,
        boolean: false,
        thick: false,
      });
