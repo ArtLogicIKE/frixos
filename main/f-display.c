@@ -1846,7 +1846,7 @@ void update_graph(void)
     lv_area_t yat = {0, py1, px1 - 2, py1 + 8};
     lv_draw_label(&layer, &lb, &yat);
     lb.text = ymin_s;
-    lv_area_t yab = {0, py2 - 8, px1 - 2, py2};
+    lv_area_t yab = {0, py2, px1 - 2, py2 + 8};
     lv_draw_label(&layer, &lb, &yab);
 
     char xnow[6] = "now";
