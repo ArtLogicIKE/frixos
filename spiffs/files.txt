@@ -21,6 +21,7 @@ default-weather.jpg
 default-wifi-off.jpg
 default.layout
 diabetic.layout
+weather.layout
 favicon.ico
 ficasso-ampm.jpg
 ficasso-dot.jpg
