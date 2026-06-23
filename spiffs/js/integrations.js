@@ -15,7 +15,13 @@ const INT_MAP = {
 async function loadIntegrations() {
   await loadGroup('group=integrations');
   const s = S();
-  for (const [id, p] of Object.entries(INT_MAP)) { if (s[p] !== undefined) setVal(id, s[p]); }
+  for (const [id, p] of Object.entries(INT_MAP)) {
+    if (s[p] !== undefined) {
+      setVal(id, s[p]);
+      const c = el(id + '-counter');
+      if (c) updateCharCounter(el(id), c);
+    }
+  }
   updateCgmExclusivity();
 }
 sectionLoaders.integrations = loadIntegrations;

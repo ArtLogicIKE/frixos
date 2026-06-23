@@ -156,6 +156,7 @@ async function boot() {
   applyTheme(s && s.p40 !== undefined ? !!s.p40 : true); // default dark
   const lang = (s && s.p41 != null && LANGUAGES[s.p41]) ? LANGUAGES[s.p41] : 'en';
   await setLanguage(lang, false);
+  initCounters();
 
   loadedSections.settings = true;
   if (sectionLoaders.settings) await sectionLoaders.settings();

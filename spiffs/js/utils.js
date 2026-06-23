@@ -121,3 +121,25 @@ function updateCgmExclusivity() {
   const d = dexcom.value !== '0', l = libre.value !== '0', n = nsUrl.value.trim() !== '';
   libre.disabled = d || n; nsUrl.disabled = d || l; dexcom.disabled = l || n;
 }
+
+/* ---------- character counters ---------- */
+function updateCharCounter(input, counter) {
+  if (!input || !counter) return;
+  const len = input.value.length;
+  const max = input.maxLength;
+  if (max < 0) return;
+  counter.textContent = len + ' / ' + max;
+  counter.classList.toggle('warn', len >= max * 0.9 && len < max);
+  counter.classList.toggle('max', len >= max);
+}
+function initCounters() {
+  $$('[maxlength]').forEach(input => {
+    const counter = el(input.id + '-counter');
+    if (counter) {
+      input.setAttribute('aria-describedby', (input.getAttribute('aria-describedby') || '') + ' ' + counter.id);
+      counter.setAttribute('aria-live', 'polite');
+      input.addEventListener('input', () => updateCharCounter(input, counter));
+      updateCharCounter(input, counter);
+    }
+  });
+}

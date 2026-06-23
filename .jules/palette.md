@@ -19,3 +19,7 @@
 ## 2025-05-16 - [Visual Samples as Interactive Controls]
 **Learning:** When visual samples (such as fonts) correspond to underlying configuration settings, they should be implemented as accessible, interactive controls. This reduces cognitive load by allowing users to directly interact with what they see, rather than translating a visual preference into a dropdown selection.
 **Action:** Implement `role="button"`, `tabindex="0"`, and localized `aria-label` for all visual sample boxes to ensure they are discoverable and usable as primary input mechanisms.
+
+## 2026-06-23 - [Character Counter Accessibility]
+**Learning:** Adding character counters is a great UX win, but they must be accessible. Using `aria-describedby` to link the input to its counter and `aria-live="polite"` on the counter ensures screen reader users are kept informed of the remaining space as they type.
+**Action:** Always pair character counters with appropriate ARIA attributes (`aria-describedby` and `aria-live`) to ensure accessibility for all users.
