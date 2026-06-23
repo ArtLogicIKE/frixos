@@ -140,6 +140,11 @@ void screen_layout_apply_factory_defaults(screen_layout_t *layout)
     strncpy(p->scroll_text, eeprom_message, SCROLL_MSG_LENGTH - 1);
     p->scroll_text[SCROLL_MSG_LENGTH - 1] = '\0';
     screen_layout_init_static_texts(p);
+
+    // User icon slots: disabled by default, centred so they are visible when
+    // first enabled. Source is S:/icon<N>.jpg (uploaded by the user).
+    for (int i = 0; i < SCREEN_ICON_COUNT; i++)
+      p->widget[SCREEN_ELEM_ICON_1 + i] = (screen_widget_t){.enabled = 0, .x = 48, .y = 48, .z = 2};
   }
 }
 

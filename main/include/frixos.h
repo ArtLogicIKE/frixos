@@ -237,10 +237,12 @@ extern char boot_ip_address[18];
 // Screen layout configuration
 // --------------------------
 // Two profiles: [0]=day, [1]=night. Selected at runtime by font_index (lux-driven).
-#define FRIXOS_SCREEN_LAYOUT_VERSION 9
+#define FRIXOS_SCREEN_LAYOUT_VERSION 10
 #define FRIXOS_SCREEN_LAYOUT_PROFILES 2
 #define SCREEN_STATIC_TEXT_LENGTH 96
 #define SCREEN_STATIC_TEXT_COUNT 8
+#define SCREEN_ICON_COUNT 8       // user JPG icon slots (S:/icon1.jpg .. icon8.jpg)
+#define SCREEN_ICON_MAX_DIM 64    // max icon dimension (px), enforced client-side
 
 #define SCREEN_MSG_ALIGN_LEFT 0
 #define SCREEN_MSG_ALIGN_CENTER 1
@@ -268,6 +270,15 @@ typedef enum
   SCREEN_ELEM_DIGIT_LABEL = 17,
   SCREEN_ELEM_DIGIT_LABEL_AUX = 18,
   SCREEN_ELEM_GRAPH = 19, // generic single-token time-series graph
+  // User JPG icons, slot N -> S:/icon<N>.jpg (static, decoded on draw, not cached).
+  SCREEN_ELEM_ICON_1 = 20,
+  SCREEN_ELEM_ICON_2 = 21,
+  SCREEN_ELEM_ICON_3 = 22,
+  SCREEN_ELEM_ICON_4 = 23,
+  SCREEN_ELEM_ICON_5 = 24,
+  SCREEN_ELEM_ICON_6 = 25,
+  SCREEN_ELEM_ICON_7 = 26,
+  SCREEN_ELEM_ICON_8 = 27,
   SCREEN_ELEM_COUNT
 } screen_element_id_t;
 
@@ -373,6 +384,16 @@ static inline bool screen_elem_has_text_layout(screen_element_id_t id)
 static inline int screen_static_text_index(screen_element_id_t id)
 {
   return (int)id - (int)SCREEN_ELEM_TEXT_1;
+}
+
+static inline bool screen_elem_is_icon(screen_element_id_t id)
+{
+  return id >= SCREEN_ELEM_ICON_1 && id <= SCREEN_ELEM_ICON_8;
+}
+
+static inline int screen_icon_index(screen_element_id_t id)
+{
+  return (int)id - (int)SCREEN_ELEM_ICON_1;
 }
 
 void build_integration_message_corpus(char *out, size_t out_size);

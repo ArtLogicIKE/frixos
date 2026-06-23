@@ -118,6 +118,13 @@ lv_obj_t *label_msg = NULL;
 lv_obj_t *label_msg_loop = NULL; // second label for seamless infinite scrolling
 lv_obj_t *label_static[SCREEN_STATIC_TEXT_COUNT] = {NULL};
 
+// User JPG icons: one lv_image per slot, pointed at S:/icon<N>.jpg. Static images
+// kept in flash and decoded on draw (LV cache is 0), so no bitmap is held in RAM.
+// icon_src_ok[i] caches whether icon<i+1>.jpg exists (refreshed in display_changed)
+// so the hot visibility path doesn't stat SPIFFS every loop.
+lv_obj_t *img_icon[SCREEN_ICON_COUNT] = {NULL};
+static bool icon_src_ok[SCREEN_ICON_COUNT] = {false};
+
 // Generic graph widget canvas (RGB565). The buffer is lazily (re)allocated at
 // the configured width x height to keep heap pressure low — important when the
 // graph coincides with a heavy TLS fetch (e.g. CGM). Realloc only happens on
@@ -383,6 +390,36 @@ static void update_static_text_labels(void)
     replace_placeholders(layout->static_text[i], rendered, sizeof(rendered));
     apply_static_text_widget(label_static[i], w, rendered);
     show_object(label_static[i], w->enabled != 0 && time_valid);
+  }
+}
+
+int check_file(char *filename); // defined later; used by update_icon_srcs
+
+// Point each icon image at S:/icon<N>.jpg if that file exists, caching the result
+// in icon_src_ok[] so the visibility path doesn't stat SPIFFS every loop. Called
+// from display_changed() (boot, layout/theme change, and after an icon upload +
+// re-apply). The JPG stays in flash; LVGL decodes it on draw (cache is 0).
+static void update_icon_srcs(void)
+{
+  char path[32];
+  char src[24];
+  for (int i = 0; i < SCREEN_ICON_COUNT; i++)
+  {
+    if (img_icon[i] == NULL)
+      continue;
+    snprintf(path, sizeof(path), "/spiffs/icon%d.jpg", i + 1);
+    if (check_file(path))
+    {
+      snprintf(src, sizeof(src), "S:/icon%d.jpg", i + 1);
+      lv_image_set_src(img_icon[i], src);
+      lv_image_set_inner_align(img_icon[i], LV_ALIGN_TOP_LEFT);
+      icon_src_ok[i] = true;
+    }
+    else
+    {
+      icon_src_ok[i] = false;
+      show_object(img_icon[i], false);
+    }
   }
 }
 
@@ -869,6 +906,12 @@ void startup_display(void)
     lv_obj_add_flag(dots[i], LV_OBJ_FLAG_HIDDEN);
     aux_dots[i] = lv_image_create(lv_scr_act());
     lv_obj_add_flag(aux_dots[i], LV_OBJ_FLAG_HIDDEN);
+  }
+  for (int i = 0; i < SCREEN_ICON_COUNT; i++)
+  {
+    img_icon[i] = lv_image_create(lv_scr_act());
+    lv_image_set_inner_align(img_icon[i], LV_ALIGN_TOP_LEFT);
+    lv_obj_add_flag(img_icon[i], LV_OBJ_FLAG_HIDDEN);
   }
 
   // hide objects
@@ -1433,6 +1476,11 @@ static void apply_widget_visibility(const screen_layout_profile_t *layout)
     show_object(img_glucose, layout->widget[SCREEN_ELEM_GLUCOSE_LEVEL].enabled && is_glucose_on());
     show_object(img_glucose_trend, layout->widget[SCREEN_ELEM_GLUCOSE_TREND].enabled && is_glucose_on() && is_glucose_fresh());
   }
+
+  // User icons: shown when enabled and the JPG exists (icon_src_ok cached by
+  // update_icon_srcs). Hidden during the boot splash via the !time_valid return.
+  for (int i = 0; i < SCREEN_ICON_COUNT; i++)
+    show_object(img_icon[i], icon_src_ok[i] && layout->widget[SCREEN_ELEM_ICON_1 + i].enabled);
 }
 
 #define SCREEN_LAYER_MAX 4
@@ -1503,6 +1551,8 @@ static void screen_layout_collect_elem_objects(screen_element_id_t id, lv_obj_t 
   default:
     if (screen_elem_is_static_text(id))
       screen_layout_push_obj(label_static[screen_static_text_index(id)], objs, count, 12);
+    else if (screen_elem_is_icon(id))
+      screen_layout_push_obj(img_icon[screen_icon_index(id)], objs, count, 12);
     break;
   }
 }
@@ -1579,6 +1629,11 @@ static void apply_screen_layout_positions(void)
   {
     const screen_widget_t *w_graph = &layout->widget[SCREEN_ELEM_GRAPH];
     lv_obj_align(graph_canvas, LV_ALIGN_TOP_LEFT, layout_abs_x(w_graph), layout_abs_y(w_graph));
+  }
+  for (int i = 0; i < SCREEN_ICON_COUNT; i++)
+  {
+    const screen_widget_t *w_icon = &layout->widget[SCREEN_ELEM_ICON_1 + i];
+    lv_obj_align(img_icon[i], LV_ALIGN_TOP_LEFT, layout_abs_x(w_icon), layout_abs_y(w_icon));
   }
   update_static_text_labels();
   update_digit_label_widgets();
@@ -2139,6 +2194,7 @@ void display_changed(void)
   // Invalidate character width cache when font changes
   invalidate_char_width_cache();
 
+  update_icon_srcs(); // (re)point icon images at S:/icon<N>.jpg before visibility
   apply_widget_visibility(layout);
   if (!screen_layout_positions_live)
   {

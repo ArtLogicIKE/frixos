@@ -1,5 +1,5 @@
 {
-  "version": 9,
+  "version": 10,
   "scroll_delay": 65,
   "day_font": "bold",
   "night_font": "bold",
@@ -234,6 +234,62 @@
           }
         },
         {
+          "id": "icon_1",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2
+        },
+        {
+          "id": "icon_2",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2
+        },
+        {
+          "id": "icon_3",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2
+        },
+        {
+          "id": "icon_4",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2
+        },
+        {
+          "id": "icon_5",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2
+        },
+        {
+          "id": "icon_6",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2
+        },
+        {
+          "id": "icon_7",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2
+        },
+        {
+          "id": "icon_8",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2
+        },
+        {
           "id": "graph",
           "enabled": 0,
           "x": 0,
@@ -464,6 +520,62 @@
             "width": 80,
             "align": 0
           }
+        },
+        {
+          "id": "icon_1",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2
+        },
+        {
+          "id": "icon_2",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2
+        },
+        {
+          "id": "icon_3",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2
+        },
+        {
+          "id": "icon_4",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2
+        },
+        {
+          "id": "icon_5",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2
+        },
+        {
+          "id": "icon_6",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2
+        },
+        {
+          "id": "icon_7",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2
+        },
+        {
+          "id": "icon_8",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2
         },
         {
           "id": "graph",

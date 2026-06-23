@@ -7,9 +7,9 @@ static const char *TAG = "f-screen-bin";
 
 _Static_assert(sizeof(screen_widget_t) == 13, "screen_widget_t wire size changed");
 _Static_assert(sizeof(screen_graph_cfg_t) == 88, "screen_graph_cfg_t wire size changed");
-_Static_assert(sizeof(screen_layout_profile_t) == 1820, "screen_layout_profile_t wire size changed");
+_Static_assert(sizeof(screen_layout_profile_t) == 1924, "screen_layout_profile_t wire size changed"); // +8 icon widgets
 _Static_assert(sizeof(screen_layout_bin_header_t) == 64, "screen_layout_bin_header_t size changed");
-_Static_assert(FRIXOS_SCREEN_LAYOUT_WIRE_SIZE == 3704, "screen_layout_wire_t size changed");
+_Static_assert(FRIXOS_SCREEN_LAYOUT_WIRE_SIZE == 3912, "screen_layout_wire_t size changed");
 
 static int clamp_int(int v, int lo, int hi)
 {

@@ -626,6 +626,12 @@ function getPreviewImageUrl(def, inMatrix) {
         const font = inMatrix ? getScreenAuxFont(window.screenEditor.mode) : 'bold';
         return resolveTimeFontPreviewUrl(font);
     }
+    if (isScreenIconElement(def.id)) {
+        // Show the uploaded JPG only once it has loaded (dims cached); until then
+        // return null so the placeholder "Icon N" label is shown instead.
+        const dims = getIconDims(def.id);
+        return dims ? iconUrl(def.id) : null;
+    }
     const item = SCREEN_THEME_ASSETS[def.id];
     if (item && inMatrix) {
         return resolveThemeAssetUrl(getScreenTimeFont(window.screenEditor.mode), item);
@@ -653,7 +659,15 @@ const SCREEN_ELEMENT_DEFS = [
     { id: 'text_6', label: 'Text 6', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.text_6 },
     { id: 'text_7', label: 'Text 7', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.text_7 },
     { id: 'text_8', label: 'Text 8', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.text_8 },
-    { id: 'graph', label: 'Graph', w: 80, h: 36, img: 'default-graph.jpg', paletteImg: 'palette-graph.png', paletteFitFullImage: true }
+    { id: 'graph', label: 'Graph', w: 80, h: 36, img: 'default-graph.jpg', paletteImg: 'palette-graph.png', paletteFitFullImage: true },
+    { id: 'icon_1', label: 'Icon 1', w: 24, h: 24, isIcon: true, paletteFitFullImage: true },
+    { id: 'icon_2', label: 'Icon 2', w: 24, h: 24, isIcon: true, paletteFitFullImage: true },
+    { id: 'icon_3', label: 'Icon 3', w: 24, h: 24, isIcon: true, paletteFitFullImage: true },
+    { id: 'icon_4', label: 'Icon 4', w: 24, h: 24, isIcon: true, paletteFitFullImage: true },
+    { id: 'icon_5', label: 'Icon 5', w: 24, h: 24, isIcon: true, paletteFitFullImage: true },
+    { id: 'icon_6', label: 'Icon 6', w: 24, h: 24, isIcon: true, paletteFitFullImage: true },
+    { id: 'icon_7', label: 'Icon 7', w: 24, h: 24, isIcon: true, paletteFitFullImage: true },
+    { id: 'icon_8', label: 'Icon 8', w: 24, h: 24, isIcon: true }
 ];
 
 const SCREEN_TEXT_SLOT_IDS = ['text_1', 'text_2', 'text_3', 'text_4', 'text_5', 'text_6', 'text_7', 'text_8'];
@@ -664,6 +678,17 @@ const SCREEN_PALETTE_TEXT_DEF = {
     w: 80,
     h: 8,
     dynamicHeight: true
+};
+
+const SCREEN_ICON_SLOT_IDS = ['icon_1', 'icon_2', 'icon_3', 'icon_4', 'icon_5', 'icon_6', 'icon_7', 'icon_8'];
+const SCREEN_ICON_MAX_DIM = 64; // must match firmware SCREEN_ICON_MAX_DIM
+
+const SCREEN_PALETTE_ICON_DEF = {
+    id: 'icon',
+    label: 'New Icon',
+    w: 24,
+    h: 24,
+    isIcon: true
 };
 
 const SCREEN_PALETTE_SETTINGS_DEF = {
@@ -690,7 +715,8 @@ const SCREEN_PALETTE_ORDER = [
     'glucose_level',
     'glucose_trend',
     'graph',
-    'text'
+    'text',
+    'icon'
 ];
 
 const SCREEN_ALIGNMENT_GRID_LINES = [20, 30, 40, 90, 100, 110];
@@ -721,6 +747,7 @@ function getTextPaletteLabel(profile, id) {
 
 function getScreenPaletteItemLabel(def, profile) {
     if (def.id === 'text') return getScreenElementLabel('text');
+    if (def.id === 'icon') return getScreenElementLabel('icon');
     if (isScreenStaticTextElement(def.id) && profile) return getTextPaletteLabel(profile, def.id);
     return getScreenElementLabel(def.id);
 }
@@ -738,6 +765,25 @@ function getNextTextSlot(profile) {
     return null;
 }
 
+function getNextIconSlot(profile) {
+    if (!profile || !profile.elements) return SCREEN_ICON_SLOT_IDS[0];
+    for (const id of SCREEN_ICON_SLOT_IDS) {
+        const elem = profile.elements.find(e => e.id === id);
+        if (!elem || !elem.enabled) return id;
+    }
+    return null;
+}
+
+function isScreenIconElement(id) {
+    return /^icon_[1-8]$/.test(id);
+}
+
+// Slot id 'icon_3' -> SPIFFS file name 'icon3.jpg' (and URL '/icon3.jpg').
+function iconFileName(id) {
+    const m = /^icon_([1-8])$/.exec(id);
+    return m ? `icon${m[1]}.jpg` : null;
+}
+
 function getScreenPaletteDefs() {
     const profile = getProfileObj(window.screenEditor.mode);
     const items = [];
@@ -753,14 +799,27 @@ function getScreenPaletteDefs() {
             }
             return;
         }
+        if (id === 'icon') {
+            if (getNextIconSlot(profile) !== null) {
+                items.push(SCREEN_PALETTE_ICON_DEF);
+            }
+            return;
+        }
         const def = findElementDef(id);
-        if (def && !isScreenStaticTextElement(def.id)) {
+        if (def && !isScreenStaticTextElement(def.id) && !isScreenIconElement(def.id)) {
             items.push(def);
         }
     });
 
     if (profile) {
         SCREEN_TEXT_SLOT_IDS.forEach(id => {
+            const elem = profile.elements.find(e => e.id === id);
+            if (elem && elem.enabled) {
+                const def = findElementDef(id);
+                if (def) items.push({ ...def });
+            }
+        });
+        SCREEN_ICON_SLOT_IDS.forEach(id => {
             const elem = profile.elements.find(e => e.id === id);
             if (elem && elem.enabled) {
                 const def = findElementDef(id);
@@ -797,6 +856,7 @@ function setScreenGridEnabled(enabled) {
 
 function resolvePaletteElementId(paletteId, profile) {
     if (paletteId === 'text') return getNextTextSlot(profile);
+    if (paletteId === 'icon') return getNextIconSlot(profile);
     return paletteId;
 }
 
@@ -859,6 +919,11 @@ function makeDefaultScreenProfile() {
             options: { font: 0, color: '#ffffff', bg_color: '#000000', width: 80, align: 0 }
         });
     });
+    SCREEN_ICON_SLOT_IDS.forEach(id => {
+        // Icons carry no text styling; only enabled/x/y/z are used. Source is
+        // S:/icon<N>.jpg, uploaded by the user.
+        elements.push({ id, enabled: 0, x: 48, y: 48, z: 2 });
+    });
     return {
         scroll_text: SCREEN_DEFAULT_SCROLL_TEXT,
         static_texts: { ...SCREEN_DEFAULT_STATIC_TEXTS },
@@ -866,14 +931,14 @@ function makeDefaultScreenProfile() {
     };
 }
 
-const SCREEN_LAYOUT_VERSION = 9;
+const SCREEN_LAYOUT_VERSION = 10;
 
 /* Compact binary wire format for /api/screen (must match f-screen-layout-bin.h). */
 const SCREEN_BIN_MAGIC = 0x4653584C;
 const SCREEN_BIN_FORMAT = 1;
 const SCREEN_BIN_FONT_LEN = 12;
 const SCREEN_BIN_WIDGET_SIZE = 13;
-const SCREEN_BIN_WIDGET_COUNT = 20; // includes SCREEN_ELEM_GRAPH
+const SCREEN_BIN_WIDGET_COUNT = 28; // glucose..graph (20) + 8 icon slots
 const SCREEN_BIN_SCROLL_LEN = 512;
 const SCREEN_BIN_STATIC_TEXT_LEN = 96;
 const SCREEN_BIN_STATIC_TEXT_COUNT = 8;
@@ -896,7 +961,8 @@ const GRAPH_FLAG = { AUTOSCALE: 0x01, SHOW_AXIS: 0x02, BAND: 0x04, BACKFILL: 0x0
 const SCREEN_WIRE_ELEM_IDS = [
     'glucose_level', 'glucose_trend', 'wifi_off', 'weather', 'moon', 'time', 'message',
     'text_1', 'text_2', 'text_3', 'text_4', 'text_5', 'text_6', 'text_7', 'text_8',
-    'ampm', 'time_aux', 'digit_label', 'digit_label_aux', 'graph'
+    'ampm', 'time_aux', 'digit_label', 'digit_label_aux', 'graph',
+    'icon_1', 'icon_2', 'icon_3', 'icon_4', 'icon_5', 'icon_6', 'icon_7', 'icon_8'
 ];
 
 function screenHexToRgb(hex, fallback) {
@@ -1214,6 +1280,7 @@ function getProfileObj(mode) {
 
 function findElementDef(id) {
     if (id === 'text') return SCREEN_PALETTE_TEXT_DEF;
+    if (id === 'icon') return SCREEN_PALETTE_ICON_DEF;
     if (id === 'screen_settings') return SCREEN_PALETTE_SETTINGS_DEF;
     return SCREEN_ELEMENT_DEFS.find(d => d.id === id) || null;
 }
@@ -1246,6 +1313,39 @@ function getScreenLabelBoxHeight(fontIndex) {
     return Math.max(1, getScreenLabelLineHeight(fontIndex) - SCREEN_LABEL_LAYOUT_TRIM);
 }
 
+// Natural dimensions (clamped to the device max) of an uploaded icon, cached.
+// Probes /icon<N>.jpg once and re-renders the canvas when it loads, so the box
+// matches what the device draws (icons render at their native JPG size).
+const screenIconDims = {};    // id -> {w,h}
+const screenIconProbing = {}; // id -> true while a probe is in flight
+let screenIconBust = 0;       // bumped on upload/delete to defeat the browser cache
+function iconUrl(id) {
+    const f = iconFileName(id);
+    if (!f) return null;
+    return '/' + f + (screenIconBust ? '?b=' + screenIconBust : '');
+}
+function getIconDims(id) {
+    if (screenIconDims[id]) return screenIconDims[id];
+    if (!iconFileName(id) || screenIconProbing[id]) return null;
+    screenIconProbing[id] = true;
+    const img = new Image();
+    img.onload = () => {
+        screenIconProbing[id] = false;
+        screenIconDims[id] = {
+            w: Math.min(SCREEN_ICON_MAX_DIM, img.naturalWidth || 24),
+            h: Math.min(SCREEN_ICON_MAX_DIM, img.naturalHeight || 24)
+        };
+        renderScreenCanvas();
+    };
+    img.onerror = () => { screenIconProbing[id] = false; };
+    img.src = iconUrl(id);
+    return null;
+}
+function invalidateIconDims(id) {
+    delete screenIconDims[id];
+    delete screenIconProbing[id];
+}
+
 function getScreenElementSize(def, elementState) {
     if (!def) return { w: 0, h: 0 };
     let w;
@@ -1257,6 +1357,10 @@ function getScreenElementSize(def, elementState) {
             : (isScreenClippedTextElement(def.id) ? def.w : 128);
         h = getScreenLabelBoxHeight(font);
         return { w: evenPx(w), h };
+    }
+    if (isScreenIconElement(def.id)) {
+        const d = getIconDims(def.id); // null until the JPG (if any) has loaded
+        return { w: evenPx(d ? d.w : def.w), h: evenPx(d ? d.h : def.h) };
     }
     w = def.w;
     h = def.h;
@@ -1346,13 +1450,15 @@ function ensureElementInProfile(profile, id) {
             e = { id, enabled: 0, x: 22, y: 84, z: 1, options: { font: 0, color: '#ffffff', bg_color: '#000000', width: 80, align: 0 } };
         } else if (id === 'digit_label_aux') {
             e = { id, enabled: 0, x: 22, y: 84, z: 1, options: { font: 0, color: '#ffffff', bg_color: '#000000', width: 80, align: 0 } };
+        } else if (isScreenIconElement(id)) {
+            e = { id, enabled: 0, x: 48, y: 48, z: 2 };
         } else {
             e = { id, enabled: 1, x: 0, y: 0, z: 0 };
         }
         profile.elements.push(e);
     }
     if (e.enabled === undefined) {
-        if (id === 'time_aux' || id === 'digit_label' || id === 'digit_label_aux') e.enabled = 0;
+        if (id === 'time_aux' || id === 'digit_label' || id === 'digit_label_aux' || isScreenIconElement(id)) e.enabled = 0;
         else e.enabled = 1;
     }
     if (id === 'ampm') e.enabled = 1;
@@ -2318,6 +2424,130 @@ function getGraphNumericTokens() {
     return Array.from(found);
 }
 
+// Options panel for an icon element: a help note, a live preview of the current
+// JPG, and Upload / Delete controls. The icon is stored on the device as
+// icon<N>.jpg (uploaded via /api/ota X-Filename, deleted via /api/files/delete).
+function appendScreenIconOptions(container, e) {
+    const fname = iconFileName(e.id);
+    if (!fname) return;
+
+    const note = document.createElement('p');
+    note.className = 'screen-options-mode-note';
+    note.textContent = getScreenTranslation('screen.icon_help',
+        `Upload a JPG up to ${SCREEN_ICON_MAX_DIM}x${SCREEN_ICON_MAX_DIM}px. Stored on the device as ${fname} and shown at its own size. Shared by Day and Night.`);
+    container.appendChild(note);
+
+    const previewWrap = document.createElement('div');
+    previewWrap.className = 'form-group';
+    const thumb = document.createElement('img');
+    thumb.className = 'screen-icon-thumb';
+    thumb.alt = e.id;
+    thumb.style.imageRendering = 'pixelated';
+    thumb.style.maxWidth = '64px';
+    thumb.style.maxHeight = '64px';
+    thumb.style.background = '#000';
+    thumb.style.border = '1px solid var(--line, #333)';
+    thumb.onerror = () => { thumb.style.display = 'none'; };
+    thumb.onload = () => { thumb.style.display = ''; };
+    thumb.src = iconUrl(e.id);
+    previewWrap.appendChild(thumb);
+    container.appendChild(previewWrap);
+
+    const row = document.createElement('div');
+    row.className = 'form-group city-row';
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = 'image/jpeg,.jpg,.jpeg';
+    fileInput.style.display = 'none';
+    fileInput.addEventListener('change', (ev) => onScreenIconFileSelected(ev, e.id));
+    const uploadBtn = document.createElement('button');
+    uploadBtn.type = 'button';
+    uploadBtn.className = 'btn sm ghost';
+    uploadBtn.textContent = getScreenTranslation('screen.icon_upload', 'Upload JPG');
+    uploadBtn.addEventListener('click', () => fileInput.click());
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'btn sm ghost';
+    delBtn.textContent = getScreenTranslation('screen.icon_delete', 'Delete');
+    delBtn.addEventListener('click', () => deleteScreenIcon(e.id));
+    row.appendChild(uploadBtn);
+    row.appendChild(delBtn);
+    row.appendChild(fileInput);
+    container.appendChild(row);
+}
+
+async function onScreenIconFileSelected(ev, id) {
+    const input = ev.target;
+    const file = input.files && input.files[0];
+    input.value = '';
+    if (!file) return;
+    const fname = iconFileName(id);
+    if (!fname) return;
+
+    if (file.type !== 'image/jpeg' && !/\.jpe?g$/i.test(file.name)) {
+        showStatus(getScreenTranslation('screen.icon_bad_type', 'Icon must be a JPG image'), 'error');
+        return;
+    }
+    // Validate dimensions client-side (the firmware decodes at native size).
+    const dataUrl = await new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => res(null); r.readAsDataURL(file); });
+    const dims = dataUrl ? await new Promise(res => { const im = new Image(); im.onload = () => res({ w: im.naturalWidth, h: im.naturalHeight }); im.onerror = () => res(null); im.src = dataUrl; }) : null;
+    if (!dims) { showStatus(getScreenTranslation('screen.icon_bad_type', 'Icon must be a JPG image'), 'error'); return; }
+    if (dims.w > SCREEN_ICON_MAX_DIM || dims.h > SCREEN_ICON_MAX_DIM) {
+        showStatus(getScreenTranslation('screen.icon_too_big', `Icon must be at most ${SCREEN_ICON_MAX_DIM}x${SCREEN_ICON_MAX_DIM} pixels`), 'error');
+        return;
+    }
+    try {
+        showStatus(getMessage('saving_settings'), 'info');
+        const body = await file.arrayBuffer();
+        const resp = await fetch('/api/ota', {
+            method: 'POST',
+            headers: { 'X-Filename': fname, 'Content-Type': 'application/octet-stream' },
+            body
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (resp.ok && data && data.status === 'ok') {
+            screenIconBust++;
+            invalidateIconDims(id);
+            ensureScreenSpiffsFiles(true);
+            showStatus(getScreenTranslation('screen.icon_uploaded', 'Icon uploaded. Click Apply to push the layout.'), 'success');
+            renderScreenOptions();
+            renderScreenCanvas();
+            renderScreenPalette();
+        } else {
+            showStatus(getScreenTranslation('screen.icon_upload_failed', 'Icon upload failed'), 'error');
+        }
+    } catch (err) {
+        console.error('Icon upload error:', err);
+        showStatus(getScreenTranslation('screen.icon_upload_failed', 'Icon upload failed'), 'error');
+    }
+}
+
+async function deleteScreenIcon(id) {
+    const fname = iconFileName(id);
+    if (!fname) return;
+    try {
+        const resp = await fetch('/api/files/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ files: [fname] })
+        });
+        if (resp.ok) {
+            screenIconBust++;
+            invalidateIconDims(id);
+            ensureScreenSpiffsFiles(true);
+            showStatus(getScreenTranslation('screen.icon_deleted', 'Icon deleted'), 'success');
+            renderScreenOptions();
+            renderScreenCanvas();
+            renderScreenPalette();
+        } else {
+            showStatus(getScreenTranslation('screen.icon_delete_failed', 'Delete failed'), 'error');
+        }
+    } catch (err) {
+        console.error('Icon delete error:', err);
+        showStatus(getScreenTranslation('screen.icon_delete_failed', 'Delete failed'), 'error');
+    }
+}
+
 function renderScreenOptions() {
     const opt = el('screenOptions');
     if (!opt) return;
@@ -2363,9 +2593,13 @@ function renderScreenOptions() {
         onChange: (on) => {
             e.enabled = on ? 1 : 0;
             renderScreenCanvas();
-            if (isScreenStaticTextElement(e.id)) renderScreenPalette();
+            if (isScreenStaticTextElement(e.id) || isScreenIconElement(e.id)) renderScreenPalette();
         }
     });
+
+    if (isScreenIconElement(e.id)) {
+        appendScreenIconOptions(opt, e);
+    }
 
     if (e.id === 'time') {
         appendScreenSwitchRow(opt, {
