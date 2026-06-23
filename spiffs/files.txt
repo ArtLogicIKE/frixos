@@ -22,6 +22,7 @@ default-wifi-off.jpg
 default.layout
 diabetic.layout
 weather.layout
+homeassistant.layout
 favicon.ico
 ficasso-ampm.jpg
 ficasso-dot.jpg
