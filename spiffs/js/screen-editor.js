@@ -1192,6 +1192,7 @@ window.screenEditor = {
     mode: 'day', // 'day' | 'night'
     scale: 4,
     dragging: null, // { id, originX, originY, startLeft, startTop, fromPalette }
+    dragRafHandle: null,
     selectedId: null,
     cursorX: null,
     cursorY: null
@@ -2656,6 +2657,8 @@ function beginDrag(id, pointerEvent, fromPalette) {
 
     const elem = ensureElementInProfile(profile, id);
 
+    // Cache metrics to avoid reflows during pointermove
+    const rect = canvas.getBoundingClientRect();
     const scale = getScreenScale();
     window.screenEditor.scale = scale;
 
@@ -2678,7 +2681,9 @@ function beginDrag(id, pointerEvent, fromPalette) {
         startLeft,
         startTop,
         fromPalette,
-        moved: false
+        moved: false,
+        rect,
+        scale
     };
     updateScreenStatusLine();
 }
@@ -2703,12 +2708,13 @@ function onScreenPointerDown(e) {
 function onScreenPointerMove(e) {
     const d = window.screenEditor.dragging;
     if (!d) return;
-    const canvas = el('screenCanvas');
-    if (!canvas) return;
     const profile = getProfileObj(window.screenEditor.mode);
     if (!profile) return;
     const elem = ensureElementInProfile(profile, d.id);
-    const scale = window.screenEditor.scale || getScreenScale();
+
+    // Use cached metrics to eliminate reflow-triggering getBoundingClientRect calls
+    const scale = d.scale;
+    const rect = d.rect;
 
     const dx = e.clientX - d.originX;
     const dy = e.clientY - d.originY;
@@ -2721,7 +2727,6 @@ function onScreenPointerMove(e) {
             elem.enabled = 1;
         }
         d.moved = true;
-        const rect = canvas.getBoundingClientRect();
         const def = findElementDef(d.id);
         const elementId = def ? def.id : d.id;
         elem.x = clamp(Math.round((e.clientX - rect.left - 10) / scale), 0, SCREEN_SIZE - 1);
@@ -2737,12 +2742,26 @@ function onScreenPointerMove(e) {
         elem.y = visualYToLayoutY(visualY, elementId);
     }
 
-    renderScreenCanvas();
+    // Throttle canvas rendering to requestAnimationFrame for maximum smoothness
+    if (!window.screenEditor.dragRafHandle) {
+        window.screenEditor.dragRafHandle = requestAnimationFrame(() => {
+            window.screenEditor.dragRafHandle = null;
+            renderScreenCanvas();
+        });
+    }
 }
 
 function onScreenPointerUp(e) {
     const d = window.screenEditor.dragging;
     if (!d) return;
+
+    // Cancel pending frame and force an immediate final render for accuracy
+    if (window.screenEditor.dragRafHandle) {
+        cancelAnimationFrame(window.screenEditor.dragRafHandle);
+        window.screenEditor.dragRafHandle = null;
+    }
+    renderScreenCanvas();
+
     const placedFromPalette = d.fromPalette && d.moved && isScreenStaticTextElement(d.id);
     window.screenEditor.dragging = null;
     updateScreenStatusLine();

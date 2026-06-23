@@ -1,5 +1,5 @@
 import os
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 import uvicorn
@@ -125,6 +125,33 @@ async def get_timezone(location: str = None, lat: str = None, lon: str = None):
 @app.get("/language_{lang}.json")
 async def get_language_legacy(lang: str):
     return await get_i18n_language(lang)
+
+@app.get("/js/{filename}")
+async def get_js(filename: str):
+    path = f"spiffs/js/{filename}"
+    if os.path.exists(path):
+        return FileResponse(path)
+    return JSONResponse(status_code=404, content={"message": "Not found"})
+
+@app.get("/css/{filename}")
+async def get_css(filename: str):
+    path = f"spiffs/css/{filename}"
+    if os.path.exists(path):
+        return FileResponse(path)
+    return JSONResponse(status_code=404, content={"message": "Not found"})
+
+@app.get("/api/files")
+async def get_files():
+    return JSONResponse(content={"files": [{"name": "bold.jpg", "size": 1000}, {"name": "frixos-layout.layout", "size": 1000}]})
+
+@app.get("/api/screen")
+async def get_screen():
+    size = 3716
+    buf = bytearray(size)
+    buf[0:4] = b"FSXL"
+    buf[4] = 1 # format
+    buf[5] = 9 # version
+    return Response(content=bytes(buf), media_type="application/octet-stream")
 
 @app.get("/{filename}")
 async def get_static(filename: str):
