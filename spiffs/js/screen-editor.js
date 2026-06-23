@@ -10,7 +10,8 @@ const SCREEN_MESSAGE_FONT_LINE_HEIGHTS = {
     1: 16,
     2: 16,
     3: 17,
-    4: 21
+    4: 21,
+    5: 10 // 5pt Tiny5 (full ASCII), device line height 7
 };
 // Visible label/bg height on device (line box minus unused rows above/below glyphs).
 const SCREEN_LABEL_VISIBLE_HEIGHTS = {
@@ -18,7 +19,8 @@ const SCREEN_LABEL_VISIBLE_HEIGHTS = {
     1: 13,
     2: 13,
     3: 14,
-    4: 18
+    4: 18,
+    5: 7 // 5pt Tiny5
 };
 // Stored layout Y is above the visible label; match on-screen bg top inset.
 const SCREEN_LABEL_LAYOUT_TRIM = 3;
@@ -28,10 +30,12 @@ const SCREEN_MESSAGE_FONT_SIZES = {
     1: 10,
     2: 12,
     3: 14,
-    4: 16
+    4: 16,
+    5: 6 // 5pt Tiny5 preview scale
 };
 const SCREEN_MESSAGE_FONT_HEIGHTS = SCREEN_MESSAGE_FONT_LINE_HEIGHTS;
 const SCREEN_MESSAGE_FONT_OPTIONS = [
+    { v: 5, t: '5pt' },
     { v: 0, t: '8pt' },
     { v: 1, t: '10pt' },
     { v: 2, t: '12pt' },

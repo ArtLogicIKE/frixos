@@ -30,7 +30,7 @@ static void sanitize_widget(screen_widget_t *w, screen_element_id_t id)
     if (!screen_elem_is_text(id))
         return;
 
-    w->font = (uint8_t)clamp_int(w->font, 0, 4);
+    w->font = (uint8_t)clamp_int(w->font, 0, 5); // 0-4 = 8..16pt, 5 = 5pt tiny
     w->color_r = w->color_r;
     w->color_g = w->color_g;
     w->color_b = w->color_b;

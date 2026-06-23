@@ -154,7 +154,7 @@ static lv_obj_t *label_degree_aux = NULL;
 #define FADE_STEPS 14
 #define FADE_INTERVAL 200       // Time between steps in ms
 #define MAX_TOKEN_COUNT 100     // Maximum number of tokens to prevent memory issues
-#define MAX_FONT_INDEX 4        // Maximum font index (0=8pt .. 4=16pt)
+#define MAX_FONT_INDEX 5        // Maximum font index (0=8pt .. 4=16pt, 5=5pt tiny)
 #define MIN_ANIMATION_TIME 1000 // Minimum animation time in milliseconds
 
 int label_scroll_pos = 0, label_max_pos = MSG_WIDTH;
@@ -222,8 +222,9 @@ static int label_size = 0;
 static char last_scroll_msg[SCROLL_MSG_LENGTH];
 static uint8_t last_scroll_font = 0xFF; // font index active when last_scroll_msg was set
 
+LV_FONT_DECLARE(frixos_5);    // Tiny5 pixel font, full ASCII, label font index 5 ("5pt")
 LV_FONT_DECLARE(frixos_8);
-LV_FONT_DECLARE(graph_tiny5); // 5px pixel font (Tiny5) for graph axis labels
+LV_FONT_DECLARE(graph_tiny5); // 5px pixel font (Tiny5) subset for graph axis labels
 LV_FONT_DECLARE(frixos_10);
 LV_FONT_DECLARE(frixos_11);
 LV_FONT_DECLARE(frixos_12);
@@ -266,7 +267,7 @@ static bool screen_layout_positions_live = false;
 static inline uint8_t active_message_font_index(void)
 {
   const screen_widget_t *w_msg = active_screen_widget(SCREEN_ELEM_MESSAGE);
-  return w_msg->font <= 4 ? w_msg->font : 0;
+  return w_msg->font <= MAX_FONT_INDEX ? w_msg->font : 0;
 }
 
 static uint8_t screen_scroll_delay_ms(void)
@@ -346,7 +347,7 @@ static void apply_message_widget_styles(const screen_widget_t *w)
 
 static void apply_static_text_widget(lv_obj_t *label, const screen_widget_t *w, const char *text)
 {
-  const uint8_t font_idx = w->font <= 4 ? w->font : 0;
+  const uint8_t font_idx = w->font <= MAX_FONT_INDEX ? w->font : 0;
   lv_obj_set_style_text_font(label, get_selected_font(font_idx), 0);
   lv_obj_set_style_text_color(label, lv_color_make(w->color_r, w->color_g, w->color_b), 0);
   apply_text_widget_background(label, w, font_idx);
@@ -973,6 +974,7 @@ const lv_font_t *get_selected_font(uint8_t font_index)
       &frixos_12, // index 2: 12pt (bitmap)
       &frixos_14, // index 3: 14pt (bitmap)
       &frixos_16, // index 4: 16pt (bitmap)
+      &frixos_5,  // index 5: 5pt (Tiny5 pixel font, full ASCII)
   };
 
   // Bounds check and return default if out of range
