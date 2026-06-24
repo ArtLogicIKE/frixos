@@ -2795,12 +2795,19 @@ function renderScreenOptions() {
         const textArea = document.createElement('textarea');
         const maxLen = e.id === 'message' ? 511 : 96;
         textArea.maxLength = maxLen;
+        textArea.id = 'editor-textarea-' + e.id;
         textArea.rows = e.id === 'message' ? 3 : 2;
+
+        const counter = document.createElement('div');
+        counter.id = textArea.id + '-counter';
+        counter.className = 'counter';
+
         if (e.id === 'message') {
             textArea.value = profile.scroll_text || '';
             textArea.addEventListener('input', () => {
                 profile.scroll_text = textArea.value;
                 renderScreenCanvas();
+                updateCharCounter(textArea, counter);
             });
         } else {
             if (!profile.static_texts) profile.static_texts = { ...SCREEN_DEFAULT_STATIC_TEXTS };
@@ -2810,10 +2817,15 @@ function renderScreenOptions() {
                 profile.static_texts[textKey] = textArea.value;
                 renderScreenCanvas();
                 if (isScreenStaticTextElement(e.id)) renderScreenPalette();
+                updateCharCounter(textArea, counter);
             });
         }
         textRow.appendChild(textLabel);
         textRow.appendChild(textArea);
+        textRow.appendChild(counter);
+        textArea.setAttribute('aria-describedby', (textArea.getAttribute('aria-describedby') || '') + ' ' + counter.id);
+        counter.setAttribute('aria-live', 'polite');
+        updateCharCounter(textArea, counter);
         setupTokenHighlightTextarea(textArea);
         opt.appendChild(textRow);
         appendScreenTokenButtons(opt, textArea);
