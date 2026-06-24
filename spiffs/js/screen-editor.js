@@ -1362,6 +1362,11 @@ function getScreenElementSize(def, elementState) {
         const d = getIconDims(def.id); // null until the JPG (if any) has loaded
         return { w: evenPx(d ? d.w : def.w), h: evenPx(d ? d.h : def.h) };
     }
+    if (def.id === 'graph') {
+        // Use the configured graph size so the editor preview tracks Width/Height.
+        const o = elementState && elementState.options ? elementState.options : {};
+        return { w: evenPx(o.gwidth || def.w), h: evenPx(o.gheight || def.h) };
+    }
     w = def.w;
     h = def.h;
     return { w: evenPx(w), h: evenPx(h) };
