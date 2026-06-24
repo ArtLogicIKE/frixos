@@ -785,7 +785,12 @@ void set_scroll_message(const char *msg)
       lv_obj_set_pos(label_msg_loop, msg_x + ipos + scroll_period, msg_y);
     }
     // else: same content, same font — belt keeps scrolling uninterrupted.
-    lv_obj_clear_flag(label_msg_loop, LV_OBJ_FLAG_HIDDEN);
+    // Only reveal the scroll belt if the message itself is visible, so a disabled
+    // message never shows its scrolling copy regardless of caller order. (#190)
+    if (!lv_obj_has_flag(label_msg, LV_OBJ_FLAG_HIDDEN))
+      lv_obj_clear_flag(label_msg_loop, LV_OBJ_FLAG_HIDDEN);
+    else
+      lv_obj_add_flag(label_msg_loop, LV_OBJ_FLAG_HIDDEN);
   }
   else
   { // centered
@@ -1462,7 +1467,10 @@ static void apply_widget_visibility(const screen_layout_profile_t *layout)
 
   show_object(img_weather, w_weather->enabled && weather_valid && time_valid);
   show_object(img_moon, w_moon->enabled && time_valid);
-  show_object(label_msg, w_msg->enabled || !time_valid);
+  const bool msg_visible = w_msg->enabled || !time_valid;
+  show_object(label_msg, msg_visible);
+  if (!msg_visible)
+    show_object(label_msg_loop, false); // hide the seamless-scroll copy too (#190)
 
   if (wifi_disabled_by_active_hours)
   {
@@ -2477,9 +2485,20 @@ static void handle_integration_and_messages(void)
     else if (!ota_update_in_progress && !show_ip_on_boot)
     {
       const screen_layout_profile_t *layout = &eeprom_screen_layout.profile[font_index];
-      replace_placeholders(layout->scroll_text, msg_scrolling, sizeof(msg_scrolling));
       lvgl_port_lock(0);
-      set_scroll_message(msg_scrolling);
+      // Only render the scroll message when it's enabled (or during the boot
+      // splash, !time_valid). When disabled, hide both the message and its
+      // seamless-scroll copy so set_scroll_message can't re-show the belt. (#190)
+      if (layout->widget[SCREEN_ELEM_MESSAGE].enabled || !time_valid)
+      {
+        replace_placeholders(layout->scroll_text, msg_scrolling, sizeof(msg_scrolling));
+        set_scroll_message(msg_scrolling);
+      }
+      else
+      {
+        show_object(label_msg, false);
+        show_object(label_msg_loop, false);
+      }
       update_static_text_labels();
       lvgl_port_unlock();
     }
