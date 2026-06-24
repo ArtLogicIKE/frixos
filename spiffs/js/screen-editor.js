@@ -2850,7 +2850,16 @@ function renderScreenOptions() {
             return mkRow(labelText, inp);
         };
 
-        // Token picker (datalist suggestions; free text allows any token).
+        // Subsection heading (declutters the now-long graph panel -- #191).
+        const mkSection = (title) => {
+            const h = document.createElement('div');
+            h.className = 'subtitle';
+            h.textContent = title;
+            opt.appendChild(h);
+        };
+
+        // --- Data ---
+        mkSection(T('screen.graph_sec_data', 'Data'));
         const tokenInput = document.createElement('input');
         tokenInput.type = 'text';
         tokenInput.setAttribute('list', 'graphTokenList');
@@ -2862,26 +2871,31 @@ function renderScreenOptions() {
         tokenInput.addEventListener('change', () => { o.token = tokenInput.value.trim(); renderScreenCanvas(); });
         mkRow(T('screen.graph_token', 'Token to plot'), tokenInput);
         opt.appendChild(dl);
-
-        mkColor(T('screen.graph_line_color', 'Line color'), o.color || '#00dcff', v => o.color = v);
-        mkColor(T('screen.background_color', 'Background Color'), o.bg_color || '#000000', v => o.bg_color = v);
-
         mkNumber(T('screen.graph_interval', 'Sample interval (min)'), o.interval_min, 1, 1440, v => o.interval_min = clamp(parseInt(v, 10) || 5, 1, 1440));
         mkNumber(T('screen.graph_points', 'Data points'), o.points, 2, 100, v => o.points = clamp(parseInt(v, 10) || 60, 2, 100));
+        appendScreenSwitchRow(opt, { id: 'graph_backfill', label: T('screen.graph_backfill', 'Backfill history (HA/CGM)'), checked: !!o.backfill, onChange: (on) => { o.backfill = on; } });
+
+        // --- Size ---
+        mkSection(T('screen.graph_sec_size', 'Size'));
         mkNumber(T('screen.graph_width', 'Width (px)'), o.gwidth, 60, 80, v => o.gwidth = clamp(parseInt(v, 10) || 80, 60, 80));
         mkNumber(T('screen.graph_height', 'Height (px)'), o.gheight, 28, 36, v => o.gheight = clamp(parseInt(v, 10) || 36, 28, 36));
 
+        // --- Scale ---
+        mkSection(T('screen.graph_sec_scale', 'Scale'));
         appendScreenSwitchRow(opt, { id: 'graph_autoscale', label: T('screen.graph_autoscale', 'Auto Y-scale'), checked: !!o.autoscale, onChange: (on) => { o.autoscale = on; renderScreenOptions(); } });
         if (!o.autoscale) {
             mkNumber(T('screen.graph_ymin', 'Y min'), o.y_min, -32767, 32767, v => o.y_min = (v === '' ? null : (parseInt(v, 10) || 0)));
             mkNumber(T('screen.graph_ymax', 'Y max'), o.y_max, -32767, 32767, v => o.y_max = (v === '' ? null : (parseInt(v, 10) || 0)));
         }
+
+        // --- Axes & value ---
+        mkSection(T('screen.graph_sec_axes', 'Axes & value'));
         appendScreenSwitchRow(opt, { id: 'graph_axis', label: T('screen.graph_axis', 'Show value axis (Y)'), checked: !!o.show_axis, onChange: (on) => { o.show_axis = on; renderScreenCanvas(); } });
         appendScreenSwitchRow(opt, { id: 'graph_xaxis', label: T('screen.graph_xaxis', 'Show time axis (X)'), checked: !!o.show_xaxis, onChange: (on) => { o.show_xaxis = on; renderScreenCanvas(); } });
         appendScreenSwitchRow(opt, { id: 'graph_value', label: T('screen.graph_value', 'Show current value'), checked: !!o.show_value, onChange: (on) => { o.show_value = on; renderScreenCanvas(); } });
-        appendScreenSwitchRow(opt, { id: 'graph_boolean', label: T('screen.graph_boolean', 'Boolean (step 0/1)'), checked: !!o.boolean, onChange: (on) => { o.boolean = on; renderScreenCanvas(); } });
-        appendScreenSwitchRow(opt, { id: 'graph_thick', label: T('screen.graph_thick', 'Thick line (2px)'), checked: !!o.thick, onChange: (on) => { o.thick = on; renderScreenCanvas(); } });
-        appendScreenSwitchRow(opt, { id: 'graph_backfill', label: T('screen.graph_backfill', 'Backfill history (HA/CGM)'), checked: !!o.backfill, onChange: (on) => { o.backfill = on; } });
+
+        // --- Band ---
+        mkSection(T('screen.graph_sec_band', 'Band'));
         appendScreenSwitchRow(opt, { id: 'graph_band', label: T('screen.graph_band', 'Show low/high band'), checked: !!o.band_on, onChange: (on) => { o.band_on = on; renderScreenOptions(); } });
         if (o.band_on) {
             mkNumber(T('screen.graph_band_low', 'Band low'), o.band_low, -32767, 32767, v => o.band_low = (v === '' ? null : (parseInt(v, 10) || 0)));
@@ -2889,9 +2903,14 @@ function renderScreenOptions() {
             mkColor(T('screen.graph_band_color', 'Band color'), o.band_color || '#283c28', v => o.band_color = v);
             mkColor(T('screen.graph_warn_color', 'Out-of-band color'), o.warn_color || '#ff5050', v => o.warn_color = v);
         }
-        if (o.show_axis) {
-            mkColor(T('screen.graph_axis_color', 'Axis color'), o.axis_color || '#787878', v => o.axis_color = v);
-        }
+
+        // --- Style ---
+        mkSection(T('screen.graph_sec_style', 'Style'));
+        mkColor(T('screen.graph_line_color', 'Line color'), o.color || '#00dcff', v => o.color = v);
+        mkColor(T('screen.background_color', 'Background Color'), o.bg_color || '#000000', v => o.bg_color = v);
+        mkColor(T('screen.graph_axis_color', 'Axis color'), o.axis_color || '#787878', v => o.axis_color = v);
+        appendScreenSwitchRow(opt, { id: 'graph_thick', label: T('screen.graph_thick', 'Thick line (2px)'), checked: !!o.thick, onChange: (on) => { o.thick = on; renderScreenCanvas(); } });
+        appendScreenSwitchRow(opt, { id: 'graph_boolean', label: T('screen.graph_boolean', 'Boolean (step 0/1)'), checked: !!o.boolean, onChange: (on) => { o.boolean = on; renderScreenCanvas(); } });
     }
 }
 
