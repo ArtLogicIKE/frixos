@@ -1975,9 +1975,9 @@ void update_graph(void)
     }
   }
 
-  // 4. Current value readout, placed just above or below the latest point so
-  //    the trend line doesn't run through the digits: below it when the line
-  //    sits in the upper half of the plot, above it when it sits in the lower.
+  // 4. Current value readout, anchored to the emptier half of the plot so it
+  //    doesn't sit on the curve: when the latest point is high (upper half) put
+  //    the value at the bottom, when it's low put it at the top. (#193)
   if (show_value && last_valid != GRAPH_VAL_UNSET)
   {
     lv_draw_label_dsc_t vb;
@@ -1991,7 +1991,7 @@ void update_graph(void)
     graph_fmt(vt, sizeof(vt), (float)last_valid, (yrange < 200.0f));
     vb.text = vt;
     int vy = CY(V2Y((float)last_valid));
-    int vtop = ((vy - py1) < (py2 - py1) / 2) ? (vy + 2) : (vy - 10);
+    int vtop = ((vy - py1) < (py2 - py1) / 2) ? (py2 - 8) : py1;
     if (vtop < py1) vtop = py1;
     if (vtop + 8 > py2) vtop = py2 - 8;
     lv_area_t va = {px1, vtop, px2, vtop + 8};
