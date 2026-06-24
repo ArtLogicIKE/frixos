@@ -1833,8 +1833,14 @@ void update_graph(void)
   int slots = (g->points > 1) ? (g->points - 1) : 1;
   float px_per_slot = (float)(pw - 1) / (float)slots;
 
+  // Inset the curve/band a couple of px from the top/bottom plot edges so the
+  // trend isn't drawn flush against (and partly clipped at) the boundary when a
+  // data extreme lands exactly on the snapped ymin/ymax. (#188)
+  int cmargin = (ph > 10) ? 2 : 0;
+  int cy1 = py1 + cmargin, cy2 = py2 - cmargin;
+  int cph = cy2 - cy1 + 1;
 
-#define V2Y(v) (py2 - (int)(((float)(v) - ymin) / yrange * (float)(ph - 1)))
+#define V2Y(v) (cy2 - (int)(((float)(v) - ymin) / yrange * (float)(cph - 1)))
 #define CY(y) ((y) < py1 ? py1 : ((y) > py2 ? py2 : (y)))
 #define I2X(i) (px2 - (int)((float)((n - 1) - (i)) * px_per_slot))
 
