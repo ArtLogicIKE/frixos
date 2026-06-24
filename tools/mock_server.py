@@ -164,7 +164,7 @@ async def get_timezone(location: str = None, lat: str = None, lon: str = None):
 async def get_language_legacy(lang: str):
     return await get_i18n_language(lang)
 
-@app.get("/{filename}")
+@app.get("/{filename:path}")
 async def get_static(filename: str):
     path = f"spiffs/{filename}"
     if os.path.exists(path):
