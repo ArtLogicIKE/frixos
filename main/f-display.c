@@ -1740,7 +1740,8 @@ void update_graph(void)
   if (gh < GRAPH_MIN_H) gh = GRAPH_MIN_H;
   if (gh > GRAPH_MAX_H) gh = GRAPH_MAX_H;
 
-  const bool show_axis = (g->flags & GRAPH_FLAG_SHOW_AXIS) != 0;
+  const bool show_yaxis = (g->flags & GRAPH_FLAG_SHOW_AXIS) != 0;  // value (Y) axis + labels
+  const bool show_xaxis = (g->flags & GRAPH_FLAG_SHOW_XAXIS) != 0; // time (X) axis + labels
   const bool show_value = (g->flags & GRAPH_FLAG_SHOW_VALUE) != 0;
   const bool band_on = (g->flags & GRAPH_FLAG_BAND) != 0;
   const bool boolean = (g->flags & GRAPH_FLAG_BOOLEAN) != 0;
@@ -1753,10 +1754,10 @@ void update_graph(void)
   lv_color_t col_warn = lv_color_make(g->warn_r, g->warn_g, g->warn_b);
   lv_color_t col_axis = lv_color_make(g->axis_r, g->axis_g, g->axis_b);
 
-  int left_m = show_axis ? 17 : 1; // 16px fits 4 Tiny5 digits (4px adv) exactly
+  int left_m = show_yaxis ? 17 : 1; // 16px fits 4 Tiny5 digits (4px adv) exactly
   int top_m = 1;
   int right_m = 1;
-  int bot_m = show_axis ? 8 : 1;
+  int bot_m = show_xaxis ? 8 : 1;
   int px1 = left_m, px2 = gw - right_m - 1;
   int py1 = top_m, py2 = gh - bot_m - 1;
   int pw = px2 - px1 + 1, ph = py2 - py1 + 1;
@@ -1896,17 +1897,15 @@ void update_graph(void)
   // (The trend polyline is drawn after finish_layer with direct pixels — see
   // graph_px_line — because lv_draw_line doesn't render thin diagonals here.)
 
-  // 3. Axis + relative time labels.
-  if (show_axis)
+  // 3. Axis + labels. The value (Y) axis and time (X) axis are independent so a
+  //    user can hide either to reclaim space (#189): hiding Y frees the left
+  //    margin, hiding X frees the bottom margin (handled via left_m/bot_m).
+  if (show_yaxis || show_xaxis)
   {
     lv_draw_line_dsc_t al;
     lv_draw_line_dsc_init(&al);
     al.width = 1;
     al.color = col_axis;
-    al.p1.x = px1 - 1; al.p1.y = py1; al.p2.x = px1 - 1; al.p2.y = py2 + 1;
-    lv_draw_line(&layer, &al);
-    al.p1.x = px1 - 1; al.p1.y = py2 + 1; al.p2.x = px2; al.p2.y = py2 + 1;
-    lv_draw_line(&layer, &al);
 
     lv_draw_label_dsc_t lb;
     lv_draw_label_dsc_init(&lb);
@@ -1915,37 +1914,48 @@ void update_graph(void)
     lb.opa = LV_OPA_COVER;
     lb.text_local = 1; // deferred draw: strdup the stack strings
 
-    // Y bounds are whole units (ceil/floor) -> integer labels.
-    char ymax_s[8], ymin_s[8];
-    graph_fmt(ymax_s, sizeof(ymax_s), ymax, false);
-    graph_fmt(ymin_s, sizeof(ymin_s), ymin, false);
-    lb.align = LV_TEXT_ALIGN_RIGHT;
-    lb.text = ymax_s;
-    lv_area_t yat = {0, py1, px1 - 2, py1 + 8};
-    lv_draw_label(&layer, &lb, &yat);
-    lb.text = ymin_s;
-    lv_area_t yab = {0, py2, px1 - 2, py2 + 8};
-    lv_draw_label(&layer, &lb, &yab);
+    if (show_yaxis)
+    {
+      al.p1.x = px1 - 1; al.p1.y = py1; al.p2.x = px1 - 1; al.p2.y = py2 + 1;
+      lv_draw_line(&layer, &al); // vertical axis line
 
-    char xnow[6] = "now";
-    lb.align = LV_TEXT_ALIGN_RIGHT;
-    lb.text = xnow;
-    // Wide enough that "now" never overflows (the w was clipping), right edge
-    // 6px in from the plot edge; raised 1px above the other x label.
-    lv_area_t xar = {px2 - 24, py2 + 1, px2 - 2, gh - 1};
-    lv_draw_label(&layer, &lb, &xar);
+      // Y bounds are whole units (ceil/floor) -> integer labels.
+      char ymax_s[8], ymin_s[8];
+      graph_fmt(ymax_s, sizeof(ymax_s), ymax, false);
+      graph_fmt(ymin_s, sizeof(ymin_s), ymin, false);
+      lb.align = LV_TEXT_ALIGN_RIGHT;
+      lb.text = ymax_s;
+      lv_area_t yat = {0, py1, px1 - 2, py1 + 8};
+      lv_draw_label(&layer, &lb, &yat);
+      lb.text = ymin_s;
+      lv_area_t yab = {0, py2, px1 - 2, py2 + 8};
+      lv_draw_label(&layer, &lb, &yab);
+    }
 
-    // Window duration label, e.g. 60 points x 1 min -> "-1h", x 5 min -> "-5h".
-    long span_min = (long)g->points * (long)interval_min;
-    char xleft[10];
-    if (span_min >= 60)
-      snprintf(xleft, sizeof(xleft), "-%ldh", span_min / 60);
-    else
-      snprintf(xleft, sizeof(xleft), "-%ldm", span_min);
-    lb.align = LV_TEXT_ALIGN_LEFT;
-    lb.text = xleft;
-    lv_area_t xal = {px1, py2 + 2, px1 + 22, gh - 1};
-    lv_draw_label(&layer, &lb, &xal);
+    if (show_xaxis)
+    {
+      al.p1.x = px1 - 1; al.p1.y = py2 + 1; al.p2.x = px2; al.p2.y = py2 + 1;
+      lv_draw_line(&layer, &al); // horizontal axis line
+
+      char xnow[6] = "now";
+      lb.align = LV_TEXT_ALIGN_RIGHT;
+      lb.text = xnow;
+      // Wide enough that "now" never overflows, right edge 6px in; raised 1px.
+      lv_area_t xar = {px2 - 24, py2 + 1, px2 - 2, gh - 1};
+      lv_draw_label(&layer, &lb, &xar);
+
+      // Window duration label, e.g. 60 points x 1 min -> "-1h", x 5 min -> "-5h".
+      long span_min = (long)g->points * (long)interval_min;
+      char xleft[10];
+      if (span_min >= 60)
+        snprintf(xleft, sizeof(xleft), "-%ldh", span_min / 60);
+      else
+        snprintf(xleft, sizeof(xleft), "-%ldm", span_min);
+      lb.align = LV_TEXT_ALIGN_LEFT;
+      lb.text = xleft;
+      lv_area_t xal = {px1, py2 + 2, px1 + 22, gh - 1};
+      lv_draw_label(&layer, &lb, &xal);
+    }
   }
 
   // 4. Current value readout, placed just above or below the latest point so

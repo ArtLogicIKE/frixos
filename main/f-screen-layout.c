@@ -122,7 +122,7 @@ void screen_layout_apply_factory_defaults(screen_layout_t *layout)
         .points = 60,
         .width = 80,
         .height = 36,
-        .flags = GRAPH_FLAG_AUTOSCALE | GRAPH_FLAG_SHOW_AXIS | GRAPH_FLAG_SHOW_VALUE | GRAPH_FLAG_BACKFILL,
+        .flags = GRAPH_FLAG_AUTOSCALE | GRAPH_FLAG_SHOW_AXIS | GRAPH_FLAG_SHOW_XAXIS | GRAPH_FLAG_SHOW_VALUE | GRAPH_FLAG_BACKFILL,
         .band_low = GRAPH_VAL_UNSET,
         .band_high = GRAPH_VAL_UNSET,
         .y_min = GRAPH_VAL_UNSET,
