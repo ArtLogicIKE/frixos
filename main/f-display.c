@@ -1756,6 +1756,15 @@ void update_graph(void)
   const bool autoscale = (g->flags & GRAPH_FLAG_AUTOSCALE) != 0;
   const bool thick = (g->flags & GRAPH_FLAG_THICK) != 0;
 
+  // Band thresholds are order-independent: the lower value is the low edge and
+  // the higher is the high edge, so entering them inverted still draws a correct
+  // band (#192). Used in place of g->band_low / g->band_high below.
+  int16_t band_lo = g->band_low, band_hi = g->band_high;
+  if (band_lo != GRAPH_VAL_UNSET && band_hi != GRAPH_VAL_UNSET && band_lo > band_hi)
+  {
+    int16_t bt = band_lo; band_lo = band_hi; band_hi = bt;
+  }
+
   lv_color_t col_line = lv_color_make(w->color_r, w->color_g, w->color_b);
   lv_color_t col_bg = lv_color_make(w->bg_r, w->bg_g, w->bg_b);
   lv_color_t col_band = lv_color_make(g->band_r, g->band_g, g->band_b);
@@ -1821,11 +1830,11 @@ void update_graph(void)
   // auto (not an explicit fixed y_min/y_max), widen the range to include both
   // thresholds so they never fall off the top or bottom of the plot.
   if (band_on && !boolean && !manual_range &&
-      g->band_low != GRAPH_VAL_UNSET && g->band_high != GRAPH_VAL_UNSET &&
-      g->band_high > g->band_low)
+      band_lo != GRAPH_VAL_UNSET && band_hi != GRAPH_VAL_UNSET &&
+      band_hi > band_lo)
   {
-    const float bl = (float)g->band_low * 10.0f;
-    const float bh = (float)g->band_high * 10.0f;
+    const float bl = (float)band_lo * 10.0f;
+    const float bh = (float)band_hi * 10.0f;
     if (bl < ymin) ymin = bl;
     if (bh > ymax) ymax = bh;
   }
@@ -1877,10 +1886,10 @@ void update_graph(void)
 
   // 1. Low/high band: shade the in-range zone, then draw a crisp horizontal
   //    line at each threshold (axis colour) so the band levels are unmistakable.
-  if (band_on && g->band_low != GRAPH_VAL_UNSET && g->band_high != GRAPH_VAL_UNSET && g->band_high > g->band_low)
+  if (band_on && band_lo != GRAPH_VAL_UNSET && band_hi != GRAPH_VAL_UNSET && band_hi > band_lo)
   {
-    int yh = CY(V2Y(g->band_high * 10));
-    int yl = CY(V2Y(g->band_low * 10));
+    int yh = CY(V2Y(band_hi * 10));
+    int yl = CY(V2Y(band_lo * 10));
     if (yl > yh)
     {
       lv_draw_rect_dsc_t bd;
@@ -2010,14 +2019,14 @@ void update_graph(void)
         float v1 = samp[prev], v2 = samp[i];
         int x1 = I2X(prev), x2 = I2X(i);
         int y1 = CY(V2Y(v1)), y2 = CY(V2Y(v2));
-        const bool have_band = band_on && g->band_low != GRAPH_VAL_UNSET && g->band_high != GRAPH_VAL_UNSET;
+        const bool have_band = band_on && band_lo != GRAPH_VAL_UNSET && band_hi != GRAPH_VAL_UNSET;
         if (boolean)
         {
           lv_color_t c = col_line;
           if (have_band)
           {
             float avg = (v1 + v2) * 0.5f; // ring units (x10); band is real -> x10
-            if (avg < (float)g->band_low * 10.0f || avg > (float)g->band_high * 10.0f)
+            if (avg < (float)band_lo * 10.0f || avg > (float)band_hi * 10.0f)
               c = col_warn;
           }
           graph_px_line(graph_canvas, x1, y1, x2, y1, gw, gh, c, thick); // hold
@@ -2028,8 +2037,8 @@ void update_graph(void)
           // Split the segment at each band-threshold crossing so the warn colour
           // covers exactly the out-of-band part: colouring by the segment average
           // flipped the whole segment up to half a step before the real crossing.
-          const float lo10 = (float)g->band_low * 10.0f;
-          const float hi10 = (float)g->band_high * 10.0f;
+          const float lo10 = (float)band_lo * 10.0f;
+          const float hi10 = (float)band_hi * 10.0f;
           const float dv = v2 - v1;
           float ts[2];
           int nts = 0;
