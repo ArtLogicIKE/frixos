@@ -1,10 +1,18 @@
 import os
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 import uvicorn
+import struct
 
 app = FastAPI()
+
+if os.path.exists("spiffs/css"):
+    app.mount("/css", StaticFiles(directory="spiffs/css"), name="css")
+if os.path.exists("spiffs/js"):
+    app.mount("/js", StaticFiles(directory="spiffs/js"), name="js")
+if os.path.exists("spiffs/i18n"):
+    app.mount("/i18n", StaticFiles(directory="spiffs/i18n"), name="i18n")
 
 # Settings storage (mock)
 settings = {
@@ -49,6 +57,36 @@ async def post_settings(request: Request):
     body = await request.json()
     settings.update({k: v for k, v in body.items() if k != "status"})
     return JSONResponse(content={"status": "ok", "message": "Settings saved"})
+
+@app.get("/api/screen")
+async def get_screen():
+    # Return a dummy binary payload of SCREEN_BIN_WIRE_SIZE bytes
+    # SCREEN_BIN_WIRE_SIZE = 64 + (20 * 13 + 512 + 8 * 96 + 2 * 96 + 88) * 2 = 3704
+    size = 3704
+    data = bytearray(size)
+    # Set magic FSXL
+    struct.pack_into("<I", data, 0, 0x4653584C)
+    # Set format 1
+    data[4] = 1
+    # Set version 9
+    data[5] = 9
+
+    # Enable 'time' widget (index 5)
+    # Widget offset = 64 + 5 * 13 = 129
+    data[129] = 1 # enabled
+    data[130] = 20 # x
+    data[131] = 20 # y
+    data[132] = 1 # z
+
+    return Response(content=bytes(data), media_type="application/octet-stream")
+
+@app.post("/api/screen")
+async def post_screen(request: Request):
+    return JSONResponse(content={"status": "ok", "message": "Screen layout saved"})
+
+@app.get("/api/files")
+async def get_files():
+    return JSONResponse(content={"files": [{"name": "bold.jpg", "size": 1000}, {"name": "default-weather.jpg", "size": 1000}]})
 
 @app.get("/i18n/language_{lang}.json")
 async def get_i18n_language(lang: str):
