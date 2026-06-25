@@ -388,10 +388,25 @@ function refreshScreenEditorI18n() {
     updateScreenStatusLine();
 }
 
-function canvasCoordsFromPointer(clientX, clientY) {
+let _screenRectCache = null;
+let _screenScaleCache = null;
+
+function invalidateScreenCache() {
+    _screenRectCache = null;
+    _screenScaleCache = null;
+}
+
+function getScreenRect() {
+    if (_screenRectCache) return _screenRectCache;
     const canvas = el('screenCanvas');
     if (!canvas) return null;
-    const rect = canvas.getBoundingClientRect();
+    _screenRectCache = canvas.getBoundingClientRect();
+    return _screenRectCache;
+}
+
+function canvasCoordsFromPointer(clientX, clientY) {
+    const rect = getScreenRect();
+    if (!rect) return null;
     if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) {
         return null;
     }
@@ -1273,10 +1288,11 @@ window.screenEditor = {
 };
 
 function getScreenScale() {
-    const canvas = el('screenCanvas');
-    if (!canvas) return 4;
-    const rect = canvas.getBoundingClientRect();
-    return Math.max(1, Math.round(rect.width / SCREEN_SIZE));
+    if (_screenScaleCache !== null) return _screenScaleCache;
+    const rect = getScreenRect();
+    if (!rect) return 4;
+    _screenScaleCache = Math.max(1, Math.round(rect.width / SCREEN_SIZE));
+    return _screenScaleCache;
 }
 
 function getProfileObj(mode) {
@@ -1578,6 +1594,13 @@ function setupScreenSection() {
         canvas.addEventListener('pointerup', onScreenPointerUp);
         canvas.addEventListener('pointercancel', onScreenPointerUp);
         canvas.addEventListener('pointerleave', clearScreenCanvasPointer);
+
+        if (typeof ResizeObserver !== 'undefined') {
+            const ro = new ResizeObserver(() => invalidateScreenCache());
+            ro.observe(canvas);
+        }
+        window.addEventListener('scroll', invalidateScreenCache, { passive: true });
+        window.addEventListener('resize', invalidateScreenCache, { passive: true });
     }
 
     document.addEventListener('keydown', onScreenArrowKeyDown);
