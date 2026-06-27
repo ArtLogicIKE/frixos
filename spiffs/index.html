@@ -41,15 +41,15 @@
   <!-- ===== NAV (with scroll indicators) ===== -->
   <div class="nav-wrap">
     <button class="nav-edge left" id="navLeft" aria-label="Scroll tabs left" tabindex="-1">‹</button>
-    <nav class="nav" id="nav">
-      <a data-tab="settings" class="active">Settings</a>
-      <a data-tab="advanced">Advanced</a>
-      <a data-tab="layout">Layout</a>
-      <a data-tab="integrations">Integrations</a>
-      <a data-tab="status">Status</a>
-      <a data-tab="files">Files</a>
-      <a data-tab="update">Update</a>
-      <a data-tab="restart">Restart</a>
+    <nav class="nav" id="nav" role="tablist">
+      <a data-tab="settings" class="active" role="tab" tabindex="0" data-i18n="menu.settings" aria-selected="true">Settings</a>
+      <a data-tab="advanced" role="tab" tabindex="0" data-i18n="menu.advanced" aria-selected="false">Advanced</a>
+      <a data-tab="layout" role="tab" tabindex="0" data-i18n="menu.screen" aria-selected="false">Layout</a>
+      <a data-tab="integrations" role="tab" tabindex="0" data-i18n="menu.integrations" aria-selected="false">Integrations</a>
+      <a data-tab="status" role="tab" tabindex="0" data-i18n="menu.status" aria-selected="false">Status</a>
+      <a data-tab="files" role="tab" tabindex="0" data-i18n="menu.files" aria-selected="false">Files</a>
+      <a data-tab="update" role="tab" tabindex="0" data-i18n="menu.update" aria-selected="false">Update</a>
+      <a data-tab="restart" role="tab" tabindex="0" data-i18n="menu.restart" aria-selected="false">Restart</a>
     </nav>
     <button class="nav-edge right" id="navRight" aria-label="Scroll tabs right" tabindex="-1">›</button>
   </div>

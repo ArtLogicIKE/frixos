@@ -27,3 +27,7 @@
 ## 2026-06-23 - [Character Counter Accessibility]
 **Learning:** Adding character counters is a great UX win, but they must be accessible. Using `aria-describedby` to link the input to its counter and `aria-live="polite"` on the counter ensures screen reader users are kept informed of the remaining space as they type.
 **Action:** Always pair character counters with appropriate ARIA attributes (`aria-describedby` and `aria-live`) to ensure accessibility for all users.
+
+## 2026-06-24 - [Keyboard Accessible Navigation]
+**Learning:** For single-page applications using `<a>` tags as tabs without `href` attributes, they are not focusable by default. Adding `tabindex="0"`, `role="tab"`, and explicit keyboard event listeners (Enter/Space) is essential for keyboard navigation. Additionally, managing `aria-selected` state and using `role="tablist"` provides necessary context for screen readers.
+**Action:** Always ensure custom tab components have proper ARIA roles, tabindex, and keyboard event handlers.
