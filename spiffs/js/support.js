@@ -25,6 +25,13 @@ async function tzFromCoords(lat, lon) {
   return null;
 }
 function setCoords(lat, lon) { el('lat').value = lat; el('lon').value = lon; }
+/* Overwrite the timezone fields for a freshly chosen location. When the device
+   could not resolve a zone (tz == null) we clear the now-stale strings rather
+   than leaving the previous city's timezone in place. */
+function applyTz(tz) {
+  el('timezone').value = tz ? tz.posix : '';
+  el('tz_iana').value = (tz && tz.iana) ? tz.iana : '';
+}
 
 async function applyDetectedHints() {
   let iana = ''; try { iana = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) { }
@@ -54,8 +61,10 @@ async function doCitySearch() {
     if (!res) { cityHint.textContent = 'City not found.'; return; }
     setCoords(res.lat, res.lon);
     const tz = await tzFromCoords(res.lat, res.lon);
-    if (tz) { el('timezone').value = tz.posix; if (tz.iana) el('tz_iana').value = tz.iana; }
-    cityHint.textContent = 'Found: ' + res.name + (tz && tz.iana ? ' (' + tz.iana + ')' : '');
+    applyTz(tz);
+    cityHint.textContent = tz
+      ? 'Found: ' + res.name + (tz.iana ? ' (' + tz.iana + ')' : '')
+      : 'Found: ' + res.name + ' — timezone lookup failed, set it manually.';
   } catch (e) { cityHint.textContent = 'Search failed. Check your connection.'; }
   finally { el('citySearch').disabled = false; }
 }
@@ -66,8 +75,10 @@ el('geolocate').addEventListener('click', async () => {
     if (!d.latitude || !d.longitude) { cityHint.textContent = 'No coordinates available on device yet.'; return; }
     setCoords(d.latitude, d.longitude);
     const tz = await tzFromCoords(d.latitude, d.longitude);
-    if (tz) { el('timezone').value = tz.posix; if (tz.iana) el('tz_iana').value = tz.iana; cityHint.textContent = 'Located' + (tz.iana ? ': ' + tz.iana : ''); }
-    else cityHint.textContent = 'Located.';
+    applyTz(tz);
+    cityHint.textContent = tz
+      ? 'Located' + (tz.iana ? ': ' + tz.iana : '')
+      : 'Located — timezone lookup failed, set it manually.';
   } catch (e) { cityHint.textContent = 'Failed to read location.'; }
   finally { el('geolocate').disabled = false; }
 });

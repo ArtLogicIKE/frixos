@@ -778,9 +778,19 @@ esp_err_t http_event_handler(esp_http_client_event_t *evt)
             strlcpy(metno_pending_lm, evt->header_value, sizeof(metno_pending_lm));
         }
         break;
-    case HTTP_EVENT_ERROR:
-    case HTTP_EVENT_REDIRECT:
     case HTTP_EVENT_ON_CONNECTED:
+    case HTTP_EVENT_REDIRECT:
+        // Reset the shared response buffer at the start of every request (and on
+        // a redirect, which restarts the response). The buffer persists across
+        // calls — it is not released after every request — so without this a new
+        // request's data appends *after* the previous response and parsers read
+        // the stale leading bytes. That is why a city search returned the
+        // previous city's timezone (cJSON_Parse picked up the old JSON object).
+        response_len = 0;
+        if (wifi_http_buffer != NULL)
+            wifi_http_buffer[0] = '\0';
+        break;
+    case HTTP_EVENT_ERROR:
     case HTTP_EVENT_DISCONNECTED:
     case HTTP_EVENT_HEADERS_SENT:
     case HTTP_EVENT_ON_HEADERS_COMPLETE:
