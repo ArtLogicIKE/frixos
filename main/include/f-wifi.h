@@ -56,6 +56,8 @@ bool validate_coordinate(const char *coord_str, bool is_latitude);
 bool validate_timezone(const char *tz_str);
 bool wifi_lookup_posix_timezone(const char *iana_location, char *out, size_t out_len);
 bool wifi_lookup_iana_from_coords(double lat, double lon, char *out, size_t out_len);
+bool wifi_ip_geolocate(char *lat_out, size_t lat_len, char *lon_out, size_t lon_len,
+                       char *city_out, size_t city_len, char *iana_out, size_t iana_len);
 
 // External variables
 extern int response_len;

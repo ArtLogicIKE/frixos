@@ -69,16 +69,20 @@ async function doCitySearch() {
   finally { el('citySearch').disabled = false; }
 }
 el('geolocate').addEventListener('click', async () => {
-  cityHint.textContent = 'Reading location from device…'; el('geolocate').disabled = true;
+  cityHint.textContent = 'Looking up your approximate location…'; el('geolocate').disabled = true;
   try {
-    const st = await apiGet('/api/status'); const d = st.data || {};
-    if (!d.latitude || !d.longitude) { cityHint.textContent = 'No coordinates available on device yet.'; return; }
-    setCoords(d.latitude, d.longitude);
-    const tz = await tzFromCoords(d.latitude, d.longitude);
+    const r = await apiGet('/api/locate'); const d = r.data || {};
+    if (!r.ok || !d.lat || !d.lon) { cityHint.textContent = 'Could not determine location from IP.'; return; }
+    setCoords(d.lat, d.lon);
+    // The device resolves a POSIX zone from the IP's IANA zone; fall back to a
+    // coordinate lookup if it could not.
+    let tz = (d.posix && isValidPosix(d.posix)) ? { iana: d.iana || '', posix: d.posix } : null;
+    if (!tz) tz = await tzFromCoords(d.lat, d.lon);
     applyTz(tz);
+    const where = d.city ? d.city : 'IP location';
     cityHint.textContent = tz
-      ? 'Located' + (tz.iana ? ': ' + tz.iana : '')
-      : 'Located — timezone lookup failed, set it manually.';
-  } catch (e) { cityHint.textContent = 'Failed to read location.'; }
+      ? 'Located: ' + where + (tz.iana ? ' (' + tz.iana + ')' : '')
+      : 'Located: ' + where + ' — timezone lookup failed, set it manually.';
+  } catch (e) { cityHint.textContent = 'Failed to look up location.'; }
   finally { el('geolocate').disabled = false; }
 });

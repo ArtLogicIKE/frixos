@@ -3745,6 +3745,52 @@ static esp_err_t timezone_lookup_send_json(httpd_req_t *req, const char *iana, c
     return ret;
 }
 
+// GET /api/locate — perform a fresh IP geolocation (the same lookup the device
+// does at startup) and return approximate coordinates for the "Locate me"
+// button. Resolves a POSIX timezone from the IANA zone when possible.
+static esp_err_t locate_handler(httpd_req_t *req)
+{
+    char lat[24] = "", lon[24] = "", city[64] = "", iana[64] = "", posix[TZ_LENGTH] = "";
+
+    if (!wifi_ip_geolocate(lat, sizeof(lat), lon, sizeof(lon), city, sizeof(city), iana, sizeof(iana)))
+    {
+        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "IP geolocation failed");
+        return ESP_FAIL;
+    }
+
+    if (iana[0])
+        wifi_lookup_posix_timezone(iana, posix, sizeof(posix)); // best effort
+
+    cJSON *root = cJSON_CreateObject();
+    if (!root)
+    {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
+        return ESP_FAIL;
+    }
+    cJSON_AddStringToObject(root, "lat", lat);
+    cJSON_AddStringToObject(root, "lon", lon);
+    cJSON_AddStringToObject(root, "city", city);
+    cJSON_AddStringToObject(root, "iana", iana);
+    cJSON_AddStringToObject(root, "posix", posix);
+    char *json = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    if (!json)
+    {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
+        return ESP_FAIL;
+    }
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-cache");
+    esp_err_t ret = httpd_resp_send(req, json, HTTPD_RESP_USE_STRLEN);
+    free(json);
+    return ret;
+}
+
+static esp_err_t locate_wrapper(httpd_req_t *req)
+{
+    return http_mutex_wrapper(req, locate_handler);
+}
+
 static esp_err_t timezone_lookup_handler(httpd_req_t *req)
 {
     char location[64] = "";
@@ -3976,6 +4022,17 @@ esp_err_t start_webserver()
     if (ret != ESP_OK)
     {
         ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to register status handler");
+        return ret;
+    }
+
+    uri_handler.uri = "/api/locate";
+    uri_handler.method = HTTP_GET;
+    uri_handler.handler = locate_wrapper;
+    uri_handler.user_ctx = NULL;
+    ret = httpd_register_uri_handler(server, &uri_handler);
+    if (ret != ESP_OK)
+    {
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to register locate handler");
         return ret;
     }
 

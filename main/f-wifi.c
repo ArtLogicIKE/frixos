@@ -1088,6 +1088,61 @@ bool wifi_lookup_iana_from_coords(double lat, double lon, char *out, size_t out_
 }
 
 /**
+ * On-demand IP geolocation (the same ip-api.com lookup the device performs at
+ * startup), exposed for the web UI's "Locate me" button. Read-only: it does NOT
+ * touch the my_lat/my_lon/my_timezone globals — it just returns the approximate
+ * location of the device's egress IP. Any out pointer may be NULL.
+ */
+bool wifi_ip_geolocate(char *lat_out, size_t lat_len, char *lon_out, size_t lon_len,
+                       char *city_out, size_t city_len, char *iana_out, size_t iana_len)
+{
+    if (lat_out && lat_len) lat_out[0] = '\0';
+    if (lon_out && lon_len) lon_out[0] = '\0';
+    if (city_out && city_len) city_out[0] = '\0';
+    if (iana_out && iana_len) iana_out[0] = '\0';
+
+    esp_http_client_config_t config = {
+        .url = "http://ip-api.com/json/?fields=country,city,lat,lon,timezone,query",
+        .event_handler = http_event_handler,
+        .timeout_ms = 5000,
+    };
+
+    esp_http_client_handle_t client = esp_http_client_init(&config);
+    if (client == NULL)
+        return false;
+
+    esp_err_t err = esp_http_client_perform(client);
+    bool ok = false;
+    if (err == ESP_OK && esp_http_client_get_status_code(client) == 200 && wifi_http_buffer != NULL)
+    {
+        cJSON *json = cJSON_Parse(wifi_http_buffer);
+        if (json)
+        {
+            cJSON *lat = cJSON_GetObjectItem(json, "lat");
+            cJSON *lon = cJSON_GetObjectItem(json, "lon");
+            cJSON *city = cJSON_GetObjectItem(json, "city");
+            cJSON *tz = cJSON_GetObjectItem(json, "timezone");
+            if (cJSON_IsNumber(lat) && cJSON_IsNumber(lon))
+            {
+                char buf[32];
+                snprintf(buf, sizeof(buf), "%2.7lf", lat->valuedouble);
+                bool lat_ok = validate_coordinate(buf, true);
+                if (lat_ok && lat_out && lat_len) { strncpy(lat_out, buf, lat_len - 1); lat_out[lat_len - 1] = '\0'; }
+                snprintf(buf, sizeof(buf), "%2.7lf", lon->valuedouble);
+                bool lon_ok = validate_coordinate(buf, false);
+                if (lon_ok && lon_out && lon_len) { strncpy(lon_out, buf, lon_len - 1); lon_out[lon_len - 1] = '\0'; }
+                ok = lat_ok && lon_ok;
+            }
+            if (cJSON_IsString(city) && city_out && city_len) { strncpy(city_out, city->valuestring, city_len - 1); city_out[city_len - 1] = '\0'; }
+            if (cJSON_IsString(tz) && iana_out && iana_len) { strncpy(iana_out, tz->valuestring, iana_len - 1); iana_out[iana_len - 1] = '\0'; }
+            cJSON_Delete(json);
+        }
+    }
+    esp_http_client_cleanup(client);
+    return ok;
+}
+
+/**
  * Fetch Weather Data from OpenWeatherMap (legacy, kept for reference / fallback).
  * No longer wired into the weather timer — wifi_get_metno_weather() is used instead.
  */
