@@ -76,6 +76,7 @@ const translations = {
 };
 
 const _translationsLoaded = { en: true };
+const _translationPromises = {};
 function deepMergeTranslations(target, source) {
   if (!source || typeof source !== 'object') return target;
   Object.keys(source).forEach(k => {
@@ -87,17 +88,27 @@ function deepMergeTranslations(target, source) {
   });
   return target;
 }
+/**
+ * Loads translation JSON for a given language.
+ * Performance: Uses a fetch promise cache to prevent redundant concurrent network
+ * requests for the same language (O(1) network efficiency for concurrent calls).
+ */
 async function loadTranslations(lang) {
   if (_translationsLoaded[lang]) return;
-  try {
-    const r = await fetch('/i18n/language_' + lang + '.json');
-    if (r.ok) {
-      const data = await r.json();
-      if (lang === 'en') deepMergeTranslations(translations.en, data);
-      else translations[lang] = deepMergeTranslations(JSON.parse(JSON.stringify(translations.en)), data);
-    }
-  } catch (e) { /* keep english */ }
-  _translationsLoaded[lang] = true;
+  if (_translationPromises[lang]) return _translationPromises[lang];
+  _translationPromises[lang] = (async () => {
+    try {
+      const r = await fetch('/i18n/language_' + lang + '.json');
+      if (r.ok) {
+        const data = await r.json();
+        if (lang === 'en') deepMergeTranslations(translations.en, data);
+        else translations[lang] = deepMergeTranslations(JSON.parse(JSON.stringify(translations.en)), data);
+      }
+    } catch (e) { /* keep english */ }
+    _translationsLoaded[lang] = true;
+    delete _translationPromises[lang];
+  })();
+  return _translationPromises[lang];
 }
 
 const _pathCache = new Map();
