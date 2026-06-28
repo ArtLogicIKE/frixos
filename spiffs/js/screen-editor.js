@@ -369,10 +369,13 @@ function appendScreenSwitchRow(container, { id, label, checked, onChange }) {
     sw.type = 'button';
     sw.className = 'gswitch' + (checked ? ' on' : '');
     sw.id = id;
+    sw.setAttribute('role', 'switch');
+    sw.setAttribute('aria-checked', checked ? 'true' : 'false');
     sw.setAttribute('aria-label', label);
     sw.addEventListener('click', () => {
-        sw.classList.toggle('on');
-        if (onChange) onChange(sw.classList.contains('on'));
+        const on = sw.classList.toggle('on');
+        sw.setAttribute('aria-checked', on ? 'true' : 'false');
+        if (onChange) onChange(on);
     });
     row.appendChild(labelEl);
     row.appendChild(sw);

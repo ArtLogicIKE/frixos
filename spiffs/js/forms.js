@@ -3,19 +3,26 @@
    ============================================================ */
 
 /* ---------- generic UI ---------- */
+function updateEyeAria(btn, isVisible) {
+  const t = translations[currentLanguage] || translations.en;
+  const label = isVisible ? getNestedTranslation(t, 'common.hide_password') : getNestedTranslation(t, 'common.show_password');
+  if (label) btn.setAttribute('aria-label', label);
+}
 $$('.pw .eye').forEach(b => b.addEventListener('click', () => {
   const inp = b.parentElement.querySelector('input');
-  inp.type = inp.type === 'password' ? 'text' : 'password';
-  b.style.opacity = inp.type === 'text' ? '1' : '';
+  const isVisible = inp.type === 'password'; // about to become visible
+  inp.type = isVisible ? 'text' : 'password';
+  b.style.opacity = isVisible ? '1' : '';
+  updateEyeAria(b, isVisible);
 }));
 
-function bindSwitch(id) { const g = el(id); if (g) g.addEventListener('click', () => g.classList.toggle('on')); return el(id); }
+function bindSwitch(id) { const g = el(id); if (g) g.addEventListener('click', () => { const on = g.classList.toggle('on'); g.setAttribute('aria-checked', on ? 'true' : 'false'); }); return el(id); }
 const swOn = id => el(id) && el(id).classList.contains('on');
-const setSw = (id, on) => { const g = el(id); if (g) g.classList.toggle('on', !!on); };
+const setSw = (id, on) => { const g = el(id); if (g) { g.classList.toggle('on', !!on); g.setAttribute('aria-checked', !!on ? 'true' : 'false'); } };
 ['mirroring', 'fahrenheit', 'hour12', 'update_firmware'].forEach(bindSwitch);
 
 const staticToggle = el('staticToggle'), staticPanel = el('staticPanel');
-staticToggle.addEventListener('click', () => { staticToggle.classList.toggle('on'); staticPanel.hidden = !staticToggle.classList.contains('on'); });
+staticToggle.addEventListener('click', () => { const on = staticToggle.classList.toggle('on'); staticToggle.setAttribute('aria-checked', on ? 'true' : 'false'); staticPanel.hidden = !on; });
 
 /* The scrolling message is edited only in the Layout palette (per day/night
    profile); there is no Settings-tab field for it. */

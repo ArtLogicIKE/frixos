@@ -89,7 +89,7 @@
       <div class="staticip">
         <div class="toggle staticip-head">
           <div class="tx"><div class="tt">Use static IP <span class="req">*</span></div><div class="ts">Assign a fixed address instead of DHCP</div></div>
-          <button class="gswitch" id="staticToggle" aria-label="Use static IP"></button>
+          <button class="gswitch" id="staticToggle" type="button" role="switch" aria-checked="false" aria-label="Use static IP"></button>
         </div>
         <div class="staticip-panel" id="staticPanel" hidden>
           <div class="grid2">
@@ -119,18 +119,18 @@
           <button class="btn sm ghost" id="settingsLayoutLoadBtn" type="button">Load</button>
         </div>
       </div>
-      <div class="toggle"><div class="tx"><div class="tt">Mirror display</div></div><button class="gswitch" id="mirroring" aria-label="Mirror"></button></div>
+      <div class="toggle"><div class="tx"><div class="tt">Mirror display</div></div><button class="gswitch" id="mirroring" type="button" role="switch" aria-checked="false" aria-label="Mirror"></button></div>
     </div>
 
     <div class="panel">
       <div class="ptitle"><h2>Regional</h2><span class="rule"></span></div>
-      <div class="toggle"><div class="tx"><div class="tt">US units</div><div class="ts">Fahrenheit, mph, inches</div></div><button class="gswitch" id="fahrenheit" aria-label="US units"></button></div>
-      <div class="toggle"><div class="tx"><div class="tt">12-hour clock</div><div class="ts">Display time with AM / PM</div></div><button class="gswitch" id="hour12" aria-label="12-hour clock"></button></div>
+      <div class="toggle"><div class="tx"><div class="tt">US units</div><div class="ts">Fahrenheit, mph, inches</div></div><button class="gswitch" id="fahrenheit" type="button" role="switch" aria-checked="false" aria-label="US units"></button></div>
+      <div class="toggle"><div class="tx"><div class="tt">12-hour clock</div><div class="ts">Display time with AM / PM</div></div><button class="gswitch" id="hour12" type="button" role="switch" aria-checked="false" aria-label="12-hour clock"></button></div>
     </div>
 
     <div class="panel">
       <div class="ptitle"><h2>Automatic update</h2><span class="rule"></span></div>
-      <div class="toggle"><div class="tx"><div class="tt">Check for firmware updates</div><div class="ts">Install new firmware automatically</div></div><button class="gswitch" id="update_firmware" aria-label="Auto update"></button></div>
+      <div class="toggle"><div class="tx"><div class="tt">Check for firmware updates</div><div class="ts">Install new firmware automatically</div></div><button class="gswitch" id="update_firmware" type="button" role="switch" aria-checked="false" aria-label="Auto update"></button></div>
     </div>
 
     <button class="btn block" id="saveSettings">Save settings</button>

@@ -118,6 +118,13 @@ function applyI18n(lang) {
     const akey = node.getAttribute('data-i18n-aria-label');
     if (akey) { const v = getNestedTranslation(t, akey); if (v != null) node.setAttribute('aria-label', v); }
   });
+  // Also update localized ARIA for password eye buttons if updateEyeAria exists.
+  if (typeof updateEyeAria === 'function') {
+    $$('.pw .eye').forEach(b => {
+      const inp = b.parentElement.querySelector('input');
+      updateEyeAria(b, inp && inp.type === 'text');
+    });
+  }
 }
 async function setLanguage(lang, persist) {
   currentLanguage = lang;
