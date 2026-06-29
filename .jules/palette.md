@@ -27,3 +27,7 @@
 ## 2026-06-23 - [Character Counter Accessibility]
 **Learning:** Adding character counters is a great UX win, but they must be accessible. Using `aria-describedby` to link the input to its counter and `aria-live="polite"` on the counter ensures screen reader users are kept informed of the remaining space as they type.
 **Action:** Always pair character counters with appropriate ARIA attributes (`aria-describedby` and `aria-live`) to ensure accessibility for all users.
+
+## 2026-06-24 - [Semantic Toggle Switches]
+**Learning:** Using a simple `.on` class for visual toggle states is insufficient for accessibility. Implementing `role="switch"` and `aria-checked` ensures that assistive technologies correctly announce the element's purpose and state. For buttons acting as switches, `type="button"` is also essential to prevent default form submission behavior.
+**Action:** Always complement visual state classes (like `.on` or `.active`) with semantic ARIA attributes (`role="switch"`, `aria-checked`) and ensure explicit `type="button"` on toggle controls.

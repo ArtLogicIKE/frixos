@@ -51,7 +51,7 @@ function toggleLoading(btn, isLoading) {
 let currentLanguage = 'en';
 const translations = {
   en: {
-    common: { insert: 'Insert' },
+    common: { insert: 'Insert', show_password: 'Show password', hide_password: 'Hide password' },
     screen: { day: 'Day', night: 'Night', options: 'Options', enabled: 'Enabled' },
     messages: {
       error_loading_settings: 'Error loading settings',
