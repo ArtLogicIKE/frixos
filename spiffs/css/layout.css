@@ -57,6 +57,7 @@ a{color:var(--cyan-deep); text-decoration:none}
   color:var(--tab-ink); white-space:nowrap; cursor:pointer; transition:color .2s, background .2s;
 }
 .nav a:hover{ color:var(--ink); }
+.nav a:focus-visible{ outline:2px solid var(--cyan); outline-offset:-2px; color:var(--ink); }
 .nav a.active{ color:var(--tab-active-ink); background:var(--tab-active-bg); box-shadow:0 1px 3px rgba(40,44,52,.18); }
 
 /* nav scroll indicators — fade + arrow on either edge when the tab bar overflows */

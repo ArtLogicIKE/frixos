@@ -154,14 +154,21 @@ document.addEventListener('click', () => {
 const nav = el('nav'), navWrap = $('.nav-wrap');
 function showTab(id) {
   $$('.tab-page').forEach(p => p.classList.toggle('active', p.id === 'tab-' + id));
-  $$('#nav a').forEach(a => a.classList.toggle('active', a.dataset.tab === id));
+  $$('#nav a').forEach(a => {
+    const isActive = a.dataset.tab === id;
+    a.classList.toggle('active', isActive);
+    a.setAttribute('aria-selected', isActive ? 'true' : 'false');
+  });
   window.scrollTo(0, 0);
   const active = $('#nav a.active'); if (active) active.scrollIntoView({ inline: 'center', block: 'nearest' });
   if (sectionLoaders[id] && !loadedSections[id]) { loadedSections[id] = true; sectionLoaders[id](); }
   else if (sectionLoaders[id] && (id === 'status' || id === 'files')) sectionLoaders[id]();
   updateNavEdges();
 }
-$$('#nav a').forEach(a => a.addEventListener('click', () => showTab(a.dataset.tab)));
+$$('#nav a').forEach(a => {
+  a.addEventListener('click', () => showTab(a.dataset.tab));
+  a.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); showTab(a.dataset.tab); } });
+});
 function updateNavEdges() {
   const maxScroll = nav.scrollWidth - nav.clientWidth - 1;
   navWrap.classList.toggle('can-left', nav.scrollLeft > 1);
