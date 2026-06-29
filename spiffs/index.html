@@ -41,21 +41,21 @@
   <!-- ===== NAV (with scroll indicators) ===== -->
   <div class="nav-wrap">
     <button class="nav-edge left" id="navLeft" aria-label="Scroll tabs left" tabindex="-1">‹</button>
-    <nav class="nav" id="nav">
-      <a data-tab="settings" class="active">Settings</a>
-      <a data-tab="advanced">Advanced</a>
-      <a data-tab="layout">Layout</a>
-      <a data-tab="integrations">Integrations</a>
-      <a data-tab="status">Status</a>
-      <a data-tab="files">Files</a>
-      <a data-tab="update">Update</a>
-      <a data-tab="restart">Restart</a>
+    <nav class="nav" id="nav" role="tablist">
+      <a id="tab-link-settings" data-tab="settings" class="active" role="tab" tabindex="0" aria-selected="true" aria-controls="tab-settings" data-i18n="menu.settings">Settings</a>
+      <a id="tab-link-advanced" data-tab="advanced" role="tab" tabindex="0" aria-selected="false" aria-controls="tab-advanced" data-i18n="menu.advanced">Advanced</a>
+      <a id="tab-link-layout" data-tab="layout" role="tab" tabindex="0" aria-selected="false" aria-controls="tab-layout" data-i18n="menu.screen">Layout</a>
+      <a id="tab-link-integrations" data-tab="integrations" role="tab" tabindex="0" aria-selected="false" aria-controls="tab-integrations" data-i18n="menu.integrations">Integrations</a>
+      <a id="tab-link-status" data-tab="status" role="tab" tabindex="0" aria-selected="false" aria-controls="tab-status" data-i18n="menu.status">Status</a>
+      <a id="tab-link-files" data-tab="files" role="tab" tabindex="0" aria-selected="false" aria-controls="tab-files" data-i18n="menu.files">Files</a>
+      <a id="tab-link-update" data-tab="update" role="tab" tabindex="0" aria-selected="false" aria-controls="tab-update" data-i18n="menu.update">Update</a>
+      <a id="tab-link-restart" data-tab="restart" role="tab" tabindex="0" aria-selected="false" aria-controls="tab-restart" data-i18n="menu.restart">Restart</a>
     </nav>
     <button class="nav-edge right" id="navRight" aria-label="Scroll tabs right" tabindex="-1">›</button>
   </div>
 
   <!-- ===================== SETTINGS ===================== -->
-  <section class="tab-page active" id="tab-settings" data-screen-label="Settings">
+  <section class="tab-page active" id="tab-settings" data-screen-label="Settings" role="tabpanel" aria-labelledby="tab-link-settings">
     <div class="hero">
       <span class="obj"><img src="logo.jpg" alt=""></span>
       <div class="ht">
@@ -137,7 +137,7 @@
   </section>
 
   <!-- ===================== ADVANCED ===================== -->
-  <section class="tab-page" id="tab-advanced" data-screen-label="Advanced">
+  <section class="tab-page" id="tab-advanced" data-screen-label="Advanced" role="tabpanel" aria-labelledby="tab-link-advanced">
     <div class="panel">
       <div class="ptitle"><h2>Location</h2><span class="rule"></span></div>
       <div class="field"><label>City</label>
@@ -207,7 +207,7 @@
   </section>
 
   <!-- ===================== LAYOUT (screen editor) ===================== -->
-  <section class="tab-page" id="tab-layout" data-screen-label="Layout">
+  <section class="tab-page" id="tab-layout" data-screen-label="Layout" role="tabpanel" aria-labelledby="tab-link-layout">
     <div class="panel">
       <div class="ptitle"><h2>Layout</h2><span class="rule"></span></div>
 
@@ -252,7 +252,7 @@
   </section>
 
   <!-- ===================== INTEGRATIONS ===================== -->
-  <section class="tab-page" id="tab-integrations" data-screen-label="Integrations">
+  <section class="tab-page" id="tab-integrations" data-screen-label="Integrations" role="tabpanel" aria-labelledby="tab-link-integrations">
     <div class="panel">
       <div class="ptitle"><h2>Home Assistant</h2><span class="rule"></span></div>
       <div class="field"><label>Server URL</label>
@@ -306,7 +306,7 @@
   </section>
 
   <!-- ===================== STATUS ===================== -->
-  <section class="tab-page" id="tab-status" data-screen-label="Status">
+  <section class="tab-page" id="tab-status" data-screen-label="Status" role="tabpanel" aria-labelledby="tab-link-status">
     <div class="panel">
       <div class="ptitle"><h2>Support</h2><span class="rule"></span></div>
       <p class="muted-p">Share device diagnostics with our team to help troubleshoot.</p>
@@ -363,7 +363,7 @@
   </section>
 
   <!-- ===================== FILES ===================== -->
-  <section class="tab-page" id="tab-files" data-screen-label="Files">
+  <section class="tab-page" id="tab-files" data-screen-label="Files" role="tabpanel" aria-labelledby="tab-link-files">
     <div class="panel">
       <div class="ptitle"><h2>SPIFFS files</h2><span class="rule"></span></div>
       <p class="muted-p">Manage files stored on the device filesystem.</p>
@@ -387,7 +387,7 @@
   </section>
 
   <!-- ===================== UPDATE ===================== -->
-  <section class="tab-page" id="tab-update" data-screen-label="Update">
+  <section class="tab-page" id="tab-update" data-screen-label="Update" role="tabpanel" aria-labelledby="tab-link-update">
     <div class="panel">
       <div class="ptitle"><h2>Reinstall</h2><span class="rule"></span></div>
       <p class="muted-p">Re-download and install the current firmware and files (SPIFFS).</p>
@@ -418,7 +418,7 @@
   </section>
 
   <!-- ===================== RESTART ===================== -->
-  <section class="tab-page" id="tab-restart" data-screen-label="Restart">
+  <section class="tab-page" id="tab-restart" data-screen-label="Restart" role="tabpanel" aria-labelledby="tab-link-restart">
     <div class="panel">
       <div class="ptitle"><h2>Device reset</h2><span class="rule"></span></div>
       <p class="muted-p">Restart your Frixos device. It will be unavailable for a short moment while it reboots.</p>
