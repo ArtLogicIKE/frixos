@@ -221,23 +221,36 @@ function isValidTokenInText(token) {
     return false;
 }
 
+/**
+ * Optimized token highlighter: batches non-token text escaping to reduce
+ * string allocations and `replace` calls from O(N) to O(tokens).
+ */
 function formatTextWithTokenHighlights(text) {
     let result = '';
     let i = 0;
+    let lastProcessed = 0;
     while (i < text.length) {
         if (text[i] === '[') {
             const end = text.indexOf(']', i + 1);
             if (end !== -1) {
                 const candidate = text.slice(i, end + 1);
                 if (isValidTokenInText(candidate)) {
+                    // Flush accumulated non-token text.
+                    if (i > lastProcessed) {
+                        result += escapeHtmlForTokenHighlight(text.slice(lastProcessed, i));
+                    }
                     result += `<span class="token-in-text">${escapeHtmlForTokenHighlight(candidate)}</span>`;
                     i = end + 1;
+                    lastProcessed = i;
                     continue;
                 }
             }
         }
-        result += escapeHtmlForTokenHighlight(text[i]);
         i++;
+    }
+    // Flush trailing non-token text.
+    if (lastProcessed < text.length) {
+        result += escapeHtmlForTokenHighlight(text.slice(lastProcessed));
     }
     return result;
 }

@@ -41,3 +41,7 @@
 ## 2026-05-21 - Rejected Global DOM Cache for i18n
 **Learning:** Attempting to implement a persistent global DOM node cache for the i18n system (`applyI18n`) proved to be a maintenance hazard in a codebase with high dynamic content injection (e.g., WiFi lists, Layout property panels). While it offered superior micro-performance, the requirement for manual invalidation across multiple files made it fragile and prone to functional regressions (missing translations).
 **Action:** Prioritize query consolidation (e.g., merging 3 `querySelectorAll` calls into 1) over persistent caching for global UI systems in dynamic SPAs. This achieves significant performance gains (~60% reduction in traversal time) while maintaining 100% functional reliability and developer ergonomics.
+
+## 2026-05-22 - Optimized Token Highlight Text Processing
+**Learning:** The `formatTextWithTokenHighlights` function was performing character-by-character string escaping and concatenation. In a text-heavy layout editor, this resulted in $O(N)$ function calls and allocations on every keystroke, causing noticeable lag in the UI's real-time highlight overlay as message length increased.
+**Action:** Implement batching for non-token text segments. Slicing and escaping entire blocks of plain text between tokens reduces the number of function calls and string allocations from $O(N)$ (text length) to $O(M)$ (number of tokens), significantly improving UI responsiveness during high-frequency typing.
