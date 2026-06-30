@@ -125,14 +125,6 @@ function getMessage(key, ...args) {
   return args.length ? m + args.join('') : m;
 }
 
-/* CGM mutual exclusivity (Dexcom / Libre / Nightscout) */
-function updateCgmExclusivity() {
-  const dexcom = el('eeprom_dexcom_region'), libre = el('eeprom_libre_region'), nsUrl = el('eeprom_ns_url');
-  if (!dexcom || !libre || !nsUrl) return;
-  const d = dexcom.value !== '0', l = libre.value !== '0', n = nsUrl.value.trim() !== '';
-  libre.disabled = d || n; nsUrl.disabled = d || l; dexcom.disabled = l || n;
-}
-
 /* ---------- character counters ---------- */
 function updateCharCounter(input, counter) {
   if (!input || !counter) return;

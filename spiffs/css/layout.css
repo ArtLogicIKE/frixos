@@ -118,3 +118,13 @@ a{color:var(--cyan-deep); text-decoration:none}
 .tab-page.active{ display:block; }
 @keyframes rise{ from{ transform:translateY(8px); } to{ transform:translateY(0); } }
 @media (prefers-reduced-motion: reduce){ .tab-page{ animation:none; } }
+
+/* ---------- PHONES — reclaim width, tighten rhythm so panels stay balanced ---------- */
+@media (max-width:480px){
+  .wrap{ padding:16px 13px 48px; }
+  .panel{ padding:16px 14px 18px; border-radius:18px; }
+  .ptitle{ margin-bottom:14px; }
+  .hero{ padding:14px; gap:12px; }
+  .hero .obj{ width:46px; height:46px; }
+  .topbar{ padding:11px 12px; }
+}

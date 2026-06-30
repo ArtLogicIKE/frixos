@@ -285,18 +285,26 @@
         <div class="field"><label>Low (mg/dL)</label><input type="number" id="eeprom_glucose_low" min="1" max="400" value="70"></div>
       </div>
       <div class="field"><label>Validity (min.)</label><input type="number" id="glucose_validity_duration" min="10" max="360" value="30"></div>
-      <div class="field"><label>Username</label>
+      <div class="subtitle">CGM device</div>
+      <div class="field"><label>Device Type</label>
+        <select id="cgm_device_type">
+          <option value="none">None</option>
+          <option value="dexcom">Dexcom</option>
+          <option value="libre">FreeStyle Libre</option>
+          <option value="nightscout">Nightscout</option>
+        </select>
+      </div>
+      <div class="field cgm-field" data-cgm="dexcom libre"><label>Username</label>
         <input type="text" id="eeprom_glucose_username" maxlength="64" autocomplete="username" placeholder="Account username">
         <div id="eeprom_glucose_username-counter" class="counter"></div>
       </div>
-      <div class="field"><label>Password</label>
+      <div class="field cgm-field" data-cgm="dexcom libre"><label>Password</label>
         <div class="pw"><input type="password" id="eeprom_glucose_password" maxlength="64" autocomplete="current-password" placeholder="••••••••"><button class="eye" type="button" aria-label="Show password">👁</button></div>
         <div id="eeprom_glucose_password-counter" class="counter"></div>
       </div>
-      <div class="subtitle">CGM device</div>
-      <div class="field"><label>Dexcom</label><select id="eeprom_dexcom_region"><option value="0">Disabled</option><option value="1">US</option><option value="2">Japan</option><option value="3">Rest of World</option></select></div>
-      <div class="field"><label>FreeStyle Libre</label><select id="eeprom_libre_region"><option value="0">Disabled</option><option value="1">United States</option><option value="2">Europe</option><option value="3">Germany</option><option value="4">France</option><option value="5">Japan</option><option value="6">Australia</option><option value="7">Global / Rest of World</option></select></div>
-      <div class="field"><label>Nightscout URL</label>
+      <div class="field cgm-field" data-cgm="dexcom"><label>Region</label><select id="eeprom_dexcom_region"><option value="0">Disabled</option><option value="1">US</option><option value="2">Japan</option><option value="3">Rest of World</option></select></div>
+      <div class="field cgm-field" data-cgm="libre"><label>Region</label><select id="eeprom_libre_region"><option value="0">Disabled</option><option value="1">United States</option><option value="2">Europe</option><option value="3">Germany</option><option value="4">France</option><option value="5">Japan</option><option value="6">Australia</option><option value="7">Global / Rest of World</option></select></div>
+      <div class="field cgm-field" data-cgm="nightscout"><label>Nightscout URL</label>
         <input type="text" id="eeprom_ns_url" maxlength="100" placeholder="https://your-site.herokuapp.com">
         <div id="eeprom_ns_url-counter" class="counter"></div>
       </div>

@@ -22,13 +22,56 @@ async function loadIntegrations() {
       if (c) updateCharCounter(el(id), c);
     }
   }
-  updateCgmExclusivity();
+  initCgmDeviceType();
 }
 sectionLoaders.integrations = loadIntegrations;
 
-['eeprom_dexcom_region', 'eeprom_libre_region', 'eeprom_ns_url'].forEach(id => {
-  const e = el(id); if (e) e.addEventListener(e.tagName === 'SELECT' ? 'change' : 'input', updateCgmExclusivity);
-});
+/* ---------- CGM device type ----------
+   "Device Type" is a UI-only selector; there is no dedicated stored field.
+   The active device is derived from whichever underlying field is set
+   (dexcom region / libre region / nightscout URL) and the three are mutually
+   exclusive, so switching device type clears the fields owned by the others. */
+function deriveCgmType() {
+  const dx = el('eeprom_dexcom_region'), lb = el('eeprom_libre_region'), ns = el('eeprom_ns_url');
+  if (dx && dx.value !== '0') return 'dexcom';
+  if (lb && lb.value !== '0') return 'libre';
+  if (ns && ns.value.trim() !== '') return 'nightscout';
+  return 'none';
+}
+
+function applyCgmVisibility(type) {
+  document.querySelectorAll('#tab-integrations .cgm-field').forEach(f => {
+    f.hidden = !(f.dataset.cgm || '').split(/\s+/).includes(type);
+  });
+}
+
+function resetCgmFieldsFor(type) {
+  // Reset only the fields owned by the other two options (username/password are
+  // shared by dexcom + libre, so they survive a switch between those two).
+  const dx = el('eeprom_dexcom_region'), lb = el('eeprom_libre_region'), ns = el('eeprom_ns_url'),
+        user = el('eeprom_glucose_username'), pass = el('eeprom_glucose_password');
+  const clearSel = e => { if (e) e.value = '0'; };
+  const clearTxt = e => { if (!e) return; e.value = ''; const c = el(e.id + '-counter'); if (c) updateCharCounter(e, c); };
+  if (type === 'dexcom') { clearSel(lb); clearTxt(ns); }
+  else if (type === 'libre') { clearSel(dx); clearTxt(ns); }
+  else if (type === 'nightscout') { clearSel(dx); clearSel(lb); clearTxt(user); clearTxt(pass); }
+  else { clearSel(dx); clearSel(lb); clearTxt(ns); clearTxt(user); clearTxt(pass); }
+}
+
+function initCgmDeviceType() {
+  const sel = el('cgm_device_type');
+  if (!sel) return;
+  sel.value = deriveCgmType();
+  applyCgmVisibility(sel.value);
+}
+
+(() => {
+  const sel = el('cgm_device_type');
+  if (sel) sel.addEventListener('change', () => {
+    resetCgmFieldsFor(sel.value);
+    applyCgmVisibility(sel.value);
+  });
+})();
 
 el('saveIntegrations').addEventListener('click', () => {
   const p = {};

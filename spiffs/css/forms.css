@@ -10,12 +10,14 @@
 .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
 @media(max-width:560px){ .grid2{ grid-template-columns:1fr; } }
 
-input[type=text],input[type=password],input[type=number],textarea,select{
+input[type=text],input[type=password],input[type=number],input[type=time],textarea,select{
   width:100%; font-family:var(--ui); font-size:14px; color:var(--ink);
   border:1px solid var(--input-border); background:var(--input-bg);
   box-shadow:0 1px 2px rgba(40,44,52,.06) inset; transition:border-color .2s, box-shadow .2s;
 }
-input[type=text],input[type=password],input[type=number],select{ height:44px; padding:0 16px; border-radius:14px; }
+input[type=text],input[type=password],input[type=number],input[type=time],select{ height:44px; padding:0 16px; border-radius:14px; }
+.theme-dark input[type=time]::-webkit-calendar-picker-indicator{ filter:invert(1); opacity:.6; }
+input[type=time]::-webkit-calendar-picker-indicator{ cursor:pointer; opacity:.7; }
 textarea{ padding:12px 16px; border-radius:16px; min-height:84px; resize:vertical; line-height:1.5; }
 input::placeholder,textarea::placeholder{ color:var(--muted); opacity:.85; }
 input:focus,textarea:focus,select:focus{ outline:none; border-color:var(--cyan); box-shadow:0 0 0 3px rgba(0,170,255,.18); }
@@ -86,9 +88,16 @@ input[type=file]::file-selector-button{ font-family:var(--ui); font-size:12.5px;
 /* ---------- CITY / TIME / DIM ---------- */
 .city-row{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
 .city-row input{ flex:1; min-width:160px; }
-.time-range{ display:flex; align-items:flex-end; gap:14px; }
+.time-range{ display:flex; align-items:flex-end; gap:14px; flex-wrap:wrap; }
 .time-box{ display:flex; flex-direction:column; }
 .time-box label{ font-size:10.5px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); margin:0 4px 7px; }
 .time-box input[type=time]{ width:150px; }
 .time-arrow{ font-size:18px; color:var(--muted); padding-bottom:11px; }
+/* phones: let Start / End split the row evenly so the pair stays balanced */
+@media(max-width:560px){
+  .time-range{ gap:10px; flex-wrap:nowrap; }
+  .time-box{ flex:1 1 0; min-width:0; }
+  .time-box input[type=time]{ width:100%; }
+  .time-arrow{ padding-bottom:11px; }
+}
 .dim-sub{ margin-top:2px; }

@@ -365,6 +365,22 @@
     align-items: stretch;
 }
 
+/* phones: a fixed 10.5rem label column leaves no room for the control, so
+   stack label-over-control like the textarea rows already do */
+@media (max-width: 560px) {
+    .screen-options .form-group {
+        grid-template-columns: 1fr;
+        align-items: stretch;
+    }
+    .screen-options .form-group label {
+        margin-bottom: 4px;
+    }
+    .screen-options .form-group input[type="number"],
+    .screen-options .form-group select {
+        max-width: none;
+    }
+}
+
 .screen-options .form-group:has(textarea) label {
     margin-bottom: 4px;
 }
