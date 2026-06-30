@@ -263,7 +263,7 @@ function updateTokenHighlightTextarea(textarea) {
     if (!wrap) return;
     const highlight = wrap.querySelector('.textarea-token-highlight');
     if (!highlight) return;
-    syncTokenHighlightMetrics(textarea, highlight);
+    // skip syncTokenHighlightMetrics here; it's expensive and only needed on resize
     highlight.innerHTML = formatTextWithTokenHighlights(textarea.value);
     highlight.scrollTop = textarea.scrollTop;
     highlight.scrollLeft = textarea.scrollLeft;
@@ -286,6 +286,10 @@ function setupTokenHighlightTextarea(textarea) {
     textarea.classList.add('textarea-token-input');
 
     const refresh = () => updateTokenHighlightTextarea(textarea);
+    const syncMetricsAndRefresh = () => {
+        syncTokenHighlightMetrics(textarea, highlight);
+        updateTokenHighlightTextarea(textarea);
+    };
     const syncScroll = () => {
         highlight.scrollTop = textarea.scrollTop;
         highlight.scrollLeft = textarea.scrollLeft;
@@ -293,10 +297,10 @@ function setupTokenHighlightTextarea(textarea) {
     textarea.addEventListener('input', refresh);
     textarea.addEventListener('scroll', syncScroll);
     if (typeof ResizeObserver !== 'undefined') {
-        const ro = new ResizeObserver(refresh);
+        const ro = new ResizeObserver(syncMetricsAndRefresh);
         ro.observe(textarea);
     }
-    refresh();
+    syncMetricsAndRefresh();
 }
 function getScreenTranslation(key, fallback) {
     const trans = translations[currentLanguage] || translations.en;
@@ -369,10 +373,13 @@ function appendScreenSwitchRow(container, { id, label, checked, onChange }) {
     sw.type = 'button';
     sw.className = 'gswitch' + (checked ? ' on' : '');
     sw.id = id;
+    sw.setAttribute('role', 'switch');
+    sw.setAttribute('aria-checked', checked ? 'true' : 'false');
     sw.setAttribute('aria-label', label);
     sw.addEventListener('click', () => {
-        sw.classList.toggle('on');
-        if (onChange) onChange(sw.classList.contains('on'));
+        const on = sw.classList.toggle('on');
+        sw.setAttribute('aria-checked', on ? 'true' : 'false');
+        if (onChange) onChange(on);
     });
     row.appendChild(labelEl);
     row.appendChild(sw);
@@ -2246,6 +2253,9 @@ function renderScreenCanvas() {
     const scale = getScreenScale();
     window.screenEditor.scale = scale;
 
+    // Use a DocumentFragment to batch DOM insertions and reduce layout thrashing.
+    const fragment = document.createDocumentFragment();
+
     // Render in z order (ascending), but allow overlap
     const elems = (profile.elements || []).slice().sort((a, b) => (a.z || 0) - (b.z || 0));
 
@@ -2280,10 +2290,11 @@ function renderScreenCanvas() {
             renderScreenPalette();
         });
 
-        canvas.appendChild(box);
+        fragment.appendChild(box);
     });
 
-    appendScreenGuides(canvas, scale);
+    appendScreenGuides(fragment, scale);
+    canvas.appendChild(fragment);
     updateScreenStatusLine();
 }
 
@@ -2960,6 +2971,8 @@ function beginDrag(id, pointerEvent, fromPalette) {
     const profile = getProfileObj(window.screenEditor.mode);
     if (!profile) return;
 
+    // Cache the reference to the dragged element to avoid redundant lookups
+    // during high-frequency pointermove events.
     const elem = ensureElementInProfile(profile, id);
 
     const scale = getScreenScale();
@@ -2979,6 +2992,7 @@ function beginDrag(id, pointerEvent, fromPalette) {
     canvas.setPointerCapture(pointerEvent.pointerId);
     window.screenEditor.dragging = {
         id,
+        elem,
         originX: pointerEvent.clientX,
         originY: pointerEvent.clientY,
         startLeft,
@@ -3015,9 +3029,7 @@ function onScreenPointerMove(e) {
     if (!d) return;
     const canvas = el('screenCanvas');
     if (!canvas) return;
-    const profile = getProfileObj(window.screenEditor.mode);
-    if (!profile) return;
-    const elem = ensureElementInProfile(profile, d.id);
+    const elem = d.elem;
     const scale = d.scale;
 
     const dx = e.clientX - d.originX;
