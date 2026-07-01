@@ -31,3 +31,7 @@
 ## 2026-06-24 - [Semantic Toggle Switches]
 **Learning:** Using a simple `.on` class for visual toggle states is insufficient for accessibility. Implementing `role="switch"` and `aria-checked` ensures that assistive technologies correctly announce the element's purpose and state. For buttons acting as switches, `type="button"` is also essential to prevent default form submission behavior.
 **Action:** Always complement visual state classes (like `.on` or `.active`) with semantic ARIA attributes (`role="switch"`, `aria-checked`) and ensure explicit `type="button"` on toggle controls.
+
+## 2025-05-18 - [Vanilla JS Keyboard Navigation Pattern]
+**Learning:** In a vanilla JS SPA that uses non-native elements (like `div` or `a` without `href`) for critical navigation components like tabs and custom menus, standard browser keyboard interactions are lost. Implementing the WAI-ARIA `tablist`/`tab` and `listbox`/`option` patterns manually is essential. This includes adding `tabindex="0"`, appropriate `role` attributes, and manual `keydown` listeners for `Enter` and `Space` to maintain parity with native controls.
+**Action:** For every custom interactive component, explicitly define its ARIA role, manage `tabindex` for focusability, and implement keyboard listeners that mirror native activation behavior.
