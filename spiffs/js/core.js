@@ -153,7 +153,11 @@ async function setLanguage(lang, persist) {
   applyI18n(lang);
   const opt = $('.lang-opt[data-lang="' + lang + '"]');
   el('langName').textContent = opt ? opt.textContent : (LANGUAGE_NAMES[lang] || 'English');
-  $$('.lang-opt').forEach(o => o.classList.toggle('sel', o.dataset.lang === lang));
+  $$('.lang-opt').forEach(o => {
+    const isSel = o.dataset.lang === lang;
+    o.classList.toggle('sel', isSel);
+    o.setAttribute('aria-selected', isSel ? 'true' : 'false');
+  });
   if (typeof refreshScreenEditorI18n === 'function') refreshScreenEditorI18n();
   if (typeof refreshDynamicI18n === 'function') refreshDynamicI18n();
   if (persist) apiPostJson('/api/settings', { p41: LANGUAGES.indexOf(lang) }); // authoritative store on device
@@ -162,11 +166,22 @@ async function setLanguage(lang, persist) {
 /* ---------- language menu ---------- */
 const langBtn = el('langBtn'), langMenu = el('langMenu');
 langBtn.addEventListener('click', e => { e.stopPropagation(); const open = langMenu.classList.toggle('open'); langBtn.setAttribute('aria-expanded', open.toString()); });
-$$('.lang-opt').forEach(o => o.addEventListener('click', () => {
-  langMenu.classList.remove('open');
-  langBtn.setAttribute('aria-expanded', 'false');
-  setLanguage(o.dataset.lang, true);
-}));
+$$('.lang-opt').forEach(o => {
+  o.addEventListener('click', () => {
+    langMenu.classList.remove('open');
+    langBtn.setAttribute('aria-expanded', 'false');
+    setLanguage(o.dataset.lang, true);
+  });
+  o.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      langMenu.classList.remove('open');
+      langBtn.setAttribute('aria-expanded', 'false');
+      setLanguage(o.dataset.lang, true);
+      langBtn.focus();
+    }
+  });
+});
 document.addEventListener('click', () => {
   langMenu.classList.remove('open');
   langBtn.setAttribute('aria-expanded', 'false');
@@ -176,14 +191,21 @@ document.addEventListener('click', () => {
 const nav = el('nav'), navWrap = $('.nav-wrap');
 function showTab(id) {
   $$('.tab-page').forEach(p => p.classList.toggle('active', p.id === 'tab-' + id));
-  $$('#nav a').forEach(a => a.classList.toggle('active', a.dataset.tab === id));
+  $$('#nav a').forEach(a => {
+    const isAct = a.dataset.tab === id;
+    a.classList.toggle('active', isAct);
+    a.setAttribute('aria-selected', isAct ? 'true' : 'false');
+  });
   window.scrollTo(0, 0);
   const active = $('#nav a.active'); if (active) active.scrollIntoView({ inline: 'center', block: 'nearest' });
   if (sectionLoaders[id] && !loadedSections[id]) { loadedSections[id] = true; sectionLoaders[id](); }
   else if (sectionLoaders[id] && (id === 'status' || id === 'files')) sectionLoaders[id]();
   updateNavEdges();
 }
-$$('#nav a').forEach(a => a.addEventListener('click', () => showTab(a.dataset.tab)));
+$$('#nav a').forEach(a => {
+  a.addEventListener('click', () => showTab(a.dataset.tab));
+  a.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); showTab(a.dataset.tab); } });
+});
 function updateNavEdges() {
   const maxScroll = nav.scrollWidth - nav.clientWidth - 1;
   navWrap.classList.toggle('can-left', nav.scrollLeft > 1);

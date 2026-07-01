@@ -41,8 +41,9 @@ a{color:var(--cyan-deep); text-decoration:none}
   border:1px solid var(--glass-border); box-shadow:var(--glass-shadow); display:none;
 }
 .lang-menu.open{ display:block; }
-.lang-opt{ padding:9px 12px; border-radius:11px; cursor:pointer; font-size:13px; color:var(--ink-2); }
+.lang-opt{ padding:9px 12px; border-radius:11px; cursor:pointer; font-size:13px; color:var(--ink-2); outline:none; }
 .lang-opt:hover{ background:var(--net-bg); color:var(--ink); }
+.lang-opt:focus-visible{ background:var(--net-bg); color:var(--ink); box-shadow:0 0 0 2px var(--cyan) inset; }
 .lang-opt.sel{ color:var(--cyan-deep); font-weight:600; }
 
 /* tab nav — glass pill */
@@ -55,8 +56,10 @@ a{color:var(--cyan-deep); text-decoration:none}
 .nav a{
   flex:none; padding:8px 15px; border-radius:999px; font-size:13px; font-weight:500;
   color:var(--tab-ink); white-space:nowrap; cursor:pointer; transition:color .2s, background .2s;
+  outline:none;
 }
 .nav a:hover{ color:var(--ink); }
+.nav a:focus-visible{ outline: 2px solid var(--cyan); outline-offset: -2px; color: var(--ink); }
 .nav a.active{ color:var(--tab-active-ink); background:var(--tab-active-bg); box-shadow:0 1px 3px rgba(40,44,52,.18); }
 
 /* nav scroll indicators — fade + arrow on either edge when the tab bar overflows */
