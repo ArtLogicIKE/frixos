@@ -6,15 +6,30 @@
     "integrations": "Integrationer",
     "status": "Status",
     "update": "Opdater",
-    "restart": "Genstart"
+    "restart": "Genstart",
+    "files": "Filer"
   },
   "common": {
     "save_settings": "Gem indstillinger",
-    "cancel": "Annuller"
+    "cancel": "Annuller",
+    "change_language": "Skift sprog",
+    "current": "Aktuel",
+    "file": "Fil",
+    "hide_password": "Skjul adgangskode",
+    "insert": "Indsæt",
+    "load": "Indlæs",
+    "none": "Ingen",
+    "offline": "Offline",
+    "online": "Online",
+    "scroll_tabs_left": "Rul faner til venstre",
+    "scroll_tabs_right": "Rul faner til højre",
+    "select_font": "Vælg {name}-skrifttype",
+    "show_password": "Vis adgangskode",
+    "toggle_theme": "Skift tema"
   },
   "settings": {
     "connection": {
-      "title": "Forbindelsesindstillinger *",
+      "title": "Forbindelse",
       "wifi_ssid": "WiFi SSID",
       "wifi_password": "WiFi-adgangskode",
       "hostname": "Værtsnavn",
@@ -29,23 +44,38 @@
       "static_dns1": "DNS-server 1",
       "static_dns2": "DNS-server 2",
       "optional": "(valgfrit)",
-      "static_dns_label": "DNS-servere"
+      "static_dns_label": "DNS-servere",
+      "hostname_required": "Værtsnavn er påkrævet.",
+      "password_placeholder": "Lad stå tomt for at beholde nuværende",
+      "ssid_placeholder": "Netværksnavn",
+      "static_ip_desc": "Tildel en fast adresse i stedet for DHCP"
     },
     "wifi": {
       "available_networks": "Tilgængelige WiFi-netværk",
       "scanning": "Søger efter netværk...",
       "scan_button": "Scan tilgængelige netværk",
       "no_scan_message": "Klik på \"Scan tilgængelige netværk\" for at se WiFi-netværk",
-      "no_networks": "Ingen netværk fundet"
+      "no_networks": "Ingen netværk fundet",
+      "open": "Åbent",
+      "scan_failed": "Scanning mislykkedes.",
+      "secure": "Sikret",
+      "signal": "Signalstyrke",
+      "tap_scan": "Tryk på scan for at finde netværk i nærheden."
     },
     "regional": {
-      "title": "Regionale indstillinger"
+      "title": "Regionalt",
+      "hour12": "12-timers ur",
+      "hour12_desc": "Vis tid med AM/PM",
+      "us_units": "Amerikanske enheder",
+      "us_units_desc": "Fahrenheit, mph, tommer"
     },
     "autoupdate": {
-      "title": "Automatisk opdatering"
+      "title": "Automatisk opdatering",
+      "check": "Kontroller for firmware-opdateringer",
+      "check_desc": "Installer ny firmware automatisk"
     },
     "display": {
-      "title": "Visningsindstillinger"
+      "title": "Skærm"
     }
   },
   "screen": {
@@ -94,7 +124,15 @@
       "title": "Visningsskema",
       "description": "Angiv hvad der vises på den primære cifervisning og hvor længe. Slots skifter i rækkefølge. Et enkelt tidsslot betyder at uret altid vises.",
       "add_slot": "+ Tilføj slot",
-      "label_placeholder": "etiket (f.eks. Udetemp.)"
+      "label_placeholder": "etiket (f.eks. Udetemp.)",
+      "duration_title": "Varighed (sekunder)",
+      "entity_placeholder": "entity_id (f.eks. sensor.temp)",
+      "sec": "sek",
+      "type_cgm": "CGM (glukose)",
+      "type_ha": "Home Assistant-entitet",
+      "type_temp": "Udetemperatur",
+      "type_time": "Tid",
+      "unit_placeholder": "enhed (f.eks. °F)"
     },
     "display_schedule_aux": {
       "title": "Visningsskema (Aux)",
@@ -110,6 +148,9 @@
     "status_none_label": "<Ingen>",
     "status_selected_size": "Valgt: {name} @ ({x},{y}) størrelse ({w},{h})",
     "status_none": "Valgt: {none} @ ({x},{y})",
+    "status_multi": "{n} elementer valgt",
+    "multi_hint": "Ctrl+klik for at vælge flere",
+    "multi_selected": "{n} elementer valgt — træk eller brug piletasterne for at flytte dem sammen. Ctrl+klik for at tilføje eller fjerne.",
     "tokens": "Tokens",
     "align": {
       "left": "Venstre",
@@ -139,7 +180,11 @@
       "text_8": "Tekst 8",
       "screen_grid": "Vis skærmgitter",
       "screen_settings": "Skærmindstillinger"
-    }
+    },
+    "apply": "Anvend",
+    "disabled": "Deaktiveret",
+    "editor_instructions": "Placer elementer på 128×128-skærmen — elementer kan overlappe. Træk elementer fra paletten til gitteret, eller træk et placeret element for at flytte det. Brug piletasterne til at flytte det valgte element (Shift = 10px).",
+    "layout_management": "Layoutstyring"
   },
   "advanced": {
     "display": {
@@ -177,7 +222,7 @@
       "title": "Skrifttypeprøver"
     },
     "location": {
-      "title": "Placeringsindstillinger *",
+      "title": "Placering",
       "latitude": "Breddegrad",
       "longitude": "Længdegrad",
       "timezone": "Tidszone",
@@ -203,7 +248,17 @@
       "city_found_tz": "Fandt: {city} ({iana})",
       "timezone_lookup_loading": "Slår tidszone op…",
       "reverse_geocode_loading": "Identificerer nærmeste by…",
-      "geolocate_no_data": "Ingen IP-koordinater tilgængelige på enheden endnu. Brug bysøgning."
+      "geolocate_no_data": "Ingen IP-koordinater tilgængelige på enheden endnu. Brug bysøgning.",
+      "found_no_tz": "Fandt: {city} — tidszoneopslag mislykkedes, angiv den manuelt.",
+      "geolocate_failed": "Kunne ikke bestemme placering fra IP.",
+      "geolocate_searching": "Slår din omtrentlige placering op…",
+      "ip_location": "IP-placering",
+      "lat_placeholder": "f.eks. 40.6892494",
+      "located": "Placeret: {where}",
+      "located_no_tz": "Placeret: {where} — tidszoneopslag mislykkedes, angiv den manuelt.",
+      "located_tz": "Placeret: {where} ({iana})",
+      "lon_placeholder": "f.eks. -74.0470807",
+      "timezone_posix": "Tidszone (POSIX)"
     },
     "wifi_hours": {
       "title": "WiFi-aktive timer",
@@ -211,7 +266,7 @@
       "end": "Slut"
     },
     "brightness": {
-      "title": "Projektionslysstyrkeindstillinger",
+      "title": "Projektionslysstyrke",
       "dimming_selection": "Dæmpningsvalg",
       "dimming_mode": "Dæmpningstilstand",
       "dim_mode_full": "Altid fuld lysstyrke",
@@ -275,7 +330,10 @@
       "title": "Del information med support",
       "send_email": "Send e-mail",
       "copy_clipboard": "Kopiér til udklipsholder",
-      "help_text": "Hvis du har brug for support, skal du dele ovenstående oplysninger med os. Klik på \"send e-mail\" for at sende os en besked; hvis det ikke virker, kopiér oplysningerne til din udklipsholder og send dem via e-mail til support@buyfrixos.com."
+      "help_text": "Hvis du har brug for support, skal du dele ovenstående oplysninger med os. Klik på \"send e-mail\" for at sende os en besked; hvis det ikke virker, kopiér oplysningerne til din udklipsholder og send dem via e-mail til support@buyfrixos.com.",
+      "desc": "Del enhedsdiagnostik med vores team for at hjælpe med fejlfinding.",
+      "email_hint": "Hvis e-mailen ikke åbner, kopiér oplysningerne og send dem til <a href=\"mailto:support@buyfrixos.com\">support@buyfrixos.com</a>.",
+      "heading": "Support"
     },
     "sensor": {
       "title": "Sensordata",
@@ -316,23 +374,26 @@
       "title": "Home Assistant",
       "kb_help": "Besøg <a href=\"https://buyfrixos.com/knowledge-base/%f0%9f%93%a1-new-integration-home-assistant-frixos-smart-projections/\" target=\"_blank\" rel=\"noopener noreferrer\">denne vidensbase-artikel</a> for opsætningsinstruktioner.",
       "server_url": "Server-URL",
-      "token": "LL adgangstoken",
+      "token": "Langlivet adgangstoken",
       "token_placeholder": "Indtast dit token",
-      "refresh_interval": "Opdatering (min.)"
+      "refresh_interval": "Opdatering (min.)",
+      "server_url_placeholder": "f.eks. http://homeassistant.local:8123"
     },
     "stock": {
-      "title": "Aktiekurstjeneste (via Finnhub.io)",
+      "title": "Aktiekurser",
       "kb_help": "Besøg <a href=\"https://buyfrixos.com/knowledge-base/get-stock-crypto-etf-fx-quotes-on-your-ceiling/\" target=\"_blank\" rel=\"noopener noreferrer\">denne vidensbase-artikel</a> for opsætningsinstruktioner.",
       "api_key": "API-nøgle",
       "api_key_placeholder": "Indtast din Finnhub API-nøgle",
-      "refresh_interval": "Opdatering (min.)"
+      "refresh_interval": "Opdatering (min.)",
+      "via": "Via Finnhub.io."
     },
     "dexcom": {
       "title": "Dexcom G5/6",
       "region": "Region",
       "disabled": "Deaktiveret",
       "japan": "Japan",
-      "rest_of_world": "Resten af verden"
+      "rest_of_world": "Resten af verden",
+      "us": "US"
     },
     "freestyle": {
       "title": "FreeStyle Libre",
@@ -340,7 +401,13 @@
       "disabled": "Disabled",
       "enabled": "Aktiveret",
       "japan": "Japan",
-      "rest_of_world": "Resten af verden"
+      "rest_of_world": "Resten af verden",
+      "australia": "Australien",
+      "europe": "Europa",
+      "france": "Frankrig",
+      "germany": "Tyskland",
+      "global": "Global / Resten af verden",
+      "united_states": "USA"
     },
     "glucose_monitors": {
       "title": "Glukoseovervågning",
@@ -360,7 +427,9 @@
         "description": "Skift projektionsvisning mellem tid og CGM-målinger",
         "time": "Tid (sek)",
         "cgm": "CGM (sek)"
-      }
+      },
+      "device_type": "Enhedstype",
+      "nightscout_url": "Nightscout-URL"
     }
   },
   "update": {
@@ -382,7 +451,9 @@
     "file_step1": "Klik på knappen \"Vælg fil\" og vælg filen (f.eks. user-font.jpg) fra din computer.",
     "file_step2": "Klik på knappen \"Upload firmware\" for at starte upload-processen.",
     "file_step3": "Vent indtil upload'en er færdig. Sluk ikke eller frakobl enheden under upload'en.",
-    "file_step4": "Du kan nu uploade en anden fil eller lukke dette vindue."
+    "file_step4": "Du kan nu uploade en anden fil eller lukke dette vindue.",
+    "reinstall_title": "Geninstaller",
+    "upload_desc": "Din enhed installerer ny firmware automatisk. Brug kun dette, hvis support har bedt dig om at installere en specifik version, eller for at uploade en tilpasset skrifttype."
   },
   "restart": {
     "title": "Enhedsgenstart",
@@ -441,6 +512,33 @@
     "layout_read_from_file": "Layout indlæst fra fil. Klik Gem for at anvende på enheden.",
     "layout_read_invalid": "Ugyldig layout-fil",
     "layout_system_loaded": "Systemlayout indlæst. Klik Gem for at anvende på enheden.",
-    "layout_system_select_file": "Vælg først en layout-fil"
+    "layout_system_select_file": "Vælg først en layout-fil",
+    "cgm_only_one": "Kun én CGM-kilde (Dexcom, FreeStyle Libre eller Nightscout-URL) kan være aktiveret ad gangen.",
+    "delete_failed": "Sletning mislykkedes",
+    "device_restarting_short": "Enheden genstarter…",
+    "done": "Færdig",
+    "done_restarting": "Færdig — genstarter…",
+    "file_renamed": "Fil omdøbt",
+    "files_deleted": "Slettede {n} fil(er)",
+    "files_refreshed": "Filer opdateret",
+    "layout_applied": "Layout anvendt på enheden",
+    "layout_apply_failed": "Kunne ikke anvende layout: ",
+    "no_changes": "Ingen ændringer at gemme",
+    "rename_failed": "Omdøbning mislykkedes",
+    "rename_prompt": "Omdøb \"{name}\" til:",
+    "save_failed": "Gemning mislykkedes",
+    "saved_restarting": "Gemt — enheden genstarter…",
+    "status_refreshed": "Status opdateret",
+    "upload_failed": "Upload mislykkedes"
+  },
+  "files": {
+    "delete_selected": "Slet valgte",
+    "description": "Administrer filer gemt på enhedens filsystem.",
+    "filename": "Filnavn",
+    "refresh": "Opdater",
+    "rename": "Omdøb",
+    "select_all": "Vælg alle",
+    "size": "Størrelse",
+    "title": "SPIFFS-filer"
   }
 }

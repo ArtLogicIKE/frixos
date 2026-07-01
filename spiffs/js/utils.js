@@ -49,6 +49,20 @@ function toggleLoading(btn, isLoading) {
    the layout editor's getNestedTranslation(...) || 'English' lookups.
    Language JSON files (/i18n/language_<lang>.json) are merged on demand. */
 let currentLanguage = 'en';
+
+/* Language is remembered two ways: authoritatively on the device (setting p41,
+   so it follows the device across browsers) and cached in localStorage so the
+   UI can render in the right language immediately on load, before /api/settings
+   returns. */
+const _LANG_STORE_KEY = 'frixos.lang';
+function getStoredLanguage() {
+  try { const v = localStorage.getItem(_LANG_STORE_KEY); return LANGUAGES.includes(v) ? v : null; }
+  catch (e) { return null; }
+}
+function storeLanguage(lang) {
+  try { if (LANGUAGES.includes(lang)) localStorage.setItem(_LANG_STORE_KEY, lang); }
+  catch (e) { /* private mode / storage disabled — device p41 still persists */ }
+}
 const translations = {
   en: {
     common: { insert: 'Insert', show_password: 'Show password', hide_password: 'Hide password' },
@@ -75,7 +89,10 @@ const translations = {
   }
 };
 
-const _translationsLoaded = { en: true };
+/* English is fetched from /i18n/language_en.json like every other language;
+   the inline translations.en above is only a pre-fetch fallback for the
+   handful of strings used before the JSON loads. */
+const _translationsLoaded = {};
 const _translationPromises = {};
 function deepMergeTranslations(target, source) {
   if (!source || typeof source !== 'object') return target;
@@ -98,6 +115,10 @@ async function loadTranslations(lang) {
   if (_translationPromises[lang]) return _translationPromises[lang];
   _translationPromises[lang] = (async () => {
     try {
+      // Ensure the full English set is loaded first: it is the fallback base
+      // that non-English languages are merged on top of (so any key missing
+      // from a translation file still renders in English rather than blank).
+      if (lang !== 'en' && !_translationsLoaded.en) await loadTranslations('en');
       const r = await fetch('/i18n/language_' + lang + '.json');
       if (r.ok) {
         const data = await r.json();
@@ -123,6 +144,15 @@ function getMessage(key, ...args) {
   let m = getNestedTranslation(translations[currentLanguage], 'messages.' + key);
   if (!m) m = getNestedTranslation(translations.en, 'messages.' + key) || key;
   return args.length ? m + args.join('') : m;
+}
+/* Generic translated-string lookup by dot path, with English fallback then a
+   literal fallback. Resolves against the current language at call time, so
+   strings rendered on demand (toasts, hints) follow the active language
+   without needing to be re-applied on switch. */
+function tr(path, fallback) {
+  let v = getNestedTranslation(translations[currentLanguage], path);
+  if (v == null) v = getNestedTranslation(translations.en, path);
+  return v != null ? v : (fallback != null ? fallback : path);
 }
 
 /* ---------- character counters ---------- */

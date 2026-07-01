@@ -75,16 +75,16 @@ function changedSecret(payload, key, newVal) {
 }
 
 async function saveSettings(payload, networkKeys) {
-  if (Object.keys(payload).length === 0) { toast('No changes to save', 'ok'); return; }
+  if (Object.keys(payload).length === 0) { toast(getMessage('no_changes'), 'ok'); return; }
   const res = await apiPostJson('/api/settings', payload);
   const okMsg = res.data && res.data.status === 'ok';
   if (res.ok && okMsg) {
     Object.assign(window.settings, payload);
     const reboot = (res.data.message || '').toLowerCase().includes('reboot') || (networkKeys || []).some(k => k in payload);
-    toast(reboot ? 'Saved — device restarting…' : 'Settings saved', 'ok');
+    toast(reboot ? getMessage('saved_restarting') : getMessage('settings_saved'), 'ok');
     if (reboot) { let n = 8; const recheck = () => { if (--n <= 0) location.reload(); else setTimeout(recheck, 1000); }; setTimeout(recheck, 1000); }
   } else {
-    toast((res.data && res.data.message) || 'Save failed', 'err');
+    toast((res.data && res.data.message) || getMessage('save_failed'), 'err');
   }
 }
 
@@ -101,6 +101,20 @@ el('themeBtn').addEventListener('click', () => {
   window.settings.p40 = p40;
   apiPostJson('/api/settings', { p40 });
 });
+
+/* Re-render dynamic (JS-generated) text that applyI18n can't reach via
+   data-i18n attributes. Called by setLanguage after each switch. */
+function refreshDynamicI18n() {
+  if (window._heroOnline !== undefined) {
+    const e = el('heroOnline');
+    if (e) e.textContent = window._heroOnline ? tr('common.online', 'Online') : tr('common.offline', 'Offline');
+  }
+  // Layout dropdowns hold a JS-built "Current" option; re-fill so it re-localizes.
+  if (typeof fillLayoutSelect === 'function') {
+    if (el('settingsLayoutSelect')) fillLayoutSelect('settingsLayoutSelect');
+    if (el('screenLayoutSelect')) fillLayoutSelect('screenLayoutSelect');
+  }
+}
 
 /* ---------- i18n apply ---------- */
 /**
@@ -127,14 +141,18 @@ function applyI18n(lang) {
   }
 }
 async function setLanguage(lang, persist) {
+  if (!LANGUAGES.includes(lang)) lang = 'en';
   currentLanguage = lang;
+  storeLanguage(lang);                 // remember locally for instant apply next load
+  document.documentElement.lang = lang; // keep <html lang> in sync for a11y
   await loadTranslations(lang);
   applyI18n(lang);
   const opt = $('.lang-opt[data-lang="' + lang + '"]');
   el('langName').textContent = opt ? opt.textContent : (LANGUAGE_NAMES[lang] || 'English');
   $$('.lang-opt').forEach(o => o.classList.toggle('sel', o.dataset.lang === lang));
   if (typeof refreshScreenEditorI18n === 'function') refreshScreenEditorI18n();
-  if (persist) apiPostJson('/api/settings', { p41: LANGUAGES.indexOf(lang) });
+  if (typeof refreshDynamicI18n === 'function') refreshDynamicI18n();
+  if (persist) apiPostJson('/api/settings', { p41: LANGUAGES.indexOf(lang) }); // authoritative store on device
 }
 
 /* ---------- language menu ---------- */
@@ -174,13 +192,20 @@ el('navRight').addEventListener('click', () => nav.scrollBy({ left: 160, behavio
 
 /* ---------- boot ---------- */
 async function boot() {
+  // Apply the cached language immediately so the UI isn't briefly all-English
+  // while /api/settings is in flight.
+  const stored = getStoredLanguage();
+  await setLanguage(stored || 'en', false);
+
   const res = await apiGet('/api/settings?group=theme');
   let s = settingsResponseHasParams(res.data) ? res.data : null;
   if (!s) { const full = await apiGet('/api/settings'); s = full.data || {}; }
   Object.assign(window.settings, s || {});
   applyTheme(s && s.p40 !== undefined ? !!s.p40 : true); // default dark
-  const lang = (s && s.p41 != null && LANGUAGES[s.p41]) ? LANGUAGES[s.p41] : 'en';
-  await setLanguage(lang, false);
+  // The device setting (p41) is authoritative; fall back to the cached language.
+  const devLang = (s && s.p41 != null && LANGUAGES[s.p41]) ? LANGUAGES[s.p41] : null;
+  const lang = devLang || stored || 'en';
+  if (lang !== currentLanguage) await setLanguage(lang, false);
   initCounters();
 
   loadedSections.settings = true;
@@ -189,7 +214,8 @@ async function boot() {
   const st = await apiGet('/api/status'); const d = st.data || {};
   el('heroStatus').textContent = (d.ip_address ? d.ip_address : 'frixos.local') + (d.version ? ' · v' + d.version : '');
   const online = !!d.wifi_connected;
-  el('heroOnline').textContent = online ? 'Online' : 'Offline';
+  window._heroOnline = online; // remembered so refreshDynamicI18n can re-localize on language switch
+  el('heroOnline').textContent = online ? tr('common.online', 'Online') : tr('common.offline', 'Offline');
   el('heroDot').style.opacity = online ? '1' : '.3';
   updateNavEdges();
 }

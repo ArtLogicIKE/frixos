@@ -6,7 +6,8 @@
     "integrations": "Integrationen",
     "status": "Status",
     "update": "Aktualisieren",
-    "restart": "Neustart"
+    "restart": "Neustart",
+    "files": "Dateien"
   },
   "common": {
     "save_settings": "Einstellungen speichern",
@@ -14,11 +15,21 @@
     "show_password": "Passwort anzeigen",
     "hide_password": "Passwort verbergen",
     "change_language": "Sprache ändern",
-    "toggle_theme": "Thema wechseln"
+    "toggle_theme": "Thema wechseln",
+    "current": "Aktuell",
+    "file": "Datei",
+    "insert": "Einfügen",
+    "load": "Laden",
+    "none": "Keine",
+    "offline": "Offline",
+    "online": "Online",
+    "scroll_tabs_left": "Tabs nach links scrollen",
+    "scroll_tabs_right": "Tabs nach rechts scrollen",
+    "select_font": "Schriftart {name} auswählen"
   },
   "settings": {
     "connection": {
-      "title": "Verbindungseinstellungen *",
+      "title": "Verbindung",
       "wifi_ssid": "WiFi SSID",
       "wifi_password": "WiFi-Passwort",
       "hostname": "Hostname",
@@ -33,7 +44,11 @@
       "static_dns1": "DNS-Server 1",
       "static_dns2": "DNS-Server 2",
       "optional": "(optional)",
-      "static_dns_label": "DNS-Server"
+      "static_dns_label": "DNS-Server",
+      "hostname_required": "Hostname ist erforderlich.",
+      "password_placeholder": "Leer lassen, um aktuelles beizubehalten",
+      "ssid_placeholder": "Netzwerkname",
+      "static_ip_desc": "Feste Adresse statt DHCP zuweisen"
     },
     "wifi": {
       "available_networks": "Verfügbare WiFi-Netzwerke",
@@ -43,16 +58,24 @@
       "no_networks": "Keine Netzwerke gefunden",
       "signal": "Signalstärke",
       "secure": "Gesichert",
-      "open": "Offen"
+      "open": "Offen",
+      "scan_failed": "Suche fehlgeschlagen.",
+      "tap_scan": "Auf Scannen tippen, um nahegelegene Netzwerke zu finden."
     },
     "regional": {
-      "title": "Regionale Einstellungen"
+      "title": "Regional",
+      "hour12": "12-Stunden-Format",
+      "hour12_desc": "Zeit mit AM / PM anzeigen",
+      "us_units": "US-Einheiten",
+      "us_units_desc": "Fahrenheit, mph, Zoll"
     },
     "autoupdate": {
-      "title": "Automatisches Update"
+      "title": "Automatisches Update",
+      "check": "Nach Firmware-Updates suchen",
+      "check_desc": "Neue Firmware automatisch installieren"
     },
     "display": {
-      "title": "Anzeigeeinstellungen"
+      "title": "Anzeige"
     }
   },
   "screen": {
@@ -101,7 +124,15 @@
       "title": "Anzeigeplan",
       "description": "Legen Sie fest, was auf der primären Ziffernanzeige erscheint und wie lange. Die Slots wechseln der Reihe nach. Ein einzelner Zeit-Slot bedeutet, dass die Uhr immer angezeigt wird.",
       "add_slot": "+ Slot hinzufügen",
-      "label_placeholder": "Beschriftung (z. B. Außentemp.)"
+      "label_placeholder": "Beschriftung (z. B. Außentemp.)",
+      "duration_title": "Dauer (Sekunden)",
+      "entity_placeholder": "entity_id (z. B. sensor.temp)",
+      "sec": "Sek.",
+      "type_cgm": "CGM (Glukose)",
+      "type_ha": "Home Assistant-Entität",
+      "type_temp": "Außentemperatur",
+      "type_time": "Zeit",
+      "unit_placeholder": "Einheit (z. B. °F)"
     },
     "display_schedule_aux": {
       "title": "Anzeigeplan (Aux)",
@@ -117,6 +148,9 @@
     "status_none_label": "<Keine>",
     "status_selected_size": "Ausgewählt: {name} @ ({x},{y}) Größe ({w},{h})",
     "status_none": "Ausgewählt: {none} @ ({x},{y})",
+    "status_multi": "{n} Elemente ausgewählt",
+    "multi_hint": "Strg+Klick für Mehrfachauswahl",
+    "multi_selected": "{n} Elemente ausgewählt – zum gemeinsamen Verschieben ziehen oder die Pfeiltasten verwenden. Strg+Klick zum Hinzufügen oder Entfernen.",
     "tokens": "Token",
     "align": {
       "left": "Links",
@@ -146,7 +180,11 @@
       "text_8": "Text 8",
       "screen_grid": "Bildschirmraster anzeigen",
       "screen_settings": "Bildschirmeinstellungen"
-    }
+    },
+    "apply": "Übernehmen",
+    "disabled": "Deaktiviert",
+    "editor_instructions": "Elemente auf dem 128×128-Display platzieren — Elemente können sich überlappen. Elemente aus der Palette auf das Raster ziehen oder ein platziertes Element zum Verschieben ziehen. Mit den Pfeiltasten das ausgewählte Element verschieben (Umschalt = 10px).",
+    "layout_management": "Layout-Verwaltung"
   },
   "advanced": {
     "display": {
@@ -184,7 +222,7 @@
       "title": "Schriftmuster"
     },
     "location": {
-      "title": "Standorteinstellungen *",
+      "title": "Standort",
       "latitude": "Breitengrad",
       "longitude": "Längengrad",
       "timezone": "Zeitzone",
@@ -210,7 +248,17 @@
       "city_found_tz": "Gefunden: {city} ({iana})",
       "timezone_lookup_loading": "Zeitzone wird ermittelt…",
       "reverse_geocode_loading": "Nächste Stadt wird ermittelt…",
-      "geolocate_no_data": "Noch keine IP-Koordinaten auf dem Gerät verfügbar. Stadtsuche verwenden."
+      "geolocate_no_data": "Noch keine IP-Koordinaten auf dem Gerät verfügbar. Stadtsuche verwenden.",
+      "found_no_tz": "Gefunden: {city} — Zeitzonensuche fehlgeschlagen, manuell einstellen.",
+      "geolocate_failed": "Standort konnte nicht anhand der IP ermittelt werden.",
+      "geolocate_searching": "Ihr ungefährer Standort wird ermittelt…",
+      "ip_location": "IP-Standort",
+      "lat_placeholder": "z. B. 40.6892494",
+      "located": "Ermittelt: {where}",
+      "located_no_tz": "Ermittelt: {where} — Zeitzonensuche fehlgeschlagen, manuell einstellen.",
+      "located_tz": "Ermittelt: {where} ({iana})",
+      "lon_placeholder": "z. B. -74.0470807",
+      "timezone_posix": "Zeitzone (POSIX)"
     },
     "wifi_hours": {
       "title": "WiFi-Aktive Stunden",
@@ -218,7 +266,7 @@
       "end": "Ende"
     },
     "brightness": {
-      "title": "Projektionshelligkeitseinstellungen",
+      "title": "Projektionshelligkeit",
       "dimming_selection": "Dimmauswahl",
       "dimming_mode": "Dimmmodus",
       "dim_mode_full": "Immer volle Helligkeit",
@@ -282,7 +330,10 @@
       "title": "Informationen mit Support teilen",
       "send_email": "E-Mail senden",
       "copy_clipboard": "In Zwischenablage kopieren",
-      "help_text": "Falls Sie Unterstützung benötigen, teilen Sie uns bitte die obigen Informationen mit. Klicken Sie auf \"E-Mail senden\", um uns eine Nachricht zu senden; falls das nicht funktioniert, kopieren Sie die Informationen in Ihre Zwischenablage und senden Sie sie per E-Mail an support@buyfrixos.com."
+      "help_text": "Falls Sie Unterstützung benötigen, teilen Sie uns bitte die obigen Informationen mit. Klicken Sie auf \"E-Mail senden\", um uns eine Nachricht zu senden; falls das nicht funktioniert, kopieren Sie die Informationen in Ihre Zwischenablage und senden Sie sie per E-Mail an support@buyfrixos.com.",
+      "desc": "Gerätediagnose mit unserem Team teilen, um bei der Fehlerbehebung zu helfen.",
+      "email_hint": "Falls sich die E-Mail nicht öffnet, kopieren Sie die Informationen und senden Sie sie an <a href=\"mailto:support@buyfrixos.com\">support@buyfrixos.com</a>.",
+      "heading": "Support"
     },
     "sensor": {
       "title": "Sensordaten",
@@ -323,23 +374,26 @@
       "title": "Home Assistant",
       "kb_help": "Anleitungen zur Einrichtung finden Sie in <a href=\"https://buyfrixos.com/knowledge-base/%f0%9f%93%a1-new-integration-home-assistant-frixos-smart-projections/\" target=\"_blank\" rel=\"noopener noreferrer\">diesem Knowledge-Base-Artikel</a>.",
       "server_url": "Server-URL",
-      "token": "LL Zugangstoken",
+      "token": "Langlebiges Zugriffstoken",
       "token_placeholder": "Geben Sie Ihr Token ein",
-      "refresh_interval": "Aktualisierung (Min.)"
+      "refresh_interval": "Aktualisierung (Min.)",
+      "server_url_placeholder": "z. B. http://homeassistant.local:8123"
     },
     "stock": {
-      "title": "Aktienkurs-Service (via Finnhub.io)",
+      "title": "Aktienkurse",
       "kb_help": "Anleitungen zur Einrichtung finden Sie in <a href=\"https://buyfrixos.com/knowledge-base/get-stock-crypto-etf-fx-quotes-on-your-ceiling/\" target=\"_blank\" rel=\"noopener noreferrer\">diesem Knowledge-Base-Artikel</a>.",
       "api_key": "API-Schlüssel",
       "api_key_placeholder": "Geben Sie Ihren Finnhub API-Schlüssel ein",
-      "refresh_interval": "Aktualisierung (Min.)"
+      "refresh_interval": "Aktualisierung (Min.)",
+      "via": "Via Finnhub.io."
     },
     "dexcom": {
       "title": "Dexcom G5/6",
       "region": "Region",
       "disabled": "Deaktiviert",
       "japan": "Japan",
-      "rest_of_world": "Rest der Welt"
+      "rest_of_world": "Rest der Welt",
+      "us": "USA"
     },
     "freestyle": {
       "title": "FreeStyle Libre",
@@ -347,7 +401,13 @@
       "disabled": "Disabled",
       "enabled": "Aktiviert",
       "japan": "Japan",
-      "rest_of_world": "Rest der Welt"
+      "rest_of_world": "Rest der Welt",
+      "australia": "Australien",
+      "europe": "Europa",
+      "france": "Frankreich",
+      "germany": "Deutschland",
+      "global": "Global / Rest der Welt",
+      "united_states": "Vereinigte Staaten"
     },
     "glucose_monitors": {
       "title": "Glukose-Überwachung",
@@ -367,7 +427,9 @@
         "description": "Alternierende Projektionsanzeige zwischen Zeit und CGM-Messungen",
         "time": "Zeit (Sek.)",
         "cgm": "CGM (Sek.)"
-      }
+      },
+      "device_type": "Gerätetyp",
+      "nightscout_url": "Nightscout-URL"
     }
   },
   "update": {
@@ -389,7 +451,9 @@
     "file_step1": "Klicken Sie auf die Schaltfläche \"Datei auswählen\" und wählen Sie die Datei (z.B. user-font.jpg) von Ihrem Computer aus.",
     "file_step2": "Klicken Sie auf die Schaltfläche \"Firmware hochladen\", um den Upload-Vorgang zu starten.",
     "file_step3": "Warten Sie, bis der Upload abgeschlossen ist. Schalten Sie das Gerät während des Uploads nicht aus und trennen Sie es nicht.",
-    "file_step4": "Sie können jetzt eine weitere Datei hochladen oder dieses Fenster schließen."
+    "file_step4": "Sie können jetzt eine weitere Datei hochladen oder dieses Fenster schließen.",
+    "reinstall_title": "Neu installieren",
+    "upload_desc": "Ihr Gerät installiert neue Firmware automatisch. Verwenden Sie dies nur, wenn der Support Sie gebeten hat, eine bestimmte Version zu installieren, oder um eine benutzerdefinierte Schriftart hochzuladen."
   },
   "restart": {
     "title": "Gerät zurücksetzen",
@@ -448,6 +512,33 @@
     "layout_read_from_file": "Layout aus Datei geladen. Klicken Sie auf Speichern, um es auf dem Gerät zu übernehmen.",
     "layout_read_invalid": "Ungültige Layout-Datei",
     "layout_system_loaded": "Systemlayout geladen. Klicken Sie auf Speichern, um es auf dem Gerät zu übernehmen.",
-    "layout_system_select_file": "Wählen Sie zuerst eine Layout-Datei aus"
+    "layout_system_select_file": "Wählen Sie zuerst eine Layout-Datei aus",
+    "cgm_only_one": "Es kann jeweils nur eine CGM-Quelle (Dexcom, FreeStyle Libre oder Nightscout-URL) aktiviert werden.",
+    "delete_failed": "Löschen fehlgeschlagen",
+    "device_restarting_short": "Gerät wird neu gestartet…",
+    "done": "Fertig",
+    "done_restarting": "Fertig — Neustart…",
+    "file_renamed": "Datei umbenannt",
+    "files_deleted": "{n} Datei(en) gelöscht",
+    "files_refreshed": "Dateien aktualisiert",
+    "layout_applied": "Layout auf das Gerät übernommen",
+    "layout_apply_failed": "Layout konnte nicht übernommen werden: ",
+    "no_changes": "Keine Änderungen zum Speichern",
+    "rename_failed": "Umbenennen fehlgeschlagen",
+    "rename_prompt": "\"{name}\" umbenennen in:",
+    "save_failed": "Speichern fehlgeschlagen",
+    "saved_restarting": "Gespeichert — Gerät wird neu gestartet…",
+    "status_refreshed": "Status aktualisiert",
+    "upload_failed": "Upload fehlgeschlagen"
+  },
+  "files": {
+    "delete_selected": "Auswahl löschen",
+    "description": "Dateien verwalten, die auf dem Gerätedateisystem gespeichert sind.",
+    "filename": "Dateiname",
+    "refresh": "Aktualisieren",
+    "rename": "Umbenennen",
+    "select_all": "Alle auswählen",
+    "size": "Größe",
+    "title": "SPIFFS-Dateien"
   }
 }

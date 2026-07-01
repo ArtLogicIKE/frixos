@@ -6,15 +6,30 @@
     "integrations": "Intégrations",
     "status": "Statut",
     "update": "Mise à jour",
-    "restart": "Redémarrer"
+    "restart": "Redémarrer",
+    "files": "Fichiers"
   },
   "common": {
     "save_settings": "Enregistrer les paramètres",
-    "cancel": "Annuler"
+    "cancel": "Annuler",
+    "change_language": "Changer de langue",
+    "current": "Actuel",
+    "file": "Fichier",
+    "hide_password": "Masquer le mot de passe",
+    "insert": "Insérer",
+    "load": "Charger",
+    "none": "Aucun",
+    "offline": "Hors ligne",
+    "online": "En ligne",
+    "scroll_tabs_left": "Faire défiler les onglets vers la gauche",
+    "scroll_tabs_right": "Faire défiler les onglets vers la droite",
+    "select_font": "Sélectionner la police {name}",
+    "show_password": "Afficher le mot de passe",
+    "toggle_theme": "Changer de thème"
   },
   "settings": {
     "connection": {
-      "title": "Paramètres de connexion *",
+      "title": "Connexion",
       "wifi_ssid": "SSID WiFi",
       "wifi_password": "Mot de passe WiFi",
       "hostname": "Nom d'hôte",
@@ -29,23 +44,38 @@
       "static_dns1": "Serveur DNS 1",
       "static_dns2": "Serveur DNS 2",
       "optional": "(optionnel)",
-      "static_dns_label": "Serveurs DNS"
+      "static_dns_label": "Serveurs DNS",
+      "hostname_required": "Le nom d'hôte est requis.",
+      "password_placeholder": "Laissez vide pour conserver l'actuel",
+      "ssid_placeholder": "Nom du réseau",
+      "static_ip_desc": "Attribuer une adresse fixe au lieu de DHCP"
     },
     "wifi": {
       "available_networks": "Réseaux WiFi disponibles",
       "scanning": "Recherche de réseaux...",
       "scan_button": "Scanner les réseaux disponibles",
       "no_scan_message": "Cliquez sur \"Rechercher les réseaux disponibles\" pour voir les réseaux WiFi",
-      "no_networks": "Aucun réseau trouvé"
+      "no_networks": "Aucun réseau trouvé",
+      "open": "Ouvert",
+      "scan_failed": "Échec de la recherche.",
+      "secure": "Sécurisé",
+      "signal": "Force du signal",
+      "tap_scan": "Touchez rechercher pour trouver les réseaux à proximité."
     },
     "regional": {
-      "title": "Paramètres régionaux"
+      "title": "Régional",
+      "hour12": "Heure au format 12 heures",
+      "hour12_desc": "Afficher l'heure avec AM / PM",
+      "us_units": "Unités US",
+      "us_units_desc": "Fahrenheit, mph, pouces"
     },
     "autoupdate": {
-      "title": "Mise à jour automatique"
+      "title": "Mise à jour automatique",
+      "check": "Vérifier les mises à jour du firmware",
+      "check_desc": "Installer automatiquement les nouveaux firmwares"
     },
     "display": {
-      "title": "Paramètres d'affichage"
+      "title": "Affichage"
     }
   },
   "screen": {
@@ -94,7 +124,15 @@
       "title": "Programme d'affichage",
       "description": "Définissez ce qui apparaît sur l'affichage numérique principal et pendant combien de temps. Les créneaux défilent dans l'ordre. Un seul créneau Heure signifie que l'horloge est toujours affichée.",
       "add_slot": "+ Ajouter un créneau",
-      "label_placeholder": "libellé (p. ex. Temp. ext.)"
+      "label_placeholder": "libellé (p. ex. Temp. ext.)",
+      "duration_title": "Durée (secondes)",
+      "entity_placeholder": "entity_id (p. ex. sensor.temp)",
+      "sec": "sec",
+      "type_cgm": "CGM (glucose)",
+      "type_ha": "Entité Home Assistant",
+      "type_temp": "Température extérieure",
+      "type_time": "Heure",
+      "unit_placeholder": "unité (p. ex. °F)"
     },
     "display_schedule_aux": {
       "title": "Programme d'affichage (Aux)",
@@ -110,6 +148,9 @@
     "status_none_label": "<Aucun>",
     "status_selected_size": "Sélectionné : {name} @ ({x},{y}) taille ({w},{h})",
     "status_none": "Sélectionné : {none} @ ({x},{y})",
+    "status_multi": "{n} éléments sélectionnés",
+    "multi_hint": "Ctrl+clic pour la sélection multiple",
+    "multi_selected": "{n} éléments sélectionnés — faites glisser ou utilisez les touches fléchées pour les déplacer ensemble. Ctrl+clic pour ajouter ou retirer.",
     "tokens": "Jetons",
     "align": {
       "left": "Gauche",
@@ -139,7 +180,11 @@
       "text_8": "Texte 8",
       "screen_grid": "Afficher la grille d'écran",
       "screen_settings": "Paramètres d'écran"
-    }
+    },
+    "apply": "Appliquer",
+    "disabled": "Désactivé",
+    "editor_instructions": "Placez les éléments sur l'écran 128×128 — les éléments peuvent se chevaucher. Faites glisser les éléments de la palette vers la grille, ou faites glisser un élément placé pour le déplacer. Utilisez les touches fléchées pour ajuster l'élément sélectionné (Maj = 10px).",
+    "layout_management": "Gestion des dispositions"
   },
   "advanced": {
     "display": {
@@ -177,7 +222,7 @@
       "title": "Échantillons de polices"
     },
     "location": {
-      "title": "Paramètres de localisation *",
+      "title": "Emplacement",
       "latitude": "Latitude",
       "longitude": "Longitude",
       "timezone": "Fuseau horaire",
@@ -203,7 +248,17 @@
       "city_found_tz": "Trouvée : {city} ({iana})",
       "timezone_lookup_loading": "Recherche du fuseau horaire…",
       "reverse_geocode_loading": "Identification de la ville la plus proche…",
-      "geolocate_no_data": "Aucune coordonnée IP disponible sur l’appareil. Essayez la recherche par ville."
+      "geolocate_no_data": "Aucune coordonnée IP disponible sur l’appareil. Essayez la recherche par ville.",
+      "found_no_tz": "Trouvée : {city} — échec de la recherche du fuseau horaire, définissez-le manuellement.",
+      "geolocate_failed": "Impossible de déterminer la localisation depuis l'IP.",
+      "geolocate_searching": "Recherche de votre localisation approximative…",
+      "ip_location": "Localisation IP",
+      "lat_placeholder": "p. ex. 40.6892494",
+      "located": "Localisé : {where}",
+      "located_no_tz": "Localisé : {where} — échec de la recherche du fuseau horaire, définissez-le manuellement.",
+      "located_tz": "Localisé : {where} ({iana})",
+      "lon_placeholder": "p. ex. -74.0470807",
+      "timezone_posix": "Fuseau horaire (POSIX)"
     },
     "wifi_hours": {
       "title": "Heures d'activation WiFi",
@@ -211,7 +266,7 @@
       "end": "Fin"
     },
     "brightness": {
-      "title": "Paramètres de luminosité de projection",
+      "title": "Luminosité de projection",
       "dimming_selection": "Sélection de gradation",
       "dimming_mode": "Mode de gradation",
       "dim_mode_full": "Toujours pleine luminosité",
@@ -275,7 +330,10 @@
       "title": "Partager les informations avec le support",
       "send_email": "Envoyer un e-mail",
       "copy_clipboard": "Copier dans le presse-papiers",
-      "help_text": "Si vous avez besoin d'aide, veuillez partager les informations ci-dessus avec nous. Cliquez sur \"envoyer un e-mail\" pour nous envoyer un message; si cela ne fonctionne pas, copiez les informations dans votre presse-papiers et envoyez-les par e-mail à support@buyfrixos.com."
+      "help_text": "Si vous avez besoin d'aide, veuillez partager les informations ci-dessus avec nous. Cliquez sur \"envoyer un e-mail\" pour nous envoyer un message; si cela ne fonctionne pas, copiez les informations dans votre presse-papiers et envoyez-les par e-mail à support@buyfrixos.com.",
+      "desc": "Partagez les diagnostics de l'appareil avec notre équipe pour faciliter le dépannage.",
+      "email_hint": "Si l'e-mail ne s'ouvre pas, copiez les informations et envoyez-les à <a href=\"mailto:support@buyfrixos.com\">support@buyfrixos.com</a>.",
+      "heading": "Support"
     },
     "sensor": {
       "title": "Données du capteur",
@@ -316,23 +374,26 @@
       "title": "Home Assistant",
       "kb_help": "Pour les instructions de configuration, consultez <a href=\"https://buyfrixos.com/knowledge-base/%f0%9f%93%a1-new-integration-home-assistant-frixos-smart-projections/\" target=\"_blank\" rel=\"noopener noreferrer\">cet article de la base de connaissances</a>.",
       "server_url": "URL du serveur",
-      "token": "Jeton d'accès LL",
+      "token": "Jeton d'accès longue durée",
       "token_placeholder": "Entrez votre jeton",
-      "refresh_interval": "Actualisation (min.)"
+      "refresh_interval": "Actualisation (min.)",
+      "server_url_placeholder": "p. ex. http://homeassistant.local:8123"
     },
     "stock": {
-      "title": "Service de cotation boursière (via Finnhub.io)",
+      "title": "Cours boursiers",
       "kb_help": "Pour les instructions de configuration, consultez <a href=\"https://buyfrixos.com/knowledge-base/get-stock-crypto-etf-fx-quotes-on-your-ceiling/\" target=\"_blank\" rel=\"noopener noreferrer\">cet article de la base de connaissances</a>.",
       "api_key": "Clé API",
       "api_key_placeholder": "Entrez votre clé API Finnhub",
-      "refresh_interval": "Actualisation (min.)"
+      "refresh_interval": "Actualisation (min.)",
+      "via": "Via Finnhub.io."
     },
     "dexcom": {
       "title": "Dexcom G5/6",
       "region": "Région",
       "disabled": "Désactivé",
       "japan": "Japon",
-      "rest_of_world": "Reste du monde"
+      "rest_of_world": "Reste du monde",
+      "us": "USA"
     },
     "freestyle": {
       "title": "FreeStyle Libre",
@@ -340,7 +401,13 @@
       "disabled": "Disabled",
       "enabled": "Activé",
       "japan": "Japon",
-      "rest_of_world": "Reste du monde"
+      "rest_of_world": "Reste du monde",
+      "australia": "Australie",
+      "europe": "Europe",
+      "france": "France",
+      "germany": "Allemagne",
+      "global": "Mondial / Reste du monde",
+      "united_states": "États-Unis"
     },
     "glucose_monitors": {
       "title": "Surveillance du glucose",
@@ -360,7 +427,9 @@
         "description": "Alterner l'affichage de projection entre l'heure et les mesures CGM",
         "time": "Heure (sec)",
         "cgm": "CGM (sec)"
-      }
+      },
+      "device_type": "Type d'appareil",
+      "nightscout_url": "URL Nightscout"
     }
   },
   "update": {
@@ -382,7 +451,9 @@
     "file_step1": "Cliquez sur le bouton \"Choisir un fichier\" et sélectionnez le fichier (par ex. user-font.jpg) depuis votre ordinateur.",
     "file_step2": "Cliquez sur le bouton \"Télécharger le firmware\" pour démarrer le processus de téléchargement.",
     "file_step3": "Attendez que le téléchargement se termine. Ne pas éteindre ou déconnecter l'appareil pendant le téléchargement.",
-    "file_step4": "Vous pouvez maintenant télécharger un autre fichier ou fermer cette fenêtre."
+    "file_step4": "Vous pouvez maintenant télécharger un autre fichier ou fermer cette fenêtre.",
+    "reinstall_title": "Réinstaller",
+    "upload_desc": "Votre appareil installe automatiquement les nouveaux firmwares. Utilisez ceci uniquement si le support vous a demandé d'installer une version spécifique, ou pour télécharger une police personnalisée."
   },
   "restart": {
     "title": "Réinitialisation de l'appareil",
@@ -441,6 +512,33 @@
     "layout_read_from_file": "Disposition chargée depuis un fichier. Cliquez sur Enregistrer pour l'appliquer à l'appareil.",
     "layout_read_invalid": "Fichier de disposition non valide",
     "layout_system_loaded": "Disposition système chargée. Cliquez sur Enregistrer pour l'appliquer à l'appareil.",
-    "layout_system_select_file": "Sélectionnez d'abord un fichier de disposition"
+    "layout_system_select_file": "Sélectionnez d'abord un fichier de disposition",
+    "cgm_only_one": "Une seule source CGM (Dexcom, FreeStyle Libre ou URL Nightscout) peut être activée à la fois.",
+    "delete_failed": "Échec de la suppression",
+    "device_restarting_short": "Redémarrage de l'appareil…",
+    "done": "Terminé",
+    "done_restarting": "Terminé — redémarrage…",
+    "file_renamed": "Fichier renommé",
+    "files_deleted": "{n} fichier(s) supprimé(s)",
+    "files_refreshed": "Fichiers actualisés",
+    "layout_applied": "Disposition appliquée à l'appareil",
+    "layout_apply_failed": "Échec de l'application de la disposition : ",
+    "no_changes": "Aucune modification à enregistrer",
+    "rename_failed": "Échec du renommage",
+    "rename_prompt": "Renommer « {name} » en :",
+    "save_failed": "Échec de l'enregistrement",
+    "saved_restarting": "Enregistré — redémarrage de l'appareil…",
+    "status_refreshed": "Statut actualisé",
+    "upload_failed": "Échec du téléchargement"
+  },
+  "files": {
+    "delete_selected": "Supprimer la sélection",
+    "description": "Gérez les fichiers stockés sur le système de fichiers de l'appareil.",
+    "filename": "Nom du fichier",
+    "refresh": "Actualiser",
+    "rename": "Renommer",
+    "select_all": "Tout sélectionner",
+    "size": "Taille",
+    "title": "Fichiers SPIFFS"
   }
 }

@@ -87,10 +87,10 @@ el('saveIntegrations').addEventListener('click', () => {
 
 /* ---------- display schedule (Layout editor: time / time_aux slots) ---------- */
 const SLOT_TYPES = [
-  { value: 0, label: 'Time' },
-  { value: 1, label: 'CGM (glucose)' },
-  { value: 2, label: 'Outside Temperature' },
-  { value: 3, label: 'Home Assistant entity' }
+  { value: 0, key: 'screen.display_schedule.type_time', label: 'Time' },
+  { value: 1, key: 'screen.display_schedule.type_cgm', label: 'CGM (glucose)' },
+  { value: 2, key: 'screen.display_schedule.type_temp', label: 'Outside Temperature' },
+  { value: 3, key: 'screen.display_schedule.type_ha', label: 'Home Assistant entity' }
 ];
 
 function buildSlotRow(slot) {
@@ -100,26 +100,26 @@ function buildSlotRow(slot) {
   const typeSelect = document.createElement('select');
   SLOT_TYPES.forEach(opt => {
     const o = document.createElement('option');
-    o.value = opt.value; o.textContent = opt.label;
+    o.value = opt.value; o.textContent = getScreenTranslation(opt.key, opt.label);
     if (slot.t === opt.value) o.selected = true;
     typeSelect.appendChild(o);
   });
 
   const durInput = document.createElement('input');
   durInput.type = 'number'; durInput.min = 1; durInput.max = 3600;
-  durInput.value = slot.d || 30; durInput.title = 'Duration (seconds)';
+  durInput.value = slot.d || 30; durInput.title = getScreenTranslation('screen.display_schedule.duration_title', 'Duration (seconds)');
 
   const durLabel = document.createElement('span');
-  durLabel.className = 'schedule-slot-sec'; durLabel.textContent = 'sec';
+  durLabel.className = 'schedule-slot-sec'; durLabel.textContent = getScreenTranslation('screen.display_schedule.sec', 'sec');
 
   const entityInput = document.createElement('input');
   entityInput.type = 'text'; entityInput.className = 'schedule-slot-entity';
-  entityInput.placeholder = 'entity_id (e.g. sensor.temp)'; entityInput.value = slot.e || '';
+  entityInput.placeholder = getScreenTranslation('screen.display_schedule.entity_placeholder', 'entity_id (e.g. sensor.temp)'); entityInput.value = slot.e || '';
   entityInput.hidden = slot.t !== 3;
 
   const unitInput = document.createElement('input');
   unitInput.type = 'text'; unitInput.className = 'schedule-slot-unit';
-  unitInput.placeholder = 'unit (e.g. °F)'; unitInput.maxLength = 7; unitInput.value = slot.l || '';
+  unitInput.placeholder = getScreenTranslation('screen.display_schedule.unit_placeholder', 'unit (e.g. °F)'); unitInput.maxLength = 7; unitInput.value = slot.l || '';
   unitInput.hidden = slot.t !== 3;
 
   const nameInput = document.createElement('input');

@@ -6,15 +6,30 @@
     "integrations": "Integrationer",
     "status": "Status",
     "update": "Uppdatera",
-    "restart": "Starta om"
+    "restart": "Starta om",
+    "files": "Filer"
   },
   "common": {
     "save_settings": "Spara inställningar",
-    "cancel": "Avbryt"
+    "cancel": "Avbryt",
+    "change_language": "Byt språk",
+    "current": "Aktuell",
+    "file": "Fil",
+    "hide_password": "Dölj lösenord",
+    "insert": "Infoga",
+    "load": "Ladda",
+    "none": "Ingen",
+    "offline": "Offline",
+    "online": "Online",
+    "scroll_tabs_left": "Rulla flikar åt vänster",
+    "scroll_tabs_right": "Rulla flikar åt höger",
+    "select_font": "Välj typsnittet {name}",
+    "show_password": "Visa lösenord",
+    "toggle_theme": "Växla tema"
   },
   "settings": {
     "connection": {
-      "title": "Anslutningsinställningar *",
+      "title": "Anslutning",
       "wifi_ssid": "WiFi SSID",
       "wifi_password": "WiFi-lösenord",
       "hostname": "Värdnamn",
@@ -29,23 +44,38 @@
       "static_dns1": "DNS-server 1",
       "static_dns2": "DNS-server 2",
       "optional": "(valfritt)",
-      "static_dns_label": "DNS-servrar"
+      "static_dns_label": "DNS-servrar",
+      "hostname_required": "Värdnamn krävs.",
+      "password_placeholder": "Lämna tomt för att behålla nuvarande",
+      "ssid_placeholder": "Nätverksnamn",
+      "static_ip_desc": "Tilldela en fast adress istället för DHCP"
     },
     "wifi": {
       "available_networks": "Tillgängliga WiFi-nätverk",
       "scanning": "Söker efter nätverk...",
       "scan_button": "Skanna tillgängliga nätverk",
       "no_scan_message": "Klicka på \"Sök tillgängliga nätverk\" för att se WiFi-nätverk",
-      "no_networks": "Inga nätverk hittades"
+      "no_networks": "Inga nätverk hittades",
+      "open": "Öppet",
+      "scan_failed": "Skanningen misslyckades.",
+      "secure": "Säkert",
+      "signal": "Signalstyrka",
+      "tap_scan": "Tryck på skanna för att hitta närliggande nätverk."
     },
     "regional": {
-      "title": "Regionala inställningar"
+      "title": "Regionalt",
+      "hour12": "12-timmarsklocka",
+      "hour12_desc": "Visa tid med AM/PM",
+      "us_units": "US-enheter",
+      "us_units_desc": "Fahrenheit, mph, tum"
     },
     "autoupdate": {
-      "title": "Automatisk uppdatering"
+      "title": "Automatisk uppdatering",
+      "check": "Sök efter firmware-uppdateringar",
+      "check_desc": "Installera ny firmware automatiskt"
     },
     "display": {
-      "title": "Visningsinställningar"
+      "title": "Skärm"
     }
   },
   "screen": {
@@ -94,7 +124,15 @@
       "title": "Visningsschema",
       "description": "Ange vad som visas på den primära siffervisningen och hur länge. Platserna växlar i ordning. En enda tidsplats betyder att klockan alltid visas.",
       "add_slot": "+ Lägg till plats",
-      "label_placeholder": "etikett (t.ex. Utetemp.)"
+      "label_placeholder": "etikett (t.ex. Utetemp.)",
+      "duration_title": "Varaktighet (sekunder)",
+      "entity_placeholder": "entity_id (t.ex. sensor.temp)",
+      "sec": "sek",
+      "type_cgm": "CGM (glukos)",
+      "type_ha": "Home Assistant-entitet",
+      "type_temp": "Utetemperatur",
+      "type_time": "Tid",
+      "unit_placeholder": "enhet (t.ex. °F)"
     },
     "display_schedule_aux": {
       "title": "Visningsschema (Aux)",
@@ -110,6 +148,9 @@
     "status_none_label": "<Ingen>",
     "status_selected_size": "Vald: {name} @ ({x},{y}) storlek ({w},{h})",
     "status_none": "Vald: {none} @ ({x},{y})",
+    "status_multi": "{n} element markerade",
+    "multi_hint": "Ctrl+klick för flerval",
+    "multi_selected": "{n} element markerade — dra eller använd piltangenterna för att flytta dem tillsammans. Ctrl+klick för att lägga till eller ta bort.",
     "tokens": "Token",
     "align": {
       "left": "Vänster",
@@ -139,7 +180,11 @@
       "text_8": "Text 8",
       "screen_grid": "Visa skärmsrutnät",
       "screen_settings": "Skärminställningar"
-    }
+    },
+    "apply": "Tillämpa",
+    "disabled": "Inaktiverad",
+    "editor_instructions": "Placera element på 128×128-skärmen — element kan överlappa. Dra objekt från paletten till rutnätet, eller dra ett placerat element för att flytta det. Använd piltangenterna för att finjustera det markerade elementet (Shift = 10px).",
+    "layout_management": "Layouthantering"
   },
   "advanced": {
     "display": {
@@ -177,7 +222,7 @@
       "title": "Typsnittsprover"
     },
     "location": {
-      "title": "Platsinställningar *",
+      "title": "Plats",
       "latitude": "Latitud",
       "longitude": "Longitud",
       "timezone": "Tidszon",
@@ -203,7 +248,17 @@
       "city_found_tz": "Hittade: {city} ({iana})",
       "timezone_lookup_loading": "Söker tidszon…",
       "reverse_geocode_loading": "Identifierar närmaste stad…",
-      "geolocate_no_data": "Inga IP-koordinater tillgängliga på enheten ännu. Använd stadssökning."
+      "geolocate_no_data": "Inga IP-koordinater tillgängliga på enheten ännu. Använd stadssökning.",
+      "found_no_tz": "Hittade: {city} — tidszonssökningen misslyckades, ange den manuellt.",
+      "geolocate_failed": "Kunde inte fastställa plats från IP.",
+      "geolocate_searching": "Söker efter din ungefärliga plats…",
+      "ip_location": "IP-plats",
+      "lat_placeholder": "t.ex. 40.6892494",
+      "located": "Lokaliserad: {where}",
+      "located_no_tz": "Lokaliserad: {where} — tidszonssökningen misslyckades, ange den manuellt.",
+      "located_tz": "Lokaliserad: {where} ({iana})",
+      "lon_placeholder": "t.ex. -74.0470807",
+      "timezone_posix": "Tidszon (POSIX)"
     },
     "wifi_hours": {
       "title": "WiFi-aktiva timmar",
@@ -211,7 +266,7 @@
       "end": "Slut"
     },
     "brightness": {
-      "title": "Projektionsljushetsinställningar",
+      "title": "Projektionsljusstyrka",
       "dimming_selection": "Dämningsval",
       "dimming_mode": "Dämningsläge",
       "dim_mode_full": "Alltid full ljusstyrka",
@@ -275,7 +330,10 @@
       "title": "Dela information med support",
       "send_email": "Skicka e-post",
       "copy_clipboard": "Kopiera till urklipp",
-      "help_text": "Om du behöver support, vänligen dela informationen ovan med oss. Klicka på \"skicka e-post\" för att skicka oss ett meddelande; om det inte fungerar, kopiera informationen till urklipp och skicka den via e-post till support@buyfrixos.com."
+      "help_text": "Om du behöver support, vänligen dela informationen ovan med oss. Klicka på \"skicka e-post\" för att skicka oss ett meddelande; om det inte fungerar, kopiera informationen till urklipp och skicka den via e-post till support@buyfrixos.com.",
+      "desc": "Dela enhetsdiagnostik med vårt team för att hjälpa till med felsökning.",
+      "email_hint": "Om e-post inte öppnas, kopiera informationen och skicka den till <a href=\"mailto:support@buyfrixos.com\">support@buyfrixos.com</a>.",
+      "heading": "Support"
     },
     "sensor": {
       "title": "Sensordata",
@@ -316,23 +374,26 @@
       "title": "Home Assistant",
       "kb_help": "För installationsinstruktioner, besök <a href=\"https://buyfrixos.com/knowledge-base/%f0%9f%93%a1-new-integration-home-assistant-frixos-smart-projections/\" target=\"_blank\" rel=\"noopener noreferrer\">denna kunskapsbanksartikel</a>.",
       "server_url": "Server-URL",
-      "token": "LL åtkomsttoken",
+      "token": "Långlivad åtkomsttoken",
       "token_placeholder": "Ange din token",
-      "refresh_interval": "Uppdatering (min.)"
+      "refresh_interval": "Uppdatering (min.)",
+      "server_url_placeholder": "t.ex. http://homeassistant.local:8123"
     },
     "stock": {
-      "title": "Aktiekurstjänst (via Finnhub.io)",
+      "title": "Aktiekurser",
       "kb_help": "För installationsinstruktioner, besök <a href=\"https://buyfrixos.com/knowledge-base/get-stock-crypto-etf-fx-quotes-on-your-ceiling/\" target=\"_blank\" rel=\"noopener noreferrer\">denna kunskapsbanksartikel</a>.",
       "api_key": "API-nyckel",
       "api_key_placeholder": "Ange din Finnhub API-nyckel",
-      "refresh_interval": "Uppdatering (min.)"
+      "refresh_interval": "Uppdatering (min.)",
+      "via": "Via Finnhub.io."
     },
     "dexcom": {
       "title": "Dexcom G5/6",
       "region": "Region",
       "disabled": "Inaktiverad",
       "japan": "Japan",
-      "rest_of_world": "Övriga världen"
+      "rest_of_world": "Övriga världen",
+      "us": "US"
     },
     "freestyle": {
       "title": "FreeStyle Libre",
@@ -340,7 +401,13 @@
       "disabled": "Disabled",
       "enabled": "Aktiverad",
       "japan": "Japan",
-      "rest_of_world": "Övriga världen"
+      "rest_of_world": "Övriga världen",
+      "australia": "Australien",
+      "europe": "Europa",
+      "france": "Frankrike",
+      "germany": "Tyskland",
+      "global": "Globalt / Övriga världen",
+      "united_states": "USA"
     },
     "glucose_monitors": {
       "title": "Glukosövervakning",
@@ -360,7 +427,9 @@
         "description": "Växla projektionsvisning mellan tid och CGM-mätningar",
         "time": "Tid (sek)",
         "cgm": "CGM (sek)"
-      }
+      },
+      "device_type": "Enhetstyp",
+      "nightscout_url": "Nightscout-URL"
     }
   },
   "update": {
@@ -382,7 +451,9 @@
     "file_step1": "Klicka på knappen \"Välj fil\" och välj filen (t.ex. user-font.jpg) från din dator.",
     "file_step2": "Klicka på knappen \"Ladda upp firmware\" för att starta uppladdningsprocessen.",
     "file_step3": "Vänta tills uppladdningen är klar. Stäng inte av eller koppla från enheten under uppladdningen.",
-    "file_step4": "Du kan nu ladda upp en annan fil eller stänga det här fönstret."
+    "file_step4": "Du kan nu ladda upp en annan fil eller stänga det här fönstret.",
+    "reinstall_title": "Installera om",
+    "upload_desc": "Din enhet installerar ny firmware automatiskt. Använd detta endast om support har bett dig installera en specifik version, eller för att ladda upp ett anpassat typsnitt."
   },
   "restart": {
     "title": "Enhetsåterställning",
@@ -441,6 +512,33 @@
     "layout_read_from_file": "Layout inläst från fil. Klicka Spara för att tillämpa på enheten.",
     "layout_read_invalid": "Ogiltig layoutfil",
     "layout_system_loaded": "Systemlayout inläst. Klicka Spara för att tillämpa på enheten.",
-    "layout_system_select_file": "Välj en layoutfil först"
+    "layout_system_select_file": "Välj en layoutfil först",
+    "cgm_only_one": "Endast en CGM-källa (Dexcom, FreeStyle Libre eller Nightscout-URL) kan vara aktiverad åt gången.",
+    "delete_failed": "Borttagningen misslyckades",
+    "device_restarting_short": "Enheten startar om…",
+    "done": "Klart",
+    "done_restarting": "Klart — startar om…",
+    "file_renamed": "Filen har bytt namn",
+    "files_deleted": "Tog bort {n} fil(er)",
+    "files_refreshed": "Filerna uppdaterade",
+    "layout_applied": "Layouten tillämpad på enheten",
+    "layout_apply_failed": "Kunde inte tillämpa layout: ",
+    "no_changes": "Inga ändringar att spara",
+    "rename_failed": "Namnbytet misslyckades",
+    "rename_prompt": "Byt namn på \"{name}\" till:",
+    "save_failed": "Sparandet misslyckades",
+    "saved_restarting": "Sparat — enheten startar om…",
+    "status_refreshed": "Status uppdaterad",
+    "upload_failed": "Uppladdningen misslyckades"
+  },
+  "files": {
+    "delete_selected": "Ta bort markerade",
+    "description": "Hantera filer som lagras på enhetens filsystem.",
+    "filename": "Filnamn",
+    "refresh": "Uppdatera",
+    "rename": "Byt namn",
+    "select_all": "Markera alla",
+    "size": "Storlek",
+    "title": "SPIFFS-filer"
   }
 }

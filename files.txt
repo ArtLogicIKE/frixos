@@ -1,3 +1,4 @@
+bold-digit-label.jpg
 bold-font.jpg
 bold.jpg
 default-ampm.jpg
@@ -7,10 +8,13 @@ default-glucose.jpg
 default-graph.jpg
 default-grid.jpg
 default-moon.jpg
+default-settings.jpg
 default-trend.jpg
 default-units.jpg
 default-weather.jpg
 default-wifi-off.jpg
+default.layout
+Diabetic.layout
 favicon.ico
 ficasso-ampm.jpg
 ficasso-dot.jpg
@@ -22,6 +26,7 @@ ficasso-weather.jpg
 ficasso-wifi-off.jpg
 ficasso.jpg
 glucose.jpg
+homeassistant.layout
 index.html
 kablame-ampm.jpg
 kablame-dot.jpg
@@ -60,12 +65,19 @@ nixie-moon.jpg
 nixie-units.jpg
 nixie-weather.jpg
 nixie.jpg
+palette-glucose.png
+palette-graph.png
+palette-message.png
+palette-moon.jpg
+palette-trend.png
+palette-wifi-off.png
 robrito-ampm.jpg
 robrito-dot.jpg
 robrito-font.jpg
 robrito.jpg
 text-ampm.jpg
 timezone.txt
+weather.layout
 wifi-qr.jpg
 css/components.css
 css/forms.css

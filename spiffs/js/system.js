@@ -28,10 +28,10 @@ async function loadStatus() {
   window.statusData = d;
 }
 sectionLoaders.status = loadStatus;
-el('refreshStatus').addEventListener('click', () => { loadStatus(); toast('Status refreshed', 'ok'); });
+el('refreshStatus').addEventListener('click', () => { loadStatus(); toast(getMessage('status_refreshed'), 'ok'); });
 el('supportCopy').addEventListener('click', async () => {
-  try { await navigator.clipboard.writeText(JSON.stringify(window.statusData || {}, null, 2)); toast('Copied to clipboard', 'ok'); }
-  catch (e) { toast('Copy failed', 'err'); }
+  try { await navigator.clipboard.writeText(JSON.stringify(window.statusData || {}, null, 2)); toast(getMessage('info_copied_clipboard'), 'ok'); }
+  catch (e) { toast(getMessage('failed_copy_clipboard'), 'err'); }
 });
 el('supportEmail').addEventListener('click', () => {
   const b = encodeURIComponent('Frixos diagnostics:\n\n' + JSON.stringify(window.statusData || {}, null, 2));
@@ -58,22 +58,26 @@ function updFileBtns() { const n = selectedNames().length; el('filesDelete').dis
 el('selAll').addEventListener('change', e => { $$('.fcb').forEach(cb => { cb.checked = e.target.checked; cb.closest('tr').classList.toggle('sel', e.target.checked); }); updFileBtns(); });
 $$('th[data-sort] button').forEach(b => b.addEventListener('click', () => {
   const k = b.dataset.sort; if (k === sortKey) sortAsc = !sortAsc; else { sortKey = k; sortAsc = true; }
-  $$('th[data-sort] button').forEach(x => { x.textContent = x.textContent.replace(/[ ↑↓]+$/, ''); if (x.dataset.sort === sortKey) x.textContent += sortAsc ? ' ↑' : ' ↓'; });
+  // Update only the arrow span so the translatable .th-label is preserved.
+  $$('th[data-sort] button').forEach(x => {
+    const arrow = x.querySelector('.th-arrow');
+    if (arrow) arrow.textContent = (x.dataset.sort === sortKey) ? (sortAsc ? ' ↑' : ' ↓') : '';
+  });
   renderFiles();
 }));
-el('filesRefresh').addEventListener('click', () => { loadFiles(); toast('Files refreshed', 'ok'); });
+el('filesRefresh').addEventListener('click', () => { loadFiles(); toast(getMessage('files_refreshed'), 'ok'); });
 el('filesDelete').addEventListener('click', async () => {
   const names = selectedNames(); if (!names.length) return;
   const res = await apiPostJson('/api/files/delete', { files: names });
-  if (res.data && res.data.status === 'ok') { toast('Deleted ' + (res.data.deleted || names.length) + ' file(s)', 'ok'); loadFiles(); }
-  else toast('Delete failed', 'err');
+  if (res.data && res.data.status === 'ok') { toast(getMessage('files_deleted').replace('{n}', res.data.deleted || names.length), 'ok'); loadFiles(); }
+  else toast(getMessage('delete_failed'), 'err');
 });
 el('filesRename').addEventListener('click', async () => {
   const names = selectedNames(); if (names.length !== 1) return;
-  const newName = prompt('Rename "' + names[0] + '" to:', names[0]); if (!newName || newName === names[0]) return;
+  const newName = prompt(getMessage('rename_prompt').replace('{name}', names[0]), names[0]); if (!newName || newName === names[0]) return;
   const res = await apiPostJson('/api/files/rename', { oldName: names[0], newName });
-  if (res.data && res.data.status === 'ok') { toast('File renamed', 'ok'); loadFiles(); }
-  else toast((res.data && res.data.message) || 'Rename failed', 'err');
+  if (res.data && res.data.status === 'ok') { toast(getMessage('file_renamed'), 'ok'); loadFiles(); }
+  else toast((res.data && res.data.message) || getMessage('rename_failed'), 'err');
 });
 
 /* ---------- UPDATE ---------- */
@@ -90,18 +94,18 @@ uploadBtn.addEventListener('click', () => {
   xhr.addEventListener('load', () => {
     let d = {}; try { d = JSON.parse(xhr.responseText); } catch (e) { }
     if (xhr.status >= 200 && xhr.status < 300 && d.status === 'ok') {
-      if ((d.message || '').toLowerCase().includes('reboot')) { txt.textContent = 'Done — restarting…'; toast('Firmware uploaded — restarting', 'ok'); setTimeout(() => location.reload(), 8000); }
-      else { txt.textContent = 'Done'; toast(d.message || 'Upload complete', 'ok'); }
-    } else { toast((d.message) || 'Upload failed', 'err'); }
+      if ((d.message || '').toLowerCase().includes('reboot')) { txt.textContent = getMessage('done_restarting'); toast(getMessage('firmware_update_success'), 'ok'); setTimeout(() => location.reload(), 8000); }
+      else { txt.textContent = getMessage('done'); toast(d.message || getMessage('file_upload_success'), 'ok'); }
+    } else { toast((d.message) || getMessage('upload_failed'), 'err'); }
     uploadBtn.disabled = false;
   });
-  xhr.addEventListener('error', () => { toast('Upload failed', 'err'); uploadBtn.disabled = false; });
+  xhr.addEventListener('error', () => { toast(getMessage('upload_failed'), 'err'); uploadBtn.disabled = false; });
   xhr.send(file);
 });
 el('reinstall').addEventListener('click', async () => {
   const res = await apiPostJson('/api/ota/reinstall', {});
-  if (res.data && res.data.status === 'ok') toast('Reinstall started', 'ok');
-  else toast((res.data && res.data.message) || 'Reinstall failed', 'err');
+  if (res.data && res.data.status === 'ok') toast(getMessage('reinstall_started'), 'ok');
+  else toast((res.data && res.data.message) || getMessage('reinstall_failed'), 'err');
 });
 
 /* ---------- RESTART ---------- */
@@ -112,6 +116,6 @@ modal.addEventListener('click', e => { if (e.target === modal) modal.classList.r
 el('confirmReset').addEventListener('click', async () => {
   modal.classList.remove('open');
   await apiPostJson('/api/reset', {});
-  toast('Device restarting…', 'ok');
+  toast(getMessage('device_restarting_short'), 'ok');
   setTimeout(() => location.reload(), 8000);
 });

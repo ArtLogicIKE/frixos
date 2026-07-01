@@ -10,57 +10,80 @@
     "restart": "Restart"
   },
   "common": {
-    "save_settings": "Save Settings",
+    "save_settings": "Save settings",
     "cancel": "Cancel",
     "show_password": "Show password",
     "hide_password": "Hide password",
     "change_language": "Change language",
     "toggle_theme": "Toggle theme",
     "insert": "Insert",
-    "select_font": "Select {name} font"
+    "select_font": "Select {name} font",
+    "scroll_tabs_left": "Scroll tabs left",
+    "scroll_tabs_right": "Scroll tabs right",
+    "current": "Current",
+    "load": "Load",
+    "none": "None",
+    "file": "File",
+    "online": "Online",
+    "offline": "Offline"
   },
   "settings": {
     "connection": {
-      "title": "Connection Settings *",
+      "title": "Connection",
       "wifi_ssid": "WiFi SSID",
-      "wifi_password": "WiFi Password",
+      "wifi_password": "WiFi password",
       "hostname": "Hostname",
       "fahrenheit": "US units (F, mph, ...)",
       "hour12": "Time in 12-hour format",
       "auto_update": "Automatically check for firmware updates",
-      "restart_note": "* Changing connection settings will restart the device.",
-      "static_ip_toggle": "Use Static IP",
-      "static_ip": "IP Address",
+      "restart_note": "* Changing these connection settings will restart the device.",
+      "static_ip_toggle": "Use static IP",
+      "static_ip": "IP address",
       "static_gw": "Gateway",
-      "static_nm": "Subnet Mask",
+      "static_nm": "Subnet mask",
       "static_dns1": "DNS Server 1",
       "static_dns2": "DNS Server 2",
       "optional": "(optional)",
-      "static_dns_label": "DNS Servers"
+      "static_dns_label": "DNS servers",
+      "ssid_placeholder": "Network name",
+      "password_placeholder": "Leave blank to keep current",
+      "hostname_required": "Hostname is required.",
+      "static_ip_desc": "Assign a fixed address instead of DHCP"
     },
     "wifi": {
-      "available_networks": "Available WiFi Networks",
-      "scanning": "Scanning for networks...",
+      "available_networks": "Available networks",
+      "scanning": "Scanning for networks…",
       "scan_button": "Scan available networks",
       "no_scan_message": "Click \"Scan available networks\" to see WiFi networks",
-      "no_networks": "No networks found",
+      "no_networks": "No networks found.",
+      "tap_scan": "Tap scan to find nearby networks.",
+      "scan_failed": "Scan failed.",
       "signal": "Signal strength",
       "secure": "Secure",
       "open": "Open"
     },
     "regional": {
-      "title": "Regional Settings"
+      "title": "Regional",
+      "us_units": "US units",
+      "us_units_desc": "Fahrenheit, mph, inches",
+      "hour12": "12-hour clock",
+      "hour12_desc": "Display time with AM / PM"
     },
     "autoupdate": {
-      "title": "Automatic Update"
+      "title": "Automatic update",
+      "check": "Check for firmware updates",
+      "check_desc": "Install new firmware automatically"
     },
     "display": {
-      "title": "Display Settings"
+      "title": "Display"
     }
   },
   "screen": {
     "title": "Layout",
     "description": "Place elements on the 128x128 display. Elements can overlap.",
+    "editor_instructions": "Place elements on the 128×128 display — elements can overlap. Drag items from the palette onto the grid, or drag a placed element to move it. Use the arrow keys to nudge the selected element (Shift = 10px).",
+    "layout_management": "Layout management",
+    "apply": "Apply",
     "day": "Day",
     "night": "Night",
     "day_night_aria": "Day/Night",
@@ -105,7 +128,15 @@
       "title": "Display Schedule",
       "description": "Define what appears on the primary digit display and for how long. Slots cycle in order. A single Time slot means the clock always shows.",
       "add_slot": "+ Add Slot",
-      "label_placeholder": "label (e.g. Outside Temp)"
+      "label_placeholder": "label (e.g. Outside Temp)",
+      "sec": "sec",
+      "duration_title": "Duration (seconds)",
+      "entity_placeholder": "entity_id (e.g. sensor.temp)",
+      "unit_placeholder": "unit (e.g. °F)",
+      "type_time": "Time",
+      "type_cgm": "CGM (glucose)",
+      "type_temp": "Outside Temperature",
+      "type_ha": "Home Assistant entity"
     },
     "display_schedule_aux": {
       "title": "Display Schedule (Aux)",
@@ -121,6 +152,9 @@
     "status_none_label": "<None>",
     "status_selected_size": "Selected: {name} @ ({x},{y}) size ({w},{h})",
     "status_none": "Selected: {none} @ ({x},{y})",
+    "status_multi": "{n} elements selected",
+    "multi_hint": "Ctrl+click for multiple selection",
+    "multi_selected": "{n} elements selected — drag or use the arrow keys to move them together. Ctrl+Click to add or remove.",
     "tokens": "Tokens",
     "align": {
       "left": "Left",
@@ -185,30 +219,40 @@
       "title": "Font Samples"
     },
     "location": {
-      "title": "Location Settings *",
+      "title": "Location",
       "latitude": "Latitude",
       "longitude": "Longitude",
       "timezone": "Timezone",
-      "timezone_placeholder": "Enter Timezone in POSIX format ONLY if automatic detection doesn't work",
+      "timezone_posix": "Timezone (POSIX)",
+      "timezone_placeholder": "e.g. EST5EDT,M3.2.0,M11.1.0",
       "timezone_region": "Timezone region",
-      "timezone_region_placeholder": "e.g. Europe/Athens",
+      "timezone_region_placeholder": "e.g. America/New_York",
+      "lat_placeholder": "e.g. 40.6892494",
+      "lon_placeholder": "e.g. -74.0470807",
       "detected": "Detected: {tz}",
-      "help_text": "You can find a list of POSIX timezones <a href=\"https://leo.leung.xyz/wiki/Timezone\" target=\"_blank\">here</a>. Lat/Lon only affect weather data.",
+      "help_text": "Find POSIX timezones <a href=\"https://leo.leung.xyz/wiki/Timezone\" target=\"_blank\" rel=\"noopener\">here</a>. Lat/Lon only affect weather data.",
       "restart_note": "* Changing location settings will restart the device.",
       "city": "City",
-      "city_placeholder": "Search by city name…",
+      "city_placeholder": "Search for a city",
       "btn_search": "Search",
       "btn_geolocate": "Locate me",
       "coordinates": "Coordinates",
       "lat_short": "Lat.",
       "lon_short": "Long.",
       "geolocate_loading": "Fetching location from device…",
-      "geolocate_error": "Failed to read location from device.",
+      "geolocate_searching": "Looking up your approximate location…",
+      "geolocate_error": "Failed to look up location.",
+      "geolocate_failed": "Could not determine location from IP.",
+      "ip_location": "IP location",
       "city_searching": "Searching…",
       "city_not_found": "City not found.",
       "city_search_error": "Search failed. Check your connection.",
       "city_found": "Found: {city}",
       "city_found_tz": "Found: {city} ({iana})",
+      "found_no_tz": "Found: {city} — timezone lookup failed, set it manually.",
+      "located": "Located: {where}",
+      "located_tz": "Located: {where} ({iana})",
+      "located_no_tz": "Located: {where} — timezone lookup failed, set it manually.",
       "timezone_lookup_loading": "Looking up timezone…",
       "reverse_geocode_loading": "Identifying nearest city…",
       "geolocate_no_data": "No IP coordinates available on device yet. Try city search."
@@ -219,7 +263,7 @@
       "end": "End"
     },
     "brightness": {
-      "title": "Projection brightness settings",
+      "title": "Projection brightness",
       "dimming_selection": "Dimming selection",
       "dimming_mode": "Dimming mode",
       "dim_mode_full": "Always full brightness",
@@ -281,6 +325,9 @@
   "status": {
     "support": {
       "title": "Share information with support",
+      "heading": "Support",
+      "desc": "Share device diagnostics with our team to help troubleshoot.",
+      "email_hint": "If email doesn't open, copy the info and send it to <a href=\"mailto:support@buyfrixos.com\">support@buyfrixos.com</a>.",
       "send_email": "Send email",
       "copy_clipboard": "Copy to clipboard",
       "help_text": "If you need any support, please share the information above with us. Click \"send email\" to send us a message; if that doesn't work, copy the information to your clipboard and send it via email to support@buyfrixos.com."
@@ -324,21 +371,24 @@
       "title": "Home Assistant",
       "kb_help": "For setup instructions, visit <a href=\"https://buyfrixos.com/knowledge-base/%f0%9f%93%a1-new-integration-home-assistant-frixos-smart-projections/\" target=\"_blank\" rel=\"noopener noreferrer\">this KB article</a>.",
       "server_url": "Server URL",
-      "token": "LL Access Token",
-      "token_placeholder": "Enter your token",
+      "server_url_placeholder": "e.g. http://homeassistant.local:8123",
+      "token": "Long-lived access token",
+      "token_placeholder": "Paste token",
       "refresh_interval": "Refresh (min.)"
     },
     "stock": {
-      "title": "Stock Quote Service (via Finnhub.io)",
+      "title": "Stock quotes",
+      "via": "Via Finnhub.io.",
       "kb_help": "For setup instructions, visit <a href=\"https://buyfrixos.com/knowledge-base/get-stock-crypto-etf-fx-quotes-on-your-ceiling/\" target=\"_blank\" rel=\"noopener noreferrer\">this KB article</a>.",
-      "api_key": "API Key",
-      "api_key_placeholder": "Enter your Finnhub API key",
+      "api_key": "API key",
+      "api_key_placeholder": "Paste API key",
       "refresh_interval": "Refresh (min.)"
     },
     "dexcom": {
       "title": "Dexcom G5/6",
       "region": "Region",
       "disabled": "Disabled",
+      "us": "US",
       "japan": "Japan",
       "rest_of_world": "Rest of World"
     },
@@ -347,7 +397,13 @@
       "region": "Region",
       "disabled": "Disabled",
       "enabled": "Enabled",
+      "united_states": "United States",
+      "europe": "Europe",
+      "germany": "Germany",
+      "france": "France",
       "japan": "Japan",
+      "australia": "Australia",
+      "global": "Global / Rest of World",
       "rest_of_world": "Rest of World"
     },
     "glucose_monitors": {
@@ -359,10 +415,12 @@
       "display_unit": "Display Unit",
       "validity_duration": "Validity (min.)",
       "username": "Username",
-      "username_placeholder": "Enter your username",
+      "username_placeholder": "Account username",
       "password": "Password",
       "password_placeholder": "Enter your password",
-      "cgm_device_title": "CGM Device",
+      "device_type": "Device Type",
+      "nightscout_url": "Nightscout URL",
+      "cgm_device_title": "CGM device",
       "alternate_time_cgm": {
         "title": "Alternate time/CGM",
         "description": "Alternate projection display between time and CGM measurements",
@@ -371,11 +429,23 @@
       }
     }
   },
+  "files": {
+    "title": "SPIFFS files",
+    "description": "Manage files stored on the device filesystem.",
+    "refresh": "Refresh",
+    "rename": "Rename",
+    "delete_selected": "Delete selected",
+    "select_all": "Select all",
+    "filename": "Filename",
+    "size": "Size"
+  },
   "update": {
     "refresh_title": "Refresh",
-    "refresh_description": "This downloads and installs again the current version of the firmware and files (spiffs).",
+    "reinstall_title": "Reinstall",
+    "refresh_description": "Re-download and install the current firmware and files (SPIFFS).",
     "reinstall_button": "Reinstall current firmware",
-    "title": "Upload Firmware / Files",
+    "title": "Upload firmware / files",
+    "upload_desc": "Your device installs new firmware automatically. Use this only if support asked you to install a specific build, or to upload a custom font.",
     "auto_check": "Your device checks and installs new firmware automatically.",
     "manual_info": "If you have been instructed by our support to manually install a specific firmware version, or if you are looking to upload e.g. a custom font, you can do this here.",
     "select_file": "Select a firmware file (.bin) or other file to upload to the device.",
@@ -450,6 +520,22 @@
     "layout_read_from_file": "Layout loaded from file. Click Save to apply to the device.",
     "layout_read_invalid": "Invalid layout file",
     "layout_system_loaded": "System layout loaded. Click Save to apply to the device.",
-    "layout_system_select_file": "Select a layout file first"
+    "layout_system_select_file": "Select a layout file first",
+    "layout_applied": "Layout applied to the device",
+    "layout_apply_failed": "Failed to apply layout: ",
+    "no_changes": "No changes to save",
+    "saved_restarting": "Saved — device restarting…",
+    "save_failed": "Save failed",
+    "status_refreshed": "Status refreshed",
+    "files_refreshed": "Files refreshed",
+    "files_deleted": "Deleted {n} file(s)",
+    "delete_failed": "Delete failed",
+    "file_renamed": "File renamed",
+    "rename_failed": "Rename failed",
+    "rename_prompt": "Rename \"{name}\" to:",
+    "done_restarting": "Done — restarting…",
+    "done": "Done",
+    "upload_failed": "Upload failed",
+    "device_restarting_short": "Device restarting…"
   }
 }

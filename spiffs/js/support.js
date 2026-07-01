@@ -5,6 +5,14 @@
 
 function isValidPosix(tz) { return tz && !/\s/.test(tz); }
 
+/* Localized location hint helper: resolves advanced.location.<key> and fills the
+   {tz}/{city}/{iana}/{where} placeholders. */
+function locStr(key, fallback, vars) {
+  let s = tr('advanced.location.' + key, fallback);
+  if (vars) Object.keys(vars).forEach(k => { s = s.replace('{' + k + '}', vars[k]); });
+  return s;
+}
+
 let _tzMap = null;
 async function loadTzMap() {
   if (_tzMap) return _tzMap; _tzMap = new Map();
@@ -35,11 +43,11 @@ function applyTz(tz) {
 
 async function applyDetectedHints() {
   let iana = ''; try { iana = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) { }
-  if (iana && el('tz_iana') && !el('tz_iana').value) el('tz_iana').placeholder = 'Detected: ' + iana;
-  if (iana && el('timezone') && !el('timezone').value) { const px = await posixFromIana(iana); if (px && !el('timezone').value) el('timezone').placeholder = 'Detected: ' + px; }
+  if (iana && el('tz_iana') && !el('tz_iana').value) el('tz_iana').placeholder = locStr('detected', 'Detected: {tz}', { tz: iana });
+  if (iana && el('timezone') && !el('timezone').value) { const px = await posixFromIana(iana); if (px && !el('timezone').value) el('timezone').placeholder = locStr('detected', 'Detected: {tz}', { tz: px }); }
   const st = await apiGet('/api/status'); const d = st.data || {};
-  if (d.latitude && el('lat') && !el('lat').value) el('lat').placeholder = 'Detected: ' + d.latitude;
-  if (d.longitude && el('lon') && !el('lon').value) el('lon').placeholder = 'Detected: ' + d.longitude;
+  if (d.latitude && el('lat') && !el('lat').value) el('lat').placeholder = locStr('detected', 'Detected: {tz}', { tz: d.latitude });
+  if (d.longitude && el('lon') && !el('lon').value) el('lon').placeholder = locStr('detected', 'Detected: {tz}', { tz: d.longitude });
 }
 
 async function searchCity(q) {
@@ -55,34 +63,36 @@ el('citySearch').addEventListener('click', doCitySearch);
 el('city_search').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); doCitySearch(); } });
 async function doCitySearch() {
   const q = el('city_search').value.trim(); if (!q) return;
-  cityHint.textContent = 'Searching…'; el('citySearch').disabled = true;
+  cityHint.textContent = locStr('city_searching', 'Searching…'); el('citySearch').disabled = true;
   try {
     const res = await searchCity(q);
-    if (!res) { cityHint.textContent = 'City not found.'; return; }
+    if (!res) { cityHint.textContent = locStr('city_not_found', 'City not found.'); return; }
     setCoords(res.lat, res.lon);
     const tz = await tzFromCoords(res.lat, res.lon);
     applyTz(tz);
     cityHint.textContent = tz
-      ? 'Found: ' + res.name + (tz.iana ? ' (' + tz.iana + ')' : '')
-      : 'Found: ' + res.name + ' — timezone lookup failed, set it manually.';
-  } catch (e) { cityHint.textContent = 'Search failed. Check your connection.'; }
+      ? (tz.iana ? locStr('city_found_tz', 'Found: {city} ({iana})', { city: res.name, iana: tz.iana })
+                 : locStr('city_found', 'Found: {city}', { city: res.name }))
+      : locStr('found_no_tz', 'Found: {city} — timezone lookup failed, set it manually.', { city: res.name });
+  } catch (e) { cityHint.textContent = locStr('city_search_error', 'Search failed. Check your connection.'); }
   finally { el('citySearch').disabled = false; }
 }
 el('geolocate').addEventListener('click', async () => {
-  cityHint.textContent = 'Looking up your approximate location…'; el('geolocate').disabled = true;
+  cityHint.textContent = locStr('geolocate_searching', 'Looking up your approximate location…'); el('geolocate').disabled = true;
   try {
     const r = await apiGet('/api/locate'); const d = r.data || {};
-    if (!r.ok || !d.lat || !d.lon) { cityHint.textContent = 'Could not determine location from IP.'; return; }
+    if (!r.ok || !d.lat || !d.lon) { cityHint.textContent = locStr('geolocate_failed', 'Could not determine location from IP.'); return; }
     setCoords(d.lat, d.lon);
     // The device resolves a POSIX zone from the IP's IANA zone; fall back to a
     // coordinate lookup if it could not.
     let tz = (d.posix && isValidPosix(d.posix)) ? { iana: d.iana || '', posix: d.posix } : null;
     if (!tz) tz = await tzFromCoords(d.lat, d.lon);
     applyTz(tz);
-    const where = d.city ? d.city : 'IP location';
+    const where = d.city ? d.city : locStr('ip_location', 'IP location');
     cityHint.textContent = tz
-      ? 'Located: ' + where + (tz.iana ? ' (' + tz.iana + ')' : '')
-      : 'Located: ' + where + ' — timezone lookup failed, set it manually.';
-  } catch (e) { cityHint.textContent = 'Failed to look up location.'; }
+      ? (tz.iana ? locStr('located_tz', 'Located: {where} ({iana})', { where: where, iana: tz.iana })
+                 : locStr('located', 'Located: {where}', { where: where }))
+      : locStr('located_no_tz', 'Located: {where} — timezone lookup failed, set it manually.', { where: where });
+  } catch (e) { cityHint.textContent = locStr('geolocate_error', 'Failed to look up location.'); }
   finally { el('geolocate').disabled = false; }
 });

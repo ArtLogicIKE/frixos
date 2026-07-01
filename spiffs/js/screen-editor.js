@@ -431,6 +431,13 @@ function updateScreenStatusLine() {
     const trans = translations[currentLanguage] || translations.en;
     const profile = getProfileObj(window.screenEditor.mode);
     const selectedId = window.screenEditor.selectedId;
+    const multiHint = getScreenTranslation('screen.multi_hint', 'Ctrl+click for multiple selection');
+
+    if (isMultiSelect()) {
+        status.textContent = getScreenTranslation('screen.status_multi', '{n} elements selected')
+            .replace('{n}', String(getSelectedIds().length)) + ' · ' + multiHint;
+        return;
+    }
 
     if (selectedId === 'screen_settings') {
         status.textContent = `Selected: ${getScreenElementLabel('screen_settings')}`;
@@ -452,7 +459,7 @@ function updateScreenStatusLine() {
                 .replace('{x}', String(elem.x ?? 0))
                 .replace('{y}', String(elem.y ?? 0))
                 .replace('{w}', String(size.w))
-                .replace('{h}', String(size.h));
+                .replace('{h}', String(size.h)) + ' · ' + multiHint;
             return;
         }
     }
@@ -464,7 +471,7 @@ function updateScreenStatusLine() {
     status.textContent = template
         .replace('{none}', noneLabel)
         .replace('{x}', cx !== null ? String(cx) : '—')
-        .replace('{y}', cy !== null ? String(cy) : '—');
+        .replace('{y}', cy !== null ? String(cy) : '—') + ' · ' + multiHint;
 }
 
 function trackScreenCanvasPointer(e) {
@@ -527,7 +534,7 @@ function fillLayoutSelect(selectId) {
     select.innerHTML = '';
     const current = document.createElement('option');
     current.value = '';
-    current.textContent = getScreenTranslation('screen.layout_current', 'Current');
+    current.textContent = getScreenTranslation('common.current', 'Current');
     select.appendChild(current);
 
     names.forEach(name => {
@@ -1288,11 +1295,38 @@ window.screenEditor = {
     mode: 'day', // 'day' | 'night'
     scale: 4,
     dragRafHandle: null,
-    dragging: null, // { id, originX, originY, startLeft, startTop, fromPalette }
-    selectedId: null,
+    dragging: null, // { id, originX, originY, startLeft, startTop, fromPalette, members }
+    selectedId: null,   // primary/anchor selection (last clicked) — drives the options panel
+    selectedIds: [],    // full selection set; >1 means a multi-selection (no per-element options)
     cursorX: null,
     cursorY: null
 };
+
+/* ---------- selection helpers (single + multi) ---------- */
+function getSelectedIds() {
+    const ids = window.screenEditor.selectedIds;
+    return Array.isArray(ids) ? ids : [];
+}
+function isElementSelected(id) {
+    return getSelectedIds().indexOf(id) !== -1;
+}
+function isMultiSelect() {
+    return getSelectedIds().length > 1;
+}
+// Sets the whole selection. `selectedId` mirrors the anchor (last id) so all the
+// existing single-selection code (options, status, palette highlight) keeps working.
+function setScreenSelection(ids) {
+    const arr = (Array.isArray(ids) ? ids : (ids ? [ids] : [])).filter(Boolean);
+    window.screenEditor.selectedIds = arr;
+    window.screenEditor.selectedId = arr.length ? arr[arr.length - 1] : null;
+}
+// Ctrl+Click toggles one element in/out of the selection.
+function toggleScreenSelection(id) {
+    const arr = getSelectedIds().slice();
+    const i = arr.indexOf(id);
+    if (i === -1) arr.push(id); else arr.splice(i, 1);
+    setScreenSelection(arr);
+}
 
 function getScreenScale() {
     if (_screenScaleCache !== null) return _screenScaleCache;
@@ -1525,39 +1559,54 @@ function shouldIgnoreScreenKeyboardNudge() {
 }
 
 function nudgeSelectedScreenElement(key, shiftKey) {
-    const selectedId = window.screenEditor.selectedId;
-    if (!selectedId || isScreenMetaElement(selectedId)) return false;
+    const ids = getSelectedIds().filter(id => id && !isScreenMetaElement(id));
+    if (!ids.length) return false;
 
     const nudge = shiftKey ? 10 : 1;
     const profile = getProfileObj(window.screenEditor.mode);
     if (!profile) return false;
-    const elem = ensureElementInProfile(profile, selectedId);
 
-    let changed = false;
-    if (key === 'ArrowLeft') {
-        elem.x = clamp(elem.x - nudge, 0, SCREEN_SIZE - 1);
-        changed = true;
-    } else if (key === 'ArrowRight') {
-        elem.x = clamp(elem.x + nudge, 0, SCREEN_SIZE - 1);
-        changed = true;
-    } else if (key === 'ArrowUp') {
-        const visualY = layoutYToVisualY(elem.y, selectedId);
-        const newVisualY = clamp(visualY - nudge, 0, SCREEN_SIZE - 1);
-        elem.y = visualYToLayoutY(newVisualY, selectedId);
-        changed = true;
-    } else if (key === 'ArrowDown') {
-        const visualY = layoutYToVisualY(elem.y, selectedId);
-        const newVisualY = clamp(visualY + nudge, 0, SCREEN_SIZE - 1);
-        elem.y = visualYToLayoutY(newVisualY, selectedId);
-        changed = true;
-    }
+    // Snapshot each member's start position in visual space.
+    const members = ids.map(id => {
+        const elem = ensureElementInProfile(profile, id);
+        return { id, elem, x: elem.x || 0, visualY: layoutYToVisualY(elem.y || 0, id) };
+    });
 
-    if (changed) {
-        renderScreenCanvas();
-        renderScreenOptions();
-        updateScreenStatusLine();
-    }
-    return changed;
+    let dx = 0, dy = 0;
+    if (key === 'ArrowLeft') dx = -nudge;
+    else if (key === 'ArrowRight') dx = nudge;
+    else if (key === 'ArrowUp') dy = -nudge;
+    else if (key === 'ArrowDown') dy = nudge;
+    else return false;
+
+    // Clamp the delta for the whole group so it moves rigidly and stops as a unit
+    // when any member reaches an edge.
+    const { dx: cdx, dy: cdy } = clampGroupDelta(members, dx, dy);
+    members.forEach(m => {
+        m.elem.x = m.x + cdx;
+        m.elem.y = visualYToLayoutY(m.visualY + cdy, m.id);
+    });
+
+    renderScreenCanvas();
+    renderScreenOptions();
+    updateScreenStatusLine();
+    return true;
+}
+
+// Clamp a (dx, dy) delta (layout units; y is visual-space) so that every member's
+// top-left corner stays within [0, SCREEN_SIZE-1] — keeps a multi-selection rigid.
+function clampGroupDelta(members, dx, dy) {
+    let minX = Infinity, maxX = -Infinity, minVY = Infinity, maxVY = -Infinity;
+    members.forEach(m => {
+        if (m.x < minX) minX = m.x;
+        if (m.x > maxX) maxX = m.x;
+        if (m.visualY < minVY) minVY = m.visualY;
+        if (m.visualY > maxVY) maxVY = m.visualY;
+    });
+    return {
+        dx: clamp(dx, -minX, (SCREEN_SIZE - 1) - maxX),
+        dy: clamp(dy, -minVY, (SCREEN_SIZE - 1) - maxVY)
+    };
 }
 
 function onScreenArrowKeyDown(e) {
@@ -1881,7 +1930,7 @@ function renderScreenPalette() {
         if (!unavailable) {
             const selectPaletteItem = () => {
                 if (def.paletteMeta) {
-                    window.screenEditor.selectedId = def.id;
+                    setScreenSelection([def.id]);
                     renderScreenCanvas();
                     renderScreenOptions();
                     renderScreenPalette();
@@ -1895,7 +1944,7 @@ function renderScreenPalette() {
                 if (!resolvedId) return;
                 const elObj = ensureElementInProfile(activeProfile, resolvedId);
                 elObj.enabled = 1;
-                window.screenEditor.selectedId = resolvedId;
+                setScreenSelection([resolvedId]);
                 renderScreenCanvas();
                 renderScreenOptions();
                 renderScreenPalette();
@@ -1928,7 +1977,7 @@ function renderScreenPalette() {
                     if (!resolvedId) return;
                     const elObj = ensureElementInProfile(activeProfile, resolvedId);
                     elObj.enabled = 1;
-                    window.screenEditor.selectedId = resolvedId;
+                    setScreenSelection([resolvedId]);
                     renderScreenCanvas();
                     renderScreenOptions();
                     renderScreenPalette();
@@ -2098,7 +2147,7 @@ function applyScreenLayoutFromData(data) {
     ensureScreenLayoutMeta(window.screenLayout);
     ensureScreenProfileShape(window.screenLayout.profiles.day);
     ensureScreenProfileShape(window.screenLayout.profiles.night);
-    window.screenEditor.selectedId = null;
+    setScreenSelection([]);
     renderScreenCanvas();
     renderScreenOptions();
     renderScreenPalette();
@@ -2170,7 +2219,7 @@ async function onScreenLayoutFileSelected(e) {
 
 async function restoreScreenDefaults() {
     window.screenLayout = cloneScreenDefaults();
-    window.screenEditor.selectedId = null;
+    setScreenSelection([]);
     renderScreenCanvas();
     renderScreenOptions();
     renderScreenPalette();
@@ -2227,7 +2276,7 @@ function appendScreenGuides(canvas, scale) {
     }
 
     const selectedId = window.screenEditor.selectedId;
-    if (!selectedId) return;
+    if (!selectedId || isMultiSelect()) return; // no crosshair for multi-selection
 
     const profile = getProfileObj(window.screenEditor.mode);
     if (!profile) return;
@@ -2267,7 +2316,8 @@ function renderScreenCanvas() {
         const size = getScreenElementSize(def, e);
 
         const box = document.createElement('div');
-        box.className = 'screen-element' + (window.screenEditor.selectedId === e.id ? ' selected' : '');
+        const selected = isElementSelected(e.id);
+        box.className = 'screen-element' + (selected ? ' selected' : '');
         box.setAttribute('data-id', e.id);
         const visualY = layoutYToVisualY(e.y || 0, e.id);
         box.style.left = `${(e.x || 0) * scale}px`;
@@ -2275,16 +2325,35 @@ function renderScreenCanvas() {
         box.style.width = `${size.w * scale}px`;
         box.style.height = `${size.h * scale}px`;
         const layer = getElementLayer(e);
-        box.style.zIndex = String(window.screenEditor.selectedId === e.id ? 12 + layer : 3 + layer);
+        box.style.zIndex = String(selected ? 12 + layer : 3 + layer);
 
         box.appendChild(createScreenPreview(def, true, e, scale));
 
         box.addEventListener('pointerdown', (ev) => {
             ev.preventDefault();
             ev.stopPropagation();
-            window.screenEditor.selectedId = e.id;
             focusScreenCanvas();
+            const additive = ev.ctrlKey || ev.metaKey;
+            if (additive) {
+                // Ctrl/Cmd+Click toggles this element in/out of the selection.
+                toggleScreenSelection(e.id);
+                if (isElementSelected(e.id)) beginDrag(e.id, ev, false);
+                renderScreenCanvas();
+                renderScreenOptions();
+                renderScreenPalette();
+                return;
+            }
+            // Plain click: if it's already part of a multi-selection, keep the group
+            // (so you can drag them all) and collapse to just this one if released
+            // without dragging; otherwise select only this element.
+            let clickSelectId = null;
+            if (isElementSelected(e.id) && getSelectedIds().length > 1) {
+                clickSelectId = e.id;
+            } else {
+                setScreenSelection([e.id]);
+            }
             beginDrag(e.id, ev, false);
+            if (window.screenEditor.dragging) window.screenEditor.dragging.clickSelectId = clickSelectId;
             renderScreenCanvas();
             renderScreenOptions();
             renderScreenPalette();
@@ -2597,6 +2666,18 @@ function renderScreenOptions() {
     if (!opt) return;
     opt.innerHTML = '';
     if (!window.screenLayout || !window.screenEditor.selectedId) return;
+
+    // Multi-selection: no per-element options, just a hint on how to move them.
+    if (isMultiSelect()) {
+        const note = document.createElement('p');
+        note.className = 'screen-options-mode-note';
+        note.textContent = getScreenTranslation(
+            'screen.multi_selected',
+            '{n} elements selected — drag or use the arrow keys to move them together. Ctrl+Click to add or remove.'
+        ).replace('{n}', String(getSelectedIds().length));
+        opt.appendChild(note);
+        return;
+    }
 
     const trans = translations[currentLanguage] || translations.en;
 
@@ -2983,11 +3064,26 @@ function beginDrag(id, pointerEvent, fromPalette) {
     let startTop = layoutYToVisualY(elem.y || 0, def ? def.id : id) * scale;
 
     if (fromPalette) {
-        window.screenEditor.selectedId = id;
+        setScreenSelection([id]);
         renderScreenCanvas();
         renderScreenOptions();
         renderScreenPalette();
     }
+
+    // Build the set of elements that move together. When grabbing an element that's
+    // part of a multi-selection, every selected (non-meta) element moves; otherwise
+    // just the grabbed one. Each member snapshots its start position in visual space.
+    let memberIds;
+    if (!fromPalette && isElementSelected(id) && getSelectedIds().length > 1) {
+        memberIds = getSelectedIds().filter(mid => mid && !isScreenMetaElement(mid));
+        if (memberIds.indexOf(id) === -1) memberIds.push(id);
+    } else {
+        memberIds = [id];
+    }
+    const members = memberIds.map(mid => {
+        const me = ensureElementInProfile(profile, mid);
+        return { id: mid, elem: me, x: me.x || 0, visualY: layoutYToVisualY(me.y || 0, mid) };
+    });
 
     canvas.setPointerCapture(pointerEvent.pointerId);
     window.screenEditor.dragging = {
@@ -2999,6 +3095,7 @@ function beginDrag(id, pointerEvent, fromPalette) {
         startTop,
         fromPalette,
         moved: false,
+        members,
         // Cache the canvas bounding rectangle and scale to eliminate layout-thrashing
         // getBoundingClientRect() calls during high-frequency pointer moves.
         rect: canvas.getBoundingClientRect(),
@@ -3015,7 +3112,7 @@ function onScreenPointerDown(e) {
 
     const target = e.target && e.target.closest ? e.target.closest('.screen-element') : null;
     if (!target) {
-        window.screenEditor.selectedId = null;
+        setScreenSelection([]);
         renderScreenCanvas();
         renderScreenOptions();
         renderScreenPalette();
@@ -3050,13 +3147,17 @@ function onScreenPointerMove(e) {
         const visualY = clamp(Math.round((e.clientY - rect.top - 10) / scale), 0, SCREEN_SIZE - 1);
         elem.y = visualYToLayoutY(visualY, elementId);
     } else {
-        const newLeft = d.startLeft + dx;
-        const newTop = d.startTop + dy;
-        const def = findElementDef(d.id);
-        const elementId = def ? def.id : d.id;
-        elem.x = clamp(Math.round(newLeft / scale), 0, SCREEN_SIZE - 1);
-        const visualY = clamp(Math.round(newTop / scale), 0, SCREEN_SIZE - 1);
-        elem.y = visualYToLayoutY(visualY, elementId);
+        d.moved = true;
+        // Move every member of the (possibly multi-element) selection by the same,
+        // group-clamped delta so the selection stays rigid.
+        const members = d.members && d.members.length
+            ? d.members
+            : [{ id: d.id, elem, x: elem.x || 0, visualY: layoutYToVisualY(elem.y || 0, d.id) }];
+        const { dx: cdx, dy: cdy } = clampGroupDelta(members, Math.round(dx / scale), Math.round(dy / scale));
+        members.forEach(m => {
+            m.elem.x = m.x + cdx;
+            m.elem.y = visualYToLayoutY(m.visualY + cdy, m.id);
+        });
     }
 
     // Throttle rendering to the display's refresh rate (typically 60Hz) using RAF.
@@ -3077,10 +3178,14 @@ function onScreenPointerUp(e) {
         window.screenEditor.dragRafHandle = null;
     }
     const placedFromPalette = d.fromPalette && d.moved && isScreenStaticTextElement(d.id);
+    // A plain click (no drag) on a member of a multi-selection collapses to just it.
+    const collapseTo = (!d.moved && d.clickSelectId) ? d.clickSelectId : null;
     window.screenEditor.dragging = null;
+    if (collapseTo) setScreenSelection([collapseTo]);
     renderScreenCanvas();
+    renderScreenOptions();
     updateScreenStatusLine();
-    if (placedFromPalette) renderScreenPalette();
+    if (placedFromPalette || collapseTo) renderScreenPalette();
 }
 
 function clamp(v, lo, hi) {
