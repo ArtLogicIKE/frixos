@@ -114,6 +114,7 @@ async function loadTranslations(lang) {
   if (_translationsLoaded[lang]) return;
   if (_translationPromises[lang]) return _translationPromises[lang];
   _translationPromises[lang] = (async () => {
+    let loaded = false;
     try {
       // Ensure the full English set is loaded first: it is the fallback base
       // that non-English languages are merged on top of (so any key missing
@@ -124,9 +125,15 @@ async function loadTranslations(lang) {
         const data = await r.json();
         if (lang === 'en') deepMergeTranslations(translations.en, data);
         else translations[lang] = deepMergeTranslations(JSON.parse(JSON.stringify(translations.en)), data);
+        loaded = true;
       }
-    } catch (e) { /* keep english */ }
-    _translationsLoaded[lang] = true;
+    } catch (e) { /* network/parse error — leave unloaded so a later call retries */ }
+    // Only cache on success. A one-off fetch failure (e.g. the ESP32 httpd
+    // dropping a concurrent request at boot) must NOT permanently mark the
+    // language loaded: with English left as the tiny inline fallback, switching
+    // back to English later would strand the previous language's text on screen
+    // until a full page refresh. Leaving it unmarked lets the next switch retry.
+    if (loaded) _translationsLoaded[lang] = true;
     delete _translationPromises[lang];
   })();
   return _translationPromises[lang];

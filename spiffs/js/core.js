@@ -124,13 +124,17 @@ function refreshDynamicI18n() {
 function applyI18n(lang) {
   const t = translations[lang] || {};
   // Consolidate global traversals: query all translatable elements in one pass.
+  // Resolve against the target language, falling back to English so a key that
+  // is missing (e.g. an incompletely-loaded file) renders English rather than
+  // leaving the previously-applied language's text in place.
+  const tv = (k) => { let v = getNestedTranslation(t, k); if (v == null && lang !== 'en') v = getNestedTranslation(translations.en, k); return v; };
   $$('[data-i18n], [data-i18n-placeholder], [data-i18n-aria-label]').forEach(node => {
     const key = node.getAttribute('data-i18n');
-    if (key) { const v = getNestedTranslation(t, key); if (v != null) node.innerHTML = v; }
+    if (key) { const v = tv(key); if (v != null) node.innerHTML = v; }
     const pkey = node.getAttribute('data-i18n-placeholder');
-    if (pkey) { const v = getNestedTranslation(t, pkey); if (v != null) node.placeholder = v; }
+    if (pkey) { const v = tv(pkey); if (v != null) node.placeholder = v; }
     const akey = node.getAttribute('data-i18n-aria-label');
-    if (akey) { const v = getNestedTranslation(t, akey); if (v != null) node.setAttribute('aria-label', v); }
+    if (akey) { const v = tv(akey); if (v != null) node.setAttribute('aria-label', v); }
   });
   // Also update localized ARIA for password eye buttons if updateEyeAria exists.
   if (typeof updateEyeAria === 'function') {
