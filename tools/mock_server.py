@@ -61,8 +61,8 @@ async def post_settings(request: Request):
 @app.get("/api/screen")
 async def get_screen():
     # Return a dummy binary payload of SCREEN_BIN_WIRE_SIZE bytes
-    # SCREEN_BIN_WIRE_SIZE = 64 + (20 * 13 + 512 + 8 * 96 + 2 * 96 + 88) * 2 = 3704
-    size = 3704
+    # SCREEN_BIN_WIRE_SIZE = 64 + (28 * 13 + 512 + 8 * 96 + 2 * 96 + 88) * 2 = 3912
+    size = 3912
     data = bytearray(size)
     # Set magic FSXL
     struct.pack_into("<I", data, 0, 0x4653584C)

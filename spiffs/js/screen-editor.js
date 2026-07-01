@@ -398,6 +398,13 @@ function refreshScreenEditorI18n() {
 let _screenRectCache = null;
 let _screenScaleCache = null;
 
+/**
+ * Image metadata cache to prevent redundant `new Image()` probes and enable
+ * synchronous rendering for already-loaded assets.
+ * Map<url, { w: number, h: number, failed: boolean, loading: boolean, queue: Array<Function> }>
+ */
+const _screenImageCache = new Map();
+
 function invalidateScreenCache() {
     _screenRectCache = null;
     _screenScaleCache = null;
@@ -1688,16 +1695,39 @@ function applyPalettePreviewSize(preview, def) {
 
 function setupSpriteBackground(preview, imgUrl, nativeH, displayW, displayH, spriteIndex = 0, spriteFrames = 1) {
     const scale = displayH / nativeH;
-    const sheet = new Image();
-    sheet.onload = () => {
+    const apply = (naturalWidth) => {
         const frames = Math.max(1, spriteFrames);
-        const frameW = sheet.naturalWidth / frames;
-        const scaledSheetW = sheet.naturalWidth * scale;
+        const frameW = naturalWidth / frames;
+        const scaledSheetW = naturalWidth * scale;
         const xOffset = -(spriteIndex * frameW * scale);
         preview.style.backgroundImage = `url("${imgUrl}")`;
         preview.style.backgroundRepeat = 'no-repeat';
         preview.style.backgroundPosition = `${xOffset}px top`;
         preview.style.backgroundSize = `${scaledSheetW}px ${displayH}px`;
+    };
+
+    const cached = _screenImageCache.get(imgUrl);
+    if (cached) {
+        if (!cached.failed && !cached.loading) {
+            apply(cached.w);
+        } else if (cached.loading) {
+            cached.queue.push(() => apply(cached.w));
+        }
+        return;
+    }
+
+    const state = { loading: true, queue: [] };
+    _screenImageCache.set(imgUrl, state);
+    const sheet = new Image();
+    sheet.onload = () => {
+        Object.assign(state, { w: sheet.naturalWidth, h: sheet.naturalHeight, failed: false, loading: false });
+        apply(sheet.naturalWidth);
+        state.queue.forEach(q => q());
+        state.queue = [];
+    };
+    sheet.onerror = () => {
+        Object.assign(state, { failed: true, loading: false });
+        state.queue = [];
     };
     sheet.src = imgUrl;
 }
@@ -1710,14 +1740,41 @@ function setupContainedBackground(preview, imgUrl, fallbackUrl) {
         preview.style.backgroundSize = 'contain';
         preview.classList.remove('screen-font-sample-thumb-missing');
     };
-    apply(imgUrl);
-    const probe = new Image();
-    probe.onerror = () => {
+
+    const handleFailure = () => {
         if (fallbackUrl && imgUrl !== fallbackUrl) {
             apply(fallbackUrl);
         } else {
             preview.classList.add('screen-font-sample-thumb-missing');
         }
+    };
+
+    const cached = _screenImageCache.get(imgUrl);
+    if (cached) {
+        if (cached.failed) {
+            handleFailure();
+        } else if (cached.loading) {
+            cached.queue.push(() => apply(imgUrl));
+        } else {
+            apply(imgUrl);
+        }
+        return;
+    }
+
+    const state = { loading: true, queue: [] };
+    _screenImageCache.set(imgUrl, state);
+    apply(imgUrl);
+    const probe = new Image();
+    probe.onload = () => {
+        Object.assign(state, { w: probe.naturalWidth, h: probe.naturalHeight, failed: false, loading: false });
+        state.queue.forEach(q => q());
+        state.queue = [];
+    };
+    probe.onerror = () => {
+        Object.assign(state, { failed: true, loading: false });
+        handleFailure();
+        state.queue.forEach(() => handleFailure());
+        state.queue = [];
     };
     probe.src = imgUrl;
 }
