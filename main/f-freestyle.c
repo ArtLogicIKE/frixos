@@ -275,42 +275,11 @@ static bool extract_string_value(char *field_start, char *obj_end, char *buffer,
     return false;
 }
 
-// Function to process glucose chunks and extract latest measurement from glucoseMeasurement objects
-static void process_glucose_chunk(const char *chunk, int len)
+// Scan the current sliding-window buffer for the latest glucoseMeasurement and
+// for graphData history points. Called repeatedly over overlapping windows;
+// re-scans are harmless (latest_timestamp compare / cgm_history_add dedup).
+static void scan_glucose_window(void)
 {
-    if (len <= 0 || glucose_chunk_buffer == NULL)
-        return;
-    
-    // If buffer would overflow, shift left to keep only the tail (last 512 bytes)
-    // This ensures we can handle objects that span chunks while not using too much memory
-    int needed_space = len + 1; // +1 for null terminator
-    if (glucose_chunk_buffer_len + needed_space > GLUCOSE_CHUNK_BUFFER_SIZE)
-    {
-        int target_size = 512;
-        int shift_amount = (glucose_chunk_buffer_len + len) - target_size;
-        if (shift_amount > 0 && shift_amount < glucose_chunk_buffer_len)
-        {
-            memmove(glucose_chunk_buffer, glucose_chunk_buffer + shift_amount, glucose_chunk_buffer_len - shift_amount);
-            glucose_chunk_buffer_len -= shift_amount;
-        }
-        else if (shift_amount >= glucose_chunk_buffer_len)
-        {
-            // Not enough space even after shift, keep only last part of new chunk
-            glucose_chunk_buffer_len = 0;
-        }
-    }
-    
-    // Append chunk to sliding window buffer
-    int available = GLUCOSE_CHUNK_BUFFER_SIZE - glucose_chunk_buffer_len - 1;
-    int copy_len = (len < available) ? len : available;
-    
-    if (copy_len > 0)
-    {
-        memcpy(glucose_chunk_buffer + glucose_chunk_buffer_len, chunk, copy_len);
-        glucose_chunk_buffer_len += copy_len;
-        glucose_chunk_buffer[glucose_chunk_buffer_len] = '\0';
-    }
-    
     // Search for "glucoseMeasurement" objects in the current buffer
     // Process all occurrences, keeping the latest one (by timestamp)
     // Handle objects that may span across chunks by using the sliding window buffer
@@ -462,6 +431,42 @@ static void process_glucose_chunk(const char *chunk, int len)
                 cgm_history_add((float)mgdl, ts);
         }
         gp = next;
+    }
+}
+
+// Feed one HTTP data event into the sliding window. Events can be up to
+// HTTP_BUFFER_SIZE (4 KB) but the window is 1 KB, so consume the event in
+// slices — append what fits, scan, keep a 512-byte tail (any partial object
+// is smaller than that), repeat — so no bytes are ever dropped.
+static void process_glucose_chunk(const char *chunk, int len)
+{
+    if (len <= 0 || glucose_chunk_buffer == NULL)
+        return;
+
+    const int tail_keep = 512;
+    while (len > 0)
+    {
+        // Make room when the remaining event doesn't fit: keep only the
+        // window tail (already-scanned bytes before it are consumed).
+        if (glucose_chunk_buffer_len + len + 1 > GLUCOSE_CHUNK_BUFFER_SIZE &&
+            glucose_chunk_buffer_len > tail_keep)
+        {
+            memmove(glucose_chunk_buffer, glucose_chunk_buffer + glucose_chunk_buffer_len - tail_keep, tail_keep);
+            glucose_chunk_buffer_len = tail_keep;
+        }
+
+        int available = GLUCOSE_CHUNK_BUFFER_SIZE - glucose_chunk_buffer_len - 1;
+        int copy_len = (len < available) ? len : available;
+        if (copy_len <= 0)
+            return; // window can't make progress; drop rather than spin
+
+        memcpy(glucose_chunk_buffer + glucose_chunk_buffer_len, chunk, copy_len);
+        glucose_chunk_buffer_len += copy_len;
+        glucose_chunk_buffer[glucose_chunk_buffer_len] = '\0';
+        chunk += copy_len;
+        len -= copy_len;
+
+        scan_glucose_window();
     }
 }
 
@@ -950,6 +955,9 @@ bool fetch_freestyle_glucose(void)
             if (status_code == 200)
             {
                 success = true; // HTTP request succeeded
+                if (latest_timestamp == 0 || latest_glucose_value <= 0)
+                    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Freestyle: no glucoseMeasurement parsed (val %.0f ts %ld)",
+                                latest_glucose_value, (long)latest_timestamp);
                 // Ensure the newest reading is in the graph history (it may be
                 // the unbounded last point the streaming capture skipped).
                 if (latest_glucose_value > 0 && latest_timestamp > 0)
