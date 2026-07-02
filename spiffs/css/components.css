@@ -49,6 +49,7 @@
   background:var(--net-bg); border:1px solid var(--net-border); cursor:pointer; transition:border-color .2s, background .2s; }
 .net + .net{ margin-top:7px; }
 .net:hover{ border-color:var(--cyan); }
+.net:focus-visible{ outline:none; border-color:var(--cyan); box-shadow:0 0 0 3px rgba(0,170,255,.25); }
 .net.sel{ border-color:rgba(0,170,255,.55); background:var(--glass-2); box-shadow:0 0 0 1px rgba(0,170,255,.25); }
 .net .nm{ flex:1; font-size:13.5px; font-weight:500; color:var(--ink); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .net .meta{ display:flex; align-items:center; gap:9px; color:var(--muted); }

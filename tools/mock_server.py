@@ -95,6 +95,22 @@ async def get_i18n_language(lang: str):
         return FileResponse(path)
     return JSONResponse(status_code=404, content={"message": "Not found"})
 
+@app.get("/api/wifi/scan")
+async def wifi_scan():
+    return JSONResponse(content={"status": "ok"})
+
+@app.get("/api/wifi/status")
+async def wifi_status():
+    return JSONResponse(content={
+        "scanning": False,
+        "scan_done": True,
+        "networks": [
+            {"ssid": "Mock WiFi 1", "signal_strength": 90, "requires_password": True},
+            {"ssid": "Mock WiFi 2", "signal_strength": 60, "requires_password": False},
+            {"ssid": "Mock WiFi 3", "signal_strength": 30, "requires_password": True}
+        ]
+    })
+
 @app.get("/api/status")
 async def get_status(logs: str = None):
     status_data = {
