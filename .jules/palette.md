@@ -31,3 +31,7 @@
 ## 2026-06-24 - [Semantic Toggle Switches]
 **Learning:** Using a simple `.on` class for visual toggle states is insufficient for accessibility. Implementing `role="switch"` and `aria-checked` ensures that assistive technologies correctly announce the element's purpose and state. For buttons acting as switches, `type="button"` is also essential to prevent default form submission behavior.
 **Action:** Always complement visual state classes (like `.on` or `.active`) with semantic ARIA attributes (`role="switch"`, `aria-checked`) and ensure explicit `type="button"` on toggle controls.
+
+## 2026-06-25 - [Accessible Dynamic Lists]
+**Learning:** For dynamic lists like WiFi networks that are populated after an async "Scan" operation, simply rendering the items is insufficient for screen reader users. Using `aria-live="polite"` on the list container and ensuring individual items have `role="button"`, `tabindex="0"`, and descriptive `aria-label` (combining SSID, security, and signal) ensures the results are both announced and navigable.
+**Action:** Always wrap async-populated lists in `aria-live` regions and implement the accessible button pattern for interactive list items.
