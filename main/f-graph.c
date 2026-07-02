@@ -96,7 +96,7 @@ void graph_configure(const screen_graph_cfg_t *cfg, bool widget_enabled)
     ring.token[GRAPH_TOKEN_LEN - 1] = '\0';
     ring.interval_min = iv;
     ring.cap = cap;
-    ring.needs_backfill = want && (cfg->flags & GRAPH_FLAG_BACKFILL);
+    ring.needs_backfill = want; // backfill is always on; GRAPH_FLAG_BACKFILL ignored
   }
   ring.active = want;
   GRAPH_UNLOCK();

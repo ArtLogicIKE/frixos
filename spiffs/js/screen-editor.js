@@ -1088,7 +1088,6 @@ function screenReadGraphCfg(view, off) {
         show_axis: !!(flags & GRAPH_FLAG.SHOW_AXIS),
         show_xaxis: !!(flags & GRAPH_FLAG.SHOW_XAXIS),
         band_on: !!(flags & GRAPH_FLAG.BAND),
-        backfill: !!(flags & GRAPH_FLAG.BACKFILL),
         show_value: !!(flags & GRAPH_FLAG.SHOW_VALUE),
         boolean: !!(flags & GRAPH_FLAG.BOOLEAN),
         thick: !!(flags & GRAPH_FLAG.THICK),
@@ -1115,7 +1114,7 @@ function screenWriteGraphCfg(view, off, o) {
     if (o.show_axis) flags |= GRAPH_FLAG.SHOW_AXIS;
     if (o.show_xaxis) flags |= GRAPH_FLAG.SHOW_XAXIS;
     if (o.band_on) flags |= GRAPH_FLAG.BAND;
-    if (o.backfill) flags |= GRAPH_FLAG.BACKFILL;
+    flags |= GRAPH_FLAG.BACKFILL; // always on: keeps older firmware backfilling
     if (o.show_value) flags |= GRAPH_FLAG.SHOW_VALUE;
     if (o.boolean) flags |= GRAPH_FLAG.BOOLEAN;
     if (o.thick) flags |= GRAPH_FLAG.THICK;
@@ -2503,7 +2502,7 @@ function ensureScreenGraphOptions(e) {
     if (!e.options) e.options = {};
     const d = {
         token: '', interval_min: 5, points: 60, gwidth: 80, gheight: 36,
-        autoscale: true, show_axis: true, show_xaxis: true, show_value: true, backfill: true,
+        autoscale: true, show_axis: true, show_xaxis: true, show_value: true,
         band_on: false, boolean: false, thick: false,
         band_low: null, band_high: null, y_min: null, y_max: null,
         color: '#00dcff', bg_color: '#000000',
@@ -3003,7 +3002,6 @@ function renderScreenOptions() {
         opt.appendChild(dl);
         mkNumber(T('screen.graph_interval', 'Sample interval (min)'), o.interval_min, 1, 1440, v => o.interval_min = clamp(parseInt(v, 10) || 5, 1, 1440));
         mkNumber(T('screen.graph_points', 'Data points'), o.points, 2, 100, v => o.points = clamp(parseInt(v, 10) || 60, 2, 100));
-        appendScreenSwitchRow(opt, { id: 'graph_backfill', label: T('screen.graph_backfill', 'Backfill history (HA/CGM)'), checked: !!o.backfill, onChange: (on) => { o.backfill = on; } });
 
         // --- Size ---
         mkSection(T('screen.graph_sec_size', 'Size'));

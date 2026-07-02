@@ -1,113 +1,58 @@
 {
   "version": 10,
-  "scroll_delay": 65,
-  "day_font": "bold",
-  "night_font": "bold",
-  "day_aux_font": "bold",
-  "night_aux_font": "bold",
+  "scroll_delay": 60,
   "day_color_filter": 0,
   "night_color_filter": 0,
+  "day_font": "bold",
+  "night_font": "light",
+  "day_aux_font": "bold",
+  "night_aux_font": "bold",
   "w": 128,
   "h": 128,
   "profiles": {
     "day": {
-      "scroll_text": "[device]: [greeting] [day], [date] [mon], now [temp] today [high]-[low], hum. [hum], sun [rise]-[set]",
-      "static_texts": {
-        "text_1": "UV [uv]",
-        "text_2": "[pressure]",
-        "text_3": "Wind [wind]",
-        "text_4": "Gust [gust]",
-        "text_5": "Rain [precip]",
-        "text_6": "",
-        "text_7": "",
-        "text_8": "",
-        "digit_label": "",
-        "digit_label_aux": ""
-      },
       "elements": [
         {
           "id": "glucose_level",
           "enabled": 1,
-          "x": 27,
-          "y": 5,
+          "x": 40,
+          "y": 14,
           "z": 4
         },
         {
           "id": "glucose_trend",
           "enabled": 1,
-          "x": 42,
-          "y": 8,
+          "x": 28,
+          "y": 20,
           "z": 4
         },
         {
           "id": "wifi_off",
           "enabled": 1,
-          "x": 22,
-          "y": 5,
+          "x": 33,
+          "y": 14,
           "z": 4
         },
         {
           "id": "weather",
           "enabled": 1,
           "x": 54,
-          "y": 2,
+          "y": 13,
           "z": 3
         },
         {
           "id": "moon",
           "enabled": 1,
-          "x": 87,
-          "y": 7,
+          "x": 86,
+          "y": 19,
           "z": 3
         },
         {
           "id": "time",
           "enabled": 1,
-          "x": 22,
-          "y": 25,
+          "x": 30,
+          "y": 34,
           "z": 1
-        },
-        {
-          "id": "digit_label",
-          "enabled": 0,
-          "x": 22,
-          "y": 84,
-          "z": 1,
-          "options": {
-            "font": 0,
-            "color": "#ffffff",
-            "bg_color": "#000000",
-            "width": 80,
-            "align": 0
-          }
-        },
-        {
-          "id": "ampm",
-          "enabled": 1,
-          "x": 101,
-          "y": 32,
-          "z": 2
-        },
-        {
-          "id": "time_aux",
-          "enabled": 0,
-          "x": 22,
-          "y": 47,
-          "z": 1
-        },
-        {
-          "id": "digit_label_aux",
-          "enabled": 0,
-          "x": 22,
-          "y": 84,
-          "z": 1,
-          "options": {
-            "font": 0,
-            "color": "#ffffff",
-            "bg_color": "#000000",
-            "width": 80,
-            "align": 0
-          }
         },
         {
           "id": "message",
@@ -118,7 +63,9 @@
           "options": {
             "font": 0,
             "color": "#ffffff",
-            "bg_color": "#000000"
+            "bg_color": "#000000",
+            "width": 0,
+            "align": 0
           }
         },
         {
@@ -234,6 +181,79 @@
           }
         },
         {
+          "id": "ampm",
+          "enabled": 1,
+          "x": 110,
+          "y": 39,
+          "z": 2
+        },
+        {
+          "id": "time_aux",
+          "enabled": 0,
+          "x": 22,
+          "y": 47,
+          "z": 1
+        },
+        {
+          "id": "digit_label",
+          "enabled": 0,
+          "x": 22,
+          "y": 84,
+          "z": 1,
+          "options": {
+            "font": 0,
+            "color": "#ffffff",
+            "bg_color": "#000000",
+            "width": 80,
+            "align": 0
+          }
+        },
+        {
+          "id": "digit_label_aux",
+          "enabled": 0,
+          "x": 22,
+          "y": 84,
+          "z": 1,
+          "options": {
+            "font": 0,
+            "color": "#ffffff",
+            "bg_color": "#000000",
+            "width": 80,
+            "align": 0
+          }
+        },
+        {
+          "id": "graph",
+          "enabled": 1,
+          "x": 22,
+          "y": 80,
+          "z": 0,
+          "options": {
+            "color": "#04ff00",
+            "bg_color": "#000000",
+            "token": "[CGM:glucose]",
+            "interval_min": 5,
+            "points": 60,
+            "gwidth": 80,
+            "gheight": 36,
+            "autoscale": true,
+            "show_axis": true,
+            "show_xaxis": true,
+            "band_on": true,
+            "backfill": true,
+            "show_value": true,
+            "boolean": false,
+            "thick": false,
+            "band_low": 70,
+            "band_high": 180,
+            "y_min": null,
+            "y_max": null,
+            "band_color": "#1ea96d",
+            "warn_color": "#ff5050",
+            "axis_color": "#ffffff"
+          }
+        },
+        {
           "id": "icon_1",
           "enabled": 0,
           "x": 48,
@@ -288,138 +308,65 @@
           "x": 48,
           "y": 48,
           "z": 2
-        },
-        {
-          "id": "graph",
-          "enabled": 1,
-          "x": 24,
-          "y": 86,
-          "z": 0,
-          "options": {
-            "token": "[CGM:glucose]",
-            "interval_min": 5,
-            "points": 60,
-            "gwidth": 80,
-            "gheight": 36,
-            "autoscale": true,
-            "show_axis": true,
-            "show_xaxis": true,
-            "show_value": true,
-            "backfill": true,
-            "band_on": true,
-            "boolean": false,
-            "thick": false,
-            "band_low": 70,
-            "band_high": 180,
-            "y_min": null,
-            "y_max": null,
-            "color": "#00dcff",
-            "bg_color": "#000000",
-            "band_color": "#283c28",
-            "warn_color": "#ff5050",
-            "axis_color": "#787878"
-          }
         }
-      ]
+      ],
+      "scroll_text": "[device]: [greeting] [day], [date] [mon], now [temp] today [high]-[low], hum. [hum], sun [rise]-[set]",
+      "static_texts": {
+        "text_1": "UV [uv]",
+        "text_2": "[pressure]",
+        "text_3": "Wind [wind]",
+        "text_4": "Gust [gust]",
+        "text_5": "Rain [precip]",
+        "text_6": "",
+        "text_7": "",
+        "text_8": "",
+        "digit_label": "",
+        "digit_label_aux": ""
+      }
     },
     "night": {
-      "scroll_text": "[device]: [greeting] [day], [date] [mon], now [temp] today [high]-[low], hum. [hum], sun [rise]-[set]",
-      "static_texts": {
-        "text_1": "UV [uv]",
-        "text_2": "[pressure]",
-        "text_3": "Wind [wind]",
-        "text_4": "Gust [gust]",
-        "text_5": "Rain [precip]",
-        "text_6": "",
-        "text_7": "",
-        "text_8": "",
-        "digit_label": "",
-        "digit_label_aux": ""
-      },
       "elements": [
         {
           "id": "glucose_level",
           "enabled": 1,
-          "x": 27,
-          "y": 5,
+          "x": 40,
+          "y": 14,
           "z": 4
         },
         {
           "id": "glucose_trend",
           "enabled": 1,
-          "x": 42,
-          "y": 8,
+          "x": 28,
+          "y": 20,
           "z": 4
         },
         {
           "id": "wifi_off",
           "enabled": 1,
-          "x": 22,
-          "y": 5,
+          "x": 33,
+          "y": 14,
           "z": 4
         },
         {
           "id": "weather",
           "enabled": 1,
           "x": 54,
-          "y": 2,
+          "y": 13,
           "z": 3
         },
         {
           "id": "moon",
           "enabled": 1,
-          "x": 87,
-          "y": 7,
+          "x": 86,
+          "y": 19,
           "z": 3
         },
         {
           "id": "time",
           "enabled": 1,
-          "x": 22,
-          "y": 25,
+          "x": 30,
+          "y": 34,
           "z": 1
-        },
-        {
-          "id": "digit_label",
-          "enabled": 0,
-          "x": 22,
-          "y": 84,
-          "z": 1,
-          "options": {
-            "font": 0,
-            "color": "#ffffff",
-            "bg_color": "#000000",
-            "width": 80,
-            "align": 0
-          }
-        },
-        {
-          "id": "ampm",
-          "enabled": 1,
-          "x": 101,
-          "y": 32,
-          "z": 2
-        },
-        {
-          "id": "time_aux",
-          "enabled": 0,
-          "x": 22,
-          "y": 47,
-          "z": 1
-        },
-        {
-          "id": "digit_label_aux",
-          "enabled": 0,
-          "x": 22,
-          "y": 84,
-          "z": 1,
-          "options": {
-            "font": 0,
-            "color": "#ffffff",
-            "bg_color": "#000000",
-            "width": 80,
-            "align": 0
-          }
         },
         {
           "id": "message",
@@ -430,7 +377,9 @@
           "options": {
             "font": 0,
             "color": "#ffffff",
-            "bg_color": "#000000"
+            "bg_color": "#000000",
+            "width": 0,
+            "align": 0
           }
         },
         {
@@ -546,6 +495,79 @@
           }
         },
         {
+          "id": "ampm",
+          "enabled": 1,
+          "x": 110,
+          "y": 39,
+          "z": 2
+        },
+        {
+          "id": "time_aux",
+          "enabled": 0,
+          "x": 22,
+          "y": 47,
+          "z": 1
+        },
+        {
+          "id": "digit_label",
+          "enabled": 0,
+          "x": 22,
+          "y": 84,
+          "z": 1,
+          "options": {
+            "font": 0,
+            "color": "#ffffff",
+            "bg_color": "#000000",
+            "width": 80,
+            "align": 0
+          }
+        },
+        {
+          "id": "digit_label_aux",
+          "enabled": 0,
+          "x": 22,
+          "y": 84,
+          "z": 1,
+          "options": {
+            "font": 0,
+            "color": "#ffffff",
+            "bg_color": "#000000",
+            "width": 80,
+            "align": 0
+          }
+        },
+        {
+          "id": "graph",
+          "enabled": 1,
+          "x": 22,
+          "y": 80,
+          "z": 0,
+          "options": {
+            "color": "#04ff00",
+            "bg_color": "#000000",
+            "token": "[CGM:glucose]",
+            "interval_min": 5,
+            "points": 60,
+            "gwidth": 80,
+            "gheight": 36,
+            "autoscale": true,
+            "show_axis": true,
+            "show_xaxis": true,
+            "band_on": true,
+            "backfill": true,
+            "show_value": true,
+            "boolean": false,
+            "thick": false,
+            "band_low": 70,
+            "band_high": 180,
+            "y_min": null,
+            "y_max": null,
+            "band_color": "#1ea96d",
+            "warn_color": "#ff5050",
+            "axis_color": "#ffffff"
+          }
+        },
+        {
           "id": "icon_1",
           "enabled": 0,
           "x": 48,
@@ -600,39 +622,21 @@
           "x": 48,
           "y": 48,
           "z": 2
-        },
-        {
-          "id": "graph",
-          "enabled": 1,
-          "x": 24,
-          "y": 86,
-          "z": 0,
-          "options": {
-            "token": "[CGM:glucose]",
-            "interval_min": 5,
-            "points": 60,
-            "gwidth": 80,
-            "gheight": 36,
-            "autoscale": true,
-            "show_axis": true,
-            "show_xaxis": true,
-            "show_value": true,
-            "backfill": true,
-            "band_on": true,
-            "boolean": false,
-            "thick": false,
-            "band_low": 70,
-            "band_high": 180,
-            "y_min": null,
-            "y_max": null,
-            "color": "#00dcff",
-            "bg_color": "#000000",
-            "band_color": "#283c28",
-            "warn_color": "#ff5050",
-            "axis_color": "#787878"
-          }
         }
-      ]
+      ],
+      "scroll_text": "[device]: [greeting] [day], [date] [mon], now [temp] today [high]-[low], hum. [hum], sun [rise]-[set]",
+      "static_texts": {
+        "text_1": "UV [uv]",
+        "text_2": "[pressure]",
+        "text_3": "Wind [wind]",
+        "text_4": "Gust [gust]",
+        "text_5": "Rain [precip]",
+        "text_6": "",
+        "text_7": "",
+        "text_8": "",
+        "digit_label": "",
+        "digit_label_aux": ""
+      }
     }
   }
 }
