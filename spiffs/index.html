@@ -24,15 +24,15 @@
         <span id="langName">English</span><span class="caret">▾</span>
       </button>
       <div class="lang-menu" id="langMenu" role="listbox">
-        <div class="lang-opt sel" data-lang="en">English</div>
-        <div class="lang-opt" data-lang="de">Deutsch</div>
-        <div class="lang-opt" data-lang="fr">Français</div>
-        <div class="lang-opt" data-lang="it">Italiano</div>
-        <div class="lang-opt" data-lang="pt">Português</div>
-        <div class="lang-opt" data-lang="sv">Svenska</div>
-        <div class="lang-opt" data-lang="da">Dansk</div>
-        <div class="lang-opt" data-lang="pl">Polski</div>
-        <div class="lang-opt" data-lang="es">Español</div>
+        <div class="lang-opt sel" data-lang="en" role="option" aria-selected="true" tabindex="0">English</div>
+        <div class="lang-opt" data-lang="de" role="option" aria-selected="false" tabindex="0">Deutsch</div>
+        <div class="lang-opt" data-lang="fr" role="option" aria-selected="false" tabindex="0">Français</div>
+        <div class="lang-opt" data-lang="it" role="option" aria-selected="false" tabindex="0">Italiano</div>
+        <div class="lang-opt" data-lang="pt" role="option" aria-selected="false" tabindex="0">Português</div>
+        <div class="lang-opt" data-lang="sv" role="option" aria-selected="false" tabindex="0">Svenska</div>
+        <div class="lang-opt" data-lang="da" role="option" aria-selected="false" tabindex="0">Dansk</div>
+        <div class="lang-opt" data-lang="pl" role="option" aria-selected="false" tabindex="0">Polski</div>
+        <div class="lang-opt" data-lang="es" role="option" aria-selected="false" tabindex="0">Español</div>
       </div>
     </div>
     <button class="ctrl" id="themeBtn" data-i18n-aria-label="common.toggle_theme" aria-label="Toggle theme" title="Toggle light / dark"><span id="themeIcon">☀</span></button>
@@ -41,17 +41,17 @@
   <!-- ===== NAV (with scroll indicators) ===== -->
   <div class="nav-wrap">
     <button class="nav-edge left" id="navLeft" data-i18n-aria-label="common.scroll_tabs_left" aria-label="Scroll tabs left" tabindex="-1">‹</button>
-    <nav class="nav" id="nav">
-      <a data-tab="settings" class="active" data-i18n="menu.device">Device</a>
-      <a data-tab="integrations" data-i18n="menu.integrations">Integrations</a>
-      <a data-tab="layout" data-i18n="menu.screen">Layout</a>
-      <a data-tab="status" data-i18n="menu.system">System</a>
+    <nav class="nav" id="nav" role="tablist">
+      <a id="tab-link-settings" data-tab="settings" class="active" data-i18n="menu.device" role="tab" aria-selected="true" aria-controls="tab-settings" tabindex="0">Device</a>
+      <a id="tab-link-integrations" data-tab="integrations" data-i18n="menu.integrations" role="tab" aria-selected="false" aria-controls="tab-integrations" tabindex="0">Integrations</a>
+      <a id="tab-link-layout" data-tab="layout" data-i18n="menu.screen" role="tab" aria-selected="false" aria-controls="tab-layout" tabindex="0">Layout</a>
+      <a id="tab-link-status" data-tab="status" data-i18n="menu.system" role="tab" aria-selected="false" aria-controls="tab-status" tabindex="0">System</a>
     </nav>
     <button class="nav-edge right" id="navRight" data-i18n-aria-label="common.scroll_tabs_right" aria-label="Scroll tabs right" tabindex="-1">›</button>
   </div>
 
   <!-- ===================== DEVICE (settings + everyday advanced) ===================== -->
-  <section class="tab-page active" id="tab-settings" data-screen-label="Device">
+  <section class="tab-page active" id="tab-settings" data-screen-label="Device" role="tabpanel" aria-labelledby="tab-link-settings">
     <div class="hero">
       <span class="obj"><img src="logo.jpg" alt=""></span>
       <div class="ht">
@@ -207,7 +207,7 @@
   </section>
 
   <!-- ===================== INTEGRATIONS ===================== -->
-  <section class="tab-page" id="tab-integrations" data-screen-label="Integrations">
+  <section class="tab-page" id="tab-integrations" data-screen-label="Integrations" role="tabpanel" aria-labelledby="tab-link-integrations">
     <div class="panel">
       <div class="ptitle"><h2><span class="dot off" id="dot-cgm"></span><span data-i18n="integrations.glucose_monitors.title">Glucose monitoring</span></h2><span class="rule"></span><span class="int-state" id="state-cgm"></span></div>
       <div class="field"><label data-i18n="integrations.glucose_monitors.device_type">Device Type</label>
@@ -283,7 +283,7 @@
 </section>
 
   <!-- ===================== LAYOUT (screen editor) ===================== -->
-  <section class="tab-page" id="tab-layout" data-screen-label="Layout">
+  <section class="tab-page" id="tab-layout" data-screen-label="Layout" role="tabpanel" aria-labelledby="tab-link-layout">
     <div class="panel">
       <div class="ptitle"><h2 data-i18n="screen.title">Layout</h2><span class="rule"></span></div>
 
@@ -337,7 +337,7 @@
   </section>
 
   <!-- ===================== SYSTEM (status + maintenance + danger zone) ===================== -->
-  <section class="tab-page" id="tab-status" data-screen-label="System">
+  <section class="tab-page" id="tab-status" data-screen-label="System" role="tabpanel" aria-labelledby="tab-link-status">
     <div class="panel">
       <div class="ptitle"><h2 data-i18n="status.system.title">System information</h2><span class="rule"></span></div>
       <div class="info-grid">

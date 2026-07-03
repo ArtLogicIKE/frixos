@@ -31,3 +31,7 @@
 ## 2026-06-24 - [Semantic Toggle Switches]
 **Learning:** Using a simple `.on` class for visual toggle states is insufficient for accessibility. Implementing `role="switch"` and `aria-checked` ensures that assistive technologies correctly announce the element's purpose and state. For buttons acting as switches, `type="button"` is also essential to prevent default form submission behavior.
 **Action:** Always complement visual state classes (like `.on` or `.active`) with semantic ARIA attributes (`role="switch"`, `aria-checked`) and ensure explicit `type="button"` on toggle controls.
+
+## 2026-06-25 - [Glass Theme Focus Indicators]
+**Learning:** In highly stylized "glass" or translucent interfaces, default browser focus rings often clash with the aesthetic or are obscured by backdrop filters. A high-impact micro-UX pattern for this design system is using `:focus-visible` with a `box-shadow` (inset for dropdown options, outset for buttons/links) in the primary accent color (`--cyan`). This provides clear accessibility without breaking the visual polish.
+**Action:** Use `box-shadow: 0 0 0 2px var(--cyan)` or `box-shadow: inset 0 0 0 2px var(--cyan)` on `:focus-visible` for all interactive elements to ensure accessible navigation remains visually integrated.

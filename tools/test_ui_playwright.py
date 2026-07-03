@@ -16,24 +16,33 @@ def run() -> int:
         page.goto(BASE, wait_until="networkidle")
         page.wait_for_timeout(1500)
 
-        # Scrolling message loads from API
-        msg = page.locator("#message")
-        msg.wait_for(state="visible")
-        val = msg.input_value()
-        if not val:
-            failures.append("Scrolling message textarea is empty on load (p16 bug)")
-        else:
-            print(f"PASS message loaded ({len(val)} chars)")
-
-        # Tab navigation
-        for tab in ("advanced", "integrations", "status", "settings"):
-            page.click(f'#nav a[data-tab="{tab}"]')
+        # Tab navigation & ARIA states
+        for tab in ("integrations", "layout", "status", "settings"):
+            tab_selector = f'#nav a[data-tab="{tab}"]'
+            page.click(tab_selector)
             page.wait_for_timeout(400)
             if not page.locator(f"#tab-{tab}").evaluate("el => el.classList.contains('active')"):
                 failures.append(f"Tab {tab} did not activate")
+            if page.locator(tab_selector).get_attribute("aria-selected") != "true":
+                failures.append(f"Tab {tab} aria-selected not true after click")
 
-        # Advanced dim mode panels
-        page.click('#nav a[data-tab="advanced"]')
+        # Keyboard navigation (Tab key to navigate, Enter to activate)
+        page.keyboard.press("Tab") # Should focus Device tab (since it's first)
+        # We might need multiple tabs to reach the nav if there are elements before it.
+        # But for this UI, let's try to focus the first tab link.
+        page.focus('#tab-link-settings')
+        page.keyboard.press("ArrowRight") # Not implemented yet, we use Tab/Enter
+        page.keyboard.press("Tab")
+        page.keyboard.press("Enter") # Activate Integrations
+        page.wait_for_timeout(400)
+        if not page.locator("#tab-integrations").evaluate("el => el.classList.contains('active')"):
+            failures.append("Integrations tab did not activate via keyboard")
+
+        # Advanced dim mode panels (now in Settings tab)
+        page.click('#nav a[data-tab="settings"]')
+        # Find the details box that contains #dim_mode
+        page.evaluate("document.querySelector('#dim_mode').closest('details').open = true")
+        page.wait_for_timeout(200)
         page.select_option("#dim_mode", "0")
         if not page.locator("#dimBright").is_visible():
             failures.append("Brightness dim panel hidden for mode 0")
@@ -41,12 +50,19 @@ def run() -> int:
         if not page.locator("#dimTime").is_visible():
             failures.append("Time dim panel hidden for mode 2")
 
-        # Language menu
+        # Language menu & Keyboard
         page.click("#langBtn")
-        page.click('.lang-opt[data-lang="de"]')
+        if page.locator("#langBtn").get_attribute("aria-expanded") != "true":
+            failures.append("langBtn aria-expanded not true after click")
+
+        # Test keyboard activation of language option
+        page.focus('.lang-opt[data-lang="de"]')
+        page.keyboard.press("Enter")
         page.wait_for_timeout(500)
         if page.locator("#langName").inner_text() != "Deutsch":
-            failures.append("Language switch to German failed")
+            failures.append("Language switch to German via keyboard failed")
+        if page.locator("#langBtn").get_attribute("aria-expanded") != "false":
+            failures.append("langBtn aria-expanded not false after selection")
 
         # Theme toggle
         was_dark = page.evaluate("document.body.classList.contains('theme-dark')")

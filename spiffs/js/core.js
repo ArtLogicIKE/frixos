@@ -156,7 +156,11 @@ async function setLanguage(lang, persist) {
   applyI18n(lang);
   const opt = $('.lang-opt[data-lang="' + lang + '"]');
   el('langName').textContent = opt ? opt.textContent : (LANGUAGE_NAMES[lang] || 'English');
-  $$('.lang-opt').forEach(o => o.classList.toggle('sel', o.dataset.lang === lang));
+  $$('.lang-opt').forEach(o => {
+    const sel = o.dataset.lang === lang;
+    o.classList.toggle('sel', sel);
+    o.setAttribute('aria-selected', sel.toString());
+  });
   if (typeof refreshScreenEditorI18n === 'function') refreshScreenEditorI18n();
   if (typeof refreshDynamicI18n === 'function') refreshDynamicI18n();
   if (persist) apiPostJson('/api/settings', { p41: LANGUAGES.indexOf(lang) }); // authoritative store on device
@@ -165,11 +169,15 @@ async function setLanguage(lang, persist) {
 /* ---------- language menu ---------- */
 const langBtn = el('langBtn'), langMenu = el('langMenu');
 langBtn.addEventListener('click', e => { e.stopPropagation(); const open = langMenu.classList.toggle('open'); langBtn.setAttribute('aria-expanded', open.toString()); });
-$$('.lang-opt').forEach(o => o.addEventListener('click', () => {
-  langMenu.classList.remove('open');
-  langBtn.setAttribute('aria-expanded', 'false');
-  setLanguage(o.dataset.lang, true);
-}));
+$$('.lang-opt').forEach(o => {
+  const act = () => {
+    langMenu.classList.remove('open');
+    langBtn.setAttribute('aria-expanded', 'false');
+    setLanguage(o.dataset.lang, true);
+  };
+  o.addEventListener('click', act);
+  o.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); act(); } });
+});
 document.addEventListener('click', () => {
   langMenu.classList.remove('open');
   langBtn.setAttribute('aria-expanded', 'false');
@@ -179,14 +187,21 @@ document.addEventListener('click', () => {
 const nav = el('nav'), navWrap = $('.nav-wrap');
 function showTab(id) {
   $$('.tab-page').forEach(p => p.classList.toggle('active', p.id === 'tab-' + id));
-  $$('#nav a').forEach(a => a.classList.toggle('active', a.dataset.tab === id));
+  $$('#nav a').forEach(a => {
+    const active = a.dataset.tab === id;
+    a.classList.toggle('active', active);
+    a.setAttribute('aria-selected', active.toString());
+  });
   window.scrollTo(0, 0);
   const active = $('#nav a.active'); if (active) active.scrollIntoView({ inline: 'center', block: 'nearest' });
   if (sectionLoaders[id] && !loadedSections[id]) { loadedSections[id] = true; sectionLoaders[id](); }
   else if (sectionLoaders[id] && id === 'status') sectionLoaders[id](); // System tab: live data, refresh on every visit
   updateNavEdges();
 }
-$$('#nav a').forEach(a => a.addEventListener('click', () => showTab(a.dataset.tab)));
+$$('#nav a').forEach(a => {
+  a.addEventListener('click', () => showTab(a.dataset.tab));
+  a.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); showTab(a.dataset.tab); } });
+});
 function updateNavEdges() {
   const maxScroll = nav.scrollWidth - nav.clientWidth - 1;
   navWrap.classList.toggle('can-left', nav.scrollLeft > 1);
