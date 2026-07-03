@@ -7,7 +7,9 @@
     "status": "Status",
     "files": "Files",
     "update": "Update",
-    "restart": "Restart"
+    "restart": "Restart",
+    "device": "Device",
+    "system": "System"
   },
   "common": {
     "save_settings": "Save settings",
@@ -25,7 +27,11 @@
     "none": "None",
     "file": "File",
     "online": "Online",
-    "offline": "Offline"
+    "offline": "Offline",
+    "advanced": "Advanced",
+    "save": "Save",
+    "discard": "Discard",
+    "unsaved_changes": "You have unsaved changes"
   },
   "settings": {
     "connection": {
@@ -184,7 +190,46 @@
       "text_8": "Text 8",
       "screen_grid": "Show screen grid",
       "screen_settings": "Screen settings"
-    }
+    },
+    "presets": "Presets",
+    "presets_desc": "Start from a ready-made layout, then customize it below and press Apply.",
+    "presets_none": "No layout files on the device.",
+    "disk_menu": "Disk ▾",
+    "graph_more": "More options",
+    "graph_token": "Token to plot",
+    "graph_interval": "Sample interval (min)",
+    "graph_points": "Data points",
+    "graph_width": "Width (px)",
+    "graph_height": "Height (px)",
+    "graph_autoscale": "Auto Y-scale",
+    "graph_ymin": "Y min",
+    "graph_ymax": "Y max",
+    "graph_axis": "Show value axis (Y)",
+    "graph_xaxis": "Show time axis (X)",
+    "graph_value": "Show current value",
+    "graph_band": "Show low/high band",
+    "graph_band_low": "Band low",
+    "graph_band_high": "Band high",
+    "graph_band_color": "Band color",
+    "graph_warn_color": "Out-of-band color",
+    "graph_line_color": "Line color",
+    "graph_axis_color": "Axis color",
+    "graph_thick": "Thick line (2px)",
+    "graph_boolean": "Boolean (step 0/1)",
+    "graph_sec_data": "Data",
+    "graph_sec_size": "Size",
+    "graph_sec_scale": "Scale",
+    "graph_sec_axes": "Axes & value",
+    "graph_sec_band": "Band",
+    "graph_sec_style": "Style",
+    "show_grid": "Screen Grid",
+    "icon_upload": "Upload JPG",
+    "icon_delete": "Delete",
+    "icon_bad_type": "Icon must be a JPG image",
+    "icon_uploaded": "Icon uploaded. Click Apply to push the layout.",
+    "icon_upload_failed": "Icon upload failed",
+    "icon_deleted": "Icon deleted",
+    "icon_delete_failed": "Delete failed"
   },
   "advanced": {
     "display": {
@@ -364,7 +409,8 @@
     "integration_status": {
       "title": "Integration Status"
     },
-    "refresh_button": "Refresh Status"
+    "refresh_button": "Refresh Status",
+    "diagnostics_title": "Diagnostics"
   },
   "integrations": {
     "ha": {
@@ -427,7 +473,10 @@
         "time": "Time (sec)",
         "cgm": "CGM (sec)"
       }
-    }
+    },
+    "state_off": "Not configured",
+    "state_ok": "Active",
+    "state_wait": "Configured — no data yet"
   },
   "files": {
     "title": "SPIFFS files",
@@ -536,6 +585,11 @@
     "done_restarting": "Done — restarting…",
     "done": "Done",
     "upload_failed": "Upload failed",
-    "device_restarting_short": "Device restarting…"
+    "device_restarting_short": "Device restarting…",
+    "changes_discarded": "Changes discarded"
+  },
+  "system": {
+    "maintenance_title": "Maintenance",
+    "danger_title": "Danger zone"
   }
 }

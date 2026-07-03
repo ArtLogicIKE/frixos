@@ -7,7 +7,9 @@
     "status": "Status",
     "update": "Aktualizacja",
     "restart": "Restart",
-    "files": "Pliki"
+    "files": "Pliki",
+    "device": "Urządzenie",
+    "system": "System"
   },
   "common": {
     "save_settings": "Zapisz ustawienia",
@@ -25,7 +27,11 @@
     "scroll_tabs_right": "Przewiń karty w prawo",
     "select_font": "Wybierz czcionkę {name}",
     "show_password": "Pokaż hasło",
-    "toggle_theme": "Przełącz motyw"
+    "toggle_theme": "Przełącz motyw",
+    "advanced": "Zaawansowane",
+    "save": "Zapisz",
+    "discard": "Odrzuć",
+    "unsaved_changes": "Masz niezapisane zmiany"
   },
   "settings": {
     "connection": {
@@ -184,7 +190,46 @@
     "apply": "Zastosuj",
     "disabled": "Wyłączone",
     "editor_instructions": "Umieść elementy na wyświetlaczu 128×128 — elementy mogą się nakładać. Przeciągnij elementy z palety na siatkę lub przeciągnij umieszczony element, aby go przesunąć. Użyj klawiszy strzałek, aby przesunąć wybrany element (Shift = 10px).",
-    "layout_management": "Zarządzanie układem"
+    "layout_management": "Zarządzanie układem",
+    "presets": "Szablony",
+    "presets_desc": "Zacznij od gotowego układu, dostosuj go poniżej i naciśnij Zastosuj.",
+    "presets_none": "Brak plików układu na urządzeniu.",
+    "disk_menu": "Plik ▾",
+    "graph_more": "Więcej opcji",
+    "graph_token": "Token do wykreślenia",
+    "graph_interval": "Interwał próbkowania (min)",
+    "graph_points": "Punkty danych",
+    "graph_width": "Szerokość (px)",
+    "graph_height": "Wysokość (px)",
+    "graph_autoscale": "Automatyczna skala Y",
+    "graph_ymin": "Y min",
+    "graph_ymax": "Y maks",
+    "graph_axis": "Pokaż oś wartości (Y)",
+    "graph_xaxis": "Pokaż oś czasu (X)",
+    "graph_value": "Pokaż bieżącą wartość",
+    "graph_band": "Pokaż pasmo nisko/wysoko",
+    "graph_band_low": "Pasmo dolne",
+    "graph_band_high": "Pasmo górne",
+    "graph_band_color": "Kolor pasma",
+    "graph_warn_color": "Kolor poza pasmem",
+    "graph_line_color": "Kolor linii",
+    "graph_axis_color": "Kolor osi",
+    "graph_thick": "Gruba linia (2px)",
+    "graph_boolean": "Logiczny (skok 0/1)",
+    "graph_sec_data": "Dane",
+    "graph_sec_size": "Rozmiar",
+    "graph_sec_scale": "Skala",
+    "graph_sec_axes": "Osie i wartość",
+    "graph_sec_band": "Pasmo",
+    "graph_sec_style": "Styl",
+    "show_grid": "Siatka ekranu",
+    "icon_upload": "Prześlij JPG",
+    "icon_delete": "Usuń",
+    "icon_bad_type": "Ikona musi być obrazem JPG",
+    "icon_uploaded": "Ikona przesłana. Kliknij Zastosuj, aby wysłać układ.",
+    "icon_upload_failed": "Przesyłanie ikony nie powiodło się",
+    "icon_deleted": "Ikona usunięta",
+    "icon_delete_failed": "Usuwanie nie powiodło się"
   },
   "advanced": {
     "display": {
@@ -367,7 +412,8 @@
     "integration_status": {
       "title": "Status integracji"
     },
-    "refresh_button": "Odśwież status"
+    "refresh_button": "Odśwież status",
+    "diagnostics_title": "Diagnostyka"
   },
   "integrations": {
     "ha": {
@@ -430,7 +476,10 @@
       },
       "device_type": "Typ urządzenia",
       "nightscout_url": "Adres URL Nightscout"
-    }
+    },
+    "state_off": "Nieskonfigurowane",
+    "state_ok": "Aktywne",
+    "state_wait": "Skonfigurowane — brak danych"
   },
   "update": {
     "refresh_title": "Odśwież",
@@ -529,7 +578,8 @@
     "save_failed": "Zapisywanie nie powiodło się",
     "saved_restarting": "Zapisano — urządzenie się restartuje…",
     "status_refreshed": "Odświeżono status",
-    "upload_failed": "Przesyłanie nie powiodło się"
+    "upload_failed": "Przesyłanie nie powiodło się",
+    "changes_discarded": "Zmiany odrzucone"
   },
   "files": {
     "delete_selected": "Usuń zaznaczone",
@@ -540,5 +590,9 @@
     "select_all": "Zaznacz wszystko",
     "size": "Rozmiar",
     "title": "Pliki SPIFFS"
+  },
+  "system": {
+    "maintenance_title": "Konserwacja",
+    "danger_title": "Strefa niebezpieczna"
   }
 }

@@ -13,7 +13,7 @@ default-trend.jpg
 default-units.jpg
 default-weather.jpg
 default-wifi-off.jpg
-default.layout
+Default.layout
 Diabetic.layout
 favicon.ico
 ficasso-ampm.jpg
@@ -26,7 +26,7 @@ ficasso-weather.jpg
 ficasso-wifi-off.jpg
 ficasso.jpg
 glucose.jpg
-homeassistant.layout
+HomeAssistant.layout
 index.html
 kablame-ampm.jpg
 kablame-dot.jpg
@@ -77,7 +77,7 @@ robrito-font.jpg
 robrito.jpg
 text-ampm.jpg
 timezone.txt
-weather.layout
+Weather.layout
 wifi-qr.jpg
 css/components.css
 css/forms.css
@@ -96,6 +96,7 @@ i18n/language_sv.json
 js/core.js
 js/forms.js
 js/integrations.js
+js/savebar.js
 js/screen-editor.js
 js/support.js
 js/system.js

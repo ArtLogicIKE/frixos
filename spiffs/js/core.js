@@ -74,8 +74,10 @@ function changedSecret(payload, key, newVal) {
   if (o === undefined || String(o) !== String(newVal)) payload[key] = newVal;
 }
 
+/* Returns true when the save succeeded (or there was nothing to save), so the
+   save bar knows whether to clear its dirty state. */
 async function saveSettings(payload, networkKeys) {
-  if (Object.keys(payload).length === 0) { toast(getMessage('no_changes'), 'ok'); return; }
+  if (Object.keys(payload).length === 0) { toast(getMessage('no_changes'), 'ok'); return true; }
   const res = await apiPostJson('/api/settings', payload);
   const okMsg = res.data && res.data.status === 'ok';
   if (res.ok && okMsg) {
@@ -83,9 +85,10 @@ async function saveSettings(payload, networkKeys) {
     const reboot = (res.data.message || '').toLowerCase().includes('reboot') || (networkKeys || []).some(k => k in payload);
     toast(reboot ? getMessage('saved_restarting') : getMessage('settings_saved'), 'ok');
     if (reboot) { let n = 8; const recheck = () => { if (--n <= 0) location.reload(); else setTimeout(recheck, 1000); }; setTimeout(recheck, 1000); }
-  } else {
-    toast((res.data && res.data.message) || getMessage('save_failed'), 'err');
+    return true;
   }
+  toast((res.data && res.data.message) || getMessage('save_failed'), 'err');
+  return false;
 }
 
 /* ---------- theme (default dark, persisted as p40) ---------- */
@@ -180,7 +183,7 @@ function showTab(id) {
   window.scrollTo(0, 0);
   const active = $('#nav a.active'); if (active) active.scrollIntoView({ inline: 'center', block: 'nearest' });
   if (sectionLoaders[id] && !loadedSections[id]) { loadedSections[id] = true; sectionLoaders[id](); }
-  else if (sectionLoaders[id] && (id === 'status' || id === 'files')) sectionLoaders[id]();
+  else if (sectionLoaders[id] && id === 'status') sectionLoaders[id](); // System tab: live data, refresh on every visit
   updateNavEdges();
 }
 $$('#nav a').forEach(a => a.addEventListener('click', () => showTab(a.dataset.tab)));

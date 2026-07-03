@@ -26,8 +26,10 @@ async function loadStatus() {
   if (el('system_logs')) el('system_logs').value = Array.isArray(d.system_logs) ? d.system_logs.join('\n') : '';
   if (el('ha_status_textarea')) el('ha_status_textarea').value = Array.isArray(d.ha_tokens) ? d.ha_tokens.join('\n') : '';
   window.statusData = d;
+  if (typeof updateIntegrationDots === 'function') updateIntegrationDots();
 }
-sectionLoaders.status = loadStatus;
+/* The System tab hosts status, files, update and restart. */
+sectionLoaders.status = function () { loadStatus(); loadFiles(); };
 el('refreshStatus').addEventListener('click', () => { loadStatus(); toast(getMessage('status_refreshed'), 'ok'); });
 el('supportCopy').addEventListener('click', async () => {
   try { await navigator.clipboard.writeText(JSON.stringify(window.statusData || {}, null, 2)); toast(getMessage('info_copied_clipboard'), 'ok'); }
@@ -45,7 +47,6 @@ async function loadFiles() {
   FILES = (res.data && res.data.files) || [];
   renderFiles();
 }
-sectionLoaders.files = loadFiles;
 function renderFiles() {
   FILES.sort((a, b) => { const r = sortKey === 'size' ? a.size - b.size : a.name.localeCompare(b.name); return sortAsc ? r : -r; });
   el('filesBody').innerHTML = FILES.map(f => `<tr><td class="cbx"><input type="checkbox" class="fcb" data-name="${(f.name || '').replace(/"/g, '&quot;')}"></td><td><a href="/${encodeURIComponent(f.name)}" download>${f.name}</a></td><td class="size">${formatBytes(f.size)}</td></tr>`).join('');
@@ -107,6 +108,20 @@ el('reinstall').addEventListener('click', async () => {
   if (res.data && res.data.status === 'ok') toast(getMessage('reinstall_started'), 'ok');
   else toast((res.data && res.data.message) || getMessage('reinstall_failed'), 'err');
 });
+
+/* ---------- MAINTENANCE ---------- */
+/* The auto-update toggle is a maintenance action: it applies immediately
+   (like the theme switch) instead of going through the save bar. */
+(() => {
+  const sw = bindSwitch('update_firmware', { quiet: true });
+  if (sw) sw.addEventListener('click', async () => {
+    const p39 = sw.classList.contains('on') ? 1 : 0;
+    window.settings.p39 = p39;
+    const res = await apiPostJson('/api/settings', { p39 });
+    if (res.ok && res.data && res.data.status === 'ok') toast(getMessage('settings_saved'), 'ok');
+    else toast(getMessage('save_failed'), 'err');
+  });
+})();
 
 /* ---------- RESTART ---------- */
 const modal = el('resetModal');

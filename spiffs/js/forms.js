@@ -1,5 +1,7 @@
 /* ============================================================
-   forms.js — Settings + Advanced tabs. Depends on core.js.
+   forms.js — Device tab (connection, display, regional) field
+   wiring + the payload collectors consumed by savebar.js.
+   Depends on core.js.
    ============================================================ */
 
 /* ---------- generic UI ---------- */
@@ -16,16 +18,42 @@ $$('.pw .eye').forEach(b => b.addEventListener('click', () => {
   updateEyeAria(b, isVisible);
 }));
 
-function bindSwitch(id) { const g = el(id); if (g) g.addEventListener('click', () => { const on = g.classList.toggle('on'); g.setAttribute('aria-checked', on ? 'true' : 'false'); }); return el(id); }
+/* Toggle switches. Toggling counts as an unsaved change unless the caller
+   opts out (e.g. the auto-update switch, which saves itself immediately). */
+function bindSwitch(id, opts) {
+  const g = el(id);
+  if (g) g.addEventListener('click', () => {
+    const on = g.classList.toggle('on');
+    g.setAttribute('aria-checked', on ? 'true' : 'false');
+    if (!opts || !opts.quiet) { if (window.saveBar) window.saveBar.markDirty(); }
+  });
+  return el(id);
+}
 const swOn = id => el(id) && el(id).classList.contains('on');
 const setSw = (id, on) => { const g = el(id); if (g) { g.classList.toggle('on', !!on); g.setAttribute('aria-checked', !!on ? 'true' : 'false'); } };
-['mirroring', 'fahrenheit', 'hour12', 'update_firmware'].forEach(bindSwitch);
+['mirroring', 'fahrenheit', 'hour12'].forEach(id => bindSwitch(id));
 
 const staticToggle = el('staticToggle'), staticPanel = el('staticPanel');
-staticToggle.addEventListener('click', () => { const on = staticToggle.classList.toggle('on'); staticToggle.setAttribute('aria-checked', on ? 'true' : 'false'); staticPanel.hidden = !on; });
+staticToggle.addEventListener('click', () => {
+  const on = staticToggle.classList.toggle('on');
+  staticToggle.setAttribute('aria-checked', on ? 'true' : 'false');
+  staticPanel.hidden = !on;
+  if (window.saveBar) window.saveBar.markDirty();
+});
+
+/* Brightness sliders show their value live. */
+function bindRangeVal(id) {
+  const r = el(id); if (!r) return;
+  const out = r.parentElement && r.parentElement.querySelector('.range-val');
+  const upd = () => { if (out) out.textContent = r.value + '%'; };
+  r.addEventListener('input', upd);
+  r._updVal = upd; upd();
+}
+['brightness_LED0', 'brightness_LED1'].forEach(bindRangeVal);
+function refreshRangeVals() { ['brightness_LED0', 'brightness_LED1'].forEach(id => { const r = el(id); if (r && r._updVal) r._updVal(); }); }
 
 /* The scrolling message is edited only in the Layout palette (per day/night
-   profile); there is no Settings-tab field for it. */
+   profile); there is no Device-tab field for it. */
 
 /* Only treat the WiFi password as changed when the user actually edits it.
    Without this, a browser/password-manager autofill leaves a value in the
@@ -37,7 +65,7 @@ let wifiPassDirty = false;
 const wifiPass = el('wifi_pass');
 if (wifiPass) wifiPass.addEventListener('input', () => { wifiPassDirty = true; });
 
-/* ---------- SETTINGS ---------- */
+/* ---------- DEVICE: connection / display / regional ---------- */
 async function loadSettings() {
   await loadGroup('group=settings&params=p03,p09');
   delete window.settings.p35; // never keep WiFi password in memory
@@ -57,14 +85,24 @@ async function loadSettings() {
   }
   if (typeof populateSettingsLayoutSelect === 'function') await populateSettingsLayoutSelect();
 }
-sectionLoaders.settings = loadSettings;
 
 const settingsLayoutLoadBtn = el('settingsLayoutLoadBtn');
 if (settingsLayoutLoadBtn) settingsLayoutLoadBtn.addEventListener('click', () => applySettingsLayoutToDevice());
 
-el('saveSettings').addEventListener('click', () => {
+el('hostname').addEventListener('input', () => { if (el('hostname').value.trim()) { el('hostname').removeAttribute('aria-invalid'); el('hostname-err').classList.remove('show'); } });
+
+/* Connection-ish fields whose change triggers a device restart on save. */
+const SETTINGS_NETWORK_KEYS = ['p00', 'p34', 'p35', 'p60', 'p61', 'p62', 'p63'];
+
+/* Diff the Device-tab basics against stored settings. Returns null when
+   validation fails (invalid hostname), an empty object when nothing changed. */
+function collectSettingsPayload() {
   const host = el('hostname');
-  if (!host.value.trim()) { host.setAttribute('aria-invalid', 'true'); el('hostname-err').classList.add('show'); host.focus(); return; }
+  if (!host.value.trim()) {
+    host.setAttribute('aria-invalid', 'true'); el('hostname-err').classList.add('show');
+    showTab('settings'); host.focus();
+    return null;
+  }
   const p = {};
   changed(p, 'p00', host.value.trim());
   changed(p, 'p34', el('wifi_ssid').value);
@@ -73,7 +111,6 @@ el('saveSettings').addEventListener('click', () => {
   changed(p, 'p09', swOn('mirroring') ? 1 : 0);
   changed(p, 'p36', swOn('fahrenheit') ? 1 : 0);
   changed(p, 'p37', swOn('hour12') ? 1 : 0);
-  changed(p, 'p39', swOn('update_firmware') ? 1 : 0);
   const wasStatic = !!(S().p60 && String(S().p60).trim());
   const useStatic = swOn('staticToggle');
   if (useStatic) {
@@ -87,11 +124,10 @@ el('saveSettings').addEventListener('click', () => {
     changed(p, 'p62', '');
     changed(p, 'p63', '');
   }
-  saveSettings(p, ['p00', 'p34', 'p35', 'p60', 'p61', 'p62', 'p63']);
-});
-el('hostname').addEventListener('input', () => { if (el('hostname').value.trim()) { el('hostname').removeAttribute('aria-invalid'); el('hostname-err').classList.remove('show'); } });
+  return p;
+}
 
-/* ---------- ADVANCED ---------- */
+/* ---------- DEVICE: location / brightness (former Advanced tab) ---------- */
 const dimMode = el('dim_mode');
 function applyDim() { el('dimBright').hidden = dimMode.value !== '0'; el('dimTime').hidden = dimMode.value !== '2'; }
 dimMode.addEventListener('change', applyDim);
@@ -107,14 +143,14 @@ async function loadAdvanced() {
   if (s.p21 !== undefined) setVal('lux_threshold', s.p21);
   if (s.p20 !== undefined) setVal('lux_sensitivity', s.p20);
   if (Array.isArray(s.p23)) { setVal('brightness_LED0', s.p23[0]); setVal('brightness_LED1', s.p23[1]); }
+  refreshRangeVals();
   setVal('pwm_frequency', s.p42); setVal('max_power', s.p43);
   if (s.p55 !== undefined) el('dim_start').value = formatMinsToTimeString(s.p55);
   if (s.p56 !== undefined) el('dim_end').value = formatMinsToTimeString(s.p56);
   if (typeof applyDetectedHints === 'function') applyDetectedHints();
 }
-sectionLoaders.advanced = loadAdvanced;
 
-el('saveAdvanced').addEventListener('click', () => {
+function collectAdvancedPayload() {
   const p = {};
   changed(p, 'p17', el('lat').value.trim());
   changed(p, 'p18', el('lon').value.trim());
@@ -132,5 +168,11 @@ el('saveAdvanced').addEventListener('click', () => {
   changed(p, 'p43', parseInt(el('max_power').value, 10) || 0);
   changed(p, 'p55', parseTimeStringToMins(el('dim_start').value));
   changed(p, 'p56', parseTimeStringToMins(el('dim_end').value));
-  saveSettings(p, []); // non-connection settings apply live without reboot
-});
+  return p;
+}
+
+/* The Device tab hosts both the former Settings and Advanced field groups. */
+sectionLoaders.settings = async function () {
+  await loadSettings();
+  await loadAdvanced();
+};

@@ -7,7 +7,9 @@
     "status": "Status",
     "update": "Aktualisieren",
     "restart": "Neustart",
-    "files": "Dateien"
+    "files": "Dateien",
+    "device": "Gerät",
+    "system": "System"
   },
   "common": {
     "save_settings": "Einstellungen speichern",
@@ -25,7 +27,11 @@
     "online": "Online",
     "scroll_tabs_left": "Tabs nach links scrollen",
     "scroll_tabs_right": "Tabs nach rechts scrollen",
-    "select_font": "Schriftart {name} auswählen"
+    "select_font": "Schriftart {name} auswählen",
+    "advanced": "Erweitert",
+    "save": "Speichern",
+    "discard": "Verwerfen",
+    "unsaved_changes": "Nicht gespeicherte Änderungen vorhanden"
   },
   "settings": {
     "connection": {
@@ -184,7 +190,46 @@
     "apply": "Übernehmen",
     "disabled": "Deaktiviert",
     "editor_instructions": "Elemente auf dem 128×128-Display platzieren — Elemente können sich überlappen. Elemente aus der Palette auf das Raster ziehen oder ein platziertes Element zum Verschieben ziehen. Mit den Pfeiltasten das ausgewählte Element verschieben (Umschalt = 10px).",
-    "layout_management": "Layout-Verwaltung"
+    "layout_management": "Layout-Verwaltung",
+    "presets": "Vorlagen",
+    "presets_desc": "Mit einem fertigen Layout starten, unten anpassen und auf Übernehmen drücken.",
+    "presets_none": "Keine Layout-Dateien auf dem Gerät.",
+    "disk_menu": "Datei ▾",
+    "graph_more": "Weitere Optionen",
+    "graph_token": "Darzustellendes Token",
+    "graph_interval": "Abtastintervall (Min.)",
+    "graph_points": "Datenpunkte",
+    "graph_width": "Breite (px)",
+    "graph_height": "Höhe (px)",
+    "graph_autoscale": "Automatische Y-Skala",
+    "graph_ymin": "Y min",
+    "graph_ymax": "Y max",
+    "graph_axis": "Werteachse (Y) anzeigen",
+    "graph_xaxis": "Zeitachse (X) anzeigen",
+    "graph_value": "Aktuellen Wert anzeigen",
+    "graph_band": "Tief-/Hoch-Band anzeigen",
+    "graph_band_low": "Band unten",
+    "graph_band_high": "Band oben",
+    "graph_band_color": "Bandfarbe",
+    "graph_warn_color": "Farbe außerhalb des Bands",
+    "graph_line_color": "Linienfarbe",
+    "graph_axis_color": "Achsenfarbe",
+    "graph_thick": "Dicke Linie (2px)",
+    "graph_boolean": "Boolesch (Stufe 0/1)",
+    "graph_sec_data": "Daten",
+    "graph_sec_size": "Größe",
+    "graph_sec_scale": "Skala",
+    "graph_sec_axes": "Achsen & Wert",
+    "graph_sec_band": "Band",
+    "graph_sec_style": "Stil",
+    "show_grid": "Bildschirmraster",
+    "icon_upload": "JPG hochladen",
+    "icon_delete": "Löschen",
+    "icon_bad_type": "Icon muss ein JPG-Bild sein",
+    "icon_uploaded": "Icon hochgeladen. Auf Übernehmen klicken, um das Layout zu übertragen.",
+    "icon_upload_failed": "Icon-Upload fehlgeschlagen",
+    "icon_deleted": "Icon gelöscht",
+    "icon_delete_failed": "Löschen fehlgeschlagen"
   },
   "advanced": {
     "display": {
@@ -367,7 +412,8 @@
     "integration_status": {
       "title": "Integrationsstatus"
     },
-    "refresh_button": "Status aktualisieren"
+    "refresh_button": "Status aktualisieren",
+    "diagnostics_title": "Diagnose"
   },
   "integrations": {
     "ha": {
@@ -430,7 +476,10 @@
       },
       "device_type": "Gerätetyp",
       "nightscout_url": "Nightscout-URL"
-    }
+    },
+    "state_off": "Nicht konfiguriert",
+    "state_ok": "Aktiv",
+    "state_wait": "Konfiguriert — noch keine Daten"
   },
   "update": {
     "refresh_title": "Aktualisieren",
@@ -529,7 +578,8 @@
     "save_failed": "Speichern fehlgeschlagen",
     "saved_restarting": "Gespeichert — Gerät wird neu gestartet…",
     "status_refreshed": "Status aktualisiert",
-    "upload_failed": "Upload fehlgeschlagen"
+    "upload_failed": "Upload fehlgeschlagen",
+    "changes_discarded": "Änderungen verworfen"
   },
   "files": {
     "delete_selected": "Auswahl löschen",
@@ -540,5 +590,9 @@
     "select_all": "Alle auswählen",
     "size": "Größe",
     "title": "SPIFFS-Dateien"
+  },
+  "system": {
+    "maintenance_title": "Wartung",
+    "danger_title": "Gefahrenzone"
   }
 }

@@ -23,8 +23,36 @@ async function loadIntegrations() {
     }
   }
   initCgmDeviceType();
+  updateIntegrationDots();
 }
 sectionLoaders.integrations = loadIntegrations;
+
+/* ---------- integration status dots ----------
+   Green: configured and the firmware reports active tokens / recent data.
+   Amber: configured but no data reported yet. Gray: not configured.
+   Source: /api/status ha_tokens lines (stable English firmware strings) +
+   the stored settings for the configured check. */
+function updateIntegrationDots() {
+  const lines = (window.statusData && Array.isArray(window.statusData.ha_tokens))
+    ? window.statusData.ha_tokens.join('\n') : '';
+  const s = S();
+  const setDot = (dotId, stateId, configured, activeRe) => {
+    const dot = el(dotId); if (!dot) return;
+    let cls = 'dot off', txt = tr('integrations.state_off', 'Not configured');
+    if (configured) {
+      const active = activeRe.test(lines);
+      cls = active ? 'dot ok' : 'dot warn';
+      txt = active ? tr('integrations.state_ok', 'Active') : tr('integrations.state_wait', 'Configured — no data yet');
+    }
+    dot.className = cls;
+    dot.title = txt;
+    const state = el(stateId);
+    if (state) state.textContent = txt;
+  };
+  setDot('dot-ha', 'state-ha', !!(s.p25 && String(s.p25).trim()), /Home Assistant tokens:\s*[1-9]/);
+  setDot('dot-stock', 'state-stock', !!(s.p28 && String(s.p28).trim()), /Stock \(finnhub\.io\) tokens:\s*[1-9]/);
+  setDot('dot-cgm', 'state-cgm', deriveCgmType() !== 'none', /(Dexcom|FreeStyle Libre|Nightscout) active:/);
+}
 
 /* ---------- CGM device type ----------
    "Device Type" is a UI-only selector; there is no dedicated stored field.
@@ -73,7 +101,8 @@ function initCgmDeviceType() {
   });
 })();
 
-el('saveIntegrations').addEventListener('click', () => {
+/* Diff the Integrations fields against stored settings (for savebar.js). */
+function collectIntegrationsPayload() {
   const p = {};
   const secrets = ['eeprom_ha_token', 'eeprom_stock_key', 'eeprom_glucose_password'];
   for (const [id, key] of Object.entries(INT_MAP)) {
@@ -82,8 +111,8 @@ el('saveIntegrations').addEventListener('click', () => {
       : (e.type === 'number') ? (parseInt(e.value, 10) || 0) : e.value;
     if (secrets.includes(id)) changedSecret(p, key, v); else changed(p, key, v);
   }
-  saveSettings(p, []);
-});
+  return p;
+}
 
 /* ---------- display schedule (Layout editor: time / time_aux slots) ---------- */
 const SLOT_TYPES = [

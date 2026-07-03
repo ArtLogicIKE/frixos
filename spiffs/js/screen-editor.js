@@ -393,6 +393,7 @@ function refreshScreenEditorI18n() {
     renderScreenPalette();
     renderScreenOptions();
     updateScreenStatusLine();
+    renderScreenPresets();
 }
 
 let _screenRectCache = null;
@@ -522,6 +523,11 @@ function getScreenLayoutFileNames() {
     return [...new Set(names)].sort((a, b) => a.localeCompare(b));
 }
 
+// Human-facing name for a .layout file: extension stripped, separators spaced.
+function screenLayoutDisplayName(name) {
+    return name.replace(/\.layout$/i, '').replace(/[-_]/g, ' ');
+}
+
 // Fill a <select> with "Current" (value '') followed by every .layout file on
 // the device. Returns the list of file names. Shared by the layout editor and
 // the Settings > Display dropdown.
@@ -540,7 +546,7 @@ function fillLayoutSelect(selectId) {
     names.forEach(name => {
         const option = document.createElement('option');
         option.value = name;
-        option.textContent = name;
+        option.textContent = screenLayoutDisplayName(name);
         select.appendChild(option);
     });
 
@@ -553,6 +559,47 @@ async function refreshScreenLayoutSelect() {
     const names = fillLayoutSelect('screenLayoutSelect');
     const loadBtn = el('screenLoadSystemBtn');
     if (loadBtn) loadBtn.disabled = names.length === 0;
+}
+
+/* ---------- preset gallery ----------
+   One card per .layout file on the device. Clicking a card loads that layout
+   into the editor (same path as the Load button); the user then presses Apply. */
+async function renderScreenPresets() {
+    const grid = el('screenPresets');
+    if (!grid) return;
+    await ensureScreenSpiffsFiles();
+    const names = getScreenLayoutFileNames();
+    grid.innerHTML = '';
+    if (!names.length) {
+        const d = document.createElement('div');
+        d.className = 'preset-empty';
+        d.textContent = getScreenTranslation('screen.presets_none', 'No layout files on the device.');
+        grid.appendChild(d);
+        return;
+    }
+    names.forEach(name => {
+        const card = document.createElement('div');
+        card.className = 'preset-card';
+        card.setAttribute('role', 'button');
+        card.tabIndex = 0;
+        const pn = document.createElement('div');
+        pn.className = 'pn';
+        pn.textContent = screenLayoutDisplayName(name);
+        card.appendChild(pn);
+        card.title = name; // full filename on hover only
+        const act = async () => {
+            const select = el('screenLayoutSelect');
+            if (select) {
+                if (![...select.options].some(o => o.value === name)) await refreshScreenLayoutSelect();
+                select.value = name;
+            }
+            await loadSystemScreenLayout();
+            $$('#screenPresets .preset-card').forEach(c => c.classList.toggle('sel', c === card));
+        };
+        card.addEventListener('click', act);
+        card.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); act(); } });
+        grid.appendChild(card);
+    });
 }
 
 // Settings > Display "Layout" dropdown: same file list, but selecting a file and
@@ -1659,6 +1706,13 @@ function setupScreenSection() {
     }
 
     document.addEventListener('keydown', onScreenArrowKeyDown);
+
+    // Close the disk dropdown after choosing an action or clicking elsewhere.
+    const diskMenu = document.querySelector('#tab-layout details.menu-dd');
+    if (diskMenu) {
+        document.addEventListener('click', e => { if (!diskMenu.contains(e.target)) diskMenu.open = false; });
+        diskMenu.querySelectorAll('.menu-pop button').forEach(b => b.addEventListener('click', () => { diskMenu.open = false; }));
+    }
 
     renderScreenPalette();
     updateScreenModeButtons();
@@ -2952,6 +3006,10 @@ function renderScreenOptions() {
         const o = ensureScreenGraphOptions(e);
         const T = (k, d) => getNestedTranslation(trans, k) || d;
 
+        // Rows/sections append to `target`: the panel itself for the common
+        // controls, then the "More options" disclosure for expert tuning.
+        let target = opt;
+
         const mkRow = (labelText, control) => {
             const row = document.createElement('div');
             row.className = 'form-group';
@@ -2959,7 +3017,7 @@ function renderScreenOptions() {
             lab.textContent = labelText;
             row.appendChild(lab);
             row.appendChild(control);
-            opt.appendChild(row);
+            target.appendChild(row);
             return control;
         };
         const mkNumber = (labelText, val, min, max, onCh) => {
@@ -2984,7 +3042,7 @@ function renderScreenOptions() {
             const h = document.createElement('div');
             h.className = 'subtitle';
             h.textContent = title;
-            opt.appendChild(h);
+            target.appendChild(h);
         };
 
         // --- Data ---
@@ -3008,9 +3066,24 @@ function renderScreenOptions() {
         mkNumber(T('screen.graph_width', 'Width (px)'), o.gwidth, 60, 80, v => o.gwidth = clamp(parseInt(v, 10) || 80, 60, 80));
         mkNumber(T('screen.graph_height', 'Height (px)'), o.gheight, 28, 36, v => o.gheight = clamp(parseInt(v, 10) || 36, 28, 36));
 
+        // Everything below is expert tuning — folded behind "More options".
+        // The open state survives the re-renders triggered by toggles inside.
+        const adv = document.createElement('details');
+        adv.className = 'adv-box';
+        adv.open = !!window._graphAdvOpen;
+        adv.addEventListener('toggle', () => { window._graphAdvOpen = adv.open; });
+        const advSummary = document.createElement('summary');
+        advSummary.textContent = T('screen.graph_more', 'More options');
+        adv.appendChild(advSummary);
+        const advBody = document.createElement('div');
+        advBody.className = 'adv-body';
+        adv.appendChild(advBody);
+        opt.appendChild(adv);
+        target = advBody;
+
         // --- Scale ---
         mkSection(T('screen.graph_sec_scale', 'Scale'));
-        appendScreenSwitchRow(opt, { id: 'graph_autoscale', label: T('screen.graph_autoscale', 'Auto Y-scale'), checked: !!o.autoscale, onChange: (on) => { o.autoscale = on; renderScreenOptions(); } });
+        appendScreenSwitchRow(target, { id: 'graph_autoscale', label: T('screen.graph_autoscale', 'Auto Y-scale'), checked: !!o.autoscale, onChange: (on) => { o.autoscale = on; renderScreenOptions(); } });
         if (!o.autoscale) {
             mkNumber(T('screen.graph_ymin', 'Y min'), o.y_min, -32767, 32767, v => o.y_min = (v === '' ? null : (parseInt(v, 10) || 0)));
             mkNumber(T('screen.graph_ymax', 'Y max'), o.y_max, -32767, 32767, v => o.y_max = (v === '' ? null : (parseInt(v, 10) || 0)));
@@ -3018,13 +3091,13 @@ function renderScreenOptions() {
 
         // --- Axes & value ---
         mkSection(T('screen.graph_sec_axes', 'Axes & value'));
-        appendScreenSwitchRow(opt, { id: 'graph_axis', label: T('screen.graph_axis', 'Show value axis (Y)'), checked: !!o.show_axis, onChange: (on) => { o.show_axis = on; renderScreenCanvas(); } });
-        appendScreenSwitchRow(opt, { id: 'graph_xaxis', label: T('screen.graph_xaxis', 'Show time axis (X)'), checked: !!o.show_xaxis, onChange: (on) => { o.show_xaxis = on; renderScreenCanvas(); } });
-        appendScreenSwitchRow(opt, { id: 'graph_value', label: T('screen.graph_value', 'Show current value'), checked: !!o.show_value, onChange: (on) => { o.show_value = on; renderScreenCanvas(); } });
+        appendScreenSwitchRow(target, { id: 'graph_axis', label: T('screen.graph_axis', 'Show value axis (Y)'), checked: !!o.show_axis, onChange: (on) => { o.show_axis = on; renderScreenCanvas(); } });
+        appendScreenSwitchRow(target, { id: 'graph_xaxis', label: T('screen.graph_xaxis', 'Show time axis (X)'), checked: !!o.show_xaxis, onChange: (on) => { o.show_xaxis = on; renderScreenCanvas(); } });
+        appendScreenSwitchRow(target, { id: 'graph_value', label: T('screen.graph_value', 'Show current value'), checked: !!o.show_value, onChange: (on) => { o.show_value = on; renderScreenCanvas(); } });
 
         // --- Band ---
         mkSection(T('screen.graph_sec_band', 'Band'));
-        appendScreenSwitchRow(opt, { id: 'graph_band', label: T('screen.graph_band', 'Show low/high band'), checked: !!o.band_on, onChange: (on) => { o.band_on = on; renderScreenOptions(); } });
+        appendScreenSwitchRow(target, { id: 'graph_band', label: T('screen.graph_band', 'Show low/high band'), checked: !!o.band_on, onChange: (on) => { o.band_on = on; renderScreenOptions(); } });
         if (o.band_on) {
             mkNumber(T('screen.graph_band_low', 'Band low'), o.band_low, -32767, 32767, v => o.band_low = (v === '' ? null : (parseInt(v, 10) || 0)));
             mkNumber(T('screen.graph_band_high', 'Band high'), o.band_high, -32767, 32767, v => o.band_high = (v === '' ? null : (parseInt(v, 10) || 0)));
@@ -3037,8 +3110,8 @@ function renderScreenOptions() {
         mkColor(T('screen.graph_line_color', 'Line color'), o.color || '#00dcff', v => o.color = v);
         mkColor(T('screen.background_color', 'Background Color'), o.bg_color || '#000000', v => o.bg_color = v);
         mkColor(T('screen.graph_axis_color', 'Axis color'), o.axis_color || '#787878', v => o.axis_color = v);
-        appendScreenSwitchRow(opt, { id: 'graph_thick', label: T('screen.graph_thick', 'Thick line (2px)'), checked: !!o.thick, onChange: (on) => { o.thick = on; renderScreenCanvas(); } });
-        appendScreenSwitchRow(opt, { id: 'graph_boolean', label: T('screen.graph_boolean', 'Boolean (step 0/1)'), checked: !!o.boolean, onChange: (on) => { o.boolean = on; renderScreenCanvas(); } });
+        appendScreenSwitchRow(target, { id: 'graph_thick', label: T('screen.graph_thick', 'Thick line (2px)'), checked: !!o.thick, onChange: (on) => { o.thick = on; renderScreenCanvas(); } });
+        appendScreenSwitchRow(target, { id: 'graph_boolean', label: T('screen.graph_boolean', 'Boolean (step 0/1)'), checked: !!o.boolean, onChange: (on) => { o.boolean = on; renderScreenCanvas(); } });
     }
 }
 
@@ -3241,5 +3314,6 @@ sectionLoaders.layout = function () {
         setupScreenSection();
     }
     fetchScreenLayout();
+    renderScreenPresets();
 };
 

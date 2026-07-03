@@ -7,7 +7,9 @@
     "status": "Status",
     "update": "Uppdatera",
     "restart": "Starta om",
-    "files": "Filer"
+    "files": "Filer",
+    "device": "Enhet",
+    "system": "System"
   },
   "common": {
     "save_settings": "Spara inställningar",
@@ -25,7 +27,11 @@
     "scroll_tabs_right": "Rulla flikar åt höger",
     "select_font": "Välj typsnittet {name}",
     "show_password": "Visa lösenord",
-    "toggle_theme": "Växla tema"
+    "toggle_theme": "Växla tema",
+    "advanced": "Avancerat",
+    "save": "Spara",
+    "discard": "Förkasta",
+    "unsaved_changes": "Du har osparade ändringar"
   },
   "settings": {
     "connection": {
@@ -184,7 +190,46 @@
     "apply": "Tillämpa",
     "disabled": "Inaktiverad",
     "editor_instructions": "Placera element på 128×128-skärmen — element kan överlappa. Dra objekt från paletten till rutnätet, eller dra ett placerat element för att flytta det. Använd piltangenterna för att finjustera det markerade elementet (Shift = 10px).",
-    "layout_management": "Layouthantering"
+    "layout_management": "Layouthantering",
+    "presets": "Mallar",
+    "presets_desc": "Börja med en färdig layout, anpassa den nedan och tryck på Tillämpa.",
+    "presets_none": "Inga layoutfiler på enheten.",
+    "disk_menu": "Fil ▾",
+    "graph_more": "Fler alternativ",
+    "graph_token": "Token att rita",
+    "graph_interval": "Samplingsintervall (min)",
+    "graph_points": "Datapunkter",
+    "graph_width": "Bredd (px)",
+    "graph_height": "Höjd (px)",
+    "graph_autoscale": "Automatisk Y-skala",
+    "graph_ymin": "Y min",
+    "graph_ymax": "Y max",
+    "graph_axis": "Visa värdeaxel (Y)",
+    "graph_xaxis": "Visa tidsaxel (X)",
+    "graph_value": "Visa aktuellt värde",
+    "graph_band": "Visa låg/hög-band",
+    "graph_band_low": "Band låg",
+    "graph_band_high": "Band hög",
+    "graph_band_color": "Bandfärg",
+    "graph_warn_color": "Färg utanför bandet",
+    "graph_line_color": "Linjefärg",
+    "graph_axis_color": "Axelfärg",
+    "graph_thick": "Tjock linje (2px)",
+    "graph_boolean": "Boolesk (steg 0/1)",
+    "graph_sec_data": "Data",
+    "graph_sec_size": "Storlek",
+    "graph_sec_scale": "Skala",
+    "graph_sec_axes": "Axlar & värde",
+    "graph_sec_band": "Band",
+    "graph_sec_style": "Stil",
+    "show_grid": "Skärmrutnät",
+    "icon_upload": "Ladda upp JPG",
+    "icon_delete": "Ta bort",
+    "icon_bad_type": "Ikonen måste vara en JPG-bild",
+    "icon_uploaded": "Ikon uppladdad. Klicka på Tillämpa för att skicka layouten.",
+    "icon_upload_failed": "Ikonuppladdning misslyckades",
+    "icon_deleted": "Ikon borttagen",
+    "icon_delete_failed": "Borttagning misslyckades"
   },
   "advanced": {
     "display": {
@@ -367,7 +412,8 @@
     "integration_status": {
       "title": "Integrationsstatus"
     },
-    "refresh_button": "Uppdatera status"
+    "refresh_button": "Uppdatera status",
+    "diagnostics_title": "Diagnostik"
   },
   "integrations": {
     "ha": {
@@ -430,7 +476,10 @@
       },
       "device_type": "Enhetstyp",
       "nightscout_url": "Nightscout-URL"
-    }
+    },
+    "state_off": "Inte konfigurerad",
+    "state_ok": "Aktiv",
+    "state_wait": "Konfigurerad — ingen data ännu"
   },
   "update": {
     "refresh_title": "Uppdatera",
@@ -529,7 +578,8 @@
     "save_failed": "Sparandet misslyckades",
     "saved_restarting": "Sparat — enheten startar om…",
     "status_refreshed": "Status uppdaterad",
-    "upload_failed": "Uppladdningen misslyckades"
+    "upload_failed": "Uppladdningen misslyckades",
+    "changes_discarded": "Ändringar förkastade"
   },
   "files": {
     "delete_selected": "Ta bort markerade",
@@ -540,5 +590,9 @@
     "select_all": "Markera alla",
     "size": "Storlek",
     "title": "SPIFFS-filer"
+  },
+  "system": {
+    "maintenance_title": "Underhåll",
+    "danger_title": "Farozon"
   }
 }

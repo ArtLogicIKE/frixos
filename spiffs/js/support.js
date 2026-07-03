@@ -32,13 +32,17 @@ async function tzFromCoords(lat, lon) {
   try { const r = await fetch('/api/timezone?lat=' + encodeURIComponent(lat) + '&lon=' + encodeURIComponent(lon)); if (r.ok) { const d = await r.json(); if (d.posix && isValidPosix(d.posix)) return { iana: d.iana || '', posix: d.posix }; } } catch (e) { }
   return null;
 }
-function setCoords(lat, lon) { el('lat').value = lat; el('lon').value = lon; }
+function setCoords(lat, lon) {
+  el('lat').value = lat; el('lon').value = lon;
+  if (window.saveBar) window.saveBar.markDirty(); // programmatic set: no input event fires
+}
 /* Overwrite the timezone fields for a freshly chosen location. When the device
    could not resolve a zone (tz == null) we clear the now-stale strings rather
    than leaving the previous city's timezone in place. */
 function applyTz(tz) {
   el('timezone').value = tz ? tz.posix : '';
   el('tz_iana').value = (tz && tz.iana) ? tz.iana : '';
+  if (window.saveBar) window.saveBar.markDirty();
 }
 
 async function applyDetectedHints() {

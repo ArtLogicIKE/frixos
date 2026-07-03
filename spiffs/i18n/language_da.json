@@ -7,7 +7,9 @@
     "status": "Status",
     "update": "Opdater",
     "restart": "Genstart",
-    "files": "Filer"
+    "files": "Filer",
+    "device": "Enhed",
+    "system": "System"
   },
   "common": {
     "save_settings": "Gem indstillinger",
@@ -25,7 +27,11 @@
     "scroll_tabs_right": "Rul faner til højre",
     "select_font": "Vælg {name}-skrifttype",
     "show_password": "Vis adgangskode",
-    "toggle_theme": "Skift tema"
+    "toggle_theme": "Skift tema",
+    "advanced": "Avanceret",
+    "save": "Gem",
+    "discard": "Kassér",
+    "unsaved_changes": "Du har ikke-gemte ændringer"
   },
   "settings": {
     "connection": {
@@ -184,7 +190,46 @@
     "apply": "Anvend",
     "disabled": "Deaktiveret",
     "editor_instructions": "Placer elementer på 128×128-skærmen — elementer kan overlappe. Træk elementer fra paletten til gitteret, eller træk et placeret element for at flytte det. Brug piletasterne til at flytte det valgte element (Shift = 10px).",
-    "layout_management": "Layoutstyring"
+    "layout_management": "Layoutstyring",
+    "presets": "Skabeloner",
+    "presets_desc": "Start med et færdigt layout, tilpas det nedenfor og tryk på Anvend.",
+    "presets_none": "Ingen layoutfiler på enheden.",
+    "disk_menu": "Fil ▾",
+    "graph_more": "Flere indstillinger",
+    "graph_token": "Token der skal tegnes",
+    "graph_interval": "Samplingsinterval (min)",
+    "graph_points": "Datapunkter",
+    "graph_width": "Bredde (px)",
+    "graph_height": "Højde (px)",
+    "graph_autoscale": "Automatisk Y-skala",
+    "graph_ymin": "Y min",
+    "graph_ymax": "Y maks",
+    "graph_axis": "Vis værdiakse (Y)",
+    "graph_xaxis": "Vis tidsakse (X)",
+    "graph_value": "Vis aktuel værdi",
+    "graph_band": "Vis lav/høj-bånd",
+    "graph_band_low": "Bånd lav",
+    "graph_band_high": "Bånd høj",
+    "graph_band_color": "Båndfarve",
+    "graph_warn_color": "Farve uden for båndet",
+    "graph_line_color": "Linjefarve",
+    "graph_axis_color": "Aksefarve",
+    "graph_thick": "Tyk linje (2px)",
+    "graph_boolean": "Boolesk (trin 0/1)",
+    "graph_sec_data": "Data",
+    "graph_sec_size": "Størrelse",
+    "graph_sec_scale": "Skala",
+    "graph_sec_axes": "Akser & værdi",
+    "graph_sec_band": "Bånd",
+    "graph_sec_style": "Stil",
+    "show_grid": "Skærmgitter",
+    "icon_upload": "Upload JPG",
+    "icon_delete": "Slet",
+    "icon_bad_type": "Ikonet skal være et JPG-billede",
+    "icon_uploaded": "Ikon uploadet. Klik på Anvend for at sende layoutet.",
+    "icon_upload_failed": "Ikon-upload mislykkedes",
+    "icon_deleted": "Ikon slettet",
+    "icon_delete_failed": "Sletning mislykkedes"
   },
   "advanced": {
     "display": {
@@ -367,7 +412,8 @@
     "integration_status": {
       "title": "Integrationsstatus"
     },
-    "refresh_button": "Opdater status"
+    "refresh_button": "Opdater status",
+    "diagnostics_title": "Diagnostik"
   },
   "integrations": {
     "ha": {
@@ -430,7 +476,10 @@
       },
       "device_type": "Enhedstype",
       "nightscout_url": "Nightscout-URL"
-    }
+    },
+    "state_off": "Ikke konfigureret",
+    "state_ok": "Aktiv",
+    "state_wait": "Konfigureret — ingen data endnu"
   },
   "update": {
     "refresh_title": "Opdater",
@@ -529,7 +578,8 @@
     "save_failed": "Gemning mislykkedes",
     "saved_restarting": "Gemt — enheden genstarter…",
     "status_refreshed": "Status opdateret",
-    "upload_failed": "Upload mislykkedes"
+    "upload_failed": "Upload mislykkedes",
+    "changes_discarded": "Ændringer kasseret"
   },
   "files": {
     "delete_selected": "Slet valgte",
@@ -540,5 +590,9 @@
     "select_all": "Vælg alle",
     "size": "Størrelse",
     "title": "SPIFFS-filer"
+  },
+  "system": {
+    "maintenance_title": "Vedligeholdelse",
+    "danger_title": "Farezone"
   }
 }

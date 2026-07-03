@@ -42,20 +42,16 @@
   <div class="nav-wrap">
     <button class="nav-edge left" id="navLeft" data-i18n-aria-label="common.scroll_tabs_left" aria-label="Scroll tabs left" tabindex="-1">‹</button>
     <nav class="nav" id="nav">
-      <a data-tab="settings" class="active" data-i18n="menu.settings">Settings</a>
-      <a data-tab="advanced" data-i18n="menu.advanced">Advanced</a>
-      <a data-tab="layout" data-i18n="menu.screen">Layout</a>
+      <a data-tab="settings" class="active" data-i18n="menu.device">Device</a>
       <a data-tab="integrations" data-i18n="menu.integrations">Integrations</a>
-      <a data-tab="status" data-i18n="menu.status">Status</a>
-      <a data-tab="files" data-i18n="menu.files">Files</a>
-      <a data-tab="update" data-i18n="menu.update">Update</a>
-      <a data-tab="restart" data-i18n="menu.restart">Restart</a>
+      <a data-tab="layout" data-i18n="menu.screen">Layout</a>
+      <a data-tab="status" data-i18n="menu.system">System</a>
     </nav>
     <button class="nav-edge right" id="navRight" data-i18n-aria-label="common.scroll_tabs_right" aria-label="Scroll tabs right" tabindex="-1">›</button>
   </div>
 
-  <!-- ===================== SETTINGS ===================== -->
-  <section class="tab-page active" id="tab-settings" data-screen-label="Settings">
+  <!-- ===================== DEVICE (settings + everyday advanced) ===================== -->
+  <section class="tab-page active" id="tab-settings" data-screen-label="Device">
     <div class="hero">
       <span class="obj"><img src="logo.jpg" alt=""></span>
       <div class="ht">
@@ -69,14 +65,14 @@
       <div class="ptitle"><h2 data-i18n="settings.connection.title">Connection</h2><span class="rule"></span></div>
       <div class="conn-grid">
         <div class="conn-fields">
-          <div class="field"><label><span data-i18n="settings.connection.wifi_ssid">WiFi SSID</span> <span class="req">*</span></label><input type="text" id="wifi_ssid" autocomplete="off" data-i18n-placeholder="settings.connection.ssid_placeholder" placeholder="Network name"></div>
-          <div class="field"><label><span data-i18n="settings.connection.wifi_password">WiFi password</span> <span class="req">*</span></label>
-            <div class="pw"><input type="password" id="wifi_pass" autocomplete="new-password" data-i18n-placeholder="settings.connection.password_placeholder" placeholder="Leave blank to keep current"><button class="eye" type="button" aria-label="Show password">👁</button></div>
-          </div>
           <div class="field"><label><span data-i18n="settings.connection.hostname">Hostname</span> <span class="req">*</span></label>
             <input type="text" id="hostname" value="frixos" required maxlength="32">
             <div id="hostname-counter" class="counter"></div>
             <span class="err" id="hostname-err" data-i18n="settings.connection.hostname_required">Hostname is required.</span>
+          </div>
+          <div class="field"><label><span data-i18n="settings.connection.wifi_ssid">WiFi SSID</span> <span class="req">*</span></label><input type="text" id="wifi_ssid" autocomplete="off" data-i18n-placeholder="settings.connection.ssid_placeholder" placeholder="Network name"></div>
+          <div class="field"><label><span data-i18n="settings.connection.wifi_password">WiFi password</span> <span class="req">*</span></label>
+            <div class="pw"><input type="password" id="wifi_pass" autocomplete="new-password" data-i18n-placeholder="settings.connection.password_placeholder" placeholder="Leave blank to keep current"><button class="eye" type="button" aria-label="Show password">👁</button></div>
           </div>
         </div>
         <div class="conn-nets">
@@ -86,25 +82,37 @@
         </div>
       </div>
 
-      <div class="staticip">
-        <div class="toggle staticip-head">
-          <div class="tx"><div class="tt"><span data-i18n="settings.connection.static_ip_toggle">Use static IP</span> <span class="req">*</span></div><div class="ts" data-i18n="settings.connection.static_ip_desc">Assign a fixed address instead of DHCP</div></div>
-          <button class="gswitch" id="staticToggle" type="button" role="switch" aria-checked="false" data-i18n-aria-label="settings.connection.static_ip_toggle" aria-label="Use static IP"></button>
-        </div>
-        <div class="staticip-panel" id="staticPanel" hidden>
-          <div class="grid2">
-            <div class="field"><label><span data-i18n="settings.connection.static_ip">IP address</span> <span class="req">*</span></label><input type="text" id="static_ip" inputmode="decimal" placeholder="192.168.1.100"></div>
-            <div class="field"><label><span data-i18n="settings.connection.static_gw">Gateway</span> <span class="req">*</span></label><input type="text" id="static_gw" inputmode="decimal" placeholder="192.168.1.1"></div>
-            <div class="field"><label><span data-i18n="settings.connection.static_nm">Subnet mask</span> <span class="req">*</span></label><input type="text" id="static_nm" inputmode="decimal" placeholder="255.255.255.0"></div>
-            <div class="field"><label><span data-i18n="settings.connection.static_dns_label">DNS servers</span> <span class="req">*</span> <span class="opt" data-i18n="settings.connection.optional">(optional)</span></label>
-              <div class="dns-pair">
-                <div class="dns-f"><span class="dns-b">1</span><input type="text" id="static_dns1" inputmode="decimal" placeholder="8.8.8.8"></div>
-                <div class="dns-f"><span class="dns-b">2</span><input type="text" id="static_dns2" inputmode="decimal" placeholder="8.8.4.4"></div>
+      <details class="adv-box">
+        <summary data-i18n="common.advanced">Advanced</summary>
+        <div class="adv-body">
+          <div class="staticip">
+            <div class="toggle staticip-head">
+              <div class="tx"><div class="tt"><span data-i18n="settings.connection.static_ip_toggle">Use static IP</span> <span class="req">*</span></div><div class="ts" data-i18n="settings.connection.static_ip_desc">Assign a fixed address instead of DHCP</div></div>
+              <button class="gswitch" id="staticToggle" type="button" role="switch" aria-checked="false" data-i18n-aria-label="settings.connection.static_ip_toggle" aria-label="Use static IP"></button>
+            </div>
+            <div class="staticip-panel" id="staticPanel" hidden>
+              <div class="grid2">
+                <div class="field"><label><span data-i18n="settings.connection.static_ip">IP address</span> <span class="req">*</span></label><input type="text" id="static_ip" inputmode="decimal" placeholder="192.168.1.100"></div>
+                <div class="field"><label><span data-i18n="settings.connection.static_gw">Gateway</span> <span class="req">*</span></label><input type="text" id="static_gw" inputmode="decimal" placeholder="192.168.1.1"></div>
+                <div class="field"><label><span data-i18n="settings.connection.static_nm">Subnet mask</span> <span class="req">*</span></label><input type="text" id="static_nm" inputmode="decimal" placeholder="255.255.255.0"></div>
+                <div class="field"><label><span data-i18n="settings.connection.static_dns_label">DNS servers</span> <span class="req">*</span> <span class="opt" data-i18n="settings.connection.optional">(optional)</span></label>
+                  <div class="dns-pair">
+                    <div class="dns-f"><span class="dns-b">1</span><input type="text" id="static_dns1" inputmode="decimal" placeholder="8.8.8.8"></div>
+                    <div class="dns-f"><span class="dns-b">2</span><input type="text" id="static_dns2" inputmode="decimal" placeholder="8.8.4.4"></div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
+
+          <div class="subtitle" data-i18n="advanced.wifi_hours.title">WiFi active hours</div>
+          <div class="time-range">
+            <div class="time-box"><label data-i18n="advanced.wifi_hours.start">Start</label><input type="time" id="wifi_start" value="00:00"></div>
+            <span class="time-arrow">→</span>
+            <div class="time-box"><label data-i18n="advanced.wifi_hours.end">End</label><input type="time" id="wifi_end" value="00:00"></div>
+          </div>
         </div>
-      </div>
+      </details>
       <p class="note left" data-i18n="settings.connection.restart_note">* Changing these connection settings will restart the device.</p>
     </div>
 
@@ -120,26 +128,60 @@
         </div>
       </div>
       <div class="toggle"><div class="tx"><div class="tt" data-i18n="advanced.display.mirror">Mirror display</div></div><button class="gswitch" id="mirroring" type="button" role="switch" aria-checked="false" data-i18n-aria-label="advanced.display.mirror" aria-label="Mirror"></button></div>
+
+      <div class="subtitle" data-i18n="advanced.brightness.title">Projection brightness</div>
+      <div class="grid2">
+        <div class="field"><label data-i18n="advanced.brightness.led_day">Brightness (day)</label>
+          <div class="range-row"><input type="range" id="brightness_LED0" min="1" max="100" value="80"><output class="range-val" for="brightness_LED0">80%</output></div>
+        </div>
+        <div class="field"><label data-i18n="advanced.brightness.led_night">Brightness (night)</label>
+          <div class="range-row"><input type="range" id="brightness_LED1" min="1" max="100" value="25"><output class="range-val" for="brightness_LED1">25%</output></div>
+        </div>
+      </div>
+
+      <details class="adv-box">
+        <summary data-i18n="common.advanced">Advanced</summary>
+        <div class="adv-body">
+          <div class="field"><label data-i18n="advanced.brightness.dimming_mode">Dimming mode</label>
+            <select id="dim_mode">
+              <option value="1" data-i18n="advanced.brightness.dim_mode_full">Always full brightness</option>
+              <option value="0" data-i18n="advanced.brightness.dim_mode_brightness">Based on brightness</option>
+              <option value="2" data-i18n="advanced.brightness.dim_mode_time">Based on time-of-day</option>
+            </select>
+          </div>
+
+          <div id="dimBright" class="dim-sub">
+            <div class="subtitle" data-i18n="advanced.brightness.brightness_dimming">Brightness-based dimming</div>
+            <div class="grid2">
+              <div class="field"><label data-i18n="advanced.brightness.day_threshold">Day threshold (lux)</label><input type="number" id="lux_threshold" step="0.1" min="0" max="500" value="12.0"></div>
+              <div class="field"><label data-i18n="advanced.brightness.light_sensitivity">Sensitivity (lux)</label><input type="number" id="lux_sensitivity" step="0.1" min="0" max="50" value="3.0"></div>
+            </div>
+            <p class="muted-p" data-i18n="advanced.brightness.sensitivity_help">Sensitivity avoids unwanted brightness changes. Dark = Threshold − Sensitivity, Bright = Threshold + Sensitivity.</p>
+          </div>
+
+          <div id="dimTime" class="dim-sub" hidden>
+            <div class="subtitle" data-i18n="advanced.brightness.timeofday_dimming">Time-of-day dimming</div>
+            <div class="time-range">
+              <div class="time-box"><label data-i18n="advanced.brightness.dim_start">Start</label><input type="time" id="dim_start" value="07:00"></div>
+              <span class="time-arrow">→</span>
+              <div class="time-box"><label data-i18n="advanced.brightness.dim_end">End</label><input type="time" id="dim_end" value="22:00"></div>
+            </div>
+          </div>
+
+          <div class="grid2">
+            <div class="field"><label data-i18n="advanced.brightness.pwm_frequency">PWM frequency</label><input type="number" id="pwm_frequency" min="60" max="50000" value="133"></div>
+            <div class="field"><label data-i18n="advanced.brightness.max_power">Max power</label><input type="number" id="max_power" min="1" max="1023" value="1023"></div>
+          </div>
+        </div>
+      </details>
     </div>
 
     <div class="panel">
       <div class="ptitle"><h2 data-i18n="settings.regional.title">Regional</h2><span class="rule"></span></div>
       <div class="toggle"><div class="tx"><div class="tt" data-i18n="settings.regional.us_units">US units</div><div class="ts" data-i18n="settings.regional.us_units_desc">Fahrenheit, mph, inches</div></div><button class="gswitch" id="fahrenheit" type="button" role="switch" aria-checked="false" data-i18n-aria-label="settings.regional.us_units" aria-label="US units"></button></div>
       <div class="toggle"><div class="tx"><div class="tt" data-i18n="settings.regional.hour12">12-hour clock</div><div class="ts" data-i18n="settings.regional.hour12_desc">Display time with AM / PM</div></div><button class="gswitch" id="hour12" type="button" role="switch" aria-checked="false" data-i18n-aria-label="settings.regional.hour12" aria-label="12-hour clock"></button></div>
-    </div>
 
-    <div class="panel">
-      <div class="ptitle"><h2 data-i18n="settings.autoupdate.title">Automatic update</h2><span class="rule"></span></div>
-      <div class="toggle"><div class="tx"><div class="tt" data-i18n="settings.autoupdate.check">Check for firmware updates</div><div class="ts" data-i18n="settings.autoupdate.check_desc">Install new firmware automatically</div></div><button class="gswitch" id="update_firmware" type="button" role="switch" aria-checked="false" data-i18n-aria-label="settings.autoupdate.check" aria-label="Auto update"></button></div>
-    </div>
-
-    <button class="btn block" id="saveSettings" data-i18n="common.save_settings">Save settings</button>
-  </section>
-
-  <!-- ===================== ADVANCED ===================== -->
-  <section class="tab-page" id="tab-advanced" data-screen-label="Advanced">
-    <div class="panel">
-      <div class="ptitle"><h2 data-i18n="advanced.location.title">Location</h2><span class="rule"></span></div>
+      <div class="subtitle" data-i18n="advanced.location.title">Location</div>
       <div class="field"><label data-i18n="advanced.location.city">City</label>
         <div class="city-row">
           <input type="text" id="city_search" data-i18n-placeholder="advanced.location.city_placeholder" placeholder="Search for a city" autocomplete="off" spellcheck="false">
@@ -148,68 +190,106 @@
         </div>
         <span class="hint" id="city-hint"></span>
       </div>
-      <div class="grid2">
-        <div class="field"><label data-i18n="advanced.location.latitude">Latitude</label><input type="text" id="lat" data-i18n-placeholder="advanced.location.lat_placeholder" placeholder="e.g. 40.6892494"></div>
-        <div class="field"><label data-i18n="advanced.location.longitude">Longitude</label><input type="text" id="lon" data-i18n-placeholder="advanced.location.lon_placeholder" placeholder="e.g. -74.0470807"></div>
-      </div>
-      <div class="field"><label data-i18n="advanced.location.timezone_region">Timezone region</label><input type="text" id="tz_iana" data-i18n-placeholder="advanced.location.timezone_region_placeholder" placeholder="e.g. America/New_York"></div>
-      <div class="field"><label data-i18n="advanced.location.timezone_posix">Timezone (POSIX)</label><input type="text" id="timezone" data-i18n-placeholder="advanced.location.timezone_placeholder" placeholder="e.g. EST5EDT,M3.2.0,M11.1.0"></div>
-      <p class="muted-p" data-i18n="advanced.location.help_text">Find POSIX timezones <a href="https://leo.leung.xyz/wiki/Timezone" target="_blank" rel="noopener">here</a>. Lat/Lon only affect weather data.</p>
-    </div>
 
-    <div class="panel">
-      <div class="ptitle"><h2 data-i18n="advanced.wifi_hours.title">WiFi active hours</h2><span class="rule"></span></div>
-      <div class="time-range">
-        <div class="time-box"><label data-i18n="advanced.wifi_hours.start">Start</label><input type="time" id="wifi_start" value="00:00"></div>
-        <span class="time-arrow">→</span>
-        <div class="time-box"><label data-i18n="advanced.wifi_hours.end">End</label><input type="time" id="wifi_end" value="00:00"></div>
-      </div>
+      <details class="adv-box">
+        <summary data-i18n="common.advanced">Advanced</summary>
+        <div class="adv-body">
+          <div class="grid2">
+            <div class="field"><label data-i18n="advanced.location.latitude">Latitude</label><input type="text" id="lat" data-i18n-placeholder="advanced.location.lat_placeholder" placeholder="e.g. 40.6892494"></div>
+            <div class="field"><label data-i18n="advanced.location.longitude">Longitude</label><input type="text" id="lon" data-i18n-placeholder="advanced.location.lon_placeholder" placeholder="e.g. -74.0470807"></div>
+          </div>
+          <div class="field"><label data-i18n="advanced.location.timezone_region">Timezone region</label><input type="text" id="tz_iana" data-i18n-placeholder="advanced.location.timezone_region_placeholder" placeholder="e.g. America/New_York"></div>
+          <div class="field"><label data-i18n="advanced.location.timezone_posix">Timezone (POSIX)</label><input type="text" id="timezone" data-i18n-placeholder="advanced.location.timezone_placeholder" placeholder="e.g. EST5EDT,M3.2.0,M11.1.0"></div>
+          <p class="muted-p" data-i18n="advanced.location.help_text">Find POSIX timezones <a href="https://leo.leung.xyz/wiki/Timezone" target="_blank" rel="noopener">here</a>. Lat/Lon only affect weather data.</p>
+        </div>
+      </details>
     </div>
+  </section>
 
+  <!-- ===================== INTEGRATIONS ===================== -->
+  <section class="tab-page" id="tab-integrations" data-screen-label="Integrations">
     <div class="panel">
-      <div class="ptitle"><h2 data-i18n="advanced.brightness.title">Projection brightness</h2><span class="rule"></span></div>
-      <div class="field"><label data-i18n="advanced.brightness.dimming_mode">Dimming mode</label>
-        <select id="dim_mode">
-          <option value="1" data-i18n="advanced.brightness.dim_mode_full">Always full brightness</option>
-          <option value="0" data-i18n="advanced.brightness.dim_mode_brightness">Based on brightness</option>
-          <option value="2" data-i18n="advanced.brightness.dim_mode_time">Based on time-of-day</option>
+      <div class="ptitle"><h2><span class="dot off" id="dot-cgm"></span><span data-i18n="integrations.glucose_monitors.title">Glucose monitoring</span></h2><span class="rule"></span><span class="int-state" id="state-cgm"></span></div>
+      <div class="field"><label data-i18n="integrations.glucose_monitors.device_type">Device Type</label>
+        <select id="cgm_device_type">
+          <option value="none" data-i18n="common.none">None</option>
+          <option value="dexcom">Dexcom</option>
+          <option value="libre">FreeStyle Libre</option>
+          <option value="nightscout">Nightscout</option>
         </select>
       </div>
-
-      <div id="dimBright" class="dim-sub">
-        <div class="subtitle" data-i18n="advanced.brightness.brightness_dimming">Brightness-based dimming</div>
-        <div class="grid2">
-          <div class="field"><label data-i18n="advanced.brightness.day_threshold">Day threshold (lux)</label><input type="number" id="lux_threshold" step="0.1" min="0" max="500" value="12.0"></div>
-          <div class="field"><label data-i18n="advanced.brightness.light_sensitivity">Sensitivity (lux)</label><input type="number" id="lux_sensitivity" step="0.1" min="0" max="50" value="3.0"></div>
+      <div class="field cgm-field" data-cgm="dexcom libre"><label data-i18n="integrations.glucose_monitors.username">Username</label>
+        <input type="text" id="eeprom_glucose_username" maxlength="64" autocomplete="username" data-i18n-placeholder="integrations.glucose_monitors.username_placeholder" placeholder="Account username">
+        <div id="eeprom_glucose_username-counter" class="counter"></div>
+      </div>
+      <div class="field cgm-field" data-cgm="dexcom libre"><label data-i18n="integrations.glucose_monitors.password">Password</label>
+        <div class="pw"><input type="password" id="eeprom_glucose_password" maxlength="64" autocomplete="current-password" placeholder="••••••••"><button class="eye" type="button" aria-label="Show password">👁</button></div>
+        <div id="eeprom_glucose_password-counter" class="counter"></div>
+      </div>
+      <div class="field cgm-field" data-cgm="dexcom"><label data-i18n="integrations.dexcom.region">Region</label><select id="eeprom_dexcom_region"><option value="0" data-i18n="integrations.dexcom.disabled">Disabled</option><option value="1" data-i18n="integrations.dexcom.us">US</option><option value="2" data-i18n="integrations.dexcom.japan">Japan</option><option value="3" data-i18n="integrations.dexcom.rest_of_world">Rest of World</option></select></div>
+      <div class="field cgm-field" data-cgm="libre"><label data-i18n="integrations.freestyle.region">Region</label><select id="eeprom_libre_region"><option value="0" data-i18n="integrations.freestyle.disabled">Disabled</option><option value="1" data-i18n="integrations.freestyle.united_states">United States</option><option value="2" data-i18n="integrations.freestyle.europe">Europe</option><option value="3" data-i18n="integrations.freestyle.germany">Germany</option><option value="4" data-i18n="integrations.freestyle.france">France</option><option value="5" data-i18n="integrations.freestyle.japan">Japan</option><option value="6" data-i18n="integrations.freestyle.australia">Australia</option><option value="7" data-i18n="integrations.freestyle.global">Global / Rest of World</option></select></div>
+      <div class="field cgm-field" data-cgm="nightscout"><label data-i18n="integrations.glucose_monitors.nightscout_url">Nightscout URL</label>
+        <input type="text" id="eeprom_ns_url" maxlength="100" placeholder="https://your-site.herokuapp.com">
+        <div id="eeprom_ns_url-counter" class="counter"></div>
+      </div>
+      <div class="grid2 cgm-field" data-cgm="dexcom libre nightscout">
+        <div class="field"><label data-i18n="integrations.glucose_monitors.display_unit">Display unit</label><select id="eeprom_glucose_unit"><option value="0">mg/dL</option><option value="1">mmol/L</option></select></div>
+        <div class="field"><label data-i18n="integrations.glucose_monitors.high_threshold">High (mg/dL)</label><input type="number" id="eeprom_glucose_high" min="1" max="400" value="175"></div>
+        <div class="field"><label data-i18n="integrations.glucose_monitors.low_threshold">Low (mg/dL)</label><input type="number" id="eeprom_glucose_low" min="1" max="400" value="70"></div>
+      </div>
+      <details class="adv-box cgm-field" data-cgm="dexcom libre nightscout">
+        <summary data-i18n="common.advanced">Advanced</summary>
+        <div class="adv-body">
+          <div class="grid2">
+            <div class="field"><label data-i18n="integrations.glucose_monitors.refresh_interval">Refresh (min.)</label><input type="number" id="eeprom_glucose_refresh" min="1" max="60" value="5"></div>
+            <div class="field"><label data-i18n="integrations.glucose_monitors.validity_duration">Validity (min.)</label><input type="number" id="glucose_validity_duration" min="10" max="360" value="30"></div>
+          </div>
         </div>
-        <p class="muted-p" data-i18n="advanced.brightness.sensitivity_help">Sensitivity avoids unwanted brightness changes. Dark = Threshold − Sensitivity, Bright = Threshold + Sensitivity.</p>
+      </details>
+    </div>
+      <div class="panel">
+      <div class="ptitle"><h2><span class="dot off" id="dot-ha"></span><span data-i18n="integrations.ha.title">Home Assistant</span></h2><span class="rule"></span><span class="int-state" id="state-ha"></span></div>
+      <div class="field"><label data-i18n="integrations.ha.server_url">Server URL</label>
+        <input type="text" id="eeprom_ha_url" maxlength="200" data-i18n-placeholder="integrations.ha.server_url_placeholder" placeholder="e.g. http://homeassistant.local:8123">
+        <div id="eeprom_ha_url-counter" class="counter"></div>
       </div>
-
-      <div id="dimTime" class="dim-sub" hidden>
-        <div class="subtitle" data-i18n="advanced.brightness.timeofday_dimming">Time-of-day dimming</div>
-        <div class="time-range">
-          <div class="time-box"><label data-i18n="advanced.brightness.dim_start">Start</label><input type="time" id="dim_start" value="07:00"></div>
-          <span class="time-arrow">→</span>
-          <div class="time-box"><label data-i18n="advanced.brightness.dim_end">End</label><input type="time" id="dim_end" value="22:00"></div>
+      <div class="field"><label data-i18n="integrations.ha.token">Long-lived access token</label>
+        <div class="pw"><input type="password" id="eeprom_ha_token" maxlength="255" data-i18n-placeholder="integrations.ha.token_placeholder" placeholder="Paste token"><button class="eye" type="button" aria-label="Show token">👁</button></div>
+        <div id="eeprom_ha_token-counter" class="counter"></div>
+      </div>
+      <details class="adv-box">
+        <summary data-i18n="common.advanced">Advanced</summary>
+        <div class="adv-body">
+          <div class="field"><label data-i18n="integrations.ha.refresh_interval">Refresh (min.)</label><input type="number" id="eeprom_ha_refresh_mins" min="1" max="7200" value="1"></div>
         </div>
-      </div>
-
-      <div class="subtitle" data-i18n="advanced.brightness.led_levels">LED levels (%)</div>
-      <div class="grid2">
-        <div class="field"><label data-i18n="advanced.brightness.led_day">Brightness (day)</label><input type="number" id="brightness_LED0" min="1" max="100" value="80"></div>
-        <div class="field"><label data-i18n="advanced.brightness.led_night">Brightness (night)</label><input type="number" id="brightness_LED1" min="1" max="100" value="25"></div>
-        <div class="field"><label data-i18n="advanced.brightness.pwm_frequency">PWM frequency</label><input type="number" id="pwm_frequency" min="60" max="50000" value="133"></div>
-        <div class="field"><label data-i18n="advanced.brightness.max_power">Max power</label><input type="number" id="max_power" min="1" max="1023" value="1023"></div>
-      </div>
+      </details>
     </div>
 
-    <button class="btn block" id="saveAdvanced" data-i18n="common.save_settings">Save settings</button>
-  </section>
+    <div class="panel">
+      <div class="ptitle"><h2><span class="dot off" id="dot-stock"></span><span data-i18n="integrations.stock.title">Stock quotes</span></h2><span class="rule"></span><span class="int-state" id="state-stock"></span></div>
+      <p class="muted-p tight" data-i18n="integrations.stock.via">Via Finnhub.io.</p>
+      <div class="field"><label data-i18n="integrations.stock.api_key">API key</label>
+        <div class="pw"><input type="password" id="eeprom_stock_key" maxlength="64" data-i18n-placeholder="integrations.stock.api_key_placeholder" placeholder="Paste API key"><button class="eye" type="button" aria-label="Show key">👁</button></div>
+        <div id="eeprom_stock_key-counter" class="counter"></div>
+      </div>
+      <details class="adv-box">
+        <summary data-i18n="common.advanced">Advanced</summary>
+        <div class="adv-body">
+          <div class="field"><label data-i18n="integrations.stock.refresh_interval">Refresh (min.)</label><input type="number" id="eeprom_stock_refresh_mins" min="1" max="1440" value="5"></div>
+        </div>
+      </details>
+    </div>
+
+</section>
 
   <!-- ===================== LAYOUT (screen editor) ===================== -->
   <section class="tab-page" id="tab-layout" data-screen-label="Layout">
     <div class="panel">
       <div class="ptitle"><h2 data-i18n="screen.title">Layout</h2><span class="rule"></span></div>
+
+      <div class="subtitle" data-i18n="screen.presets">Presets</div>
+      <p class="muted-p" data-i18n="screen.presets_desc">Start from a ready-made layout, then customize it below and press Apply.</p>
+      <div id="screenPresets" class="preset-grid"></div>
 
       <p class="muted-p" data-i18n="screen.editor_instructions">Place elements on the 128×128 display — elements can overlap. Drag items from the palette onto the grid, or drag a placed element to move it. Use the arrow keys to nudge the selected element (Shift = 10px).</p>
 
@@ -218,8 +298,13 @@
         <div class="city-row">
           <select id="screenLayoutSelect"><option value="" data-i18n="common.current">Current</option></select>
           <button type="button" class="btn sm ghost" id="screenLoadSystemBtn" data-i18n="common.load">Load</button>
-          <button type="button" class="btn sm ghost" id="screenReadFromFileBtn" data-i18n="screen.read_from_file">Load from disk</button>
-          <button type="button" class="btn sm ghost" id="screenSaveToFileBtn" data-i18n="screen.save_to_file">Save to disk</button>
+          <details class="menu-dd">
+            <summary class="btn sm ghost" data-i18n="screen.disk_menu">Disk ▾</summary>
+            <div class="menu-pop">
+              <button type="button" class="btn sm ghost" id="screenReadFromFileBtn" data-i18n="screen.read_from_file">Load from disk</button>
+              <button type="button" class="btn sm ghost" id="screenSaveToFileBtn" data-i18n="screen.save_to_file">Save to disk</button>
+            </div>
+          </details>
         </div>
         <input type="file" id="screenLayoutFileInput" accept=".layout,application/json" hidden>
       </div>
@@ -251,94 +336,8 @@
     </div>
   </section>
 
-  <!-- ===================== INTEGRATIONS ===================== -->
-  <section class="tab-page" id="tab-integrations" data-screen-label="Integrations">
-    <div class="panel">
-      <div class="ptitle"><h2 data-i18n="integrations.ha.title">Home Assistant</h2><span class="rule"></span></div>
-      <div class="field"><label data-i18n="integrations.ha.server_url">Server URL</label>
-        <input type="text" id="eeprom_ha_url" maxlength="200" data-i18n-placeholder="integrations.ha.server_url_placeholder" placeholder="e.g. http://homeassistant.local:8123">
-        <div id="eeprom_ha_url-counter" class="counter"></div>
-      </div>
-      <div class="field"><label data-i18n="integrations.ha.token">Long-lived access token</label>
-        <div class="pw"><input type="password" id="eeprom_ha_token" maxlength="255" data-i18n-placeholder="integrations.ha.token_placeholder" placeholder="Paste token"><button class="eye" type="button" aria-label="Show token">👁</button></div>
-        <div id="eeprom_ha_token-counter" class="counter"></div>
-      </div>
-      <div class="field"><label data-i18n="integrations.ha.refresh_interval">Refresh (min.)</label><input type="number" id="eeprom_ha_refresh_mins" min="1" max="7200" value="1"></div>
-    </div>
-
-    <div class="panel">
-      <div class="ptitle"><h2 data-i18n="integrations.stock.title">Stock quotes</h2><span class="rule"></span></div>
-      <p class="muted-p tight" data-i18n="integrations.stock.via">Via Finnhub.io.</p>
-      <div class="field"><label data-i18n="integrations.stock.api_key">API key</label>
-        <div class="pw"><input type="password" id="eeprom_stock_key" maxlength="64" data-i18n-placeholder="integrations.stock.api_key_placeholder" placeholder="Paste API key"><button class="eye" type="button" aria-label="Show key">👁</button></div>
-        <div id="eeprom_stock_key-counter" class="counter"></div>
-      </div>
-      <div class="field"><label data-i18n="integrations.stock.refresh_interval">Refresh (min.)</label><input type="number" id="eeprom_stock_refresh_mins" min="1" max="1440" value="5"></div>
-    </div>
-
-    <div class="panel">
-      <div class="ptitle"><h2 data-i18n="integrations.glucose_monitors.title">Glucose monitoring</h2><span class="rule"></span></div>
-      <div class="grid2">
-        <div class="field"><label data-i18n="integrations.glucose_monitors.refresh_interval">Refresh (min.)</label><input type="number" id="eeprom_glucose_refresh" min="1" max="60" value="5"></div>
-        <div class="field"><label data-i18n="integrations.glucose_monitors.display_unit">Display unit</label><select id="eeprom_glucose_unit"><option value="0">mg/dL</option><option value="1">mmol/L</option></select></div>
-        <div class="field"><label data-i18n="integrations.glucose_monitors.high_threshold">High (mg/dL)</label><input type="number" id="eeprom_glucose_high" min="1" max="400" value="175"></div>
-        <div class="field"><label data-i18n="integrations.glucose_monitors.low_threshold">Low (mg/dL)</label><input type="number" id="eeprom_glucose_low" min="1" max="400" value="70"></div>
-      </div>
-      <div class="field"><label data-i18n="integrations.glucose_monitors.validity_duration">Validity (min.)</label><input type="number" id="glucose_validity_duration" min="10" max="360" value="30"></div>
-      <div class="subtitle" data-i18n="integrations.glucose_monitors.cgm_device_title">CGM device</div>
-      <div class="field"><label data-i18n="integrations.glucose_monitors.device_type">Device Type</label>
-        <select id="cgm_device_type">
-          <option value="none" data-i18n="common.none">None</option>
-          <option value="dexcom">Dexcom</option>
-          <option value="libre">FreeStyle Libre</option>
-          <option value="nightscout">Nightscout</option>
-        </select>
-      </div>
-      <div class="field cgm-field" data-cgm="dexcom libre"><label data-i18n="integrations.glucose_monitors.username">Username</label>
-        <input type="text" id="eeprom_glucose_username" maxlength="64" autocomplete="username" data-i18n-placeholder="integrations.glucose_monitors.username_placeholder" placeholder="Account username">
-        <div id="eeprom_glucose_username-counter" class="counter"></div>
-      </div>
-      <div class="field cgm-field" data-cgm="dexcom libre"><label data-i18n="integrations.glucose_monitors.password">Password</label>
-        <div class="pw"><input type="password" id="eeprom_glucose_password" maxlength="64" autocomplete="current-password" placeholder="••••••••"><button class="eye" type="button" aria-label="Show password">👁</button></div>
-        <div id="eeprom_glucose_password-counter" class="counter"></div>
-      </div>
-      <div class="field cgm-field" data-cgm="dexcom"><label data-i18n="integrations.dexcom.region">Region</label><select id="eeprom_dexcom_region"><option value="0" data-i18n="integrations.dexcom.disabled">Disabled</option><option value="1" data-i18n="integrations.dexcom.us">US</option><option value="2" data-i18n="integrations.dexcom.japan">Japan</option><option value="3" data-i18n="integrations.dexcom.rest_of_world">Rest of World</option></select></div>
-      <div class="field cgm-field" data-cgm="libre"><label data-i18n="integrations.freestyle.region">Region</label><select id="eeprom_libre_region"><option value="0" data-i18n="integrations.freestyle.disabled">Disabled</option><option value="1" data-i18n="integrations.freestyle.united_states">United States</option><option value="2" data-i18n="integrations.freestyle.europe">Europe</option><option value="3" data-i18n="integrations.freestyle.germany">Germany</option><option value="4" data-i18n="integrations.freestyle.france">France</option><option value="5" data-i18n="integrations.freestyle.japan">Japan</option><option value="6" data-i18n="integrations.freestyle.australia">Australia</option><option value="7" data-i18n="integrations.freestyle.global">Global / Rest of World</option></select></div>
-      <div class="field cgm-field" data-cgm="nightscout"><label data-i18n="integrations.glucose_monitors.nightscout_url">Nightscout URL</label>
-        <input type="text" id="eeprom_ns_url" maxlength="100" placeholder="https://your-site.herokuapp.com">
-        <div id="eeprom_ns_url-counter" class="counter"></div>
-      </div>
-    </div>
-
-    <button class="btn block" id="saveIntegrations" data-i18n="common.save_settings">Save settings</button>
-  </section>
-
-  <!-- ===================== STATUS ===================== -->
-  <section class="tab-page" id="tab-status" data-screen-label="Status">
-    <div class="panel">
-      <div class="ptitle"><h2 data-i18n="status.support.heading">Support</h2><span class="rule"></span></div>
-      <p class="muted-p" data-i18n="status.support.desc">Share device diagnostics with our team to help troubleshoot.</p>
-      <div class="btn-row">
-        <button class="btn sm" id="supportEmail" data-i18n="status.support.send_email">Send email</button>
-        <button class="btn sm ghost" id="supportCopy" data-i18n="status.support.copy_clipboard">Copy to clipboard</button>
-      </div>
-      <p class="muted-p" style="margin-top:12px" data-i18n="status.support.email_hint">If email doesn't open, copy the info and send it to <a href="mailto:support@buyfrixos.com">support@buyfrixos.com</a>.</p>
-    </div>
-
-    <div class="panel">
-      <div class="ptitle"><h2 data-i18n="status.sensor.title">Sensor data</h2><span class="rule"></span></div>
-      <div class="info-grid">
-        <div class="info"><div class="l" data-i18n="status.sensor.light_level">Light level (lux)</div><div class="v" id="lux">-</div></div>
-        <div class="info"><div class="l" data-i18n="status.sensor.last_time_update">Last time update</div><div class="v" id="last_time_update">-</div></div>
-        <div class="info"><div class="l" data-i18n="status.sensor.timezone">Timezone</div><div class="v" id="timezone_val">-</div></div>
-        <div class="info"><div class="l" data-i18n="status.sensor.moon_phase">Moon phase</div><div class="v" id="moon_status">-</div></div>
-        <div class="info"><div class="l" data-i18n="status.sensor.last_weather_update">Last weather update</div><div class="v" id="last_weather_update">-</div></div>
-        <div class="info"><div class="l" data-i18n="status.sensor.latitude">Latitude</div><div class="v" id="latitude">-</div></div>
-        <div class="info"><div class="l" data-i18n="status.sensor.longitude">Longitude</div><div class="v" id="longitude">-</div></div>
-        <div class="info"><div class="l" data-i18n="status.sensor.uptime">Uptime</div><div class="v" id="uptime">-</div></div>
-      </div>
-    </div>
-
+  <!-- ===================== SYSTEM (status + maintenance + danger zone) ===================== -->
+  <section class="tab-page" id="tab-status" data-screen-label="System">
     <div class="panel">
       <div class="ptitle"><h2 data-i18n="status.system.title">System information</h2><span class="rule"></span></div>
       <div class="info-grid">
@@ -358,82 +357,110 @@
     </div>
 
     <div class="panel">
-      <div class="ptitle"><h2 data-i18n="status.logs.title">System logs</h2><span class="rule"></span></div>
-      <textarea class="logbox" id="system_logs" readonly></textarea>
-    </div>
-
-    <div class="panel">
-      <div class="ptitle"><h2 data-i18n="status.integration_status.title">Integration status</h2><span class="rule"></span></div>
-      <textarea class="logbox" id="ha_status_textarea" readonly></textarea>
-    </div>
-
-    <button class="btn block" id="refreshStatus" data-i18n="status.refresh_button">Refresh status</button>
-  </section>
-
-  <!-- ===================== FILES ===================== -->
-  <section class="tab-page" id="tab-files" data-screen-label="Files">
-    <div class="panel">
-      <div class="ptitle"><h2 data-i18n="files.title">SPIFFS files</h2><span class="rule"></span></div>
-      <p class="muted-p" data-i18n="files.description">Manage files stored on the device filesystem.</p>
-      <div class="btn-row" style="margin-bottom:14px">
-        <button class="btn sm ghost" id="filesRefresh">↻ <span data-i18n="files.refresh">Refresh</span></button>
-        <button class="btn sm ghost" id="filesRename" disabled data-i18n="files.rename">Rename</button>
-        <button class="btn sm danger" id="filesDelete" disabled data-i18n="files.delete_selected">Delete selected</button>
+      <div class="ptitle"><h2 data-i18n="status.sensor.title">Sensor data</h2><span class="rule"></span></div>
+      <div class="info-grid">
+        <div class="info"><div class="l" data-i18n="status.sensor.light_level">Light level (lux)</div><div class="v" id="lux">-</div></div>
+        <div class="info"><div class="l" data-i18n="status.sensor.last_time_update">Last time update</div><div class="v" id="last_time_update">-</div></div>
+        <div class="info"><div class="l" data-i18n="status.sensor.timezone">Timezone</div><div class="v" id="timezone_val">-</div></div>
+        <div class="info"><div class="l" data-i18n="status.sensor.moon_phase">Moon phase</div><div class="v" id="moon_status">-</div></div>
+        <div class="info"><div class="l" data-i18n="status.sensor.last_weather_update">Last weather update</div><div class="v" id="last_weather_update">-</div></div>
+        <div class="info"><div class="l" data-i18n="status.sensor.latitude">Latitude</div><div class="v" id="latitude">-</div></div>
+        <div class="info"><div class="l" data-i18n="status.sensor.longitude">Longitude</div><div class="v" id="longitude">-</div></div>
+        <div class="info"><div class="l" data-i18n="status.sensor.uptime">Uptime</div><div class="v" id="uptime">-</div></div>
       </div>
-      <div class="tbl-wrap">
-        <table class="files">
-          <thead><tr>
-            <th class="cbx"><input type="checkbox" id="selAll" data-i18n-aria-label="files.select_all" aria-label="Select all"></th>
-            <th><button data-sort="name"><span class="th-label" data-i18n="files.filename">Filename</span><span class="th-arrow"> ↑</span></button></th>
-            <th class="size"><button data-sort="size"><span class="th-label" data-i18n="files.size">Size</span><span class="th-arrow"></span></button></th>
-          </tr></thead>
-          <tbody id="filesBody"></tbody>
-        </table>
-      </div>
-      <p class="note left" id="filesSummary"></p>
+      <button class="btn sm ghost" id="refreshStatus" style="margin-top:14px" data-i18n="status.refresh_button">Refresh status</button>
     </div>
-  </section>
 
-  <!-- ===================== UPDATE ===================== -->
-  <section class="tab-page" id="tab-update" data-screen-label="Update">
     <div class="panel">
-      <div class="ptitle"><h2 data-i18n="update.reinstall_title">Reinstall</h2><span class="rule"></span></div>
+      <div class="ptitle"><h2 data-i18n="status.diagnostics_title">Diagnostics</h2><span class="rule"></span></div>
+      <p class="muted-p" data-i18n="status.support.desc">Share device diagnostics with our team to help troubleshoot.</p>
+      <div class="btn-row">
+        <button class="btn sm" id="supportEmail" data-i18n="status.support.send_email">Send email</button>
+        <button class="btn sm ghost" id="supportCopy" data-i18n="status.support.copy_clipboard">Copy to clipboard</button>
+      </div>
+      <p class="muted-p" style="margin-top:12px" data-i18n="status.support.email_hint">If email doesn't open, copy the info and send it to <a href="mailto:support@buyfrixos.com">support@buyfrixos.com</a>.</p>
+
+      <details class="adv-box">
+        <summary data-i18n="status.logs.title">System logs</summary>
+        <div class="adv-body">
+          <textarea class="logbox" id="system_logs" readonly></textarea>
+        </div>
+      </details>
+      <details class="adv-box">
+        <summary data-i18n="status.integration_status.title">Integration status</summary>
+        <div class="adv-body">
+          <textarea class="logbox" id="ha_status_textarea" readonly></textarea>
+        </div>
+      </details>
+    </div>
+
+    <div class="panel">
+      <div class="ptitle"><h2 data-i18n="system.maintenance_title">Maintenance</h2><span class="rule"></span></div>
+      <div class="toggle"><div class="tx"><div class="tt" data-i18n="settings.autoupdate.check">Check for firmware updates</div><div class="ts" data-i18n="settings.autoupdate.check_desc">Install new firmware automatically</div></div><button class="gswitch" id="update_firmware" type="button" role="switch" aria-checked="false" data-i18n-aria-label="settings.autoupdate.check" aria-label="Auto update"></button></div>
       <p class="muted-p" data-i18n="update.refresh_description">Re-download and install the current firmware and files (SPIFFS).</p>
-      <button class="btn ghost" id="reinstall" data-i18n="update.reinstall_button">Reinstall current firmware</button>
-    </div>
-
-    <div class="panel">
-      <div class="ptitle"><h2 data-i18n="update.title">Upload firmware / files</h2><span class="rule"></span></div>
-      <p class="muted-p" data-i18n="update.upload_desc">Your device installs new firmware automatically. Use this only if support asked you to install a specific build, or to upload a custom font.</p>
-      <div class="field"><label data-i18n="common.file">File</label><input type="file" id="fwFile"></div>
-      <button class="btn block" id="uploadBtn" disabled data-i18n="update.upload_button">Upload file</button>
-      <div class="progress-wrap" id="progressWrap" style="display:none">
-        <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
-        <div class="progress-txt" id="progressTxt">0%</div>
+      <div class="btn-row">
+        <button class="btn sm ghost" id="reinstall" data-i18n="update.reinstall_button">Reinstall current firmware</button>
+        <button class="btn sm danger" id="restartBtn" data-i18n="restart.button">Restart device</button>
       </div>
+      <p class="muted-p" style="margin-top:10px" data-i18n="restart.description">Restart your Frixos device. It will be unavailable for a short moment while it reboots.</p>
     </div>
 
-    <div class="panel">
-      <div class="ptitle"><h2 data-i18n="update.firmware_instructions_title">Firmware update</h2><span class="rule"></span></div>
-      <ol class="steps">
-        <li data-i18n="update.firmware_step1">Choose the firmware file (.bin) from your computer.</li>
-        <li data-i18n="update.firmware_step2">Press “Upload file” to start the update.</li>
-        <li data-i18n="update.firmware_step3">Wait for completion — don't power off or disconnect the device.</li>
-        <li data-i18n="update.firmware_step4">The device restarts automatically when done.</li>
-      </ol>
-      <div class="callout" data-i18n="update.firmware_warning"><b>Warning</b> — uploading incorrect firmware may stop the device from working. Use only the firmware built for your model.</div>
+    <div class="panel danger-panel">
+      <details class="adv-box danger-box">
+        <summary data-i18n="system.danger_title">Danger zone</summary>
+        <div class="adv-body">
+          <div class="subtitle" data-i18n="update.title">Upload firmware / files</div>
+          <p class="muted-p" data-i18n="update.upload_desc">Your device installs new firmware automatically. Use this only if support asked you to install a specific build, or to upload a custom font.</p>
+          <div class="field"><label data-i18n="common.file">File</label><input type="file" id="fwFile"></div>
+          <button class="btn block" id="uploadBtn" disabled data-i18n="update.upload_button">Upload file</button>
+          <div class="progress-wrap" id="progressWrap" style="display:none">
+            <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+            <div class="progress-txt" id="progressTxt">0%</div>
+          </div>
+          <details class="adv-box">
+            <summary data-i18n="update.firmware_instructions_title">Firmware update</summary>
+            <div class="adv-body">
+              <ol class="steps">
+                <li data-i18n="update.firmware_step1">Choose the firmware file (.bin) from your computer.</li>
+                <li data-i18n="update.firmware_step2">Press “Upload file” to start the update.</li>
+                <li data-i18n="update.firmware_step3">Wait for completion — don't power off or disconnect the device.</li>
+                <li data-i18n="update.firmware_step4">The device restarts automatically when done.</li>
+              </ol>
+            </div>
+          </details>
+          <div class="callout" data-i18n="update.firmware_warning"><b>Warning</b> — uploading incorrect firmware may stop the device from working. Use only the firmware built for your model.</div>
+
+          <div class="subtitle" data-i18n="files.title">SPIFFS files</div>
+          <p class="muted-p" data-i18n="files.description">Manage files stored on the device filesystem.</p>
+          <div class="btn-row" style="margin-bottom:14px">
+            <button class="btn sm ghost" id="filesRefresh">↻ <span data-i18n="files.refresh">Refresh</span></button>
+            <button class="btn sm ghost" id="filesRename" disabled data-i18n="files.rename">Rename</button>
+            <button class="btn sm danger" id="filesDelete" disabled data-i18n="files.delete_selected">Delete selected</button>
+          </div>
+          <div class="tbl-wrap">
+            <table class="files">
+              <thead><tr>
+                <th class="cbx"><input type="checkbox" id="selAll" data-i18n-aria-label="files.select_all" aria-label="Select all"></th>
+                <th><button data-sort="name"><span class="th-label" data-i18n="files.filename">Filename</span><span class="th-arrow"> ↑</span></button></th>
+                <th class="size"><button data-sort="size"><span class="th-label" data-i18n="files.size">Size</span><span class="th-arrow"></span></button></th>
+              </tr></thead>
+              <tbody id="filesBody"></tbody>
+            </table>
+          </div>
+          <p class="note left" id="filesSummary"></p>
+        </div>
+      </details>
     </div>
   </section>
 
-  <!-- ===================== RESTART ===================== -->
-  <section class="tab-page" id="tab-restart" data-screen-label="Restart">
-    <div class="panel">
-      <div class="ptitle"><h2 data-i18n="restart.title">Device reset</h2><span class="rule"></span></div>
-      <p class="muted-p" data-i18n="restart.description">Restart your Frixos device. It will be unavailable for a short moment while it reboots.</p>
-      <button class="btn danger block" id="restartBtn" data-i18n="restart.button">Restart device</button>
-    </div>
-  </section>
+</div>
 
+<div class="savebar" id="saveBar" hidden>
+  <span class="savebar-txt" data-i18n="common.unsaved_changes">You have unsaved changes</span>
+  <div class="savebar-actions">
+    <button class="btn sm ghost" id="discardBtn" data-i18n="common.discard">Discard</button>
+    <button class="btn sm" id="saveAllBtn" data-i18n="common.save">Save</button>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -456,6 +483,7 @@
 <script src="js/integrations.js"></script>
 <script src="js/system.js"></script>
 <script src="js/support.js"></script>
+<script src="js/savebar.js"></script>
 <script src="js/screen-editor.js"></script>
 </body>
 </html>

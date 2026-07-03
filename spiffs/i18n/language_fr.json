@@ -7,7 +7,9 @@
     "status": "Statut",
     "update": "Mise à jour",
     "restart": "Redémarrer",
-    "files": "Fichiers"
+    "files": "Fichiers",
+    "device": "Appareil",
+    "system": "Système"
   },
   "common": {
     "save_settings": "Enregistrer les paramètres",
@@ -25,7 +27,11 @@
     "scroll_tabs_right": "Faire défiler les onglets vers la droite",
     "select_font": "Sélectionner la police {name}",
     "show_password": "Afficher le mot de passe",
-    "toggle_theme": "Changer de thème"
+    "toggle_theme": "Changer de thème",
+    "advanced": "Avancé",
+    "save": "Enregistrer",
+    "discard": "Ignorer",
+    "unsaved_changes": "Modifications non enregistrées"
   },
   "settings": {
     "connection": {
@@ -184,7 +190,46 @@
     "apply": "Appliquer",
     "disabled": "Désactivé",
     "editor_instructions": "Placez les éléments sur l'écran 128×128 — les éléments peuvent se chevaucher. Faites glisser les éléments de la palette vers la grille, ou faites glisser un élément placé pour le déplacer. Utilisez les touches fléchées pour ajuster l'élément sélectionné (Maj = 10px).",
-    "layout_management": "Gestion des dispositions"
+    "layout_management": "Gestion des dispositions",
+    "presets": "Modèles",
+    "presets_desc": "Partez d'une disposition prête à l'emploi, personnalisez-la ci-dessous puis appuyez sur Appliquer.",
+    "presets_none": "Aucun fichier de disposition sur l'appareil.",
+    "disk_menu": "Fichier ▾",
+    "graph_more": "Plus d'options",
+    "graph_token": "Jeton à tracer",
+    "graph_interval": "Intervalle d'échantillonnage (min)",
+    "graph_points": "Points de données",
+    "graph_width": "Largeur (px)",
+    "graph_height": "Hauteur (px)",
+    "graph_autoscale": "Échelle Y automatique",
+    "graph_ymin": "Y min",
+    "graph_ymax": "Y max",
+    "graph_axis": "Afficher l'axe des valeurs (Y)",
+    "graph_xaxis": "Afficher l'axe du temps (X)",
+    "graph_value": "Afficher la valeur actuelle",
+    "graph_band": "Afficher la bande basse/haute",
+    "graph_band_low": "Bande basse",
+    "graph_band_high": "Bande haute",
+    "graph_band_color": "Couleur de la bande",
+    "graph_warn_color": "Couleur hors bande",
+    "graph_line_color": "Couleur de la ligne",
+    "graph_axis_color": "Couleur des axes",
+    "graph_thick": "Ligne épaisse (2px)",
+    "graph_boolean": "Booléen (palier 0/1)",
+    "graph_sec_data": "Données",
+    "graph_sec_size": "Taille",
+    "graph_sec_scale": "Échelle",
+    "graph_sec_axes": "Axes et valeur",
+    "graph_sec_band": "Bande",
+    "graph_sec_style": "Style",
+    "show_grid": "Grille d'écran",
+    "icon_upload": "Téléverser un JPG",
+    "icon_delete": "Supprimer",
+    "icon_bad_type": "L'icône doit être une image JPG",
+    "icon_uploaded": "Icône téléversée. Cliquez sur Appliquer pour envoyer la disposition.",
+    "icon_upload_failed": "Échec du téléversement de l'icône",
+    "icon_deleted": "Icône supprimée",
+    "icon_delete_failed": "Échec de la suppression"
   },
   "advanced": {
     "display": {
@@ -367,7 +412,8 @@
     "integration_status": {
       "title": "Statut des intégrations"
     },
-    "refresh_button": "Actualiser le statut"
+    "refresh_button": "Actualiser le statut",
+    "diagnostics_title": "Diagnostic"
   },
   "integrations": {
     "ha": {
@@ -430,7 +476,10 @@
       },
       "device_type": "Type d'appareil",
       "nightscout_url": "URL Nightscout"
-    }
+    },
+    "state_off": "Non configuré",
+    "state_ok": "Actif",
+    "state_wait": "Configuré — pas encore de données"
   },
   "update": {
     "refresh_title": "Actualiser",
@@ -529,7 +578,8 @@
     "save_failed": "Échec de l'enregistrement",
     "saved_restarting": "Enregistré — redémarrage de l'appareil…",
     "status_refreshed": "Statut actualisé",
-    "upload_failed": "Échec du téléchargement"
+    "upload_failed": "Échec du téléchargement",
+    "changes_discarded": "Modifications ignorées"
   },
   "files": {
     "delete_selected": "Supprimer la sélection",
@@ -540,5 +590,9 @@
     "select_all": "Tout sélectionner",
     "size": "Taille",
     "title": "Fichiers SPIFFS"
+  },
+  "system": {
+    "maintenance_title": "Maintenance",
+    "danger_title": "Zone de danger"
   }
 }

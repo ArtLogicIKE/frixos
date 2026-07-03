@@ -18,12 +18,16 @@ el('scanBtn').addEventListener('click', async () => {
 });
 
 const bars = pct => { const lv = Math.max(1, Math.min(4, Math.ceil((pct || 0) / 25))); return '<span class="sig s' + lv + '"><i></i><i></i><i></i><i></i></span>'; };
+/* SSIDs are attacker-controlled (anyone can broadcast one) — escape before
+   they touch innerHTML. */
+const escHtml = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 function renderNets(nets) {
   if (!nets.length) { el('netlist').innerHTML = '<div class="net-empty">' + tr('settings.wifi.no_networks', 'No networks found.') + '</div>'; return; }
   nets.sort((a, b) => (b.signal_strength || 0) - (a.signal_strength || 0));
-  el('netlist').innerHTML = nets.map(n => `<div class="net" data-ssid="${(n.ssid || '').replace(/"/g, '&quot;')}">${n.requires_password ? '<span class="lock"></span>' : ''}<span class="nm">${n.ssid || ''}</span><span class="meta">${bars(n.signal_strength)}</span></div>`).join('');
+  el('netlist').innerHTML = nets.map(n => `<div class="net" data-ssid="${escHtml(n.ssid || '')}">${n.requires_password ? '<span class="lock"></span>' : ''}<span class="nm">${escHtml(n.ssid || '')}</span><span class="meta">${bars(n.signal_strength)}</span></div>`).join('');
   $$('#netlist .net').forEach(node => node.addEventListener('click', () => {
     $$('#netlist .net').forEach(x => x.classList.remove('sel')); node.classList.add('sel');
     el('wifi_ssid').value = node.dataset.ssid; el('wifi_pass').focus();
+    if (window.saveBar) window.saveBar.markDirty(); // programmatic set: no input event fires
   }));
 }

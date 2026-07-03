@@ -101,3 +101,20 @@ input[type=file]::file-selector-button{ font-family:var(--ui); font-size:12.5px;
   .time-arrow{ padding-bottom:11px; }
 }
 .dim-sub{ margin-top:2px; }
+
+/* ---------- ADVANCED DISCLOSURE (progressive disclosure box) ---------- */
+details.adv-box{ margin-top:14px; border-radius:16px; border:1px solid var(--hairline-soft); background:var(--net-bg); }
+details.adv-box > summary{ list-style:none; cursor:pointer; padding:12px 14px; font-size:11px; font-weight:600;
+  letter-spacing:.1em; text-transform:uppercase; color:var(--muted); display:flex; align-items:center; gap:8px;
+  user-select:none; transition:color .2s; }
+details.adv-box > summary::-webkit-details-marker{ display:none; }
+details.adv-box > summary::before{ content:"▸"; font-size:11px; transition:transform .2s; }
+details.adv-box[open] > summary::before{ transform:rotate(90deg); }
+details.adv-box > summary:hover{ color:var(--ink); }
+details.adv-box > .adv-body{ padding:6px 14px 16px; border-top:1px solid var(--hairline-soft); }
+details.adv-box > .adv-body > .subtitle:first-child{ border-top:none; padding-top:6px; margin-top:0; }
+
+/* ---------- RANGE SLIDERS (brightness) ---------- */
+.range-row{ display:flex; align-items:center; gap:12px; }
+.range-row input[type=range]{ flex:1; accent-color:var(--cyan); cursor:pointer; }
+.range-val{ font-family:var(--mono); font-size:12px; color:var(--ink-2); min-width:44px; text-align:right; }

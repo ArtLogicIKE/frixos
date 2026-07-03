@@ -7,7 +7,9 @@
     "status": "Estado",
     "update": "Actualizar",
     "restart": "Reiniciar",
-    "files": "Archivos"
+    "files": "Archivos",
+    "device": "Dispositivo",
+    "system": "Sistema"
   },
   "common": {
     "save_settings": "Guardar Configuración",
@@ -25,7 +27,11 @@
     "online": "En línea",
     "scroll_tabs_left": "Desplazar pestañas a la izquierda",
     "scroll_tabs_right": "Desplazar pestañas a la derecha",
-    "select_font": "Seleccionar fuente {name}"
+    "select_font": "Seleccionar fuente {name}",
+    "advanced": "Avanzado",
+    "save": "Guardar",
+    "discard": "Descartar",
+    "unsaved_changes": "Tienes cambios sin guardar"
   },
   "settings": {
     "connection": {
@@ -184,7 +190,46 @@
     "apply": "Aplicar",
     "disabled": "Desactivado",
     "editor_instructions": "Coloque elementos en la pantalla de 128×128 — los elementos pueden superponerse. Arrastre elementos de la paleta a la cuadrícula, o arrastre un elemento colocado para moverlo. Use las teclas de flecha para ajustar el elemento seleccionado (Mayús = 10px).",
-    "layout_management": "Gestión de diseños"
+    "layout_management": "Gestión de diseños",
+    "presets": "Plantillas",
+    "presets_desc": "Empieza con un diseño listo, personalízalo abajo y pulsa Aplicar.",
+    "presets_none": "No hay archivos de diseño en el dispositivo.",
+    "disk_menu": "Archivo ▾",
+    "graph_more": "Más opciones",
+    "graph_token": "Token a graficar",
+    "graph_interval": "Intervalo de muestreo (min)",
+    "graph_points": "Puntos de datos",
+    "graph_width": "Ancho (px)",
+    "graph_height": "Alto (px)",
+    "graph_autoscale": "Escala Y automática",
+    "graph_ymin": "Y mín",
+    "graph_ymax": "Y máx",
+    "graph_axis": "Mostrar eje de valores (Y)",
+    "graph_xaxis": "Mostrar eje de tiempo (X)",
+    "graph_value": "Mostrar valor actual",
+    "graph_band": "Mostrar banda baja/alta",
+    "graph_band_low": "Banda baja",
+    "graph_band_high": "Banda alta",
+    "graph_band_color": "Color de la banda",
+    "graph_warn_color": "Color fuera de banda",
+    "graph_line_color": "Color de línea",
+    "graph_axis_color": "Color de los ejes",
+    "graph_thick": "Línea gruesa (2px)",
+    "graph_boolean": "Booleano (escalón 0/1)",
+    "graph_sec_data": "Datos",
+    "graph_sec_size": "Tamaño",
+    "graph_sec_scale": "Escala",
+    "graph_sec_axes": "Ejes y valor",
+    "graph_sec_band": "Banda",
+    "graph_sec_style": "Estilo",
+    "show_grid": "Cuadrícula de pantalla",
+    "icon_upload": "Subir JPG",
+    "icon_delete": "Eliminar",
+    "icon_bad_type": "El icono debe ser una imagen JPG",
+    "icon_uploaded": "Icono subido. Pulsa Aplicar para enviar el diseño.",
+    "icon_upload_failed": "Error al subir el icono",
+    "icon_deleted": "Icono eliminado",
+    "icon_delete_failed": "Error al eliminar"
   },
   "advanced": {
     "display": {
@@ -367,7 +412,8 @@
     "integration_status": {
       "title": "Estado de integraciones"
     },
-    "refresh_button": "Actualizar Estado"
+    "refresh_button": "Actualizar Estado",
+    "diagnostics_title": "Diagnóstico"
   },
   "integrations": {
     "ha": {
@@ -430,7 +476,10 @@
       },
       "device_type": "Tipo de dispositivo",
       "nightscout_url": "URL de Nightscout"
-    }
+    },
+    "state_off": "Sin configurar",
+    "state_ok": "Activo",
+    "state_wait": "Configurado — aún sin datos"
   },
   "update": {
     "refresh_title": "Actualizar",
@@ -529,7 +578,8 @@
     "save_failed": "Error al guardar",
     "saved_restarting": "Guardado — reiniciando el dispositivo…",
     "status_refreshed": "Estado actualizado",
-    "upload_failed": "Error al subir"
+    "upload_failed": "Error al subir",
+    "changes_discarded": "Cambios descartados"
   },
   "files": {
     "delete_selected": "Eliminar seleccionados",
@@ -540,5 +590,9 @@
     "select_all": "Seleccionar todo",
     "size": "Tamaño",
     "title": "Archivos SPIFFS"
+  },
+  "system": {
+    "maintenance_title": "Mantenimiento",
+    "danger_title": "Zona de peligro"
   }
 }
