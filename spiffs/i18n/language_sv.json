@@ -365,6 +365,10 @@
       "token_cgm_time": "Tid för senaste CGM-mätning, t.ex. 12:01em (kräver aktiv CGM-integration)",
       "tokens_note": "Obs: Tokens är skiftlägeskänsliga och måste vara inom hakparenteser.",
       "default_message": "Standardmeddelande: [device].local/ [greeting] [day], [date] [mon], nu [temp] idag [high]-[low], fukt. [hum], sol [rise]-[set]"
+    },
+    "night_font": {
+      "title": "Natttypsnitt",
+      "desc": "Välj typsnittet för klockan på natten. Detta uppdaterar Natt-layouten och tillämpar den direkt."
     }
   },
   "status": {
@@ -577,7 +581,8 @@
     "status_refreshed": "Status uppdaterad",
     "upload_failed": "Uppladdningen misslyckades",
     "changes_discarded": "Ändringar förkastade",
-    "wifi_not_connected": "Wi-Fi är inte anslutet."
+    "wifi_not_connected": "Wi-Fi är inte anslutet.",
+    "night_font_applied": "Natttypsnitt tillämpat."
   },
   "files": {
     "delete_selected": "Ta bort markerade",

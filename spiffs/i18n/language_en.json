@@ -365,6 +365,10 @@
       "token_cgm_time": "Time of latest CGM measurement, e.g. 12:01pm (needs active CGM integration)",
       "tokens_note": "Note: Tokens are case-sensitive and must be enclosed in square brackets.",
       "default_message": "Default message: [device].local/ [greeting] [day], [date] [mon], now [temp] today [high]-[low], hum. [hum], sun [rise]-[set]"
+    },
+    "night_font": {
+      "title": "Night font",
+      "desc": "Pick the font used for the clock at night. This updates the Night layout and applies it right away."
     }
   },
   "status": {
@@ -587,7 +591,8 @@
     "upload_failed": "Upload failed",
     "device_restarting_short": "Device restarting…",
     "changes_discarded": "Changes discarded",
-    "wifi_not_connected": "Wi-Fi is not connected."
+    "wifi_not_connected": "Wi-Fi is not connected.",
+    "night_font_applied": "Night font applied."
   },
   "system": {
     "maintenance_title": "Maintenance",

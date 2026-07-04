@@ -365,6 +365,10 @@
       "token_cgm_time": "Heure de la dernière mesure CGM, p.ex. 12:01apr. (nécessite une intégration CGM active)",
       "tokens_note": "Remarque: Les jetons sont sensibles à la casse et doivent être placés entre crochets.",
       "default_message": "Message par défaut: [device].local/ [greeting] [day], [date] [mon], maintenant [temp] aujourd'hui [high]-[low], hum. [hum], soleil [rise]-[set]"
+    },
+    "night_font": {
+      "title": "Police de nuit",
+      "desc": "Choisissez la police de l’horloge la nuit. Cela met à jour la disposition Nuit et l’applique aussitôt."
     }
   },
   "status": {
@@ -577,7 +581,8 @@
     "status_refreshed": "Statut actualisé",
     "upload_failed": "Échec du téléchargement",
     "changes_discarded": "Modifications ignorées",
-    "wifi_not_connected": "Le Wi-Fi n’est pas connecté."
+    "wifi_not_connected": "Le Wi-Fi n’est pas connecté.",
+    "night_font_applied": "Police de nuit appliquée."
   },
   "files": {
     "delete_selected": "Supprimer la sélection",

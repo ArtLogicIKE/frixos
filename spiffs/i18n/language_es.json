@@ -365,6 +365,10 @@
       "token_cgm_time": "Hora de la última medición CGM, ej. 12:01p.m. (requiere integración CGM activa)",
       "tokens_note": "Nota: Los tokens distinguen entre mayúsculas y minúsculas y deben estar entre corchetes.",
       "default_message": "Mensaje predeterminado: [device].local/ [greeting] [day], [date] [mon], ahora [temp] hoy [high]-[low], hum. [hum], sol [rise]-[set]"
+    },
+    "night_font": {
+      "title": "Fuente nocturna",
+      "desc": "Elige la fuente del reloj por la noche. Esto actualiza el diseño Nocturno y lo aplica de inmediato."
     }
   },
   "status": {
@@ -577,7 +581,8 @@
     "status_refreshed": "Estado actualizado",
     "upload_failed": "Error al subir",
     "changes_discarded": "Cambios descartados",
-    "wifi_not_connected": "El Wi-Fi no está conectado."
+    "wifi_not_connected": "El Wi-Fi no está conectado.",
+    "night_font_applied": "Fuente nocturna aplicada."
   },
   "files": {
     "delete_selected": "Eliminar seleccionados",

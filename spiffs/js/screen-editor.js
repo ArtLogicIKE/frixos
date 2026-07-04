@@ -2512,6 +2512,80 @@ async function appendScreenFontSamples(container, selectedFont, fontLayoutKey) {
     container.appendChild(wrap);
 }
 
+/* ---------- Night-font shortcut (Device > Display) ----------
+   A beginner-friendly control that changes only the night layout's clock
+   font: it loads the current screen layout, sets night_font, and saves it
+   to the device (same effect as picking a Night font in the Layout editor
+   and pressing Apply) - without making the user open the editor. */
+async function applyNightFontShortcut(font, box, grid) {
+    if (!window.screenLayout || !window.screenLayout.profiles) {
+        await fetchScreenLayout(); // populate window.screenLayout from the device
+    }
+    if (!window.screenLayout) {
+        toast(getMessage('error_saving_settings'), 'err');
+        return;
+    }
+    window.screenLayout.night_font = font;
+    window.screenLayout.version = SCREEN_LAYOUT_VERSION;
+    ensureScreenLayoutMeta(window.screenLayout);
+    ensureScreenProfileShape(window.screenLayout.profiles.day);
+    ensureScreenProfileShape(window.screenLayout.profiles.night);
+    grid.querySelectorAll('.screen-font-sample-box').forEach(b => b.classList.toggle('selected', b === box));
+    try {
+        const body = encodeScreenLayoutBinary(window.screenLayout);
+        const resp = await fetch('/api/screen', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/octet-stream' },
+            body
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (resp.ok && data && data.status === 'ok') {
+            if (window.settings) window.settings.p05 = font; // keep the mirrored setting in sync
+            toast(getMessage('night_font_applied'), 'ok');
+        } else {
+            toast(getMessage('error_saving_settings'), 'err');
+        }
+    } catch (e) {
+        console.error('Night font apply failed:', e);
+        toast(getMessage('error_saving_unknown'), 'err');
+    }
+}
+
+async function renderNightFontShortcut() {
+    const host = el('nightFontSamples');
+    if (!host || host.dataset.rendered) return;
+    host.dataset.rendered = '1';
+    await ensureScreenSpiffsFiles();
+    if (!window.screenLayout || !window.screenLayout.profiles) {
+        await fetchScreenLayout();
+    }
+    const current = (window.screenLayout && window.screenLayout.night_font) || 'bold';
+    const grid = document.createElement('div');
+    grid.className = 'screen-font-samples-grid';
+    SCREEN_TIME_FONTS.forEach(font => {
+        const box = document.createElement('button');
+        box.type = 'button';
+        box.className = 'screen-font-sample-box' + (font === current ? ' selected' : '');
+        const name = document.createElement('div');
+        name.className = 'screen-font-sample-name';
+        name.textContent = font.charAt(0).toUpperCase() + font.slice(1);
+        box.appendChild(name);
+        box.appendChild(createFontSamplePreview(font));
+        box.addEventListener('click', () => applyNightFontShortcut(font, box, grid));
+        grid.appendChild(box);
+    });
+    host.innerHTML = '';
+    host.appendChild(grid);
+}
+
+function initNightFontShortcut() {
+    const box = el('nightFontBox');
+    if (!box || box.dataset.wired) return;
+    box.dataset.wired = '1';
+    // Render the samples lazily the first time the section is expanded.
+    box.addEventListener('toggle', () => { if (box.open) renderNightFontShortcut(); });
+}
+
 function appendScreenTokenButtons(container, textarea) {
     const tokenWrap = document.createElement('div');
     tokenWrap.className = 'message-tokens screen-message-tokens';
