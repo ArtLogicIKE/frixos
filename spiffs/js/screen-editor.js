@@ -554,11 +554,10 @@ function fillLayoutSelect(selectId) {
     return names;
 }
 
-async function refreshScreenLayoutSelect() {
+async function refreshScreenLayoutFiles() {
+    // The Presets gallery (renderScreenPresets) is now the only layout picker;
+    // this just makes sure the SPIFFS file list is fresh before it renders.
     await ensureScreenSpiffsFiles(true);
-    const names = fillLayoutSelect('screenLayoutSelect');
-    const loadBtn = el('screenLoadSystemBtn');
-    if (loadBtn) loadBtn.disabled = names.length === 0;
 }
 
 /* ---------- preset gallery ----------
@@ -588,12 +587,7 @@ async function renderScreenPresets() {
         card.appendChild(pn);
         card.title = name; // full filename on hover only
         const act = async () => {
-            const select = el('screenLayoutSelect');
-            if (select) {
-                if (![...select.options].some(o => o.value === name)) await refreshScreenLayoutSelect();
-                select.value = name;
-            }
-            await loadSystemScreenLayout();
+            await loadSystemScreenLayout(name);
             $$('#screenPresets .preset-card').forEach(c => c.classList.toggle('sel', c === card));
         };
         card.addEventListener('click', act);
@@ -1671,7 +1665,6 @@ function setupScreenSection() {
     const btnDay = el('screenModeDay');
     const btnNight = el('screenModeNight');
     const saveBtn = el('screenSaveBtn');
-    const loadSystemBtn = el('screenLoadSystemBtn');
     const copyBtn = el('screenCopyBtn');
     const saveToFileBtn = el('screenSaveToFileBtn');
     const readFromFileBtn = el('screenReadFromFileBtn');
@@ -1680,7 +1673,6 @@ function setupScreenSection() {
     if (btnDay) btnDay.addEventListener('click', () => setScreenMode('day'));
     if (btnNight) btnNight.addEventListener('click', () => setScreenMode('night'));
     if (saveBtn) saveBtn.addEventListener('click', saveScreenLayout);
-    if (loadSystemBtn) loadSystemBtn.addEventListener('click', loadSystemScreenLayout);
     if (copyBtn) copyBtn.addEventListener('click', copyScreenLayoutToOtherMode);
     if (saveToFileBtn) saveToFileBtn.addEventListener('click', saveScreenLayoutToFile);
     if (readFromFileBtn) readFromFileBtn.addEventListener('click', () => layoutFileInput && layoutFileInput.click());
@@ -1706,13 +1698,6 @@ function setupScreenSection() {
     }
 
     document.addEventListener('keydown', onScreenArrowKeyDown);
-
-    // Close the disk dropdown after choosing an action or clicking elsewhere.
-    const diskMenu = document.querySelector('#tab-layout details.menu-dd');
-    if (diskMenu) {
-        document.addEventListener('click', e => { if (!diskMenu.contains(e.target)) diskMenu.open = false; });
-        diskMenu.querySelectorAll('.menu-pop button').forEach(b => b.addEventListener('click', () => { diskMenu.open = false; }));
-    }
 
     renderScreenPalette();
     updateScreenModeButtons();
@@ -2045,7 +2030,7 @@ function renderScreenPalette() {
 
 async function fetchScreenLayout() {
     try {
-        await refreshScreenLayoutSelect();
+        await refreshScreenLayoutFiles();
         const [settingsResp, response] = await Promise.all([
             fetchSettingsJson('/api/settings?params=p08,p24,p50,p48,p49,p57,p58,p59', {
                 fallbackUrl: '/api/settings'
@@ -2223,13 +2208,9 @@ function saveScreenLayoutToFile() {
     showStatus(getMessage('layout_saved_to_file'), 'success');
 }
 
-async function loadSystemScreenLayout() {
-    const select = el('screenLayoutSelect');
-    const loadBtn = el('screenLoadSystemBtn');
-    const filename = select && select.value;
-    if (!filename) return; // "Current" selected -> editor already shows it
+async function loadSystemScreenLayout(filename) {
+    if (!filename) return;
     try {
-        toggleLoading(loadBtn, true);
         const response = await fetch('/' + encodeURIComponent(filename));
         if (!response.ok) {
             showStatus(getMessage('layout_read_invalid'), 'error');
@@ -2245,8 +2226,6 @@ async function loadSystemScreenLayout() {
     } catch (error) {
         console.error('Error loading system layout:', error);
         showStatus(getMessage('layout_read_invalid'), 'error');
-    } finally {
-        toggleLoading(loadBtn, false);
     }
 }
 

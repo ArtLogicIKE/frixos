@@ -290,24 +290,15 @@
       <div class="subtitle" data-i18n="screen.presets">Presets</div>
       <p class="muted-p" data-i18n="screen.presets_desc">Start from a ready-made layout, then customize it below and press Apply.</p>
       <div id="screenPresets" class="preset-grid"></div>
-
-      <p class="muted-p" data-i18n="screen.editor_instructions">Place elements on the 128×128 display — elements can overlap. Drag items from the palette onto the grid, or drag a placed element to move it. Use the arrow keys to nudge the selected element (Shift = 10px).</p>
-
       <div class="layout-mgmt">
-        <div class="subtitle" data-i18n="screen.layout_management">Layout management</div>
         <div class="city-row">
-          <select id="screenLayoutSelect"><option value="" data-i18n="common.current">Current</option></select>
-          <button type="button" class="btn sm ghost" id="screenLoadSystemBtn" data-i18n="common.load">Load</button>
-          <details class="menu-dd">
-            <summary class="btn sm ghost" data-i18n="screen.disk_menu">Disk ▾</summary>
-            <div class="menu-pop">
-              <button type="button" class="btn sm ghost" id="screenReadFromFileBtn" data-i18n="screen.read_from_file">Load from disk</button>
-              <button type="button" class="btn sm ghost" id="screenSaveToFileBtn" data-i18n="screen.save_to_file">Save to disk</button>
-            </div>
-          </details>
+          <button type="button" class="btn sm ghost" id="screenReadFromFileBtn" data-i18n="screen.read_from_file">Load from File</button>
+          <button type="button" class="btn sm ghost" id="screenSaveToFileBtn" data-i18n="screen.save_to_file">Save to File</button>
         </div>
         <input type="file" id="screenLayoutFileInput" accept=".layout,application/json" hidden>
       </div>
+
+      <p class="muted-p" data-i18n="screen.editor_instructions">Place elements on the 128×128 display — elements can overlap. Drag items from the palette onto the grid, or drag a placed element to move it. Use the arrow keys to nudge the selected element (Shift = 10px).</p>
 
       <div class="layout-toolbar">
         <div class="seg" role="group" data-i18n-aria-label="screen.day_night_aria" aria-label="Day / Night">
