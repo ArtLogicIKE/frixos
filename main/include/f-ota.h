@@ -13,8 +13,12 @@
 #include "freertos/task.h"
 #include "freertos/semphr.h"
 
-// Update server configuration
+// Update server configuration. The #ifndef guard lets a test build override
+// the server without touching source (e.g. -DUPDATE_SERVER_BASE=...).
+// Single source of truth - f-wifi.c (timezone lookups) uses this too.
+#ifndef UPDATE_SERVER_BASE
 #define UPDATE_SERVER_BASE "http://update.artlogic.gr:8080"
+#endif
 #define UPDATE_CHECK_INTERVAL (8 * 3600) // 8 hours in seconds
 #define UPDATE_TIMEOUT_MS 30000 // 30 seconds timeout
 #define MAX_RETRIES 1

@@ -83,8 +83,6 @@ static int weather_retry_attempts = 0;
 #define WEATHER_RETRY_DELAY_MS (30 * 1000) // 30 seconds
 #define WEATHER_MAX_RETRIES 2
 
-#define UPDATE_SERVER_BASE "http://update.artlogic.gr:8080"
-
 void str_replace_char(char *str, char find, char replace);
 
 // Add these global variables at the top with other globals
