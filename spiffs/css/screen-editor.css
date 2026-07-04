@@ -125,8 +125,12 @@
 .palette-items {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    /* Uniform rows so the 5-row cap below is exact (swatch 50 + 2-line label + padding) */
+    grid-auto-rows: 92px;
     gap: 8px;
     margin-top: 10px;
+    /* Show 5 rows, scroll the rest */
+    max-height: calc(5 * 92px + 4 * 8px);
     overflow-y: auto;
     align-content: start;
 }
