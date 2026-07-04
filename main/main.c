@@ -36,9 +36,12 @@
 #include "nvs_flash.h"
 #include "nvs.h"
 #include "esp_timer.h"
+#include "f-manifest.h"
 
-// Boot fail count for auto-rescue mode (3 failed boots -> rescue once)
+// Boot fail count for auto-rescue mode (3 failed boots -> rescue once).
+// While OTA writes SPIFFS the bar is raised - see check_boot_fail_count().
 #define BOOT_FAIL_THRESHOLD 3
+#define BOOT_FAIL_THRESHOLD_DURING_OTA 9
 #define BOOT_SUCCESS_DELAY_SEC 10
 #define NVS_BOOT_NAMESPACE "frixos"
 #define NVS_BOOT_FAIL_KEY "boot_fail_count"
@@ -578,7 +581,15 @@ static void check_boot_fail_count(void)
   nvs_set_u8(h, NVS_BOOT_FAIL_KEY, fail_count);
   nvs_commit(h);
 
-  if (fail_count > BOOT_FAIL_THRESHOLD) // at least BOOT_FAIL_THRESHOLD failed boots, next one resets settings
+  // While an OTA/self-heal is writing SPIFFS, crash-reboots are expected and
+  // the interrupted update resumes safely (files are hash-verified, finished
+  // ones are skipped). Raise the rescue bar so those crashes don't wipe the
+  // user's settings; keep a higher ceiling as the bricking-loop safety valve.
+  uint8_t threshold = manifest_get_ota_in_progress()
+                          ? BOOT_FAIL_THRESHOLD_DURING_OTA
+                          : BOOT_FAIL_THRESHOLD;
+
+  if (fail_count > threshold) // at least threshold failed boots, next one resets settings
   {
     rescue_mode_this_boot = 1;
     ESP_LOGW(TAG, "Auto-rescue: %u failed boots, entering rescue mode (reset settings except WiFi)", (unsigned)fail_count);
@@ -587,12 +598,13 @@ static void check_boot_fail_count(void)
   }
   else
   {
-    ESP_LOGI(TAG, "Boot fail count: %u/%u", (unsigned)fail_count, (unsigned)BOOT_FAIL_THRESHOLD);
+    ESP_LOGI(TAG, "Boot fail count: %u/%u", (unsigned)fail_count, (unsigned)threshold);
   }
   nvs_close(h);
 }
 
-/** Clear boot fail count on successful boot. Called by 120s success timer. */
+/** Clear boot fail count on successful boot.
+ *  Called by the BOOT_SUCCESS_DELAY_SEC one-shot timer armed at startup. */
 static void clear_boot_fail_count(void)
 {
   nvs_handle_t h;

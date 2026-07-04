@@ -17,6 +17,9 @@
 
 #include "cJSON.h"
 #include <dirent.h>
+#include <sys/stat.h>
+
+#include "f-manifest.h"
 
 static const char *TAG = "f-ota";
 static update_progress_callback_t progress_callback = NULL;
@@ -28,7 +31,8 @@ SemaphoreHandle_t ota_update_semaphore = NULL;
 static volatile bool ota_reinstall_mode = false;
 
 // Internal function declarations
-static esp_err_t download_file(const char *url, const char *dest_path, int *progress);
+static esp_err_t download_file(const char *url, const char *dest_path, int *progress,
+                               const uint8_t *expected_sha256, uint32_t expected_size);
 static void update_progress(int progress, const char *message);
 static void ota_update_task(void *pvParameters);
 static void log_partition_info(const esp_partition_t *partition, const char *prefix);
@@ -36,6 +40,10 @@ static void ota_handle_failure(const char *error_msg, update_status_t status, bo
 static void ota_handle_failure_with_cleanup(const char *error_msg, update_status_t status, esp_http_client_handle_t client, esp_ota_handle_t ota_handle, bool release_mutex);
 static void cleanup_update_files(void);
 static void f_ota_do_update(int version);
+static esp_err_t ota_fetch_manifest(int version, manifest_t *m);
+static esp_err_t ota_reconcile_files(const manifest_t *m, int progress_lo, int progress_hi, bool show_progress);
+static void ota_self_heal(void);
+static void ota_quiet_refresh(void);
 
 // Add this function before f_ota_init
 static void log_partition_info(const esp_partition_t *partition, const char *prefix)
@@ -110,6 +118,9 @@ static void ota_handle_failure(const char *error_msg, update_status_t status, bo
     ota_reinstall_in_progress = false;
     ota_updating_message = false;
     ota_start_time = 0;
+
+    // SPIFFS writes are over; restore the normal boot-loop rescue threshold.
+    manifest_set_ota_in_progress(false);
 
     // Clean up any leftover .update files
     cleanup_update_files();
@@ -187,7 +198,15 @@ static void ota_handle_failure_with_cleanup(const char *error_msg, update_status
     ota_handle_failure(error_msg, status, release_mutex);
 }
 
-static esp_err_t download_file(const char *url, const char *dest_path, int *progress)
+/* Download url into dest_path via a temporary "<dest>.update" file.
+ *
+ * When expected_sha256 is non-NULL the payload is SHA-256-hashed while it
+ * streams in and the temp file only replaces dest_path if size AND hash
+ * match the manifest. Every write is checked: a failed fwrite/fclose (the
+ * silent-corruption bug that produced truncated files in the field, 2026-07)
+ * fails the download instead of installing a short file. */
+static esp_err_t download_file(const char *url, const char *dest_path, int *progress,
+                               const uint8_t *expected_sha256, uint32_t expected_size)
 {
     // Create update path with .update extension
     char update_path[512];
@@ -224,6 +243,14 @@ static esp_err_t download_file(const char *url, const char *dest_path, int *prog
         return ESP_FAIL;
     }
 
+    if (expected_size > 0 && (uint32_t)content_length != expected_size)
+    {
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "%s: server sends %d bytes, manifest says %lu",
+                    url, content_length, (unsigned long)expected_size);
+        esp_http_client_cleanup(client);
+        return ESP_FAIL;
+    }
+
     FILE *file = fopen(update_path, "wb");
     if (file == NULL)
     {
@@ -232,14 +259,33 @@ static esp_err_t download_file(const char *url, const char *dest_path, int *prog
         return ESP_FAIL;
     }
 
+    manifest_hash_t sha_ctx;
+    if (expected_sha256 && manifest_hash_begin(&sha_ctx) != ESP_OK)
+    {
+        fclose(file);
+        remove(update_path);
+        esp_http_client_cleanup(client);
+        return ESP_FAIL;
+    }
+
     int total_read = 0;
     char *buffer = get_shared_buffer(HTTP_BUFFER_SIZE, "download_file");
     int read_len;
-    bool download_success = false;
+    bool write_failed = false;
 
     while (total_read < content_length && (read_len = esp_http_client_read(client, buffer, 1024)) > 0)
     {
-        fwrite(buffer, 1, read_len, file);
+        if (fwrite(buffer, 1, read_len, file) != (size_t)read_len)
+        {
+            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "SPIFFS write failed at %d/%d bytes of %s",
+                        total_read, content_length, update_path);
+            write_failed = true;
+            break;
+        }
+        if (expected_sha256)
+        {
+            manifest_hash_update(&sha_ctx, buffer, read_len);
+        }
         total_read += read_len;
         taskYIELD();
         if (progress)
@@ -248,14 +294,38 @@ static esp_err_t download_file(const char *url, const char *dest_path, int *prog
         }
     }
     release_shared_buffer(buffer);
-    fclose(file);
+    if (fclose(file) != 0)
+    {
+        // Buffered data may not have reached flash - the file cannot be trusted.
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "SPIFFS close failed for %s", update_path);
+        write_failed = true;
+    }
     esp_http_client_cleanup(client);
 
-    // Check if download was successful
-    if (total_read == content_length)
+    uint8_t actual_sha[MANIFEST_SHA256_LEN];
+    bool sha_ok = true;
+    if (expected_sha256)
+    {
+        sha_ok = (manifest_hash_end(&sha_ctx, actual_sha) == ESP_OK) &&
+                 (memcmp(actual_sha, expected_sha256, MANIFEST_SHA256_LEN) == 0);
+    }
+
+    bool download_success = false;
+    if (write_failed || total_read != content_length)
+    {
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Download incomplete: %d of %d bytes", total_read, content_length);
+        remove(update_path);
+        sha_ok = false; // hash context result is meaningless for a partial payload
+    }
+    else if (!sha_ok)
+    {
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Hash mismatch for %s - discarding download", dest_path);
+        remove(update_path);
+    }
+    else
     {
         remove(dest_path); // Remove the original file
-        // Download successful, replace original file with update file
+        // Download successful and verified, replace original file with update file
         if (rename(update_path, dest_path) == 0)
         {
             ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Successfully updated file: %s", dest_path);
@@ -268,14 +338,243 @@ static esp_err_t download_file(const char *url, const char *dest_path, int *prog
             remove(update_path);
         }
     }
-    else
-    {
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Download incomplete: %d of %d bytes", total_read, content_length);
-        // Clean up the partial update file
-        remove(update_path);
-    }
 
     return download_success ? ESP_OK : ESP_FAIL;
+}
+
+/* Make room on SPIFFS before writing `needed` bytes. SPIFFS garbage
+ * collection otherwise runs synchronously inside fwrite when free pages run
+ * out - a long stall mid-download that has watchdog-reset devices in the
+ * field. Collecting deliberately between files keeps the stall bounded and
+ * away from open sockets. */
+static void ota_prepare_space(uint32_t needed)
+{
+    size_t total = 0, used = 0;
+    if (esp_spiffs_info(NULL, &total, &used) != ESP_OK)
+    {
+        return;
+    }
+    // The download needs room for the .update copy; keep generous headroom.
+    uint32_t want = needed + 64 * 1024;
+    if (total - used >= want)
+    {
+        return;
+    }
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "SPIFFS gc: %u free, want %lu",
+                (unsigned)(total - used), (unsigned long)want);
+    esp_err_t err = esp_spiffs_gc(NULL, want - (total - used));
+    if (err != ESP_OK)
+    {
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "SPIFFS gc failed: %s", esp_err_to_name(err));
+    }
+}
+
+/* Fetch <base>/<version>/manifest.txt, verify its signature and downgrade
+ * stamp, and install it as MANIFEST_PATH. Fills *m from the accepted file.
+ * ESP_ERR_INVALID_RESPONSE = authenticity problem (report as SIGNATURE). */
+static esp_err_t ota_fetch_manifest(int version, manifest_t *m)
+{
+    char url[512];
+    char temp_path[64];
+    snprintf(url, sizeof(url), "%s/%d/manifest.txt", UPDATE_SERVER_BASE, version);
+    snprintf(temp_path, sizeof(temp_path), "%s.update", MANIFEST_PATH);
+
+    if (download_file(url, temp_path, NULL, NULL, 0) != ESP_OK)
+    {
+        // download_file only renames onto temp_path on success, so nothing to clean
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Manifest download failed: %s", url);
+        return ESP_FAIL;
+    }
+
+    esp_err_t err = manifest_load_and_verify(temp_path, m);
+    if (err != ESP_OK)
+    {
+        remove(temp_path);
+        return ESP_ERR_INVALID_RESPONSE;
+    }
+
+    uint32_t applied = manifest_get_applied_generation();
+    if (m->generated < applied)
+    {
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Manifest generation %lu older than applied %lu - replay rejected",
+                    (unsigned long)m->generated, (unsigned long)applied);
+        manifest_free(m);
+        remove(temp_path);
+        return ESP_ERR_INVALID_RESPONSE;
+    }
+
+    remove(MANIFEST_PATH);
+    if (rename(temp_path, MANIFEST_PATH) != 0)
+    {
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to install verified manifest");
+        manifest_free(m);
+        remove(temp_path);
+        return ESP_FAIL;
+    }
+    return ESP_OK;
+}
+
+/* Bring SPIFFS in line with a verified manifest: hash every listed file
+ * locally, skip the ones that already match, download the rest (verified,
+ * up to 3 attempts each). Only changed files are ever written, which keeps
+ * both flash wear and crash exposure minimal. */
+static esp_err_t ota_reconcile_files(const manifest_t *m, int progress_lo, int progress_hi, bool show_progress)
+{
+    int downloaded = 0, skipped = 0;
+    char url[512];
+    char dest_path[128 + 8];
+    uint8_t local_sha[MANIFEST_SHA256_LEN];
+
+    for (int i = 0; i < m->entry_count; i++)
+    {
+        const manifest_entry_t *e = &m->entries[i];
+        snprintf(dest_path, sizeof(dest_path), "/spiffs/%s", e->path);
+
+        struct stat st;
+        bool matches = (stat(dest_path, &st) == 0 && (uint32_t)st.st_size == e->size &&
+                        manifest_sha256_file(dest_path, local_sha) == ESP_OK &&
+                        memcmp(local_sha, e->sha256, MANIFEST_SHA256_LEN) == 0);
+        if (matches)
+        {
+            skipped++;
+        }
+        else
+        {
+            snprintf(url, sizeof(url), "%s/%d/%s", UPDATE_SERVER_BASE, m->version, e->path);
+            esp_err_t err = ESP_FAIL;
+            for (int attempt = 1; attempt <= 3 && err != ESP_OK; attempt++)
+            {
+                if (attempt > 1)
+                {
+                    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Retrying %s (attempt %d/3)", e->path, attempt);
+                    vTaskDelay(pdMS_TO_TICKS(1000 * attempt));
+                }
+                ota_prepare_space(e->size);
+                err = download_file(url, dest_path, NULL, e->sha256, e->size);
+            }
+            if (err != ESP_OK)
+            {
+                ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Giving up on %s after 3 attempts", e->path);
+                return ESP_FAIL;
+            }
+            downloaded++;
+            // Breather between writes: let httpd/WiFi/display drain their queues.
+            vTaskDelay(pdMS_TO_TICKS(250));
+        }
+
+        if (show_progress)
+        {
+            int p = progress_lo + ((i + 1) * (progress_hi - progress_lo)) / m->entry_count;
+            update_progress(p, "Updating files...");
+        }
+        taskYIELD();
+    }
+
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Reconcile done: %d downloaded, %d already current", downloaded, skipped);
+    return ESP_OK;
+}
+
+/* First boot after an OTA (or first boot of the first signed firmware, whose
+ * files arrived through the legacy unverified downloader): check every
+ * SPIFFS file against the stored, signature-checked manifest and re-download
+ * whatever does not match. Heals interrupted updates and any file corrupted
+ * in transit. Clears the raised boot-rescue threshold once the set is clean. */
+static void ota_self_heal(void)
+{
+    manifest_t m;
+    esp_err_t err = manifest_load_and_verify(MANIFEST_PATH, &m);
+    if (err == ESP_ERR_NOT_FOUND)
+    {
+        // Pre-signed-era SPIFFS: nothing to verify against; a quiet refresh
+        // will fetch a manifest for this version soon.
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Self-heal: no stored manifest, skipping");
+        manifest_set_self_heal_pending(false);
+        manifest_set_ota_in_progress(false);
+        return;
+    }
+    if (err != ESP_OK)
+    {
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Self-heal: stored manifest failed verification, discarding it");
+        f_ota_report_status(UPDATE_ERROR_SIGNATURE, "Self-heal: stored manifest invalid");
+        remove(MANIFEST_PATH);
+        manifest_set_self_heal_pending(false);
+        manifest_set_ota_in_progress(false);
+        return;
+    }
+
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Self-heal: verifying %d files against release %d",
+                m.entry_count, m.version);
+    xSemaphoreTake(http_mutex, portMAX_DELAY);
+    err = ota_reconcile_files(&m, 0, 0, false);
+    xSemaphoreGive(http_mutex);
+
+    if (err == ESP_OK)
+    {
+        manifest_set_applied_generation(m.generated);
+        manifest_set_self_heal_pending(false);
+        manifest_set_ota_in_progress(false);
+        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Self-heal complete");
+    }
+    else
+    {
+        // Keep the pending flag; retried on the next update check.
+        f_ota_report_status(UPDATE_ERROR_VERIFY, "Self-heal: reconcile failed");
+    }
+    manifest_free(&m);
+}
+
+/* Re-fetch the current release's manifest so web-file-only fixes published
+ * with `push.py --files-only` reach the fleet without a version bump, flash
+ * write, or reboot. Files are only touched when the publisher stamped a NEWER
+ * generation than what this device applied - so a user's locally customized
+ * files are never reverted by a mere re-check, only by actual publishes
+ * (matching what full updates have always done). */
+static void ota_quiet_refresh(void)
+{
+    uint32_t applied = manifest_get_applied_generation();
+
+    xSemaphoreTake(http_mutex, portMAX_DELAY);
+    manifest_t m;
+    esp_err_t err = ota_fetch_manifest(fwversion, &m);
+    if (err != ESP_OK)
+    {
+        xSemaphoreGive(http_mutex);
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Quiet refresh: manifest fetch/verify failed (%s)",
+                    esp_err_to_name(err));
+        if (err == ESP_ERR_INVALID_RESPONSE)
+        {
+            f_ota_report_status(UPDATE_ERROR_SIGNATURE, "Quiet refresh: manifest rejected");
+        }
+        return;
+    }
+
+    if (m.generated <= applied && applied != 0)
+    {
+        // Nothing new published since we last applied - leave files alone.
+        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Quiet refresh: generation %lu already applied",
+                    (unsigned long)m.generated);
+        manifest_free(&m);
+        xSemaphoreGive(http_mutex);
+        return;
+    }
+
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Quiet refresh: applying generation %lu (files only)",
+                (unsigned long)m.generated);
+    manifest_set_ota_in_progress(true);
+    err = ota_reconcile_files(&m, 0, 0, false);
+    xSemaphoreGive(http_mutex);
+
+    if (err == ESP_OK)
+    {
+        manifest_set_applied_generation(m.generated);
+        f_ota_report_status(UPDATE_SUCCESS, "Quiet file refresh applied");
+    }
+    else
+    {
+        f_ota_report_status(UPDATE_ERROR_VERIFY, "Quiet refresh: reconcile failed");
+    }
+    manifest_set_ota_in_progress(false);
+    manifest_free(&m);
 }
 
 void f_ota_report_status(update_status_t status, const char *error_msg)
@@ -367,6 +666,22 @@ void f_ota_check_update(void)
     {
         ESP_LOG_WEB(ESP_LOG_INFO, TAG, "WiFi not connected, skipping OTA check");
         return;
+    }
+
+    // First boot after an update - or first boot of the first signed
+    // firmware, whose files arrived via the legacy path - verify the SPIFFS
+    // file set against the stored manifest before doing anything else.
+    if (manifest_get_self_heal_pending())
+    {
+        ota_self_heal();
+    }
+    else if (manifest_get_applied_generation() == 0)
+    {
+        struct stat heal_st;
+        if (stat(MANIFEST_PATH, &heal_st) == 0)
+        {
+            ota_self_heal();
+        }
     }
 
     // Thread-safe time check
@@ -535,6 +850,17 @@ void f_ota_check_update(void)
     if (new_version <= fwversion)
     {
         ESP_LOG_WEB(ESP_LOG_INFO, TAG, "No update available, latest %d, current %d", new_version, fwversion);
+
+        // Every QUIET_REFRESH_EVERY_CHECKS idle checks (or right away while no
+        // release has ever been applied), pick up web-file-only publishes.
+        static int quiet_refresh_counter = 0;
+        quiet_refresh_counter++;
+        if (quiet_refresh_counter >= QUIET_REFRESH_EVERY_CHECKS ||
+            manifest_get_applied_generation() == 0)
+        {
+            quiet_refresh_counter = 0;
+            ota_quiet_refresh();
+        }
         return;
     }
 
@@ -555,84 +881,41 @@ static void f_ota_do_update(int version)
 
     esp_err_t err;
 
-    // Download SPIFFS files
-    char update_dir[96];
-    snprintf(update_dir, sizeof(update_dir), "%s/%d", UPDATE_SERVER_BASE, version);
-
-    // First download the files.txt manifest; reuse url variable
-    snprintf(url, sizeof(url), "%s/files.txt", update_dir);
-
-    char manifest_path[300];
-    snprintf(manifest_path, sizeof(manifest_path), "/spiffs/files.txt");
-
-    if (download_file(url, manifest_path, NULL) != ESP_OK)
+    // Fetch and authenticate the release manifest FIRST - nothing is written
+    // until the release provably came from our signing key.
+    update_progress(2, "Verifying release...");
+    manifest_t m;
+    err = ota_fetch_manifest(version, &m);
+    if (err == ESP_ERR_INVALID_RESPONSE)
     {
-        ota_handle_failure("Failed to download files.txt manifest", UPDATE_ERROR_DOWNLOAD, true);
+        ota_handle_failure("Release manifest failed signature/downgrade check", UPDATE_ERROR_SIGNATURE, true);
+        return;
+    }
+    if (err != ESP_OK)
+    {
+        ota_handle_failure("Failed to download release manifest", UPDATE_ERROR_DOWNLOAD, true);
         return;
     }
 
-    // Read the manifest file
-    FILE *manifest = fopen(manifest_path, "r");
-    if (manifest == NULL)
+    // Raise the boot-loop rescue threshold while SPIFFS writes are in flight:
+    // an interrupted update resumes safely via self-heal, so crash-reboots
+    // here must not factory-reset the user's settings.
+    manifest_set_ota_in_progress(true);
+
+    // Bring SPIFFS files in line with the manifest (unchanged files are skipped).
+    if (ota_reconcile_files(&m, 5, 50, true) != ESP_OK)
     {
-        ota_handle_failure("Failed to open files.txt manifest", UPDATE_ERROR_DOWNLOAD, true);
+        manifest_free(&m);
+        ota_handle_failure("File reconcile failed verification after retries", UPDATE_ERROR_VERIFY, true);
         return;
     }
 
-    // Count total files in manifest
-    char line[256];
-    int file_count = 0;
-    while (fgets(line, sizeof(line), manifest))
-    {
-        if (line[0] != '\n' && line[0] != '#')
-        {
-            file_count++;
-        }
-    }
-    rewind(manifest);
-
-    // Download each file listed in the manifest
-    int current_file = 0;
-    char dest_path[300];
-    while (fgets(line, sizeof(line), manifest))
-    {
-        if (line[0] == '\n' || line[0] == '#')
-        {
-            continue;
-        }
-
-        if (strstr(line, "files.txt") == NULL)
-        {
-            line[strcspn(line, "\r\n")] = 0;
-            snprintf(url, sizeof(url), "%s/%s", update_dir, line);
-            snprintf(dest_path, sizeof(dest_path), "/spiffs/%s", line);
-
-            ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Downloading file %i of %i: %s to %s", current_file + 1, file_count, url, dest_path);
-            int progress = 0;
-            if (download_file(url, dest_path, &progress) != ESP_OK)
-            {
-                fclose(manifest);
-                char error_msg[256];
-                snprintf(error_msg, sizeof(error_msg), "Failed to download file: %s/%.128s", update_dir, line);
-                url_encode_string(error_msg, error_msg);
-                ota_handle_failure(error_msg, UPDATE_ERROR_DOWNLOAD, true);
-                return;
-            }
-        }
-
-        current_file++;
-        // Use floating point for more accurate progress
-        float overall_progress = ((float)current_file / (float)file_count) * 50.0f;
-        update_progress((int)overall_progress, "Updating files...");
-        taskYIELD();
-    }
-    fclose(manifest);
-
-    // Clean up the manifest file with error checking
-    if (remove("/spiffs/files.txt") != 0)
-    {
-        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Failed to remove manifest file: %s", strerror(errno));
-    }
+    // Keep what the firmware step needs, then release the entry table.
+    uint8_t fw_expected_sha[MANIFEST_SHA256_LEN];
+    memcpy(fw_expected_sha, m.fw_sha256, sizeof(fw_expected_sha));
+    uint32_t fw_expected_size = m.fw_size;
+    uint32_t manifest_generation = m.generated;
+    manifest_free(&m);
 
     // ****************
     // Download and install firmware
@@ -696,13 +979,27 @@ static void f_ota_do_update(int version)
         ota_handle_failure_with_cleanup("Firmware too large for partition", UPDATE_ERROR_VERIFY, fw_client, ota_handle, true);
         return;
     }
+    if ((uint32_t)fw_content_length != fw_expected_size)
+    {
+        ota_handle_failure_with_cleanup("Firmware size disagrees with signed manifest", UPDATE_ERROR_VERIFY, fw_client, ota_handle, true);
+        return;
+    }
 
     int total_read = 0;
     char fw_buffer[1024] __attribute__((aligned(4)));
     int fw_read_len;
     int last_progress = 50;
     bool first_chunk = true;
-    uint32_t checksum = 0;
+
+    // Stream-hash the image; compared against the signed manifest below.
+    // (esp_ota_end() checks integrity via the image's embedded digest; the
+    // manifest comparison is what proves the image came from our servers.)
+    manifest_hash_t fw_sha_ctx;
+    if (manifest_hash_begin(&fw_sha_ctx) != ESP_OK)
+    {
+        ota_handle_failure_with_cleanup("Hash init failed", UPDATE_ERROR_INSTALL, fw_client, ota_handle, true);
+        return;
+    }
 
     while (total_read < fw_content_length && (fw_read_len = esp_http_client_read(fw_client, fw_buffer, sizeof(fw_buffer))) > 0)
     {
@@ -711,17 +1008,14 @@ static void f_ota_do_update(int version)
         {
             if (fw_buffer[0] != 0xE9)
             {
+                manifest_hash_abort(&fw_sha_ctx);
                 ota_handle_failure_with_cleanup("Invalid firmware image: magic byte mismatch", UPDATE_ERROR_VERIFY, fw_client, ota_handle, true);
                 return;
             }
             first_chunk = false;
         }
 
-        // Calculate checksum
-        for (int i = 0; i < fw_read_len; i++)
-        {
-            checksum += (uint32_t)fw_buffer[i];
-        }
+        manifest_hash_update(&fw_sha_ctx, fw_buffer, fw_read_len);
 
         if (esp_ota_write(ota_handle, fw_buffer, fw_read_len) != ESP_OK)
         {
@@ -740,10 +1034,19 @@ static void f_ota_do_update(int version)
     esp_http_client_cleanup(fw_client);
     fw_client = NULL; /* client already cleaned up; failure paths must not use it */
 
-    // Verify checksum
+    uint8_t fw_actual_sha[MANIFEST_SHA256_LEN];
+    esp_err_t sha_ret = manifest_hash_end(&fw_sha_ctx, fw_actual_sha);
+
     if (total_read != fw_content_length)
     {
         ota_handle_failure_with_cleanup("Firmware download incomplete", UPDATE_ERROR_DOWNLOAD, NULL, ota_handle, true);
+        return;
+    }
+
+    // Origin check: the streamed image must be the one the signed manifest names.
+    if (sha_ret != ESP_OK || memcmp(fw_actual_sha, fw_expected_sha, MANIFEST_SHA256_LEN) != 0)
+    {
+        ota_handle_failure_with_cleanup("Firmware hash disagrees with signed manifest", UPDATE_ERROR_SIGNATURE, NULL, ota_handle, true);
         return;
     }
 
@@ -753,17 +1056,6 @@ static void f_ota_do_update(int version)
         return;
     }
 
-    // Verify the new firmware
-    /*
-    esp_err_t verify_err = esp_ota_check_rollback_is_possible();
-    if (verify_err != ESP_OK)
-    {
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Firmware verification failed: %s", esp_err_to_name(verify_err));
-        f_ota_report_status(UPDATE_ERROR_VERIFY);
-        return;
-    }
-    */
-
     // Set boot partition and verify
     err = esp_ota_set_boot_partition(next);
     if (err != ESP_OK)
@@ -771,6 +1063,13 @@ static void f_ota_do_update(int version)
         ota_handle_failure("esp_ota_set_boot_partition failed", UPDATE_ERROR_INSTALL, true);
         return;
     }
+
+    // Record the applied release and ask the new firmware to verify all
+    // SPIFFS files on its first boot (self-heal). ota_in_progress stays set
+    // on purpose: the raised rescue threshold covers the first-boot window
+    // and self-heal clears it once the file set checks out.
+    manifest_set_applied_generation(manifest_generation);
+    manifest_set_self_heal_pending(true);
 
     update_progress(100, "Update complete, rebooting...");
     f_ota_report_status(UPDATE_SUCCESS, "OK");
@@ -851,10 +1150,12 @@ void f_ota_start_update_thread(void)
     // Create OTA update task on APP_CPU (core 1). Same rationale as wifi_task /
     // integration_update_task: keep heavy HTTP / mbedtls work off PRO_CPU so
     // WiFi, lwIP and httpd remain responsive.
+    // 10240: manifest ECDSA verification (mbedtls_pk_verify) runs on this
+    // task and needs several KB of stack on top of the HTTP/download paths.
     BaseType_t xReturned = xTaskCreatePinnedToCore(
         ota_update_task,
         "ota_update_task",
-        7168,
+        10240,
         NULL,
         3,
         &ota_update_task_handle,

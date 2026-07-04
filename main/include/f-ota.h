@@ -18,15 +18,19 @@
 #define UPDATE_CHECK_INTERVAL (8 * 3600) // 8 hours in seconds
 #define UPDATE_TIMEOUT_MS 30000 // 30 seconds timeout
 #define MAX_RETRIES 1
+// Idle update checks between quiet manifest re-fetches (web-file-only
+// publishes reach a device within ~QUIET_REFRESH_EVERY_CHECKS * 8h).
+#define QUIET_REFRESH_EVERY_CHECKS 10
 
-// Update status codes
+// Update status codes (reported to the update server; append only)
 typedef enum {
     UPDATE_SUCCESS = 0,
     UPDATE_ERROR_NO_UPDATE,
     UPDATE_ERROR_DOWNLOAD,
     UPDATE_ERROR_VERIFY,
     UPDATE_ERROR_INSTALL,
-    UPDATE_ERROR_ROLLBACK
+    UPDATE_ERROR_ROLLBACK,
+    UPDATE_ERROR_SIGNATURE // manifest missing/unsigned/bad signature or downgrade
 } update_status_t;
 
 // Update progress callback type
