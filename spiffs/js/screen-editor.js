@@ -207,38 +207,66 @@ function bindTokenInsert(btn, textarea, afterInsert) {
     };
 }
 
+const TOKEN_HA_RE = /^\[HA:[^:\]]+:[^\]]+\]$/;
+const TOKEN_STOCK_RE = /^\[\$:[^\]]+\]$/;
+const ESCAPE_RE = /[&<>]/g;
+const ESCAPE_MAP = { '&': '&amp;', '<': '&lt;', '>': '&gt;' };
+
+/**
+ * Optimized HTML escaping for token highlighting: uses a single regex pass with
+ * a mapping function for O(N) efficiency.
+ */
 function escapeHtmlForTokenHighlight(text) {
-    return text
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
+    if (!text) return '';
+    return text.replace(ESCAPE_RE, c => ESCAPE_MAP[c]);
 }
 
+/**
+ * Validates if a substring is a recognized token. Uses pre-compiled regexes
+ * to avoid re-compilation overhead during frequent typing updates.
+ */
 function isValidTokenInText(token) {
     if (TOKEN_HELP[token]) return true;
-    if (/^\[HA:[^:\]]+:[^\]]+\]$/.test(token)) return true;
-    if (/^\[\$:[^\]]+\]$/.test(token)) return true;
+    if (TOKEN_HA_RE.test(token)) return true;
+    if (TOKEN_STOCK_RE.test(token)) return true;
     return false;
 }
 
+/**
+ * Optimized token highlighting: batches non-token text segments before escaping.
+ * Performance: Reduces function calls and string allocations from O(N) to O(tokens),
+ * significantly improving UI responsiveness during high-frequency typing.
+ */
 function formatTextWithTokenHighlights(text) {
     let result = '';
     let i = 0;
+    let last = 0;
+
     while (i < text.length) {
         if (text[i] === '[') {
             const end = text.indexOf(']', i + 1);
             if (end !== -1) {
                 const candidate = text.slice(i, end + 1);
                 if (isValidTokenInText(candidate)) {
+                    // Flush accumulated non-token text as a single batch
+                    if (i > last) {
+                        result += escapeHtmlForTokenHighlight(text.slice(last, i));
+                    }
                     result += `<span class="token-in-text">${escapeHtmlForTokenHighlight(candidate)}</span>`;
                     i = end + 1;
+                    last = i;
                     continue;
                 }
             }
         }
-        result += escapeHtmlForTokenHighlight(text[i]);
         i++;
     }
+
+    // Flush remaining text
+    if (i > last) {
+        result += escapeHtmlForTokenHighlight(text.slice(last, i));
+    }
+
     return result;
 }
 
