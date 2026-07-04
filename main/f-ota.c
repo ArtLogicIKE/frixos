@@ -215,8 +215,11 @@ static esp_err_t download_file(const char *url, const char *dest_path, int *prog
     esp_http_client_config_t config = {
         .url = url,
         .timeout_ms = UPDATE_TIMEOUT_MS,
-        .buffer_size = HTTP_BUFFER_SIZE,
-        .buffer_size_tx = HTTP_BUFFER_SIZE,
+        // Small buffers: we read in 1 KB chunks; large rx/tx buffers only
+        // inflate peak heap and made client init fail in the low-heap boot
+        // window (observed at 21 KB free on first-boot quiet refresh).
+        .buffer_size = 2048,
+        .buffer_size_tx = 512,
         .transport_type = HTTP_TRANSPORT_OVER_TCP,
     };
 
@@ -342,6 +345,31 @@ static esp_err_t download_file(const char *url, const char *dest_path, int *prog
     return download_success ? ESP_OK : ESP_FAIL;
 }
 
+/* Defer (don't fail) OTA work while heap is critically low - the boot storm
+ * (weather + CGM TLS + geolocation) can leave <10 KB free for the first
+ * minute, which starves HTTP client allocs and socket reads. The internal
+ * esp_http_client rx/tx buffers cannot come from the f-membuffer pool (the
+ * IDF API only takes sizes), so waiting is the reliable fix. */
+static void ota_wait_for_heap(const char *who)
+{
+    const uint32_t needed = 35 * 1024;
+    for (int i = 0; i < 18; i++) // up to 90 s
+    {
+        uint32_t free_heap = esp_get_free_heap_size();
+        if (free_heap >= needed)
+        {
+            return;
+        }
+        if (i == 0)
+        {
+            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "%s: heap low (%lu), waiting for boot tasks to settle",
+                        who, (unsigned long)free_heap);
+        }
+        vTaskDelay(pdMS_TO_TICKS(5000));
+    }
+    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "%s: proceeding despite low heap", who);
+}
+
 /* Make room on SPIFFS before writing `needed` bytes. SPIFFS garbage
  * collection otherwise runs synchronously inside fwrite when free pages run
  * out - a long stall mid-download that has watchdog-reset devices in the
@@ -390,7 +418,9 @@ static esp_err_t ota_fetch_manifest(int version, manifest_t *m)
     if (err != ESP_OK)
     {
         remove(temp_path);
-        return ESP_ERR_INVALID_RESPONSE;
+        // Only an actual signature/format verdict is "rejected"; transient
+        // failures (alloc, I/O) must stay retryable, not read as tampering.
+        return (err == ESP_ERR_INVALID_RESPONSE) ? ESP_ERR_INVALID_RESPONSE : ESP_FAIL;
     }
 
     uint32_t applied = manifest_get_applied_generation();
@@ -398,7 +428,6 @@ static esp_err_t ota_fetch_manifest(int version, manifest_t *m)
     {
         ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Manifest generation %lu older than applied %lu - replay rejected",
                     (unsigned long)m->generated, (unsigned long)applied);
-        manifest_free(m);
         remove(temp_path);
         return ESP_ERR_INVALID_RESPONSE;
     }
@@ -407,7 +436,6 @@ static esp_err_t ota_fetch_manifest(int version, manifest_t *m)
     if (rename(temp_path, MANIFEST_PATH) != 0)
     {
         ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to install verified manifest");
-        manifest_free(m);
         remove(temp_path);
         return ESP_FAIL;
     }
@@ -417,61 +445,81 @@ static esp_err_t ota_fetch_manifest(int version, manifest_t *m)
 /* Bring SPIFFS in line with a verified manifest: hash every listed file
  * locally, skip the ones that already match, download the rest (verified,
  * up to 3 attempts each). Only changed files are ever written, which keeps
- * both flash wear and crash exposure minimal. */
-static esp_err_t ota_reconcile_files(const manifest_t *m, int progress_lo, int progress_hi, bool show_progress)
+ * both flash wear and crash exposure minimal. Entries stream from the
+ * manifest file on disk - nothing sizeable is held in RAM. */
+typedef struct
 {
-    int downloaded = 0, skipped = 0;
+    int version;
+    int entry_count;
+    int progress_lo, progress_hi;
+    bool show_progress;
+    int downloaded, skipped;
+} reconcile_ctx_t;
+
+static esp_err_t reconcile_entry_cb(const manifest_entry_t *e, int index, void *arg)
+{
+    reconcile_ctx_t *ctx = (reconcile_ctx_t *)arg;
     char url[512];
     char dest_path[128 + 8];
     uint8_t local_sha[MANIFEST_SHA256_LEN];
 
-    for (int i = 0; i < m->entry_count; i++)
+    snprintf(dest_path, sizeof(dest_path), "/spiffs/%s", e->path);
+
+    struct stat st;
+    bool matches = (stat(dest_path, &st) == 0 && (uint32_t)st.st_size == e->size &&
+                    manifest_sha256_file(dest_path, local_sha) == ESP_OK &&
+                    memcmp(local_sha, e->sha256, MANIFEST_SHA256_LEN) == 0);
+    if (matches)
     {
-        const manifest_entry_t *e = &m->entries[i];
-        snprintf(dest_path, sizeof(dest_path), "/spiffs/%s", e->path);
-
-        struct stat st;
-        bool matches = (stat(dest_path, &st) == 0 && (uint32_t)st.st_size == e->size &&
-                        manifest_sha256_file(dest_path, local_sha) == ESP_OK &&
-                        memcmp(local_sha, e->sha256, MANIFEST_SHA256_LEN) == 0);
-        if (matches)
+        ctx->skipped++;
+    }
+    else
+    {
+        snprintf(url, sizeof(url), "%s/%d/%s", UPDATE_SERVER_BASE, ctx->version, e->path);
+        esp_err_t err = ESP_FAIL;
+        for (int attempt = 1; attempt <= 3 && err != ESP_OK; attempt++)
         {
-            skipped++;
-        }
-        else
-        {
-            snprintf(url, sizeof(url), "%s/%d/%s", UPDATE_SERVER_BASE, m->version, e->path);
-            esp_err_t err = ESP_FAIL;
-            for (int attempt = 1; attempt <= 3 && err != ESP_OK; attempt++)
+            if (attempt > 1)
             {
-                if (attempt > 1)
-                {
-                    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Retrying %s (attempt %d/3)", e->path, attempt);
-                    vTaskDelay(pdMS_TO_TICKS(1000 * attempt));
-                }
-                ota_prepare_space(e->size);
-                err = download_file(url, dest_path, NULL, e->sha256, e->size);
+                ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Retrying %s (attempt %d/3)", e->path, attempt);
+                vTaskDelay(pdMS_TO_TICKS(1000 * attempt));
             }
-            if (err != ESP_OK)
-            {
-                ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Giving up on %s after 3 attempts", e->path);
-                return ESP_FAIL;
-            }
-            downloaded++;
-            // Breather between writes: let httpd/WiFi/display drain their queues.
-            vTaskDelay(pdMS_TO_TICKS(250));
+            ota_prepare_space(e->size);
+            err = download_file(url, dest_path, NULL, e->sha256, e->size);
         }
-
-        if (show_progress)
+        if (err != ESP_OK)
         {
-            int p = progress_lo + ((i + 1) * (progress_hi - progress_lo)) / m->entry_count;
-            update_progress(p, "Updating files...");
+            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Giving up on %s after 3 attempts", e->path);
+            return ESP_FAIL;
         }
-        taskYIELD();
+        ctx->downloaded++;
+        // Breather between writes: let httpd/WiFi/display drain their queues.
+        vTaskDelay(pdMS_TO_TICKS(250));
     }
 
-    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Reconcile done: %d downloaded, %d already current", downloaded, skipped);
+    if (ctx->show_progress && ctx->entry_count > 0)
+    {
+        int p = ctx->progress_lo +
+                ((index + 1) * (ctx->progress_hi - ctx->progress_lo)) / ctx->entry_count;
+        update_progress(p, "Updating files...");
+    }
+    taskYIELD();
     return ESP_OK;
+}
+
+static esp_err_t ota_reconcile_files(const manifest_t *m, int progress_lo, int progress_hi, bool show_progress)
+{
+    reconcile_ctx_t ctx = {
+        .version = m->version,
+        .entry_count = m->entry_count,
+        .progress_lo = progress_lo,
+        .progress_hi = progress_hi,
+        .show_progress = show_progress,
+    };
+    esp_err_t err = manifest_for_each_entry(MANIFEST_PATH, reconcile_entry_cb, &ctx);
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Reconcile done: %d downloaded, %d already current",
+                ctx.downloaded, ctx.skipped);
+    return err;
 }
 
 /* First boot after an OTA (or first boot of the first signed firmware, whose
@@ -520,7 +568,6 @@ static void ota_self_heal(void)
         // Keep the pending flag; retried on the next update check.
         f_ota_report_status(UPDATE_ERROR_VERIFY, "Self-heal: reconcile failed");
     }
-    manifest_free(&m);
 }
 
 /* Re-fetch the current release's manifest so web-file-only fixes published
@@ -535,7 +582,21 @@ static void ota_quiet_refresh(void)
 
     xSemaphoreTake(http_mutex, portMAX_DELAY);
     manifest_t m;
-    esp_err_t err = ota_fetch_manifest(fwversion, &m);
+    esp_err_t err = ESP_FAIL;
+    // A few spaced attempts: the first-boot refresh lands in the boot
+    // congestion window where a transient alloc/connect failure is likely.
+    for (int attempt = 1; attempt <= 3; attempt++)
+    {
+        if (attempt > 1)
+        {
+            vTaskDelay(pdMS_TO_TICKS(60 * 1000));
+        }
+        err = ota_fetch_manifest(fwversion, &m);
+        if (err != ESP_FAIL) // OK or a definitive signature/downgrade verdict
+        {
+            break;
+        }
+    }
     if (err != ESP_OK)
     {
         xSemaphoreGive(http_mutex);
@@ -553,7 +614,6 @@ static void ota_quiet_refresh(void)
         // Nothing new published since we last applied - leave files alone.
         ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Quiet refresh: generation %lu already applied",
                     (unsigned long)m.generated);
-        manifest_free(&m);
         xSemaphoreGive(http_mutex);
         return;
     }
@@ -574,7 +634,6 @@ static void ota_quiet_refresh(void)
         f_ota_report_status(UPDATE_ERROR_VERIFY, "Quiet refresh: reconcile failed");
     }
     manifest_set_ota_in_progress(false);
-    manifest_free(&m);
 }
 
 void f_ota_report_status(update_status_t status, const char *error_msg)
@@ -873,6 +932,7 @@ static void f_ota_do_update(int version)
     char url[512] = "";
 
     ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Starting update process to version %d", version);
+    ota_wait_for_heap("update");
     xSemaphoreTake(http_mutex, portMAX_DELAY);
     update_progress(0, "Starting update...");
     ota_update_in_progress = true;
@@ -905,7 +965,6 @@ static void f_ota_do_update(int version)
     // Bring SPIFFS files in line with the manifest (unchanged files are skipped).
     if (ota_reconcile_files(&m, 5, 50, true) != ESP_OK)
     {
-        manifest_free(&m);
         ota_handle_failure("File reconcile failed verification after retries", UPDATE_ERROR_VERIFY, true);
         return;
     }
@@ -915,7 +974,6 @@ static void f_ota_do_update(int version)
     memcpy(fw_expected_sha, m.fw_sha256, sizeof(fw_expected_sha));
     uint32_t fw_expected_size = m.fw_size;
     uint32_t manifest_generation = m.generated;
-    manifest_free(&m);
 
     // ****************
     // Download and install firmware

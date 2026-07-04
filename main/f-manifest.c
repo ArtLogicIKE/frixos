@@ -44,23 +44,33 @@ static bool parse_hex(const char *hex, uint8_t *out, int out_len)
     return true;
 }
 
-static esp_err_t verify_signature(const uint8_t *region, size_t region_len,
-                                  const uint8_t sig[MANIFEST_SIG_RAW_LEN])
+/* Parse one "f <sha256hex> <size> <path>" line (no trailing newline). */
+static bool parse_entry_line(const char *line, manifest_entry_t *e)
+{
+    const char *hex = line + 2;
+    const char *sp1 = strchr(hex, ' ');
+    const char *sp2 = sp1 ? strchr(sp1 + 1, ' ') : NULL;
+    if (sp1 == NULL || sp2 == NULL || (sp1 - hex) != MANIFEST_SHA256_LEN * 2 ||
+        strlen(sp2 + 1) == 0 || strlen(sp2 + 1) >= MANIFEST_MAX_PATH)
+    {
+        return false;
+    }
+    if (!parse_hex(hex, e->sha256, MANIFEST_SHA256_LEN))
+    {
+        return false;
+    }
+    e->size = (uint32_t)strtoul(sp1 + 1, NULL, 10);
+    strlcpy(e->path, sp2 + 1, sizeof(e->path));
+    return true;
+}
+
+static esp_err_t verify_signature_hash(const uint8_t hash[MANIFEST_SHA256_LEN],
+                                       const uint8_t sig[MANIFEST_SIG_RAW_LEN])
 {
     psa_status_t status = psa_crypto_init(); // idempotent
     if (status != PSA_SUCCESS)
     {
         ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "psa_crypto_init failed: %d", (int)status);
-        return ESP_FAIL;
-    }
-
-    uint8_t hash[MANIFEST_SHA256_LEN];
-    size_t hash_len = 0;
-    status = psa_hash_compute(PSA_ALG_SHA_256, region, region_len,
-                              hash, sizeof(hash), &hash_len);
-    if (status != PSA_SUCCESS || hash_len != sizeof(hash))
-    {
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Manifest hash failed: %d", (int)status);
         return ESP_FAIL;
     }
 
@@ -79,7 +89,7 @@ static esp_err_t verify_signature(const uint8_t *region, size_t region_len,
     }
 
     status = psa_verify_hash(key, PSA_ALG_ECDSA(PSA_ALG_SHA_256),
-                             hash, hash_len, sig, MANIFEST_SIG_RAW_LEN);
+                             hash, MANIFEST_SHA256_LEN, sig, MANIFEST_SIG_RAW_LEN);
     psa_destroy_key(key);
     if (status != PSA_SUCCESS)
     {
@@ -89,46 +99,49 @@ static esp_err_t verify_signature(const uint8_t *region, size_t region_len,
     return ESP_OK;
 }
 
+/* Fully streaming (no heap, ~1 KB stack): the device cannot rely on having
+ * a manifest-sized buffer free - a 12 KB malloc here failed in the field
+ * during the boot window. Layout knowledge used: the "sig" line is the LAST
+ * line of the file, so the signed region is everything before it. */
 esp_err_t manifest_load_and_verify(const char *path, manifest_t *out)
 {
     memset(out, 0, sizeof(*out));
 
     FILE *f = fopen(path, "rb");
     if (f == NULL)
+    {
         return ESP_ERR_NOT_FOUND;
+    }
     struct stat st;
     if (stat(path, &st) != 0 || st.st_size <= 0 || st.st_size > MANIFEST_MAX_SIZE)
     {
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Manifest missing or implausible size");
         fclose(f);
-        return ESP_ERR_INVALID_SIZE;
+        return ESP_ERR_INVALID_RESPONSE;
     }
 
-    char *buf = malloc(st.st_size + 1);
-    if (buf == NULL)
-    {
-        fclose(f);
-        return ESP_ERR_NO_MEM;
-    }
-    size_t got = fread(buf, 1, st.st_size, f);
-    fclose(f);
-    if (got != (size_t)st.st_size)
-    {
-        free(buf);
-        return ESP_FAIL;
-    }
-    buf[got] = '\0';
+    // --- Pass 1: read the tail to find the signature line ---
+    // "sig " + 128 hex + '\n' = 133 bytes; read a bit more for safety.
+    char tail[192];
+    long tail_off = st.st_size > (long)(sizeof(tail) - 1) ? st.st_size - (long)(sizeof(tail) - 1) : 0;
+    fseek(f, tail_off, SEEK_SET);
+    size_t tail_len = fread(tail, 1, sizeof(tail) - 1, f);
+    tail[tail_len] = '\0';
 
-    // Locate the trailing signature line; everything before it is signed.
-    char *sig_line = strstr(buf, "\nsig ");
+    char *sig_line = NULL;
+    for (char *p = tail; (p = strstr(p, "\nsig ")) != NULL; p++)
+    {
+        sig_line = p; // keep the LAST occurrence
+    }
     if (sig_line == NULL)
     {
         ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Manifest has no signature line");
-        free(buf);
+        fclose(f);
         return ESP_ERR_INVALID_RESPONSE;
     }
-    size_t region_len = (sig_line - buf) + 1; // include the '\n'
+    size_t region_len = (size_t)tail_off + (sig_line - tail) + 1; // include the '\n'
     char *sig_hex = sig_line + 5;
-    char *sig_end = strchr(sig_hex, '\n');
+    char *sig_end = strpbrk(sig_hex, "\r\n");
     if (sig_end)
         *sig_end = '\0';
 
@@ -137,31 +150,82 @@ esp_err_t manifest_load_and_verify(const char *path, manifest_t *out)
         !parse_hex(sig_hex, sig_raw, MANIFEST_SIG_RAW_LEN))
     {
         ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Manifest signature not valid hex");
-        free(buf);
+        fclose(f);
         return ESP_ERR_INVALID_RESPONSE;
     }
 
-    esp_err_t err = verify_signature((const uint8_t *)buf, region_len, sig_raw);
+    // --- Pass 2: stream-hash the signed region and verify the signature ---
+    if (psa_crypto_init() != PSA_SUCCESS)
+    {
+        fclose(f);
+        return ESP_FAIL;
+    }
+    manifest_hash_t hctx;
+    if (manifest_hash_begin(&hctx) != ESP_OK)
+    {
+        fclose(f);
+        return ESP_FAIL;
+    }
+    fseek(f, 0, SEEK_SET);
+    uint8_t chunk[512];
+    size_t remaining = region_len;
+    bool magic_checked = false, io_error = false;
+    while (remaining > 0)
+    {
+        size_t want = remaining < sizeof(chunk) ? remaining : sizeof(chunk);
+        size_t got = fread(chunk, 1, want, f);
+        if (got != want)
+        {
+            io_error = true;
+            break;
+        }
+        if (!magic_checked)
+        {
+            if (got < strlen(MANIFEST_MAGIC) ||
+                memcmp(chunk, MANIFEST_MAGIC, strlen(MANIFEST_MAGIC)) != 0)
+            {
+                io_error = true; // not our format; treated below
+                break;
+            }
+            magic_checked = true;
+        }
+        if (manifest_hash_update(&hctx, chunk, got) != ESP_OK)
+        {
+            io_error = true;
+            break;
+        }
+        remaining -= got;
+    }
+    if (io_error)
+    {
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Manifest read/magic failed while hashing");
+        manifest_hash_abort(&hctx);
+        fclose(f);
+        return ESP_ERR_INVALID_RESPONSE;
+    }
+
+    uint8_t hash[MANIFEST_SHA256_LEN];
+    if (manifest_hash_end(&hctx, hash) != ESP_OK)
+    {
+        fclose(f);
+        return ESP_FAIL;
+    }
+    esp_err_t err = verify_signature_hash(hash, sig_raw);
     if (err != ESP_OK)
     {
-        free(buf);
+        fclose(f);
         return err;
     }
 
-    // Signature is good - parse the (now trusted) region line by line.
-    buf[region_len - 1] = '\0'; // terminate the signed region at its last '\n'
-    if (strncmp(buf, MANIFEST_MAGIC, strlen(MANIFEST_MAGIC)) != 0)
-    {
-        free(buf);
-        return ESP_ERR_INVALID_RESPONSE;
-    }
-
-    int capacity = 0;
+    // --- Pass 3: signature is good; parse header + validate entries ---
+    fseek(f, 0, SEEK_SET);
+    char line[MANIFEST_MAX_PATH + MANIFEST_SHA256_LEN * 2 + 24];
+    long consumed = 0;
     bool have_fw = false, malformed = false;
-    char *saveptr = NULL;
-    for (char *line = strtok_r(buf, "\n", &saveptr); line != NULL;
-         line = strtok_r(NULL, "\n", &saveptr))
+    while (consumed < (long)region_len && fgets(line, sizeof(line), f) != NULL)
     {
+        consumed += (long)strlen(line);
+        line[strcspn(line, "\r\n")] = '\0';
         if (strncmp(line, "version ", 8) == 0)
         {
             out->version = atoi(line + 8);
@@ -186,45 +250,23 @@ esp_err_t manifest_load_and_verify(const char *path, manifest_t *out)
         }
         else if (strncmp(line, "f ", 2) == 0)
         {
-            // "f <sha256hex> <size> <path>"
-            char *hex = line + 2;
-            char *sp1 = strchr(hex, ' ');
-            char *sp2 = sp1 ? strchr(sp1 + 1, ' ') : NULL;
-            if (sp1 == NULL || sp2 == NULL || (sp1 - hex) != MANIFEST_SHA256_LEN * 2 ||
-                strlen(sp2 + 1) == 0 || strlen(sp2 + 1) >= MANIFEST_MAX_PATH)
+            // Validate only - entries are re-read from disk on demand
+            // (manifest_for_each_entry), never held in RAM as an array.
+            manifest_entry_t e;
+            if (!parse_entry_line(line, &e))
             {
                 malformed = true;
                 break;
             }
-            if (out->entry_count == capacity)
-            {
-                capacity = capacity ? capacity * 2 : 32;
-                manifest_entry_t *grown = realloc(out->entries, capacity * sizeof(*grown));
-                if (grown == NULL)
-                {
-                    malformed = true;
-                    break;
-                }
-                out->entries = grown;
-            }
-            manifest_entry_t *e = &out->entries[out->entry_count];
-            if (!parse_hex(hex, e->sha256, MANIFEST_SHA256_LEN))
-            {
-                malformed = true;
-                break;
-            }
-            e->size = (uint32_t)strtoul(sp1 + 1, NULL, 10);
-            strlcpy(e->path, sp2 + 1, sizeof(e->path));
             out->entry_count++;
         }
     }
-    free(buf);
+    fclose(f);
 
     if (malformed || !have_fw || out->version <= 0 || out->generated == 0 || out->entry_count == 0)
     {
         ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Manifest verified but malformed (fw:%d ver:%d gen:%lu n:%d)",
                     have_fw, out->version, (unsigned long)out->generated, out->entry_count);
-        manifest_free(out);
         return ESP_ERR_INVALID_RESPONSE;
     }
 
@@ -233,11 +275,34 @@ esp_err_t manifest_load_and_verify(const char *path, manifest_t *out)
     return ESP_OK;
 }
 
-void manifest_free(manifest_t *m)
+esp_err_t manifest_for_each_entry(const char *path, manifest_entry_cb_t cb, void *ctx)
 {
-    free(m->entries);
-    m->entries = NULL;
-    m->entry_count = 0;
+    FILE *f = fopen(path, "r");
+    if (f == NULL)
+        return ESP_ERR_NOT_FOUND;
+
+    char line[MANIFEST_MAX_PATH + MANIFEST_SHA256_LEN * 2 + 24];
+    manifest_entry_t e;
+    int index = 0;
+    esp_err_t err = ESP_OK;
+    while (fgets(line, sizeof(line), f) != NULL)
+    {
+        if (strncmp(line, "sig ", 4) == 0)
+            break;
+        if (strncmp(line, "f ", 2) != 0)
+            continue;
+        line[strcspn(line, "\r\n")] = '\0';
+        if (!parse_entry_line(line, &e))
+        {
+            err = ESP_ERR_INVALID_RESPONSE; // can't happen for a file that passed load
+            break;
+        }
+        err = cb(&e, index++, ctx);
+        if (err != ESP_OK)
+            break;
+    }
+    fclose(f);
+    return err;
 }
 
 esp_err_t manifest_hash_begin(manifest_hash_t *ctx)

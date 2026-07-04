@@ -41,16 +41,23 @@ typedef struct
     uint32_t generated; // unix timestamp stamped by push.py
     uint8_t fw_sha256[MANIFEST_SHA256_LEN];
     uint32_t fw_size;
-    manifest_entry_t *entries; // heap; free with manifest_free
-    int entry_count;
+    int entry_count; // number of "f" lines (entries stay on disk; see below)
 } manifest_t;
 
 /* Load a manifest file, verify its signature against the embedded public
- * key, and parse it. Returns ESP_OK only for an authentic manifest;
- * ESP_ERR_INVALID_RESPONSE for a bad signature/format. */
+ * key, and parse/validate it. Returns ESP_OK only for an authentic,
+ * well-formed manifest; ESP_ERR_INVALID_RESPONSE for a bad signature or
+ * format. File entries are validated but NOT kept in RAM (a ~100-entry
+ * array cost ~14 KB and failed to allocate in the low-heap boot window);
+ * iterate them from disk with manifest_for_each_entry. */
 esp_err_t manifest_load_and_verify(const char *path, manifest_t *out);
 
-void manifest_free(manifest_t *m);
+/* Stream the "f" entries of an ALREADY-VERIFIED manifest file one at a
+ * time (tiny stack footprint). The callback returns ESP_OK to continue;
+ * any other value stops the walk and is returned. `index` counts entries
+ * from 0. */
+typedef esp_err_t (*manifest_entry_cb_t)(const manifest_entry_t *e, int index, void *ctx);
+esp_err_t manifest_for_each_entry(const char *path, manifest_entry_cb_t cb, void *ctx);
 
 /* SHA-256 of a file on SPIFFS (streamed). ESP_ERR_NOT_FOUND if absent. */
 esp_err_t manifest_sha256_file(const char *path, uint8_t out[MANIFEST_SHA256_LEN]);

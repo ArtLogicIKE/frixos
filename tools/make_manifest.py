@@ -97,8 +97,16 @@ def sign(signed_region: bytes, pin: str | None) -> bytes:
         session = PivSession(conn)
         session.verify_pin(pin or getpass.getpass(f"PIV PIN (YubiKey {info.serial}): "))
         print("Signing on YubiKey - touch it when it blinks...", flush=True)
-        sig_der = session.sign(SLOT.SIGNATURE, KEY_TYPE.ECCP256,
-                               signed_region, hashes.SHA256())
+        try:
+            sig_der = session.sign(SLOT.SIGNATURE, KEY_TYPE.ECCP256,
+                                   signed_region, hashes.SHA256())
+        except Exception as e:
+            if "6982" in str(e):
+                sys.exit("error: signing rejected (SW=6982). Either the touch "
+                         "timed out (15 s), or gpg's scdaemon is holding the "
+                         "card - run: gpg-connect-agent \"scd killscd\" /bye "
+                         "and retry.")
+            raise
     return der_sig_to_raw(sig_der)
 
 
