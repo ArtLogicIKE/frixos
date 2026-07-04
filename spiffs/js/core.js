@@ -87,7 +87,7 @@ async function saveSettings(payload, networkKeys) {
     if (reboot) { let n = 8; const recheck = () => { if (--n <= 0) location.reload(); else setTimeout(recheck, 1000); }; setTimeout(recheck, 1000); }
     return true;
   }
-  toast((res.data && res.data.message) || getMessage('save_failed'), 'err');
+  toast(localizeServerMessage(res.data && res.data.message, 'save_failed'), 'err');
   return false;
 }
 

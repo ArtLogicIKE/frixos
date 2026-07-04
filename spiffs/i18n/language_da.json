@@ -238,9 +238,6 @@
       "y_offset": "Y-forskydning",
       "rotation": "Displayrotation",
       "show_scroll": "Vis rullende informationsbesked",
-      "show_weather": "Vis vejrudsigtsikon og månefase",
-      "show_leading_zero": "Vis 0 for encifret time",
-      "disable_dots_breathe": "Deaktiver åndingseffekt for tidspunkter",
       "show_grid": "Vis gitter",
       "mirror": "Spejlvend display"
     },
@@ -539,7 +536,7 @@
     "reinstall_started": "Geninstallation startet. Sluk ikke enheden.",
     "reinstall_failed": "Kunne ikke starte geninstallation: ",
     "reinstall_wifi_required": "WiFi skal være forbundet for at geninstallere firmware",
-    "reinstall_in_progress": "En opdatering er allerede i gang",
+    "reinstall_in_progress": "En opdatering er allerede i gang.",
     "sending_reset": "Sender genstartskommando...",
     "device_restarting": "Enheden genstarter. Denne side vil opdateres om ",
     "device_restarting_seconds": " sekunder.",
@@ -579,7 +576,8 @@
     "saved_restarting": "Gemt — enheden genstarter…",
     "status_refreshed": "Status opdateret",
     "upload_failed": "Upload mislykkedes",
-    "changes_discarded": "Ændringer kasseret"
+    "changes_discarded": "Ændringer kasseret",
+    "wifi_not_connected": "Wi-Fi er ikke tilsluttet."
   },
   "files": {
     "delete_selected": "Slet valgte",

@@ -152,6 +152,19 @@ function getMessage(key, ...args) {
   if (!m) m = getNestedTranslation(translations.en, 'messages.' + key) || key;
   return args.length ? m + args.join('') : m;
 }
+
+/* The device firmware speaks English only, so its response `message` strings
+   must never be shown to the user verbatim. Map the known ones to localized
+   message keys; anything unrecognised falls back to the localized fallbackKey
+   (never the raw English text). */
+const SERVER_MESSAGE_KEYS = {
+  'update already in progress': 'reinstall_in_progress',
+  'wifi not connected': 'wifi_not_connected'
+};
+function localizeServerMessage(message, fallbackKey) {
+  const mapped = message && SERVER_MESSAGE_KEYS[String(message).trim().toLowerCase()];
+  return getMessage(mapped || fallbackKey);
+}
 /* Generic translated-string lookup by dot path, with English fallback then a
    literal fallback. Resolves against the current language at call time, so
    strings rendered on demand (toasts, hints) follow the active language

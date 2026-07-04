@@ -238,9 +238,6 @@
       "y_offset": "Y-Versatz",
       "rotation": "Display-Rotation",
       "show_scroll": "Laufende Informationsnachricht anzeigen",
-      "show_weather": "Wettervorhersage-Symbol und Mondphase anzeigen",
-      "show_leading_zero": "0 für einstellige Stunde anzeigen",
-      "disable_dots_breathe": "Atmung der Zeitanzeige-Punkte deaktivieren",
       "show_grid": "Raster anzeigen",
       "mirror": "Display spiegeln"
     },
@@ -539,7 +536,7 @@
     "reinstall_started": "Neuinstallation gestartet. Schalten Sie das Gerät nicht aus.",
     "reinstall_failed": "Neuinstallation konnte nicht gestartet werden: ",
     "reinstall_wifi_required": "Für die Neuinstallation muss WiFi verbunden sein",
-    "reinstall_in_progress": "Ein Update läuft bereits",
+    "reinstall_in_progress": "Ein Update wird bereits ausgeführt.",
     "sending_reset": "Neustart-Befehl wird gesendet...",
     "device_restarting": "Gerät wird neu gestartet. Diese Seite wird in ",
     "device_restarting_seconds": " Sekunden aktualisiert.",
@@ -579,7 +576,8 @@
     "saved_restarting": "Gespeichert — Gerät wird neu gestartet…",
     "status_refreshed": "Status aktualisiert",
     "upload_failed": "Upload fehlgeschlagen",
-    "changes_discarded": "Änderungen verworfen"
+    "changes_discarded": "Änderungen verworfen",
+    "wifi_not_connected": "WLAN ist nicht verbunden."
   },
   "files": {
     "delete_selected": "Auswahl löschen",

@@ -238,9 +238,6 @@
       "y_offset": "Desplazamiento Y",
       "rotation": "Rotación de Pantalla",
       "show_scroll": "Mostrar mensaje de información desplazable",
-      "show_weather": "Mostrar icono de pronóstico del tiempo y fase lunar",
-      "show_leading_zero": "Mostrar 0 para hora de un solo dígito",
-      "disable_dots_breathe": "Desactivar efecto de respiración de los puntos de hora",
       "show_grid": "Mostrar cuadrícula",
       "mirror": "Reflejar Pantalla"
     },
@@ -539,7 +536,7 @@
     "reinstall_started": "Reinstalación iniciada. No apague el dispositivo.",
     "reinstall_failed": "No se pudo iniciar la reinstalación: ",
     "reinstall_wifi_required": "WiFi debe estar conectado para reinstalar el firmware",
-    "reinstall_in_progress": "Ya hay una actualización en curso",
+    "reinstall_in_progress": "Ya hay una actualización en curso.",
     "sending_reset": "Enviando comando de reinicio...",
     "device_restarting": "El dispositivo se está reiniciando. Esta página se actualizará en ",
     "device_restarting_seconds": " segundos.",
@@ -579,7 +576,8 @@
     "saved_restarting": "Guardado — reiniciando el dispositivo…",
     "status_refreshed": "Estado actualizado",
     "upload_failed": "Error al subir",
-    "changes_discarded": "Cambios descartados"
+    "changes_discarded": "Cambios descartados",
+    "wifi_not_connected": "El Wi-Fi no está conectado."
   },
   "files": {
     "delete_selected": "Eliminar seleccionados",

@@ -238,9 +238,6 @@
       "y_offset": "Y-offset",
       "rotation": "Displayrotation",
       "show_scroll": "Visa rullande informationsmeddelande",
-      "show_weather": "Visa väderprognos-ikon och månfas",
-      "show_leading_zero": "Visa 0 för ensiffrig timme",
-      "disable_dots_breathe": "Inaktivera andningseffekt för tidsklocka",
       "show_grid": "Visa rutnät",
       "mirror": "Spegla display"
     },
@@ -539,7 +536,7 @@
     "reinstall_started": "Ominstallation startad. Stäng inte av enheten.",
     "reinstall_failed": "Kunde inte starta ominstallation: ",
     "reinstall_wifi_required": "WiFi måste vara anslutet för att ominstallera firmware",
-    "reinstall_in_progress": "En uppdatering pågår redan",
+    "reinstall_in_progress": "En uppdatering pågår redan.",
     "sending_reset": "Skickar omstartskommando...",
     "device_restarting": "Enheten startar om. Denna sida kommer att uppdateras om ",
     "device_restarting_seconds": " sekunder.",
@@ -579,7 +576,8 @@
     "saved_restarting": "Sparat — enheten startar om…",
     "status_refreshed": "Status uppdaterad",
     "upload_failed": "Uppladdningen misslyckades",
-    "changes_discarded": "Ändringar förkastade"
+    "changes_discarded": "Ändringar förkastade",
+    "wifi_not_connected": "Wi-Fi är inte anslutet."
   },
   "files": {
     "delete_selected": "Ta bort markerade",

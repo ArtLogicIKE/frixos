@@ -238,9 +238,6 @@
       "y_offset": "Przesunięcie Y",
       "rotation": "Obrót wyświetlacza",
       "show_scroll": "Pokaż przewijaną wiadomość informacyjną",
-      "show_weather": "Pokaż ikonę prognozy pogody i fazę księżyca",
-      "show_leading_zero": "Pokaż 0 dla jednocyfrowej godziny",
-      "disable_dots_breathe": "Wyłącz efekt oddychania kropek czasu",
       "show_grid": "Pokaż siatkę",
       "mirror": "Odbij wyświetlacz"
     },
@@ -539,7 +536,7 @@
     "reinstall_started": "Ponowna instalacja rozpoczęta. Nie wyłączaj urządzenia.",
     "reinstall_failed": "Nie udało się rozpocząć ponownej instalacji: ",
     "reinstall_wifi_required": "WiFi musi być połączone, aby ponownie zainstalować oprogramowanie",
-    "reinstall_in_progress": "Aktualizacja jest już w toku",
+    "reinstall_in_progress": "Aktualizacja jest już w toku.",
     "sending_reset": "Wysyłanie polecenia restartu...",
     "device_restarting": "Urządzenie się restartuje. Ta strona odświeży się za ",
     "device_restarting_seconds": " sekund.",
@@ -579,7 +576,8 @@
     "saved_restarting": "Zapisano — urządzenie się restartuje…",
     "status_refreshed": "Odświeżono status",
     "upload_failed": "Przesyłanie nie powiodło się",
-    "changes_discarded": "Zmiany odrzucone"
+    "changes_discarded": "Zmiany odrzucone",
+    "wifi_not_connected": "Wi-Fi nie jest połączone."
   },
   "files": {
     "delete_selected": "Usuń zaznaczone",

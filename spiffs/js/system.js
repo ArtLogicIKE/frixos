@@ -78,7 +78,7 @@ el('filesRename').addEventListener('click', async () => {
   const newName = prompt(getMessage('rename_prompt').replace('{name}', names[0]), names[0]); if (!newName || newName === names[0]) return;
   const res = await apiPostJson('/api/files/rename', { oldName: names[0], newName });
   if (res.data && res.data.status === 'ok') { toast(getMessage('file_renamed'), 'ok'); loadFiles(); }
-  else toast((res.data && res.data.message) || getMessage('rename_failed'), 'err');
+  else toast(localizeServerMessage(res.data && res.data.message, 'rename_failed'), 'err');
 });
 
 /* ---------- UPDATE ---------- */
@@ -96,8 +96,8 @@ uploadBtn.addEventListener('click', () => {
     let d = {}; try { d = JSON.parse(xhr.responseText); } catch (e) { }
     if (xhr.status >= 200 && xhr.status < 300 && d.status === 'ok') {
       if ((d.message || '').toLowerCase().includes('reboot')) { txt.textContent = getMessage('done_restarting'); toast(getMessage('firmware_update_success'), 'ok'); setTimeout(() => location.reload(), 8000); }
-      else { txt.textContent = getMessage('done'); toast(d.message || getMessage('file_upload_success'), 'ok'); }
-    } else { toast((d.message) || getMessage('upload_failed'), 'err'); }
+      else { txt.textContent = getMessage('done'); toast(getMessage('file_upload_success'), 'ok'); }
+    } else { toast(localizeServerMessage(d.message, 'upload_failed'), 'err'); }
     uploadBtn.disabled = false;
   });
   xhr.addEventListener('error', () => { toast(getMessage('upload_failed'), 'err'); uploadBtn.disabled = false; });
@@ -106,7 +106,7 @@ uploadBtn.addEventListener('click', () => {
 el('reinstall').addEventListener('click', async () => {
   const res = await apiPostJson('/api/ota/reinstall', {});
   if (res.data && res.data.status === 'ok') toast(getMessage('reinstall_started'), 'ok');
-  else toast((res.data && res.data.message) || getMessage('reinstall_failed'), 'err');
+  else toast(localizeServerMessage(res.data && res.data.message, 'reinstall_failed'), 'err');
 });
 
 /* ---------- MAINTENANCE ---------- */

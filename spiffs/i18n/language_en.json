@@ -546,7 +546,7 @@
     "reinstall_started": "Reinstall started. Do not power off the device.",
     "reinstall_failed": "Failed to start reinstall: ",
     "reinstall_wifi_required": "WiFi must be connected to reinstall firmware",
-    "reinstall_in_progress": "An update is already in progress",
+    "reinstall_in_progress": "An update is already in progress.",
     "sending_reset": "Sending reset command...",
     "device_restarting": "Device is restarting. This page will refresh in ",
     "device_restarting_seconds": " seconds.",
@@ -586,7 +586,8 @@
     "done": "Done",
     "upload_failed": "Upload failed",
     "device_restarting_short": "Device restarting…",
-    "changes_discarded": "Changes discarded"
+    "changes_discarded": "Changes discarded",
+    "wifi_not_connected": "Wi-Fi is not connected."
   },
   "system": {
     "maintenance_title": "Maintenance",
