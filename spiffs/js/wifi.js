@@ -21,13 +21,42 @@ const bars = pct => { const lv = Math.max(1, Math.min(4, Math.ceil((pct || 0) / 
 /* SSIDs are attacker-controlled (anyone can broadcast one) — escape before
    they touch innerHTML. */
 const escHtml = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function selectNetwork(node) {
+  $$('#netlist .net').forEach(x => x.classList.remove('sel'));
+  node.classList.add('sel');
+  el('wifi_ssid').value = node.dataset.ssid;
+  el('wifi_pass').focus();
+  if (window.saveBar) window.saveBar.markDirty(); // programmatic set: no input event fires
+}
+
 function renderNets(nets) {
   if (!nets.length) { el('netlist').innerHTML = '<div class="net-empty">' + tr('settings.wifi.no_networks', 'No networks found.') + '</div>'; return; }
   nets.sort((a, b) => (b.signal_strength || 0) - (a.signal_strength || 0));
-  el('netlist').innerHTML = nets.map(n => `<div class="net" data-ssid="${escHtml(n.ssid || '')}">${n.requires_password ? '<span class="lock"></span>' : ''}<span class="nm">${escHtml(n.ssid || '')}</span><span class="meta">${bars(n.signal_strength)}</span></div>`).join('');
-  $$('#netlist .net').forEach(node => node.addEventListener('click', () => {
-    $$('#netlist .net').forEach(x => x.classList.remove('sel')); node.classList.add('sel');
-    el('wifi_ssid').value = node.dataset.ssid; el('wifi_pass').focus();
-    if (window.saveBar) window.saveBar.markDirty(); // programmatic set: no input event fires
-  }));
+
+  const signalLabel = tr('settings.wifi.signal', 'Signal strength');
+  const secureLabel = tr('settings.wifi.secure', 'Secure');
+  const openLabel = tr('settings.wifi.open', 'Open');
+
+  el('netlist').innerHTML = nets.map(n => {
+    const ssid = escHtml(n.ssid || '');
+    const pct = n.signal_strength || 0;
+    const isSecure = !!n.requires_password;
+    const ariaLabel = `${ssid}, ${isSecure ? secureLabel : openLabel}, ${signalLabel} ${pct}%`;
+
+    return `<div class="net" role="button" tabindex="0" data-ssid="${ssid}" aria-label="${ariaLabel}">` +
+           `${isSecure ? '<span class="lock"></span>' : ''}` +
+           `<span class="nm">${ssid}</span>` +
+           `<span class="meta">${bars(pct)}</span></div>`;
+  }).join('');
+
+  $$('#netlist .net').forEach(node => {
+    node.addEventListener('click', () => selectNetwork(node));
+    node.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        selectNetwork(node);
+      }
+    });
+  });
 }
