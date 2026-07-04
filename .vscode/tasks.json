@@ -4,11 +4,11 @@
         {
             "label": "ESP-IDF: Build",
             "type": "shell",
-            "command": ". 'C:\\Espressif\\tools\\Microsoft.v6.0.1.PowerShell_profile.ps1'; Set-Location '${workspaceFolder}'; idf.py build; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }",
+            "command": "cmd.exe /c \"call C:\\Espressif\\frameworks\\esp-idf-v6.0.1\\export.bat && set ESP_IDF_VERSION=6.0.1 && set _IDF.PY_COMPLETE= && cd /d ${workspaceFolder} && idf.py build\"",
             "options": {
                 "shell": {
-                    "executable": "pwsh.exe",
-                    "args": ["-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command"]
+                    "executable": "cmd.exe",
+                    "args": ["/d", "/c"]
                 }
             },
             "group": {

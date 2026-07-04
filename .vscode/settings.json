@@ -33,5 +33,13 @@
   "idf.pythonInstallPath": "c:\\Espressif\\python_env\\idf6.0_py3.13_env\\Scripts\\python.exe",
   "idf.currentSetup": "C:\\Espressif\\frameworks\\esp-idf-v6.0.1",
   "idf.buildPath": "${workspaceFolder}/build",
-  "idf.customExtraVars": {}
+  "idf.customExtraVars": {
+    "ESP_IDF_VERSION": "6.0.1"
+  },
+  "clangd.path": "C:\\Espressif\\tools\\esp-clang\\esp-20.1.1_20250829\\esp-clang\\bin\\clangd.exe",
+  "clangd.arguments": [
+    "--background-index",
+    "--query-driver=**",
+    "--compile-commands-dir=c:\\source\\frixos\\build"
+  ]
 }

@@ -55,7 +55,11 @@ idf_component_register(SRCS
     REQUIRES mbedtls
     REQUIRES esp-tls
     REQUIRES vfs
-    REQUIRES teriyakigod__esp_lcd_st7735)
+    REQUIRES teriyakigod__esp_lcd_st7735
+    REQUIRES lvgl__lvgl
+    REQUIRES espressif__esp_lvgl_port
+    REQUIRES espressif__mdns
+    REQUIRES espressif__cjson)
 
     target_compile_options(${COMPONENT_LIB} PRIVATE "-fno-jump-tables" "-fno-tree-switch-conversion")
 
