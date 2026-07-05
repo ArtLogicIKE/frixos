@@ -261,7 +261,10 @@
       "bw": "Bianco e nero"
     },
     "fonts": {
-      "title": "Esempi di font"
+      "title": "Caratteri",
+      "desc": "Scegli il carattere dell’orologio per giorno e notte. Questo aggiorna il layout e lo applica subito.",
+      "day": "Giorno",
+      "night": "Notte"
     },
     "location": {
       "title": "Posizione",
@@ -365,10 +368,6 @@
       "token_cgm_time": "Ora dell'ultima misurazione CGM, es. 12:01pom. (richiede integrazione CGM attiva)",
       "tokens_note": "Nota: i token sono sensibili alle maiuscole e devono essere racchiusi tra parentesi quadre.",
       "default_message": "Messaggio predefinito: [device].local/ [greeting] [day], [date] [mon], ora [temp] oggi [high]-[low], um. [hum], sole [rise]-[set]"
-    },
-    "night_font": {
-      "title": "Carattere notturno",
-      "desc": "Scegli il carattere dell’orologio di notte. Questo aggiorna il layout Notte e lo applica subito."
     }
   },
   "status": {
@@ -582,7 +581,7 @@
     "upload_failed": "Caricamento fallito",
     "changes_discarded": "Modifiche scartate",
     "wifi_not_connected": "Il Wi-Fi non è connesso.",
-    "night_font_applied": "Carattere notturno applicato."
+    "font_applied": "Carattere applicato."
   },
   "files": {
     "delete_selected": "Elimina selezionati",

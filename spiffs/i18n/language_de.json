@@ -261,7 +261,10 @@
       "bw": "Schwarz-Weiß"
     },
     "fonts": {
-      "title": "Schriftmuster"
+      "title": "Schriftarten",
+      "desc": "Wählen Sie die Uhr-Schriftart für Tag und Nacht. Dies aktualisiert das Layout und wendet es sofort an.",
+      "day": "Tag",
+      "night": "Nacht"
     },
     "location": {
       "title": "Standort",
@@ -365,10 +368,6 @@
       "token_cgm_time": "Uhrzeit der letzten CGM-Messung, z.B. 12:01nachm. (benötigt aktive CGM-Integration)",
       "tokens_note": "Hinweis: Token sind Groß-/Kleinschreibung beachtend und müssen in eckigen Klammern stehen.",
       "default_message": "Standardnachricht: [device].local/ [greeting] [day], [date] [mon], jetzt [temp] heute [high]-[low], Feuchte [hum], Sonne [rise]-[set]"
-    },
-    "night_font": {
-      "title": "Nachtschriftart",
-      "desc": "Wählen Sie die Schriftart für die Uhr bei Nacht. Dies aktualisiert das Nacht-Layout und wendet es sofort an."
     }
   },
   "status": {
@@ -582,7 +581,7 @@
     "upload_failed": "Upload fehlgeschlagen",
     "changes_discarded": "Änderungen verworfen",
     "wifi_not_connected": "WLAN ist nicht verbunden.",
-    "night_font_applied": "Nachtschriftart angewendet."
+    "font_applied": "Schriftart angewendet."
   },
   "files": {
     "delete_selected": "Auswahl löschen",

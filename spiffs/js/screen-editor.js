@@ -2512,12 +2512,13 @@ async function appendScreenFontSamples(container, selectedFont, fontLayoutKey) {
     container.appendChild(wrap);
 }
 
-/* ---------- Night-font shortcut (Device > Display) ----------
-   A beginner-friendly control that changes only the night layout's clock
-   font: it loads the current screen layout, sets night_font, and saves it
-   to the device (same effect as picking a Night font in the Layout editor
-   and pressing Apply) - without making the user open the editor. */
-async function applyNightFontShortcut(font, box, grid) {
+/* ---------- Fonts shortcut (Device > Display) ----------
+   A beginner-friendly control that changes only the clock font for the day
+   and/or night layout: it loads the current screen layout, sets day_font /
+   night_font, and saves it to the device (same effect as picking a font in
+   the Layout editor and pressing Apply) - without opening the editor.
+   `mode` is 'day' or 'night'; p04/p05 are the mirrored settings for each. */
+async function applyFontShortcut(mode, font, box, grid) {
     if (!window.screenLayout || !window.screenLayout.profiles) {
         await fetchScreenLayout(); // populate window.screenLayout from the device
     }
@@ -2525,7 +2526,8 @@ async function applyNightFontShortcut(font, box, grid) {
         toast(getMessage('error_saving_settings'), 'err');
         return;
     }
-    window.screenLayout.night_font = font;
+    const fontKey = mode === 'day' ? 'day_font' : 'night_font';
+    window.screenLayout[fontKey] = font;
     window.screenLayout.version = SCREEN_LAYOUT_VERSION;
     ensureScreenLayoutMeta(window.screenLayout);
     ensureScreenProfileShape(window.screenLayout.profiles.day);
@@ -2540,26 +2542,18 @@ async function applyNightFontShortcut(font, box, grid) {
         });
         const data = await resp.json().catch(() => ({}));
         if (resp.ok && data && data.status === 'ok') {
-            if (window.settings) window.settings.p05 = font; // keep the mirrored setting in sync
-            toast(getMessage('night_font_applied'), 'ok');
+            if (window.settings) window.settings[mode === 'day' ? 'p04' : 'p05'] = font; // keep mirror in sync
+            toast(getMessage('font_applied'), 'ok');
         } else {
             toast(getMessage('error_saving_settings'), 'err');
         }
     } catch (e) {
-        console.error('Night font apply failed:', e);
+        console.error('Font apply failed:', e);
         toast(getMessage('error_saving_unknown'), 'err');
     }
 }
 
-async function renderNightFontShortcut() {
-    const host = el('nightFontSamples');
-    if (!host || host.dataset.rendered) return;
-    host.dataset.rendered = '1';
-    await ensureScreenSpiffsFiles();
-    if (!window.screenLayout || !window.screenLayout.profiles) {
-        await fetchScreenLayout();
-    }
-    const current = (window.screenLayout && window.screenLayout.night_font) || 'bold';
+function buildFontSampleGrid(mode, current) {
     const grid = document.createElement('div');
     grid.className = 'screen-font-samples-grid';
     SCREEN_TIME_FONTS.forEach(font => {
@@ -2571,19 +2565,33 @@ async function renderNightFontShortcut() {
         name.textContent = font.charAt(0).toUpperCase() + font.slice(1);
         box.appendChild(name);
         box.appendChild(createFontSamplePreview(font));
-        box.addEventListener('click', () => applyNightFontShortcut(font, box, grid));
+        box.addEventListener('click', () => applyFontShortcut(mode, font, box, grid));
         grid.appendChild(box);
     });
-    host.innerHTML = '';
-    host.appendChild(grid);
+    return grid;
 }
 
-function initNightFontShortcut() {
-    const box = el('nightFontBox');
+async function renderFontsShortcut() {
+    const dayHost = el('dayFontSamples');
+    const nightHost = el('nightFontSamples');
+    if (!dayHost || !nightHost || dayHost.dataset.rendered) return;
+    dayHost.dataset.rendered = '1';
+    await ensureScreenSpiffsFiles();
+    if (!window.screenLayout || !window.screenLayout.profiles) {
+        await fetchScreenLayout();
+    }
+    dayHost.innerHTML = '';
+    dayHost.appendChild(buildFontSampleGrid('day', (window.screenLayout && window.screenLayout.day_font) || 'bold'));
+    nightHost.innerHTML = '';
+    nightHost.appendChild(buildFontSampleGrid('night', (window.screenLayout && window.screenLayout.night_font) || 'bold'));
+}
+
+function initFontsShortcut() {
+    const box = el('fontsBox');
     if (!box || box.dataset.wired) return;
     box.dataset.wired = '1';
     // Render the samples lazily the first time the section is expanded.
-    box.addEventListener('toggle', () => { if (box.open) renderNightFontShortcut(); });
+    box.addEventListener('toggle', () => { if (box.open) renderFontsShortcut(); });
 }
 
 function appendScreenTokenButtons(container, textarea) {

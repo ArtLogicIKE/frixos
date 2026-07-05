@@ -175,5 +175,5 @@ function collectAdvancedPayload() {
 sectionLoaders.settings = async function () {
   await loadSettings();
   await loadAdvanced();
-  if (typeof initNightFontShortcut === 'function') initNightFontShortcut();
+  if (typeof initFontsShortcut === 'function') initFontsShortcut();
 };

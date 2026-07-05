@@ -261,7 +261,10 @@
       "bw": "Czarno-biały"
     },
     "fonts": {
-      "title": "Przykłady czcionek"
+      "title": "Czcionki",
+      "desc": "Wybierz czcionkę zegara dla dnia i nocy. Zaktualizuje to układ i zastosuje go od razu.",
+      "day": "Dzień",
+      "night": "Noc"
     },
     "location": {
       "title": "Lokalizacja",
@@ -365,10 +368,6 @@
       "token_cgm_time": "Czas ostatniego pomiaru CGM, np. 12:01PM (wymaga aktywnej integracji CGM)",
       "tokens_note": "Uwaga: Tokeny rozróżniają wielkość liter i muszą być w nawiasach kwadratowych.",
       "default_message": "Domyślna wiadomość: [device].local/ [greeting] [day], [date] [mon], teraz [temp] dziś [high]-[low], wilg. [hum], sol [rise]-[set]"
-    },
-    "night_font": {
-      "title": "Czcionka nocna",
-      "desc": "Wybierz czcionkę zegara w nocy. Zaktualizuje to układ Noc i zastosuje go od razu."
     }
   },
   "status": {
@@ -582,7 +581,7 @@
     "upload_failed": "Przesyłanie nie powiodło się",
     "changes_discarded": "Zmiany odrzucone",
     "wifi_not_connected": "Wi-Fi nie jest połączone.",
-    "night_font_applied": "Zastosowano czcionkę nocną."
+    "font_applied": "Zastosowano czcionkę."
   },
   "files": {
     "delete_selected": "Usuń zaznaczone",

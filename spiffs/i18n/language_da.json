@@ -261,7 +261,10 @@
       "bw": "Sort-hvid"
     },
     "fonts": {
-      "title": "Skrifttypeprøver"
+      "title": "Skrifttyper",
+      "desc": "Vælg urets skrifttype for dag og nat. Dette opdaterer layoutet og anvender det med det samme.",
+      "day": "Dag",
+      "night": "Nat"
     },
     "location": {
       "title": "Placering",
@@ -365,10 +368,6 @@
       "token_cgm_time": "Tidspunkt for seneste CGM-måling, f.eks. 12:01em (kræver aktiv CGM-integration)",
       "tokens_note": "Bemærk: Tokens er store og små bogstaver og skal være i kantede parenteser.",
       "default_message": "Standardbesked: [device].local/ [greeting] [day], [date] [mon], nu [temp] i dag [high]-[low], fugt. [hum], sol [rise]-[set]"
-    },
-    "night_font": {
-      "title": "Natskrifttype",
-      "desc": "Vælg skrifttypen til uret om natten. Dette opdaterer Nat-layoutet og anvender det med det samme."
     }
   },
   "status": {
@@ -582,7 +581,7 @@
     "upload_failed": "Upload mislykkedes",
     "changes_discarded": "Ændringer kasseret",
     "wifi_not_connected": "Wi-Fi er ikke tilsluttet.",
-    "night_font_applied": "Natskrifttype anvendt."
+    "font_applied": "Skrifttype anvendt."
   },
   "files": {
     "delete_selected": "Slet valgte",

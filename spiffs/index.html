@@ -121,6 +121,18 @@
       <div class="field"><label data-i18n="advanced.display.rotation">Display rotation</label>
         <select id="rotation"><option value="0">0°</option><option value="1">90°</option><option value="2">180°</option><option value="3">270°</option></select>
       </div>
+
+      <details class="adv-box" id="fontsBox">
+        <summary data-i18n="advanced.fonts.title">Fonts</summary>
+        <div class="adv-body">
+          <p class="muted-p" data-i18n="advanced.fonts.desc">Pick the clock font for day and night. This updates the layout and applies it right away.</p>
+          <div class="subtitle" data-i18n="advanced.fonts.day">Day</div>
+          <div id="dayFontSamples"></div>
+          <div class="subtitle" data-i18n="advanced.fonts.night">Night</div>
+          <div id="nightFontSamples"></div>
+        </div>
+      </details>
+
       <div class="field"><label data-i18n="menu.screen">Layout</label>
         <div class="city-row">
           <select id="settingsLayoutSelect"><option value="" data-i18n="common.current">Current</option></select>
@@ -128,14 +140,6 @@
         </div>
       </div>
       <div class="toggle"><div class="tx"><div class="tt" data-i18n="advanced.display.mirror">Mirror display</div></div><button class="gswitch" id="mirroring" type="button" role="switch" aria-checked="false" data-i18n-aria-label="advanced.display.mirror" aria-label="Mirror"></button></div>
-
-      <details class="adv-box" id="nightFontBox">
-        <summary data-i18n="advanced.night_font.title">Night font</summary>
-        <div class="adv-body">
-          <p class="muted-p" data-i18n="advanced.night_font.desc">Pick the font used for the clock at night. This updates the Night layout and applies it right away.</p>
-          <div id="nightFontSamples"></div>
-        </div>
-      </details>
 
       <div class="subtitle" data-i18n="advanced.brightness.title">Projection brightness</div>
       <div class="grid2">
