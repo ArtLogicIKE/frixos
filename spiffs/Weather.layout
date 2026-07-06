@@ -27,44 +27,44 @@
       "elements": [
         {
           "id": "glucose_level",
-          "enabled": 0,
-          "x": 27,
-          "y": 27,
+          "enabled": 1,
+          "x": 100,
+          "y": 48,
           "z": 4
         },
         {
           "id": "glucose_trend",
-          "enabled": 0,
-          "x": 42,
-          "y": 30,
+          "enabled": 1,
+          "x": 101,
+          "y": 34,
           "z": 4
         },
         {
           "id": "wifi_off",
           "enabled": 1,
-          "x": 96,
-          "y": 2,
+          "x": 25,
+          "y": 11,
           "z": 4
         },
         {
           "id": "weather",
           "enabled": 1,
-          "x": 96,
-          "y": 2,
+          "x": 46,
+          "y": 9,
           "z": 3
         },
         {
           "id": "moon",
           "enabled": 1,
-          "x": 100,
-          "y": 24,
+          "x": 79,
+          "y": 17,
           "z": 3
         },
         {
           "id": "time",
           "enabled": 1,
-          "x": 4,
-          "y": 2,
+          "x": 20,
+          "y": 32,
           "z": 1
         },
         {
@@ -84,8 +84,8 @@
         {
           "id": "ampm",
           "enabled": 1,
-          "x": 86,
-          "y": 8,
+          "x": 11,
+          "y": 44,
           "z": 2
         },
         {
@@ -113,7 +113,7 @@
           "id": "message",
           "enabled": 1,
           "x": 0,
-          "y": 94,
+          "y": 103,
           "z": 0,
           "options": {
             "font": 0,
@@ -124,22 +124,22 @@
         {
           "id": "text_1",
           "enabled": 1,
-          "x": 2,
-          "y": 44,
+          "x": 0,
+          "y": 66,
           "z": 1,
           "options": {
             "font": 0,
             "color": "#ffffff",
             "bg_color": "#000000",
             "width": 60,
-            "align": 0
+            "align": 2
           }
         },
         {
           "id": "text_2",
           "enabled": 1,
-          "x": 66,
-          "y": 44,
+          "x": 65,
+          "y": 93,
           "z": 2,
           "options": {
             "font": 0,
@@ -152,36 +152,36 @@
         {
           "id": "text_3",
           "enabled": 1,
-          "x": 2,
-          "y": 56,
+          "x": 0,
+          "y": 75,
           "z": 3,
           "options": {
             "font": 0,
             "color": "#ffffff",
             "bg_color": "#000000",
             "width": 60,
-            "align": 0
+            "align": 2
           }
         },
         {
           "id": "text_4",
           "enabled": 1,
-          "x": 66,
-          "y": 56,
+          "x": 0,
+          "y": 84,
           "z": 4,
           "options": {
             "font": 0,
             "color": "#ffffff",
             "bg_color": "#000000",
             "width": 60,
-            "align": 0
+            "align": 2
           }
         },
         {
           "id": "text_5",
           "enabled": 1,
-          "x": 2,
-          "y": 68,
+          "x": 65,
+          "y": 76,
           "z": 4,
           "options": {
             "font": 0,
@@ -194,8 +194,8 @@
         {
           "id": "text_6",
           "enabled": 1,
-          "x": 66,
-          "y": 68,
+          "x": 65,
+          "y": 67,
           "z": 4,
           "options": {
             "font": 0,
@@ -208,22 +208,22 @@
         {
           "id": "text_7",
           "enabled": 1,
-          "x": 2,
-          "y": 80,
+          "x": 0,
+          "y": 93,
           "z": 4,
           "options": {
             "font": 0,
             "color": "#ffffff",
             "bg_color": "#000000",
             "width": 60,
-            "align": 0
+            "align": 2
           }
         },
         {
           "id": "text_8",
           "enabled": 1,
-          "x": 66,
-          "y": 80,
+          "x": 65,
+          "y": 84,
           "z": 4,
           "options": {
             "font": 0,
@@ -315,44 +315,44 @@
       "elements": [
         {
           "id": "glucose_level",
-          "enabled": 0,
-          "x": 27,
-          "y": 27,
+          "enabled": 1,
+          "x": 100,
+          "y": 48,
           "z": 4
         },
         {
           "id": "glucose_trend",
-          "enabled": 0,
-          "x": 42,
-          "y": 30,
+          "enabled": 1,
+          "x": 101,
+          "y": 34,
           "z": 4
         },
         {
           "id": "wifi_off",
           "enabled": 1,
-          "x": 96,
-          "y": 2,
+          "x": 25,
+          "y": 11,
           "z": 4
         },
         {
           "id": "weather",
           "enabled": 1,
-          "x": 96,
-          "y": 2,
+          "x": 46,
+          "y": 9,
           "z": 3
         },
         {
           "id": "moon",
           "enabled": 1,
-          "x": 100,
-          "y": 24,
+          "x": 79,
+          "y": 17,
           "z": 3
         },
         {
           "id": "time",
           "enabled": 1,
-          "x": 4,
-          "y": 2,
+          "x": 20,
+          "y": 32,
           "z": 1
         },
         {
@@ -372,8 +372,8 @@
         {
           "id": "ampm",
           "enabled": 1,
-          "x": 86,
-          "y": 8,
+          "x": 11,
+          "y": 44,
           "z": 2
         },
         {
@@ -401,7 +401,7 @@
           "id": "message",
           "enabled": 1,
           "x": 0,
-          "y": 94,
+          "y": 103,
           "z": 0,
           "options": {
             "font": 0,
@@ -412,22 +412,22 @@
         {
           "id": "text_1",
           "enabled": 1,
-          "x": 2,
-          "y": 44,
+          "x": 0,
+          "y": 66,
           "z": 1,
           "options": {
             "font": 0,
             "color": "#ffffff",
             "bg_color": "#000000",
             "width": 60,
-            "align": 0
+            "align": 2
           }
         },
         {
           "id": "text_2",
           "enabled": 1,
-          "x": 66,
-          "y": 44,
+          "x": 65,
+          "y": 93,
           "z": 2,
           "options": {
             "font": 0,
@@ -440,36 +440,36 @@
         {
           "id": "text_3",
           "enabled": 1,
-          "x": 2,
-          "y": 56,
+          "x": 0,
+          "y": 75,
           "z": 3,
           "options": {
             "font": 0,
             "color": "#ffffff",
             "bg_color": "#000000",
             "width": 60,
-            "align": 0
+            "align": 2
           }
         },
         {
           "id": "text_4",
           "enabled": 1,
-          "x": 66,
-          "y": 56,
+          "x": 0,
+          "y": 84,
           "z": 4,
           "options": {
             "font": 0,
             "color": "#ffffff",
             "bg_color": "#000000",
             "width": 60,
-            "align": 0
+            "align": 2
           }
         },
         {
           "id": "text_5",
           "enabled": 1,
-          "x": 2,
-          "y": 68,
+          "x": 65,
+          "y": 76,
           "z": 4,
           "options": {
             "font": 0,
@@ -482,8 +482,8 @@
         {
           "id": "text_6",
           "enabled": 1,
-          "x": 66,
-          "y": 68,
+          "x": 65,
+          "y": 67,
           "z": 4,
           "options": {
             "font": 0,
@@ -496,22 +496,22 @@
         {
           "id": "text_7",
           "enabled": 1,
-          "x": 2,
-          "y": 80,
+          "x": 0,
+          "y": 93,
           "z": 4,
           "options": {
             "font": 0,
             "color": "#ffffff",
             "bg_color": "#000000",
             "width": 60,
-            "align": 0
+            "align": 2
           }
         },
         {
           "id": "text_8",
           "enabled": 1,
-          "x": 66,
-          "y": 80,
+          "x": 65,
+          "y": 84,
           "z": 4,
           "options": {
             "font": 0,
