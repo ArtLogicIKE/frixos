@@ -968,6 +968,87 @@ bool validate_timezone(const char *tz_str)
     return true;
 }
 
+// Timezone table files. timezone.txt is the pristine, read-only IANA->POSIX
+// table shipped in SPIFFS and tracked by the OTA manifest; the firmware must
+// NEVER write to it, or its hash diverges from the signed manifest and every
+// OTA reconcile needlessly re-downloads it (and an interrupted rewrite can
+// leave it truncated, so local lookups start missing entries that are actually
+// present). Zones learned at runtime from the update server are appended to a
+// SEPARATE file that is not in the manifest, so both survive OTA independently.
+#define TZ_TABLE_PATH "/spiffs/timezone.txt"
+#define TZ_LEARNED_PATH "/spiffs/timezone_learned.txt"
+
+// Scan one "location;posix_tz" table for `needle` (spaces already normalised to
+// underscores). Returns 1 = found (copied into out), 0 = scanned but absent,
+// -1 = could not open (missing file / IO error) — kept distinct from "absent"
+// so callers don't mistake an unreadable table for "not in the table" and hit
+// the update server for a zone that is in fact present.
+static int scan_tz_file(const char *path, const char *needle, char *out, size_t out_len)
+{
+    FILE *file = fopen(path, "r");
+    if (!file)
+        return -1;
+    char line[192];
+    while (fgets(line, sizeof(line), file))
+    {
+        strtok(line, "\r\n");
+        str_replace_char(line, ' ', '_');
+        char *loc_part = strtok(line, ";");
+        char *tz_part = strtok(NULL, ";");
+        if (loc_part && tz_part && strcasecmp(loc_part, needle) == 0)
+        {
+            strncpy(out, tz_part, out_len - 1);
+            out[out_len - 1] = '\0';
+            fclose(file);
+            return 1;
+        }
+    }
+    fclose(file);
+    return 0;
+}
+
+// Resolve `needle` (normalised) against the pristine table then the learned
+// table. Sets *table_readable to true when the pristine table could be opened,
+// so the caller may escalate a genuine miss to the update server; false means
+// SPIFFS/the table could not be read (an infrastructure error) and the caller
+// must NOT query the server — that would only log a bogus placeholder for a
+// zone that is very likely present locally.
+static bool lookup_local_timezone(const char *needle, char *out, size_t out_len,
+                                  bool *table_readable)
+{
+    int r = scan_tz_file(TZ_TABLE_PATH, needle, out, out_len);
+    if (r == 1)
+    {
+        if (table_readable)
+            *table_readable = true;
+        return true;
+    }
+    // The learned file is optional; -1 (does not exist) is normal, not an error.
+    if (scan_tz_file(TZ_LEARNED_PATH, needle, out, out_len) == 1)
+    {
+        if (table_readable)
+            *table_readable = true;
+        return true;
+    }
+    if (table_readable)
+        *table_readable = (r == 0); // pristine table was actually read
+    return false;
+}
+
+// Append a server-learned zone to the runtime table only (never the pristine,
+// manifest-tracked table). `loc` must already be normalised (spaces->'_').
+static void save_learned_timezone(const char *loc, const char *tz)
+{
+    FILE *file = fopen(TZ_LEARNED_PATH, "a");
+    if (file)
+    {
+        fprintf(file, "%s;%s\n", loc, tz);
+        fclose(file);
+    }
+    else
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Could not open %s to save learned timezone", TZ_LEARNED_PATH);
+}
+
 bool wifi_lookup_posix_timezone(const char *iana_location, char *out, size_t out_len)
 {
     if (!iana_location || !out || out_len == 0)
@@ -980,25 +1061,19 @@ bool wifi_lookup_posix_timezone(const char *iana_location, char *out, size_t out
     normalized[sizeof(normalized) - 1] = '\0';
     str_replace_char(normalized, ' ', '_');
 
-    FILE *file = fopen("/spiffs/timezone.txt", "r");
-    if (file)
+    bool table_readable = false;
+    if (lookup_local_timezone(normalized, out, out_len, &table_readable))
+        return validate_timezone(out);
+
+    if (!table_readable)
     {
-        char line[192];
-        while (fgets(line, sizeof(line), file))
-        {
-            strtok(line, "\r\n");
-            str_replace_char(line, ' ', '_');
-            char *loc_part = strtok(line, ";");
-            char *tz_part = strtok(NULL, ";");
-            if (loc_part && tz_part && strcasecmp(loc_part, normalized) == 0)
-            {
-                strncpy(out, tz_part, out_len - 1);
-                out[out_len - 1] = '\0';
-                fclose(file);
-                return validate_timezone(out);
-            }
-        }
-        fclose(file);
+        // Couldn't read the pristine table (SPIFFS not mounted / file missing).
+        // Don't ask the server for a zone that is almost certainly present in
+        // the table we failed to open.
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG,
+                    "Timezone table %s unreadable; skipping server lookup for '%s'",
+                    TZ_TABLE_PATH, iana_location);
+        return false;
     }
 
     char url[128];
@@ -1023,17 +1098,14 @@ bool wifi_lookup_posix_timezone(const char *iana_location, char *out, size_t out
         char *nl = strchr(wifi_http_buffer, '\n');
         if (nl)
             *nl = '\0';
-        if (validate_timezone(wifi_http_buffer))
+        // validate_timezone() accepts "" (UTC fallback), so guard non-empty too
+        // or we'd save a useless empty learned entry from a 200-with-empty-body.
+        if (wifi_http_buffer[0] != '\0' && validate_timezone(wifi_http_buffer))
         {
             strncpy(out, wifi_http_buffer, out_len - 1);
             out[out_len - 1] = '\0';
             found = true;
-            file = fopen("/spiffs/timezone.txt", "a");
-            if (file)
-            {
-                fprintf(file, "\n%s;%s", normalized, out);
-                fclose(file);
-            }
+            save_learned_timezone(normalized, out);
         }
     }
     esp_http_client_cleanup(client);
@@ -2097,40 +2169,30 @@ bool wifi_get_location()
     if (strlen(internet_location) > 0)
     {
         str_replace_char(internet_location, ' ', '_');
-        FILE *file = fopen("/spiffs/timezone.txt", "r");
-        if (file)
+
+        bool table_readable = false;
+        char tz[TZ_LENGTH] = {0};
+        if (lookup_local_timezone(internet_location, tz, sizeof(tz), &table_readable))
         {
-            char line[64];
-            while (fgets(line, sizeof(line), file))
-            {
-                strtok(line, "\r\n"); // Remove newlines
-                // replace ' ' with '_' in line
-                str_replace_char(line, ' ', '_');
-
-                // Split the line at the ; between location and timezone
-                char *loc_part = strtok(line, ";");
-                char *tz_part = strtok(NULL, ";");
-
-                if (loc_part && tz_part)
-                {
-                    // ESP_LOG_WEB(ESP_LOG_INFO,TAG, "Checking location: %s, timezone: %s", loc_part, tz_part);
-                    if (strcasecmp(loc_part, internet_location) == 0)
-                    {
-                        strncpy(my_timezone, tz_part, TZ_LENGTH);
-                        ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Found timezone: %s for location: %s", my_timezone, internet_location);
-                        break;
-                    }
-                }
-            }
-            fclose(file);
+            strncpy(my_timezone, tz, TZ_LENGTH - 1);
+            my_timezone[TZ_LENGTH - 1] = '\0';
+            ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Found timezone: %s for location: %s", my_timezone, internet_location);
         }
-        // if no timezone found, ask http://update.artlogic.gr:6868/timezone?location=<internet_location>.
-        // the response is a simple POSIX timezone string, plain format
-        // if found, save to /spiffs/timezone.txt and try again
-        // if not found, set timezone to UTC
-        if (strlen(my_timezone) == 0 && strlen(internet_location) > 0)
+        else if (!table_readable)
         {
-            ESP_LOG_WEB(ESP_LOG_INFO, TAG, "No timezone found, asking update server for timezone");
+            // SPIFFS/timezone.txt could not be read - fall back to UTC without
+            // asking the update server. The zone is almost certainly in the
+            // table we failed to open, and a server query would only create a
+            // bogus placeholder there while still returning nothing useful.
+            ESP_LOG_WEB(ESP_LOG_ERROR, TAG,
+                        "Timezone table %s unreadable; using UTC without server lookup", TZ_TABLE_PATH);
+        }
+        else
+        {
+            // Genuinely absent from the local table: ask the update server, and
+            // on success remember it in the learned table (never the pristine
+            // one). Response is a plain POSIX TZ string; empty/invalid -> UTC.
+            ESP_LOG_WEB(ESP_LOG_INFO, TAG, "No timezone found locally, asking update server");
             char url[128];
             // HTML escape the internet_location
             char escaped_location[64];
@@ -2155,26 +2217,21 @@ bool wifi_get_location()
                 /* Trim trailing newline from response */
                 char *nl = strchr(wifi_http_buffer, '\n');
                 if (nl) *nl = '\0';
-                if (validate_timezone(wifi_http_buffer))
+                if (wifi_http_buffer[0] != '\0' && validate_timezone(wifi_http_buffer))
                 {
                     ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Timezone found: %s is %s", internet_location, wifi_http_buffer);
-                    strncpy(my_timezone, wifi_http_buffer, TZ_LENGTH);
-                    file = fopen("/spiffs/timezone.txt", "a");
-                    if (file)
-                    {
-                        fprintf(file, "\n%s;%s", internet_location, my_timezone);
-                        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Timezone saved to /spiffs/timezone.txt");
-                        fclose(file);
-                    }
+                    strncpy(my_timezone, wifi_http_buffer, TZ_LENGTH - 1);
+                    my_timezone[TZ_LENGTH - 1] = '\0';
+                    save_learned_timezone(internet_location, my_timezone);
                 }
                 else
-                    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Invalid timezone from server: '%s', ignoring", wifi_http_buffer);
+                    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Invalid/empty timezone from server: '%s', ignoring", wifi_http_buffer);
             }
             esp_http_client_cleanup(client);
         }
     }
     else
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Missing timezone.txt file");
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "No location available to resolve a timezone");
 
     // if all else fails, set timezone to UTC
     if (strlen(my_timezone) == 0)
