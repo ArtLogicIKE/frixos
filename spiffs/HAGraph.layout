@@ -15,50 +15,50 @@
         {
           "id": "glucose_level",
           "enabled": 1,
-          "x": 45,
-          "y": 11,
+          "x": 40,
+          "y": 14,
           "z": 4
         },
         {
           "id": "glucose_trend",
           "enabled": 1,
-          "x": 34,
-          "y": 17,
+          "x": 28,
+          "y": 20,
           "z": 4
         },
         {
           "id": "wifi_off",
           "enabled": 1,
-          "x": 39,
-          "y": 11,
+          "x": 33,
+          "y": 14,
           "z": 4
         },
         {
           "id": "weather",
           "enabled": 1,
-          "x": 58,
-          "y": 9,
+          "x": 54,
+          "y": 13,
           "z": 3
         },
         {
           "id": "moon",
           "enabled": 1,
-          "x": 90,
-          "y": 17,
+          "x": 86,
+          "y": 19,
           "z": 3
         },
         {
           "id": "time",
           "enabled": 1,
-          "x": 22,
-          "y": 31,
+          "x": 30,
+          "y": 34,
           "z": 1
         },
         {
           "id": "message",
           "enabled": 1,
           "x": 0,
-          "y": 64,
+          "y": 68,
           "z": 0,
           "options": {
             "font": 0,
@@ -70,121 +70,121 @@
         },
         {
           "id": "text_1",
-          "enabled": 1,
-          "x": 64,
-          "y": 73,
+          "enabled": 0,
+          "x": 45,
+          "y": 90,
           "z": 1,
           "options": {
             "font": 0,
             "color": "#ffffff",
             "bg_color": "#000000",
-            "width": 50,
+            "width": 80,
             "align": 0
           }
         },
         {
           "id": "text_2",
-          "enabled": 1,
-          "x": 14,
-          "y": 73,
+          "enabled": 0,
+          "x": 45,
+          "y": 90,
           "z": 2,
           "options": {
             "font": 0,
             "color": "#ffffff",
             "bg_color": "#000000",
-            "width": 50,
-            "align": 2
+            "width": 80,
+            "align": 0
           }
         },
         {
           "id": "text_3",
-          "enabled": 1,
-          "x": 64,
-          "y": 82,
+          "enabled": 0,
+          "x": 45,
+          "y": 90,
           "z": 3,
           "options": {
             "font": 0,
             "color": "#ffffff",
-            "bg_color": "#ff0000",
-            "width": 50,
+            "bg_color": "#000000",
+            "width": 80,
             "align": 0
           }
         },
         {
           "id": "text_4",
-          "enabled": 1,
-          "x": 14,
-          "y": 82,
-          "z": 4,
-          "options": {
-            "font": 0,
-            "color": "#ffffff",
-            "bg_color": "#ff0000",
-            "width": 50,
-            "align": 2
-          }
-        },
-        {
-          "id": "text_5",
-          "enabled": 1,
-          "x": 64,
-          "y": 91,
+          "enabled": 0,
+          "x": 45,
+          "y": 90,
           "z": 4,
           "options": {
             "font": 0,
             "color": "#ffffff",
             "bg_color": "#000000",
-            "width": 50,
+            "width": 80,
+            "align": 0
+          }
+        },
+        {
+          "id": "text_5",
+          "enabled": 0,
+          "x": 45,
+          "y": 90,
+          "z": 4,
+          "options": {
+            "font": 0,
+            "color": "#ffffff",
+            "bg_color": "#000000",
+            "width": 80,
             "align": 0
           }
         },
         {
           "id": "text_6",
-          "enabled": 1,
-          "x": 14,
-          "y": 91,
+          "enabled": 0,
+          "x": 45,
+          "y": 90,
           "z": 4,
           "options": {
             "font": 0,
             "color": "#ffffff",
             "bg_color": "#000000",
-            "width": 50,
-            "align": 2
+            "width": 80,
+            "align": 0
           }
         },
         {
           "id": "text_7",
-          "enabled": 1,
-          "x": 64,
-          "y": 100,
+          "enabled": 0,
+          "x": 45,
+          "y": 90,
           "z": 4,
           "options": {
             "font": 0,
             "color": "#ffffff",
-            "bg_color": "#ff0000",
-            "width": 50,
+            "bg_color": "#000000",
+            "width": 80,
             "align": 0
           }
         },
         {
           "id": "text_8",
-          "enabled": 1,
-          "x": 14,
-          "y": 100,
+          "enabled": 0,
+          "x": 45,
+          "y": 90,
           "z": 4,
           "options": {
             "font": 0,
             "color": "#ffffff",
-            "bg_color": "#ff0000",
-            "width": 50,
-            "align": 2
+            "bg_color": "#000000",
+            "width": 80,
+            "align": 0
           }
         },
         {
           "id": "ampm",
           "enabled": 1,
-          "x": 101,
-          "y": 38,
+          "x": 110,
+          "y": 39,
           "z": 2
         },
         {
@@ -224,32 +224,33 @@
         },
         {
           "id": "graph",
-          "enabled": 0,
-          "x": 0,
-          "y": 0,
+          "enabled": 1,
+          "x": 22,
+          "y": 80,
           "z": 0,
           "options": {
             "color": "#ffffff",
             "bg_color": "#000000",
-            "token": "",
-            "interval_min": 5,
+            "token": "[HA:sensor.ground_power]",
+            "interval_min": 1,
             "points": 60,
             "gwidth": 80,
             "gheight": 36,
-            "autoscale": false,
-            "show_axis": false,
-            "show_xaxis": false,
+            "autoscale": true,
+            "show_axis": true,
+            "show_xaxis": true,
             "band_on": false,
-            "show_value": false,
+            "backfill": true,
+            "show_value": true,
             "boolean": false,
             "thick": false,
-            "band_low": null,
-            "band_high": null,
+            "band_low": 70,
+            "band_high": 180,
             "y_min": null,
             "y_max": null,
-            "band_color": "#283c28",
+            "band_color": "#1ea96d",
             "warn_color": "#ff5050",
-            "axis_color": "#787878"
+            "axis_color": "#ffea00"
           }
         },
         {
@@ -311,14 +312,14 @@
       ],
       "scroll_text": "[device]: [greeting] [day], [date] [mon], now [temp] today [high]-[low], hum. [hum], sun [rise]-[set]",
       "static_texts": {
-        "text_1": "[HA:sensor.ground_power]W ",
-        "text_2": " [HA:climate.playroom:current_temperature]°C  ",
-        "text_3": "[HA:sensor.living_kitchen_power]W ",
-        "text_4": " [HA:climate.living_room:current_temperature]°C  ",
-        "text_5": "[HA:sensor.2nd_rooms_power]W ",
-        "text_6": " [HA:climate.master:current_temperature]°C  ",
-        "text_7": "[HA:sensor.ground_voltage]V ",
-        "text_8": " [HA:climate.attic:current_temperature]°C  ",
+        "text_1": "UV [uv]",
+        "text_2": "[pressure]",
+        "text_3": "Wind [wind]",
+        "text_4": "Gust [gust]",
+        "text_5": "Rain [precip]",
+        "text_6": "",
+        "text_7": "",
+        "text_8": "",
         "digit_label": "",
         "digit_label_aux": ""
       }
@@ -328,50 +329,50 @@
         {
           "id": "glucose_level",
           "enabled": 1,
-          "x": 45,
-          "y": 11,
+          "x": 40,
+          "y": 14,
           "z": 4
         },
         {
           "id": "glucose_trend",
           "enabled": 1,
-          "x": 34,
-          "y": 17,
+          "x": 28,
+          "y": 20,
           "z": 4
         },
         {
           "id": "wifi_off",
           "enabled": 1,
-          "x": 39,
-          "y": 11,
+          "x": 33,
+          "y": 14,
           "z": 4
         },
         {
           "id": "weather",
           "enabled": 1,
-          "x": 58,
-          "y": 9,
+          "x": 54,
+          "y": 13,
           "z": 3
         },
         {
           "id": "moon",
           "enabled": 1,
-          "x": 90,
-          "y": 17,
+          "x": 86,
+          "y": 19,
           "z": 3
         },
         {
           "id": "time",
           "enabled": 1,
-          "x": 22,
-          "y": 31,
+          "x": 30,
+          "y": 34,
           "z": 1
         },
         {
           "id": "message",
           "enabled": 1,
           "x": 0,
-          "y": 64,
+          "y": 68,
           "z": 0,
           "options": {
             "font": 0,
@@ -383,121 +384,121 @@
         },
         {
           "id": "text_1",
-          "enabled": 1,
-          "x": 64,
-          "y": 73,
+          "enabled": 0,
+          "x": 45,
+          "y": 90,
           "z": 1,
           "options": {
             "font": 0,
             "color": "#ffffff",
             "bg_color": "#000000",
-            "width": 50,
+            "width": 80,
             "align": 0
           }
         },
         {
           "id": "text_2",
-          "enabled": 1,
-          "x": 14,
-          "y": 73,
+          "enabled": 0,
+          "x": 45,
+          "y": 90,
           "z": 2,
           "options": {
             "font": 0,
             "color": "#ffffff",
             "bg_color": "#000000",
-            "width": 50,
-            "align": 2
+            "width": 80,
+            "align": 0
           }
         },
         {
           "id": "text_3",
-          "enabled": 1,
-          "x": 64,
-          "y": 82,
+          "enabled": 0,
+          "x": 45,
+          "y": 90,
           "z": 3,
           "options": {
             "font": 0,
             "color": "#ffffff",
-            "bg_color": "#ff0000",
-            "width": 50,
+            "bg_color": "#000000",
+            "width": 80,
             "align": 0
           }
         },
         {
           "id": "text_4",
-          "enabled": 1,
-          "x": 14,
-          "y": 82,
-          "z": 4,
-          "options": {
-            "font": 0,
-            "color": "#ffffff",
-            "bg_color": "#ff0000",
-            "width": 50,
-            "align": 2
-          }
-        },
-        {
-          "id": "text_5",
-          "enabled": 1,
-          "x": 64,
-          "y": 91,
+          "enabled": 0,
+          "x": 45,
+          "y": 90,
           "z": 4,
           "options": {
             "font": 0,
             "color": "#ffffff",
             "bg_color": "#000000",
-            "width": 50,
+            "width": 80,
+            "align": 0
+          }
+        },
+        {
+          "id": "text_5",
+          "enabled": 0,
+          "x": 45,
+          "y": 90,
+          "z": 4,
+          "options": {
+            "font": 0,
+            "color": "#ffffff",
+            "bg_color": "#000000",
+            "width": 80,
             "align": 0
           }
         },
         {
           "id": "text_6",
-          "enabled": 1,
-          "x": 14,
-          "y": 91,
+          "enabled": 0,
+          "x": 45,
+          "y": 90,
           "z": 4,
           "options": {
             "font": 0,
             "color": "#ffffff",
             "bg_color": "#000000",
-            "width": 50,
-            "align": 2
+            "width": 80,
+            "align": 0
           }
         },
         {
           "id": "text_7",
-          "enabled": 1,
-          "x": 64,
-          "y": 100,
+          "enabled": 0,
+          "x": 45,
+          "y": 90,
           "z": 4,
           "options": {
             "font": 0,
             "color": "#ffffff",
-            "bg_color": "#ff0000",
-            "width": 50,
+            "bg_color": "#000000",
+            "width": 80,
             "align": 0
           }
         },
         {
           "id": "text_8",
-          "enabled": 1,
-          "x": 14,
-          "y": 100,
+          "enabled": 0,
+          "x": 45,
+          "y": 90,
           "z": 4,
           "options": {
             "font": 0,
             "color": "#ffffff",
-            "bg_color": "#ff0000",
-            "width": 50,
-            "align": 2
+            "bg_color": "#000000",
+            "width": 80,
+            "align": 0
           }
         },
         {
           "id": "ampm",
           "enabled": 1,
-          "x": 101,
-          "y": 38,
+          "x": 110,
+          "y": 39,
           "z": 2
         },
         {
@@ -537,32 +538,33 @@
         },
         {
           "id": "graph",
-          "enabled": 0,
-          "x": 0,
-          "y": 0,
+          "enabled": 1,
+          "x": 22,
+          "y": 80,
           "z": 0,
           "options": {
             "color": "#ffffff",
             "bg_color": "#000000",
-            "token": "",
-            "interval_min": 5,
+            "token": "[HA:sensor.ground_power]",
+            "interval_min": 1,
             "points": 60,
             "gwidth": 80,
             "gheight": 36,
-            "autoscale": false,
-            "show_axis": false,
-            "show_xaxis": false,
+            "autoscale": true,
+            "show_axis": true,
+            "show_xaxis": true,
             "band_on": false,
-            "show_value": false,
+            "backfill": true,
+            "show_value": true,
             "boolean": false,
             "thick": false,
-            "band_low": null,
-            "band_high": null,
+            "band_low": 70,
+            "band_high": 180,
             "y_min": null,
             "y_max": null,
-            "band_color": "#283c28",
+            "band_color": "#1ea96d",
             "warn_color": "#ff5050",
-            "axis_color": "#787878"
+            "axis_color": "#ffea00"
           }
         },
         {
@@ -624,14 +626,14 @@
       ],
       "scroll_text": "[device]: [greeting] [day], [date] [mon], now [temp] today [high]-[low], hum. [hum], sun [rise]-[set]",
       "static_texts": {
-        "text_1": "[HA:sensor.ground_power]W ",
-        "text_2": " [HA:climate.playroom:current_temperature]°C  ",
-        "text_3": "[HA:sensor.living_kitchen_power]W ",
-        "text_4": " [HA:climate.living_room:current_temperature]°C  ",
-        "text_5": "[HA:sensor.2nd_rooms_power]W ",
-        "text_6": " [HA:climate.master:current_temperature]°C  ",
-        "text_7": "[HA:sensor.ground_voltage]V ",
-        "text_8": " [HA:climate.attic:current_temperature]°C  ",
+        "text_1": "UV [uv]",
+        "text_2": "[pressure]",
+        "text_3": "Wind [wind]",
+        "text_4": "Gust [gust]",
+        "text_5": "Rain [precip]",
+        "text_6": "",
+        "text_7": "",
+        "text_8": "",
         "digit_label": "",
         "digit_label_aux": ""
       }
