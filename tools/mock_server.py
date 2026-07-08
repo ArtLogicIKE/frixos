@@ -39,7 +39,7 @@ settings = {
 
 @app.get("/")
 async def read_index():
-    with open("spiffs/index.html", "r") as f:
+    with open("spiffs/index.html", "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
 
 @app.get("/api/settings")
