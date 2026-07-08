@@ -1730,7 +1730,7 @@ void update_graph(void)
     return;
   }
 
-  int16_t samp[GRAPH_MAX_POINTS];
+  int32_t samp[GRAPH_MAX_POINTS];
   time_t last_sample = 0;
   uint16_t interval_min = g->interval_min ? g->interval_min : 1;
   int n = graph_snapshot(samp, GRAPH_MAX_POINTS, &last_sample, &interval_min);
@@ -1784,10 +1784,10 @@ void update_graph(void)
   // Data range over valid samples.
   float dmin = 1e9f, dmax = -1e9f;
   int valid = 0;
-  int16_t last_valid = GRAPH_VAL_UNSET;
+  int32_t last_valid = GRAPH_SAMPLE_UNSET;
   for (int i = 0; i < n; i++)
   {
-    if (samp[i] == GRAPH_VAL_UNSET)
+    if (samp[i] == GRAPH_SAMPLE_UNSET)
       continue;
     valid++;
     last_valid = samp[i];
@@ -1978,11 +1978,11 @@ void update_graph(void)
   // 4. Current value readout, anchored to the emptier half of the plot so it
   //    doesn't sit on the curve: when the latest point is high (upper half) put
   //    the value at the bottom, when it's low put it at the top. (#193)
-  if (show_value && last_valid != GRAPH_VAL_UNSET)
+  if (show_value && last_valid != GRAPH_SAMPLE_UNSET)
   {
     lv_draw_label_dsc_t vb;
     lv_draw_label_dsc_init(&vb);
-    vb.font = &frixos_8;
+    vb.font = &graph_tiny5; // compact 5px font, matching the axis labels
     vb.color = col_line;
     vb.opa = LV_OPA_COVER;
     vb.text_local = 1;
@@ -2012,7 +2012,7 @@ void update_graph(void)
     int prev = -1;
     for (int i = 0; i < n; i++)
     {
-      if (samp[i] == GRAPH_VAL_UNSET)
+      if (samp[i] == GRAPH_SAMPLE_UNSET)
         continue;
       if (prev >= 0 && (i - prev) <= max_gap)
       {
@@ -2080,7 +2080,7 @@ void update_graph(void)
     // A single reading can't form a line -> draw a 3x3 marker so it's visible.
     for (int i = 0; i < n; i++)
     {
-      if (samp[i] == GRAPH_VAL_UNSET)
+      if (samp[i] == GRAPH_SAMPLE_UNSET)
         continue;
       int mx = I2X(i), my = CY(V2Y(samp[i]));
       for (int ox = -1; ox <= 1; ox++)

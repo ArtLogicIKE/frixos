@@ -26,7 +26,7 @@
  */
 typedef struct
 {
-  int16_t v[GRAPH_MAX_POINTS]; // samples; GRAPH_VAL_UNSET = gap / no sample
+  int32_t v[GRAPH_MAX_POINTS]; // samples (value x10); GRAPH_SAMPLE_UNSET = gap / no sample
   char token[GRAPH_TOKEN_LEN]; // token currently sampled, e.g. "[temp]"
   uint8_t count;               // valid samples (0..cap)
   uint8_t cap;                 // active capacity = cfg.points
@@ -48,7 +48,7 @@ void graph_configure(const screen_graph_cfg_t *cfg, bool widget_enabled); // on 
 
 // Snapshot up to max chronological samples (oldest first) into out_v. Returns
 // the number copied; optionally returns the anchor time and interval.
-int graph_snapshot(int16_t *out_v, int max, time_t *last_sample, uint16_t *interval_min);
+int graph_snapshot(int32_t *out_v, int max, time_t *last_sample, uint16_t *interval_min);
 
 bool graph_is_active(void);
 
