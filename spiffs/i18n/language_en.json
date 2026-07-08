@@ -378,6 +378,7 @@
       "email_hint": "If email doesn't open, copy the info and send it to <a href=\"mailto:support@buyfrixos.com\">support@buyfrixos.com</a>.",
       "send_email": "Send email",
       "copy_clipboard": "Copy to clipboard",
+      "refresh_logs": "Refresh logs",
       "help_text": "If you need any support, please share the information above with us. Click \"send email\" to send us a message; if that doesn't work, copy the information to your clipboard and send it via email to support@buyfrixos.com."
     },
     "sensor": {
@@ -579,6 +580,7 @@
     "saved_restarting": "Saved — device restarting…",
     "save_failed": "Save failed",
     "status_refreshed": "Status refreshed",
+    "logs_refreshed": "Logs refreshed",
     "files_refreshed": "Files refreshed",
     "files_deleted": "Deleted {n} file(s)",
     "delete_failed": "Delete failed",

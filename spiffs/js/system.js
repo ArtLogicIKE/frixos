@@ -39,6 +39,12 @@ el('supportEmail').addEventListener('click', () => {
   const b = encodeURIComponent('Frixos diagnostics:\n\n' + JSON.stringify(window.statusData || {}, null, 2));
   location.href = 'mailto:support@buyfrixos.com?subject=Frixos%20support&body=' + b;
 });
+el('refreshLogs').addEventListener('click', async () => {
+  const res = await apiGet('/api/status?logs=1');
+  const d = res.data;
+  if (d && el('system_logs')) el('system_logs').value = Array.isArray(d.system_logs) ? d.system_logs.join('\n') : '';
+  toast(getMessage('logs_refreshed'), 'ok');
+});
 
 /* ---------- FILES ---------- */
 let FILES = [], sortKey = 'name', sortAsc = true;
@@ -57,10 +63,10 @@ function renderFiles() {
 function selectedNames() { return $$('.fcb:checked').map(cb => cb.dataset.name); }
 function updFileBtns() { const n = selectedNames().length; el('filesDelete').disabled = n === 0; el('filesRename').disabled = n !== 1; el('selAll').checked = n === FILES.length && n > 0; }
 el('selAll').addEventListener('change', e => { $$('.fcb').forEach(cb => { cb.checked = e.target.checked; cb.closest('tr').classList.toggle('sel', e.target.checked); }); updFileBtns(); });
-$$('th[data-sort] button').forEach(b => b.addEventListener('click', () => {
+$$('th button[data-sort]').forEach(b => b.addEventListener('click', () => {
   const k = b.dataset.sort; if (k === sortKey) sortAsc = !sortAsc; else { sortKey = k; sortAsc = true; }
   // Update only the arrow span so the translatable .th-label is preserved.
-  $$('th[data-sort] button').forEach(x => {
+  $$('th button[data-sort]').forEach(x => {
     const arrow = x.querySelector('.th-arrow');
     if (arrow) arrow.textContent = (x.dataset.sort === sortKey) ? (sortAsc ? ' ↑' : ' ↓') : '';
   });

@@ -23,6 +23,7 @@
 #define GRAPH_MIN_H 28
 #define GRAPH_MAX_H 60
 #define GRAPH_VAL_UNSET ((int16_t)0x8000)
+#define GRAPH_SAMPLE_UNSET ((int32_t)0x80000000)
 #define GRAPH_FLAG_AUTOSCALE 0x01
 #define GRAPH_FLAG_SHOW_AXIS 0x02
 #define GRAPH_FLAG_BAND 0x04
@@ -108,10 +109,11 @@ int main(void)
       graph_sampler_tick(t);
       t += 60;
     }
-    int16_t out[GRAPH_MAX_POINTS];
+    int32_t out[GRAPH_MAX_POINTS];
     int n = graph_snapshot(out, GRAPH_MAX_POINTS, NULL, NULL);
     CHECK(n == 5, "wrap: count should be 5");
-    int16_t expect[5] = {30, 40, 50, 60, 70};
+    /* Stored as deci-units (value x10): last 5 of 30..70 -> 300..700. */
+    int32_t expect[5] = {300, 400, 500, 600, 700};
     int ok = 1;
     for (int i = 0; i < 5; i++)
       if (out[i] != expect[i])
@@ -129,7 +131,7 @@ int main(void)
     graph_sampler_tick(t);        /* first sample (last==0) */
     graph_sampler_tick(t + 60);   /* +1min: too soon */
     graph_sampler_tick(t + 120);  /* +2min: too soon */
-    int16_t out[GRAPH_MAX_POINTS];
+    int32_t out[GRAPH_MAX_POINTS];
     int n = graph_snapshot(out, GRAPH_MAX_POINTS, NULL, NULL);
     CHECK(n == 1, "interval: only one sample within 5 min");
     graph_sampler_tick(t + 300);  /* +5min: due */
@@ -145,10 +147,10 @@ int main(void)
     stub_has = 1; stub_val = 11; graph_sampler_tick(t);
     stub_has = 0;               graph_sampler_tick(t + 60); /* no value -> gap */
     stub_has = 1; stub_val = 13; graph_sampler_tick(t + 120);
-    int16_t out[GRAPH_MAX_POINTS];
+    int32_t out[GRAPH_MAX_POINTS];
     int n = graph_snapshot(out, GRAPH_MAX_POINTS, NULL, NULL);
     CHECK(n == 3, "gap: three slots");
-    CHECK(out[0] == 11 && out[1] == GRAPH_VAL_UNSET && out[2] == 13, "gap: middle is UNSET");
+    CHECK(out[0] == 110 && out[1] == GRAPH_SAMPLE_UNSET && out[2] == 130, "gap: middle is UNSET");
   }
 
   /* 4. Reconfigure with same token+interval+points keeps history. */
@@ -156,7 +158,7 @@ int main(void)
     screen_graph_cfg_t c = mkcfg("[temp]", 1, 10, 0);
     graph_configure(&c, true);
     stub_has = 1; stub_val = 5; graph_sampler_tick(5000);
-    int16_t out[GRAPH_MAX_POINTS];
+    int32_t out[GRAPH_MAX_POINTS];
     int before = graph_snapshot(out, GRAPH_MAX_POINTS, NULL, NULL);
     graph_configure(&c, true); /* identical cfg */
     int after = graph_snapshot(out, GRAPH_MAX_POINTS, NULL, NULL);
@@ -176,11 +178,24 @@ int main(void)
     float vals[4] = {25, 24, 23, 22};
     time_t times[4] = {now, now - 600, now - 1200, now - 1800};
     graph_backfill(vals, times, 4, now);
-    int16_t out[GRAPH_MAX_POINTS];
+    int32_t out[GRAPH_MAX_POINTS];
     int n = graph_snapshot(out, GRAPH_MAX_POINTS, NULL, NULL);
     CHECK(n == 4, "backfill: 4 points landed");
-    /* chronological oldest->newest = 22,23,24,25 */
-    CHECK(out[n - 1] == 25 && out[0] == 22, "backfill: newest=25, oldest=22");
+    /* chronological oldest->newest = 22,23,24,25 (deci-units x10) */
+    CHECK(out[n - 1] == 250 && out[0] == 220, "backfill: newest=25, oldest=22");
+  }
+
+  /* 6. High-magnitude token (e.g. [HA:sensor.ground_power] in watts) is stored
+   *    without int16 saturation. Pre-fix, value x10 overflowed int16 and clamped
+   *    to 32767 -> 3276.7 on display; int32 deci-units represent it exactly. */
+  {
+    screen_graph_cfg_t c = mkcfg("[HA:sensor.ground_power]", 1, 5, 0);
+    graph_configure(&c, true);
+    stub_has = 1; stub_val = 4357.2f; graph_sampler_tick(200000);
+    int32_t out[GRAPH_MAX_POINTS];
+    int n = graph_snapshot(out, GRAPH_MAX_POINTS, NULL, NULL);
+    CHECK(n == 1, "power: one sample");
+    CHECK(out[0] == 43572, "power: 4357.2 stored as 43572 (not clamped to 32767)");
   }
 
   if (g_fail == 0)

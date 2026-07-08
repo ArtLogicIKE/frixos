@@ -306,7 +306,8 @@ typedef struct
 #define GRAPH_MAX_W 80
 #define GRAPH_MIN_H 28
 #define GRAPH_MAX_H 36
-#define GRAPH_VAL_UNSET ((int16_t)0x8000) // sentinel: threshold/scale not set, or missing sample
+#define GRAPH_VAL_UNSET ((int16_t)0x8000) // sentinel: threshold/scale not set (config int16 fields)
+#define GRAPH_SAMPLE_UNSET ((int32_t)0x80000000) // sentinel: missing/gap sample (int32 ring value)
 
 #define GRAPH_FLAG_AUTOSCALE 0x01 // auto Y-range from windowed min/max (else use y_min/y_max)
 #define GRAPH_FLAG_SHOW_AXIS 0x02 // draw value (Y) axis + min/max labels

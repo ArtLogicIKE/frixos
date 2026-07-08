@@ -43,20 +43,22 @@ static void graph_lock_init(void)
 static graph_ring_t ring;
 
 // Samples are stored as fixed-point deci-units (value x 10) so decimals (e.g.
-// 26.3 °C) survive. int16 x10 covers -3276.7 .. 3276.7, ample for temperature,
-// glucose, power, etc. The renderer divides by 10 for display.
-static int16_t clamp_sample(float v)
+// 26.3 °C) survive. int32 x10 covers roughly -214M .. 214M real units — ample
+// for temperature, glucose, and high-magnitude tokens like power in watts
+// (int16 x10 used to cap at 3276.7, silently clamping larger readings). The
+// renderer divides by 10 for display.
+static int32_t clamp_sample(float v)
 {
-  long r = lroundf(v * 10.0f);
-  if (r > 32767)
-    r = 32767;
-  if (r < -32767) // keep -32768 (GRAPH_VAL_UNSET) reserved as the gap sentinel
-    r = -32767;
-  return (int16_t)r;
+  long long r = llroundf(v * 10.0f);
+  if (r > INT32_MAX)
+    r = INT32_MAX;
+  if (r <= INT32_MIN) // keep INT32_MIN (GRAPH_SAMPLE_UNSET) reserved as the gap sentinel
+    r = INT32_MIN + 1;
+  return (int32_t)r;
 }
 
 // Push one sample into the ring (caller holds the lock).
-static void ring_push(int16_t val)
+static void ring_push(int32_t val)
 {
   if (ring.cap == 0)
     return;
@@ -109,14 +111,14 @@ void graph_sampler_tick(time_t now)
       (ring.last_sample == 0 || (now - ring.last_sample) >= (time_t)ring.interval_min * 60))
   {
     float v;
-    int16_t s = token_numeric_value(ring.token, &v) ? clamp_sample(v) : GRAPH_VAL_UNSET;
+    int32_t s = token_numeric_value(ring.token, &v) ? clamp_sample(v) : GRAPH_SAMPLE_UNSET;
     ring_push(s);
     ring.last_sample = now;
   }
   GRAPH_UNLOCK();
 }
 
-int graph_snapshot(int16_t *out_v, int max, time_t *last_sample, uint16_t *interval_min)
+int graph_snapshot(int32_t *out_v, int max, time_t *last_sample, uint16_t *interval_min)
 {
   GRAPH_LOCK();
   int n = ring.count;
@@ -250,7 +252,7 @@ void graph_backfill(const float *vals, const time_t *times, int n, time_t now)
   const long bin = (long)iv * 60;
   bool filled[GRAPH_MAX_POINTS] = {0};
   for (int k = 0; k < cap; k++)
-    ring.v[k] = GRAPH_VAL_UNSET;
+    ring.v[k] = GRAPH_SAMPLE_UNSET;
 
   for (int i = 0; i < n; i++)
   {
@@ -283,7 +285,7 @@ void graph_backfill(const float *vals, const time_t *times, int n, time_t now)
     for (int k = 0; k < ring.count; k++)
       ring.v[k] = ring.v[oldest + k];
     for (int k = ring.count; k < cap; k++)
-      ring.v[k] = GRAPH_VAL_UNSET;
+      ring.v[k] = GRAPH_SAMPLE_UNSET;
   }
   ring.head = (uint8_t)(ring.count % cap);
   ring.last_sample = now;

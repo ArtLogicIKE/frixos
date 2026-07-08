@@ -41,7 +41,9 @@ static void ota_handle_failure_with_cleanup(const char *error_msg, update_status
 static void cleanup_update_files(void);
 static void f_ota_do_update(int version);
 static esp_err_t ota_fetch_manifest(int version, manifest_t *m);
-static esp_err_t ota_reconcile_files(const manifest_t *m, int progress_lo, int progress_hi, bool show_progress);
+static void ota_prune_old_files(int version);
+static esp_err_t ota_reconcile_files(const manifest_t *m, int progress_lo, int progress_hi, bool show_progress,
+                                     char *failed_out, size_t failed_len);
 static void ota_self_heal(void);
 static void ota_quiet_refresh(void);
 
@@ -282,6 +284,12 @@ static esp_err_t download_file(const char *url, const char *dest_path, int *prog
         {
             ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "SPIFFS write failed at %d/%d bytes of %s",
                         total_read, content_length, update_path);
+            size_t fs_total = 0, fs_used = 0;
+            if (esp_spiffs_info(NULL, &fs_total, &fs_used) == ESP_OK)
+            {
+                ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "SPIFFS at failure: %u used / %u total, %u free",
+                            (unsigned)fs_used, (unsigned)fs_total, (unsigned)(fs_total - fs_used));
+            }
             write_failed = true;
             break;
         }
@@ -407,6 +415,12 @@ static esp_err_t ota_fetch_manifest(int version, manifest_t *m)
     snprintf(url, sizeof(url), "%s/%d/manifest.txt", UPDATE_SERVER_BASE, version);
     snprintf(temp_path, sizeof(temp_path), "%s.update", MANIFEST_PATH);
 
+    // Compact/free SPIFFS before the first write. The reconcile path prepares
+    // space per file, but the manifest download had no such step - on a
+    // near-full or fragmented filesystem the very first fwrite could fail
+    // (SPIFFS_ERR_FULL) even with nominal free bytes, aborting the update.
+    ota_prepare_space(16 * 1024);
+
     if (download_file(url, temp_path, NULL, NULL, 0) != ESP_OK)
     {
         // download_file only renames onto temp_path on success, so nothing to clean
@@ -442,6 +456,120 @@ static esp_err_t ota_fetch_manifest(int version, manifest_t *m)
     return ESP_OK;
 }
 
+/* Curated cleanup of files left behind by older firmware, run after the
+ * manifest is verified and before the new file set is downloaded.
+ *
+ * OTA reconcile only adds/updates the files a manifest lists - it never
+ * removes files that dropped out of the build across UI restructurings - so
+ * they accumulate and can wedge a near-full SPIFFS (the failure that stopped
+ * the manifest write itself from succeeding, 2026-07). The release ships a
+ * prune list (spiffs/prune.txt); because that file is an ordinary manifest
+ * entry, its hash is covered by the signed manifest, so a prune list fetched
+ * over plain HTTP is still trustworthy. We verify it against that hash and
+ * delete only the paths it names.
+ *
+ * Best-effort by design: a missing prune list (older releases) or a failed
+ * download never fails the update - the device just stays fuller. */
+#define PRUNE_LIST_REL "prune.txt"
+#define PRUNE_LIST_PATH "/spiffs/" PRUNE_LIST_REL
+
+typedef struct
+{
+    const char *want;
+    bool found;
+    uint8_t sha256[MANIFEST_SHA256_LEN];
+    uint32_t size;
+} manifest_lookup_t;
+
+/* Stops the walk (returns non-ESP_OK) once the wanted path is found. */
+static esp_err_t manifest_lookup_cb(const manifest_entry_t *e, int index, void *arg)
+{
+    (void)index;
+    manifest_lookup_t *l = (manifest_lookup_t *)arg;
+    if (strcmp(e->path, l->want) == 0)
+    {
+        l->found = true;
+        memcpy(l->sha256, e->sha256, MANIFEST_SHA256_LEN);
+        l->size = e->size;
+        return ESP_FAIL; // found it - stop iterating
+    }
+    return ESP_OK;
+}
+
+static void ota_prune_old_files(int version)
+{
+    // Look the prune list up in the already-verified manifest so we can check
+    // the download against its signed hash. No entry => nothing to prune.
+    manifest_lookup_t l = {.want = PRUNE_LIST_REL};
+    manifest_for_each_entry(MANIFEST_PATH, manifest_lookup_cb, &l);
+    if (!l.found)
+    {
+        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "No prune list in manifest; skipping prune");
+        return;
+    }
+
+    char url[512];
+    snprintf(url, sizeof(url), "%s/%d/%s", UPDATE_SERVER_BASE, version, PRUNE_LIST_REL);
+    ota_prepare_space(l.size);
+    if (download_file(url, PRUNE_LIST_PATH, NULL, l.sha256, l.size) != ESP_OK)
+    {
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Prune list download failed; skipping prune");
+        return;
+    }
+
+    FILE *f = fopen(PRUNE_LIST_PATH, "r");
+    if (f == NULL)
+    {
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Prune list unreadable; skipping prune");
+        return;
+    }
+
+    char line[MANIFEST_MAX_PATH + 16];
+    int pruned = 0;
+    while (fgets(line, sizeof(line), f) != NULL)
+    {
+        // Trim leading and trailing whitespace / line endings.
+        char *s = line;
+        while (*s == ' ' || *s == '\t')
+            s++;
+        char *end = s + strlen(s);
+        while (end > s && (end[-1] == '\n' || end[-1] == '\r' || end[-1] == ' ' || end[-1] == '\t'))
+            *--end = '\0';
+
+        if (*s == '\0' || *s == '#')
+            continue; // blank line or comment
+
+        // Accept only plain relative paths under /spiffs - never absolute
+        // paths or "..", so a malformed list can't reach outside the mount.
+        if (s[0] == '/' || strstr(s, "..") != NULL)
+        {
+            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Ignoring unsafe prune entry: %s", s);
+            continue;
+        }
+        // Never delete live OTA state or the prune list itself.
+        if (strcmp(s, "manifest.txt") == 0 || strcmp(s, PRUNE_LIST_REL) == 0)
+            continue;
+
+        char path[160];
+        snprintf(path, sizeof(path), "/spiffs/%s", s);
+        struct stat st;
+        if (stat(path, &st) != 0)
+            continue; // already gone
+
+        if (remove(path) == 0)
+        {
+            ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Pruned old file: %s (%u bytes)", s, (unsigned)st.st_size);
+            pruned++;
+        }
+        else
+        {
+            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Failed to prune %s", s);
+        }
+    }
+    fclose(f);
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Prune complete: %d old file(s) removed", pruned);
+}
+
 /* Bring SPIFFS in line with a verified manifest: hash every listed file
  * locally, skip the ones that already match, download the rest (verified,
  * up to 3 attempts each). Only changed files are ever written, which keeps
@@ -454,6 +582,7 @@ typedef struct
     int progress_lo, progress_hi;
     bool show_progress;
     int downloaded, skipped;
+    char failed_path[MANIFEST_MAX_PATH]; // set to the entry we gave up on (empty = none)
 } reconcile_ctx_t;
 
 static esp_err_t reconcile_entry_cb(const manifest_entry_t *e, int index, void *arg)
@@ -490,6 +619,8 @@ static esp_err_t reconcile_entry_cb(const manifest_entry_t *e, int index, void *
         if (err != ESP_OK)
         {
             ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Giving up on %s after 3 attempts", e->path);
+            strncpy(ctx->failed_path, e->path, sizeof(ctx->failed_path) - 1);
+            ctx->failed_path[sizeof(ctx->failed_path) - 1] = '\0';
             return ESP_FAIL;
         }
         ctx->downloaded++;
@@ -507,7 +638,8 @@ static esp_err_t reconcile_entry_cb(const manifest_entry_t *e, int index, void *
     return ESP_OK;
 }
 
-static esp_err_t ota_reconcile_files(const manifest_t *m, int progress_lo, int progress_hi, bool show_progress)
+static esp_err_t ota_reconcile_files(const manifest_t *m, int progress_lo, int progress_hi, bool show_progress,
+                                     char *failed_out, size_t failed_len)
 {
     reconcile_ctx_t ctx = {
         .version = m->version,
@@ -519,6 +651,13 @@ static esp_err_t ota_reconcile_files(const manifest_t *m, int progress_lo, int p
     esp_err_t err = manifest_for_each_entry(MANIFEST_PATH, reconcile_entry_cb, &ctx);
     ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Reconcile done: %d downloaded, %d already current",
                 ctx.downloaded, ctx.skipped);
+    // Surface the file we gave up on (if any) so callers can name it in the
+    // failure report; empty when the walk itself failed for another reason.
+    if (failed_out && failed_len)
+    {
+        strncpy(failed_out, ctx.failed_path, failed_len - 1);
+        failed_out[failed_len - 1] = '\0';
+    }
     return err;
 }
 
@@ -552,8 +691,13 @@ static void ota_self_heal(void)
 
     ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Self-heal: verifying %d files against release %d",
                 m.entry_count, m.version);
+    char failed[MANIFEST_MAX_PATH] = {0};
     xSemaphoreTake(http_mutex, portMAX_DELAY);
-    err = ota_reconcile_files(&m, 0, 0, false);
+    // Prune stale files first, same order as the full-update and quiet-refresh
+    // paths, so a near-full SPIFFS has room to re-download a mismatched file.
+    // Without this a full disk makes self-heal fail the same way every boot.
+    ota_prune_old_files(m.version);
+    err = ota_reconcile_files(&m, 0, 0, false, failed, sizeof(failed));
     xSemaphoreGive(http_mutex);
 
     if (err == ESP_OK)
@@ -566,7 +710,12 @@ static void ota_self_heal(void)
     else
     {
         // Keep the pending flag; retried on the next update check.
-        f_ota_report_status(UPDATE_ERROR_VERIFY, "Self-heal: reconcile failed");
+        char msg[MANIFEST_MAX_PATH + 40];
+        if (failed[0])
+            snprintf(msg, sizeof(msg), "Self-heal: reconcile failed on %s", failed);
+        else
+            snprintf(msg, sizeof(msg), "Self-heal: reconcile failed");
+        f_ota_report_status(UPDATE_ERROR_VERIFY, msg);
     }
 }
 
@@ -621,7 +770,11 @@ static void ota_quiet_refresh(void)
     ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Quiet refresh: applying generation %lu (files only)",
                 (unsigned long)m.generated);
     manifest_set_ota_in_progress(true);
-    err = ota_reconcile_files(&m, 0, 0, false);
+    // Same prune-before-reconcile order as a full update, so files-only
+    // publishes reclaim stale files across the fleet without a version bump.
+    ota_prune_old_files(fwversion);
+    char failed[MANIFEST_MAX_PATH] = {0};
+    err = ota_reconcile_files(&m, 0, 0, false, failed, sizeof(failed));
     xSemaphoreGive(http_mutex);
 
     if (err == ESP_OK)
@@ -631,7 +784,12 @@ static void ota_quiet_refresh(void)
     }
     else
     {
-        f_ota_report_status(UPDATE_ERROR_VERIFY, "Quiet refresh: reconcile failed");
+        char msg[MANIFEST_MAX_PATH + 40];
+        if (failed[0])
+            snprintf(msg, sizeof(msg), "Quiet refresh: reconcile failed on %s", failed);
+        else
+            snprintf(msg, sizeof(msg), "Quiet refresh: reconcile failed");
+        f_ota_report_status(UPDATE_ERROR_VERIFY, msg);
     }
     manifest_set_ota_in_progress(false);
 }
@@ -939,6 +1097,11 @@ static void f_ota_do_update(int version)
     ota_updating_message = false;
     ota_start_time = 0;
 
+    // Clear any leftover *.update scratch files from a previous run that a
+    // reset (watchdog/power) cut short before its failure handler ran - they
+    // otherwise sit on SPIFFS consuming the space this update needs.
+    cleanup_update_files();
+
     esp_err_t err;
 
     // Fetch and authenticate the release manifest FIRST - nothing is written
@@ -962,10 +1125,22 @@ static void f_ota_do_update(int version)
     // here must not factory-reset the user's settings.
     manifest_set_ota_in_progress(true);
 
+    // Remove files left behind by older firmware before downloading the new
+    // set, so a near-full SPIFFS has room. Driven by the signed prune list;
+    // best-effort, so it never aborts the update on its own.
+    update_progress(3, "Cleaning up old files...");
+    ota_prune_old_files(version);
+
     // Bring SPIFFS files in line with the manifest (unchanged files are skipped).
-    if (ota_reconcile_files(&m, 5, 50, true) != ESP_OK)
+    char failed[MANIFEST_MAX_PATH] = {0};
+    if (ota_reconcile_files(&m, 5, 50, true, failed, sizeof(failed)) != ESP_OK)
     {
-        ota_handle_failure("File reconcile failed verification after retries", UPDATE_ERROR_VERIFY, true);
+        char msg[MANIFEST_MAX_PATH + 48];
+        if (failed[0])
+            snprintf(msg, sizeof(msg), "File reconcile failed after retries on %s", failed);
+        else
+            snprintf(msg, sizeof(msg), "File reconcile failed verification after retries");
+        ota_handle_failure(msg, UPDATE_ERROR_VERIFY, true);
         return;
     }
 

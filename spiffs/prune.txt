@@ -1,0 +1,32 @@
+# frixos OTA prune list
+#
+# Files that older firmware wrote to SPIFFS but current builds no longer ship.
+# OTA reconcile only adds/updates manifest files - it never removes files that
+# dropped out of the build - so these accumulate and can wedge a near-full
+# filesystem. During an update the device downloads this list (its hash is
+# covered by the signed manifest), then deletes any of these that still exist
+# before downloading the new file set.
+#
+# One relative path per line (relative to /spiffs, forward slashes). Blank
+# lines and lines starting with '#' are ignored. Only add files you are
+# certain the current build does not use - a wrong entry is deleted on every
+# device. Never list a file that is part of the current manifest.
+
+# Pre-modular monolithic UI (replaced by js/*.js and css/*.css)
+index.js
+index.css
+
+# Flat i18n bundles (moved under i18n/)
+language_en.json
+language_de.json
+language_fr.json
+language_it.json
+language_pt.json
+language_sv.json
+language_da.json
+language_pl.json
+language_es.json
+
+# Renamed / removed assets
+robrito-weather.jpg
+kablame-wifi-off.jpg
