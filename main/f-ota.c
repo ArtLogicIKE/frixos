@@ -669,6 +669,7 @@ static esp_err_t ota_reconcile_files(const manifest_t *m, int progress_lo, int p
 static void ota_self_heal(void)
 {
     manifest_t m;
+    char failed[MANIFEST_MAX_PATH] = {0};
     esp_err_t err = manifest_load_and_verify(MANIFEST_PATH, &m);
     if (err == ESP_ERR_NOT_FOUND)
     {
@@ -679,19 +680,49 @@ static void ota_self_heal(void)
         manifest_set_ota_in_progress(false);
         return;
     }
-    if (err != ESP_OK)
+    if (err == ESP_FAIL)
     {
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Self-heal: stored manifest failed verification, discarding it");
-        f_ota_report_status(UPDATE_ERROR_SIGNATURE, "Self-heal: stored manifest invalid");
-        remove(MANIFEST_PATH);
-        manifest_set_self_heal_pending(false);
+        // Transient: the manifest could not be cryptographically evaluated at
+        // all (PSA crypto init / hash setup failed - typically heap pressure in
+        // the boot window), NOT a verdict that the manifest is bad. Never
+        // delete a manifest we could not judge; keep it and let the next boot /
+        // update check retry. Mirrors ota_fetch_manifest's transient handling.
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Self-heal: manifest verify unavailable (transient), will retry");
+        f_ota_report_status(UPDATE_ERROR_VERIFY, "Self-heal: manifest verify deferred (transient)");
         manifest_set_ota_in_progress(false);
-        return;
+        return; // leave self_heal_pending set so it retries next boot
+    }
+    if (err == ESP_ERR_INVALID_RESPONSE)
+    {
+        // The stored manifest is genuinely bad (truncated/tampered/malformed).
+        // The dominant cause is the legacy (<=66) downloader, which judged a
+        // download successful by bytes-read and could silently install a
+        // truncated manifest while upgrading into this first signed firmware.
+        // That is an expected part of the legacy->signed bootstrap, not a
+        // security event - so instead of surfacing a scary signature failure
+        // and waiting for a later quiet refresh, discard it and re-fetch a
+        // fresh signed manifest now, then heal the whole file set this cycle.
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Self-heal: stored manifest invalid, re-fetching a fresh copy");
+        remove(MANIFEST_PATH);
+        xSemaphoreTake(http_mutex, portMAX_DELAY);
+        err = ota_fetch_manifest(fwversion, &m);
+        xSemaphoreGive(http_mutex);
+        if (err != ESP_OK)
+        {
+            // No good manifest available right now; a later quiet refresh will
+            // retry. Report the honest (retryable) outcome, not a tampering code.
+            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Self-heal: manifest re-fetch failed (%s)",
+                        esp_err_to_name(err));
+            f_ota_report_status(UPDATE_ERROR_DOWNLOAD, "Self-heal: manifest re-fetch failed");
+            manifest_set_self_heal_pending(false);
+            manifest_set_ota_in_progress(false);
+            return;
+        }
+        // Fresh signed manifest installed; fall through to reconcile against it.
     }
 
     ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Self-heal: verifying %d files against release %d",
                 m.entry_count, m.version);
-    char failed[MANIFEST_MAX_PATH] = {0};
     xSemaphoreTake(http_mutex, portMAX_DELAY);
     // Prune stale files first, same order as the full-update and quiet-refresh
     // paths, so a near-full SPIFFS has room to re-download a mismatched file.
