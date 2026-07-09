@@ -58,6 +58,37 @@ function showStatus(message, type) {
   toast(message, type === 'success' ? 'ok' : type === 'error' ? 'err' : '');
 }
 
+/* ---------- reboot wait ----------
+   Shows a full-screen "Waiting for reboot to be completed" overlay and polls
+   the device until it is reachable again, then reloads the page. Idempotent:
+   calling it while already waiting is a no-op. It waits until the device has
+   actually gone unreachable at least once before trusting an "up" response, so
+   a still-alive pre-reboot device doesn't trigger a premature reload; a hard
+   time cap reloads anyway in case the drop is never observed. */
+let _rebootWaiting = false;
+function waitForReboot() {
+  if (_rebootWaiting) return;
+  _rebootWaiting = true;
+  const overlay = el('rebootOverlay');
+  if (overlay) { overlay.classList.add('open'); overlay.setAttribute('aria-hidden', 'false'); }
+  const POLL_MS = 1500, MAX_MS = 120000, start = Date.now();
+  let sawDown = false;
+  const probe = async () => {
+    let up = false;
+    try {
+      const ctrl = new AbortController();
+      const to = setTimeout(() => ctrl.abort(), 4000);
+      const r = await fetch('/api/status?_=' + Date.now(), { signal: ctrl.signal, cache: 'no-store', headers: { 'Accept': 'application/json' } });
+      clearTimeout(to);
+      up = r.ok;
+    } catch (e) { up = false; }
+    if (!up) sawDown = true;
+    if (up && (sawDown || Date.now() - start > MAX_MS)) { location.reload(); return; }
+    setTimeout(probe, POLL_MS);
+  };
+  probe();
+}
+
 /* ---------- settings helpers ---------- */
 const S = () => window.settings;
 const setVal = (id, v) => { const e = el(id); if (e != null && v !== undefined && v !== null) e.value = v; };
@@ -84,7 +115,7 @@ async function saveSettings(payload, networkKeys) {
     Object.assign(window.settings, payload);
     const reboot = (res.data.message || '').toLowerCase().includes('reboot') || (networkKeys || []).some(k => k in payload);
     toast(reboot ? getMessage('saved_restarting') : getMessage('settings_saved'), 'ok');
-    if (reboot) { let n = 8; const recheck = () => { if (--n <= 0) location.reload(); else setTimeout(recheck, 1000); }; setTimeout(recheck, 1000); }
+    if (reboot) waitForReboot();
     return true;
   }
   toast(localizeServerMessage(res.data && res.data.message, 'save_failed'), 'err');

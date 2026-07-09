@@ -512,7 +512,9 @@
     "confirm_title": "Confirmar Reinicio",
     "confirm_message": "¿Está seguro de que desea reiniciar el dispositivo?",
     "unavailable_message": "El dispositivo estará temporalmente no disponible durante el reinicio.",
-    "confirm_button": "Reiniciar"
+    "confirm_button": "Reiniciar",
+    "waiting_title": "Esperando a que se complete el reinicio",
+    "waiting_hint": "Esta página se volverá a conectar automáticamente cuando el dispositivo esté de nuevo en línea."
   },
   "messages": {
     "error_loading_settings": "Error al cargar la configuración",

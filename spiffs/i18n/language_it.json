@@ -512,7 +512,9 @@
     "confirm_title": "Conferma riavvio",
     "confirm_message": "Sei sicuro di voler riavviare il dispositivo?",
     "unavailable_message": "Il dispositivo sarà temporaneamente non disponibile durante il riavvio.",
-    "confirm_button": "Riavvia"
+    "confirm_button": "Riavvia",
+    "waiting_title": "In attesa del completamento del riavvio",
+    "waiting_hint": "Questa pagina si riconnetterà automaticamente quando il dispositivo sarà di nuovo online."
   },
   "messages": {
     "error_loading_settings": "Errore nel caricamento delle impostazioni",

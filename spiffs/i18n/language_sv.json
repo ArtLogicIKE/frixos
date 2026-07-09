@@ -512,7 +512,9 @@
     "confirm_title": "Bekräfta omstart",
     "confirm_message": "Är du säker på att du vill starta om enheten?",
     "unavailable_message": "Enheten kommer att vara tillfälligt otillgänglig under omstarten.",
-    "confirm_button": "Starta om"
+    "confirm_button": "Starta om",
+    "waiting_title": "Väntar på att omstarten ska slutföras",
+    "waiting_hint": "Den här sidan återansluter automatiskt när enheten är online igen."
   },
   "messages": {
     "error_loading_settings": "Fel vid laddning av inställningar",

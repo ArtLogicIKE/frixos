@@ -512,7 +512,9 @@
     "confirm_title": "Bekræft genstart",
     "confirm_message": "Er du sikker på, at du vil genstarte enheden?",
     "unavailable_message": "Enheden vil være midlertidigt utilgængelig under genstart.",
-    "confirm_button": "Genstart"
+    "confirm_button": "Genstart",
+    "waiting_title": "Venter på at genstarten fuldføres",
+    "waiting_hint": "Denne side genopretter forbindelsen automatisk, når din enhed er online igen."
   },
   "messages": {
     "error_loading_settings": "Fejl ved indlæsning af indstillinger",

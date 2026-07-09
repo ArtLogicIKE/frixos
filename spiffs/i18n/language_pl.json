@@ -512,7 +512,9 @@
     "confirm_title": "Potwierdź restart",
     "confirm_message": "Czy na pewno chcesz zrestartować urządzenie?",
     "unavailable_message": "Urządzenie będzie tymczasowo niedostępne podczas restartu.",
-    "confirm_button": "Restart"
+    "confirm_button": "Restart",
+    "waiting_title": "Oczekiwanie na zakończenie ponownego uruchomienia",
+    "waiting_hint": "Ta strona połączy się ponownie automatycznie, gdy urządzenie wróci do trybu online."
   },
   "messages": {
     "error_loading_settings": "Błąd wczytywania ustawień",
