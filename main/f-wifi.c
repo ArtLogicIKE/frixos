@@ -1511,6 +1511,30 @@ static int metno_day_bucket(time_t et)
     return -1;
 }
 
+// Extract the current-conditions symbol_code from a met.no timeseries entry.
+// met.no serialises the forecast sub-blocks in ALPHABETICAL key order, so an
+// entry reads: instant, next_12_hours, next_1_hours, next_6_hours. A blind
+// search for the first "symbol_code" therefore returns the 12-hour outlook, not
+// the near-term conditions - which shows a rain icon on a clear morning when
+// rain is forecast later that day (Athens, 2026-07-09: next_12_hours was
+// rainshowers_day while next_1_hours was clearsky_day). Pick the shortest
+// available horizon explicitly, scoping the search to that block.
+static void metno_get_symbol(const char *entry, char *out, size_t out_len)
+{
+    static const char *blocks[] = {"\"next_1_hours\"", "\"next_6_hours\"", "\"next_12_hours\""};
+    for (size_t i = 0; i < sizeof(blocks) / sizeof(blocks[0]); i++)
+    {
+        const char *b = strstr(entry, blocks[i]);
+        if (b)
+        {
+            get_value_from_JSON_string(b, "symbol_code", out, out_len, NULL);
+            if (strcmp(out, "-") != 0)
+                return;
+        }
+    }
+    strlcpy(out, "-", out_len);
+}
+
 // Apply current-conditions fields from a single met.no timeseries entry.
 static void metno_apply_entry_weather(const char *entry, const char *time_str)
 {
@@ -1555,7 +1579,7 @@ static void metno_apply_entry_weather(const char *entry, const char *time_str)
         weather_pressure_hpa = new_p;
     }
 
-    get_value_from_JSON_string(entry, "symbol_code", val, sizeof(val), NULL);
+    metno_get_symbol(entry, val, sizeof(val));
     if (strcmp(val, "-") != 0)
     {
         int sidx = map_metno_symbol(val);
