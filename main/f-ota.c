@@ -386,7 +386,15 @@ static void ota_wait_for_heap(const char *who)
  * collection otherwise runs synchronously inside fwrite when free pages run
  * out - a long stall mid-download that has watchdog-reset devices in the
  * field. Collecting deliberately between files keeps the stall bounded and
- * away from open sockets. */
+ * away from open sockets.
+ *
+ * We must GC on high *usage*, not just low free bytes: esp_spiffs_info counts
+ * deleted-but-not-yet-erased pages as free, but those pages are not writable
+ * until GC erases their block, so once the FS is ~80% full a small write can
+ * fail with SPIFFS_ERR_FULL while hundreds of KB still read as "free" (field
+ * report 2026-07: a 9.6 KB manifest write failing at 1 KB with 258 KB free on
+ * an 82%-full FS wedged every OTA/self-heal cycle). A GC pass reclaims those
+ * dead pages so the write can land. */
 static void ota_prepare_space(uint32_t needed)
 {
     size_t total = 0, used = 0;
@@ -396,13 +404,21 @@ static void ota_prepare_space(uint32_t needed)
     }
     // The download needs room for the .part scratch copy; keep generous headroom.
     uint32_t want = needed + 64 * 1024;
-    if (total - used >= want)
+    uint32_t free_bytes = (uint32_t)(total - used);
+    bool low_free = free_bytes < want;
+    // >75% full: the reported free space is likely fragmented dead pages that
+    // only GC can turn back into writable pages.
+    bool high_usage = used > (size_t)total * 3 / 4;
+    if (!low_free && !high_usage)
     {
         return;
     }
-    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "SPIFFS gc: %u free, want %lu",
-                (unsigned)(total - used), (unsigned long)want);
-    esp_err_t err = esp_spiffs_gc(NULL, want - (total - used));
+    // When free is genuinely low, target the shortfall; when it only looks full
+    // (fragmentation), force GC to guarantee a writable margin for this write.
+    uint32_t gc_target = low_free ? (want - free_bytes) : (needed + 32 * 1024);
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "SPIFFS gc: %u used / %u total, %u free, target %lu",
+                (unsigned)used, (unsigned)total, (unsigned)free_bytes, (unsigned long)gc_target);
+    esp_err_t err = esp_spiffs_gc(NULL, gc_target);
     if (err != ESP_OK)
     {
         ESP_LOG_WEB(ESP_LOG_WARN, TAG, "SPIFFS gc failed: %s", esp_err_to_name(err));
