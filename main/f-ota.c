@@ -165,7 +165,7 @@ static void cleanup_update_files(void)
 
     while ((ent = readdir(dir)) != NULL)
     {
-        if (strstr(ent->d_name, ".update") != NULL)
+        if (strstr(ent->d_name, ".update") != NULL || strstr(ent->d_name, ".part") != NULL)
         {
             char filepath[256];
             snprintf(filepath, sizeof(filepath), "/spiffs/%.200s", ent->d_name);
@@ -200,19 +200,23 @@ static void ota_handle_failure_with_cleanup(const char *error_msg, update_status
     ota_handle_failure(error_msg, status, release_mutex);
 }
 
-/* Download url into dest_path via a temporary "<dest>.update" file.
+/* Download url into dest_path via a temporary "<dest>.part" file.
  *
  * When expected_sha256 is non-NULL the payload is SHA-256-hashed while it
  * streams in and the temp file only replaces dest_path if size AND hash
  * match the manifest. Every write is checked: a failed fwrite/fclose (the
  * silent-corruption bug that produced truncated files in the field, 2026-07)
- * fails the download instead of installing a short file. */
+ * fails the download instead of installing a short file.
+ *
+ * The in-progress scratch uses a ".part" suffix (not ".update") so that when
+ * the manifest is downloaded to its own "<manifest>.update" temp the suffix
+ * only ever appears once, rather than stacking into ".update.update". */
 static esp_err_t download_file(const char *url, const char *dest_path, int *progress,
                                const uint8_t *expected_sha256, uint32_t expected_size)
 {
-    // Create update path with .update extension
+    // Create scratch path with .part extension
     char update_path[512];
-    snprintf(update_path, sizeof(update_path), "%s.update", dest_path);
+    snprintf(update_path, sizeof(update_path), "%s.part", dest_path);
 
     esp_http_client_config_t config = {
         .url = url,
@@ -390,7 +394,7 @@ static void ota_prepare_space(uint32_t needed)
     {
         return;
     }
-    // The download needs room for the .update copy; keep generous headroom.
+    // The download needs room for the .part scratch copy; keep generous headroom.
     uint32_t want = needed + 64 * 1024;
     if (total - used >= want)
     {
@@ -1128,7 +1132,7 @@ static void f_ota_do_update(int version)
     ota_updating_message = false;
     ota_start_time = 0;
 
-    // Clear any leftover *.update scratch files from a previous run that a
+    // Clear any leftover *.part / *.update scratch files from a previous run that a
     // reset (watchdog/power) cut short before its failure handler ran - they
     // otherwise sit on SPIFFS consuming the space this update needs.
     cleanup_update_files();
