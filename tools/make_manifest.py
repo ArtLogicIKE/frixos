@@ -47,7 +47,9 @@ def sha256_file(path: Path) -> str:
 
 
 def build_signed_region(version: int, spiffs_dir: Path, generated: int,
-                        firmware: Path = None, fw_line: str = None) -> bytes:
+                        firmware: Path = None, fw_line: str = None,
+                        firmware_only: bool = False,
+                        anchor: Path = None, anchor_rel: str = None) -> bytes:
     if fw_line is None:
         fw_line = f"fw revE{version}.bin {firmware.stat().st_size} {sha256_file(firmware)}"
     lines = [
@@ -56,15 +58,26 @@ def build_signed_region(version: int, spiffs_dir: Path, generated: int,
         f"generated {generated}",
         fw_line,
     ]
-    entries = []
-    for p in sorted(spiffs_dir.rglob("*")):
-        if not p.is_file():
-            continue
-        rel = p.relative_to(spiffs_dir).as_posix()
-        if rel in EXCLUDE:
-            continue
-        entries.append(f"f {sha256_file(p)} {p.stat().st_size} {rel}")
-    lines.extend(entries)
+    # firmware_only carries the fw entry plus a SINGLE anchor file entry - a
+    # stable file the device already has unchanged. Reconcile matches it on
+    # disk and skips it, so no SPIFFS is written, yet the manifest is not empty
+    # (devices reject a 0-entry manifest, f-manifest.c: entry_count == 0). This
+    # is the recovery path for a device whose SPIFFS is too full/fragmented to
+    # write the full manifest: it still flashes the firmware (app partition, no
+    # SPIFFS) and the newer firmware then heals its own filesystem.
+    if firmware_only:
+        if anchor is not None:
+            lines.append(f"f {sha256_file(anchor)} {anchor.stat().st_size} {anchor_rel}")
+    else:
+        entries = []
+        for p in sorted(spiffs_dir.rglob("*")):
+            if not p.is_file():
+                continue
+            rel = p.relative_to(spiffs_dir).as_posix()
+            if rel in EXCLUDE:
+                continue
+            entries.append(f"f {sha256_file(p)} {p.stat().st_size} {rel}")
+        lines.extend(entries)
     return ("\n".join(lines) + "\n").encode()
 
 
@@ -125,28 +138,45 @@ def verify(signed_region: bytes, sig_raw: bytes) -> None:
 
 def make_manifest(version: int, spiffs_dir: Path, firmware: Path,
                   out: Path, pin: str | None = None,
-                  fw_line: str = None, min_generated: int = 0) -> None:
+                  fw_line: str = None, min_generated: int = 0,
+                  firmware_only: bool = False,
+                  anchor: Path = None, anchor_rel: str = None) -> None:
     generated = max(int(time.time()), min_generated + 1)
     region = build_signed_region(version, spiffs_dir, generated,
-                                 firmware=firmware, fw_line=fw_line)
+                                 firmware=firmware, fw_line=fw_line,
+                                 firmware_only=firmware_only,
+                                 anchor=anchor, anchor_rel=anchor_rel)
     sig_raw = sign(region, pin)
     verify(region, sig_raw)
     out.write_bytes(region + b"sig " + sig_raw.hex().encode() + b"\n")
     n_files = region.count(b"\nf ")
-    print(f"wrote {out}: version {version}, {n_files} files, signature verified "
+    print(f"wrote {out}: version {version}, {n_files} files"
+          f"{' (firmware-only)' if firmware_only else ''}, signature verified "
           f"against {PUBKEY_HEADER.name}")
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--version", type=int, required=True)
-    ap.add_argument("--spiffs", type=Path, required=True)
+    ap.add_argument("--spiffs", type=Path,
+                    help="spiffs tree to hash (not needed with --firmware-only)")
     ap.add_argument("--firmware", type=Path, required=True,
                     help="firmware .bin whose hash goes into the fw entry")
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--pin", help="PIV PIN (omit to be prompted)")
+    ap.add_argument("--firmware-only", action="store_true",
+                    help="emit a recovery bootstrap: fw entry + one --anchor file, no other files")
+    ap.add_argument("--anchor", type=Path,
+                    help="with --firmware-only: a stable file the device already has "
+                         "unchanged (reconcile skips it, so no SPIFFS write)")
     a = ap.parse_args()
-    make_manifest(a.version, a.spiffs, a.firmware, a.out, a.pin)
+    if not a.firmware_only and a.spiffs is None:
+        ap.error("--spiffs is required unless --firmware-only is given")
+    if a.firmware_only and a.anchor is None:
+        ap.error("--firmware-only requires --anchor (a 0-entry manifest is rejected by devices)")
+    make_manifest(a.version, a.spiffs, a.firmware, a.out, a.pin,
+                  firmware_only=a.firmware_only,
+                  anchor=a.anchor, anchor_rel=a.anchor.name if a.anchor else None)
 
 
 if __name__ == "__main__":

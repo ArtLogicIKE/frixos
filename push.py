@@ -8,6 +8,11 @@ Quiet file refresh (web files only, same firmware, devices pick it up on
 their ~10th update check without flashing or rebooting):
     python push.py --files-only 68 [--pin <piv-pin>]
 
+Recovery bootstrap (firmware + a 0-file manifest, no web tree) for devices
+whose SPIFFS is too full/fragmented to write the full manifest - they flash
+the firmware (app partition, no SPIFFS) and self-heal on a later version:
+    python push.py --firmware-only 68 [--pin <piv-pin>]
+
 Every publish signs manifest.txt on the release YubiKey (touch required) and
 then re-hashes the COPIED server tree against the manifest, so the published
 signature can never disagree with the published content. Any failure aborts
@@ -32,6 +37,11 @@ REPO = Path(__file__).resolve().parent
 SPIFFS = REPO / "spiffs"
 FIRMWARE = REPO / "build" / "frixos.bin"
 WWW = Path(r"C:\source\frixos-web\www")
+
+# Anchor for --firmware-only: a small, stable, universally-present file. A
+# self-healed device is guaranteed to have it byte-for-byte (it is a signed
+# manifest entry that has not changed), so reconcile skips it without a write.
+ANCHOR_REL = "favicon.ico"
 
 
 def spiffs_files():
@@ -89,8 +99,13 @@ def main():
     ap.add_argument("version", type=int)
     ap.add_argument("--files-only", action="store_true",
                     help="refresh web files of an existing release; firmware entry reused")
+    ap.add_argument("--firmware-only", action="store_true",
+                    help="publish firmware + a 0-file bootstrap manifest (recovery for "
+                         "devices whose SPIFFS is too full to write the full manifest)")
     ap.add_argument("--pin", help="PIV PIN (omit to be prompted)")
     args = ap.parse_args()
+    if args.files_only and args.firmware_only:
+        sys.exit("error: --files-only and --firmware-only are mutually exclusive")
 
     ver_dir = WWW / str(args.version)
     manifest_out = ver_dir / "manifest.txt"
@@ -109,6 +124,36 @@ def main():
         write_files_txt(ver_dir / "files.txt")
         make_manifest(args.version, SPIFFS, None, manifest_out, args.pin,
                       fw_line=fw_line, min_generated=old_generated)
+    elif args.firmware_only:
+        # Recovery bootstrap: publish the firmware + a manifest that lists only
+        # a single stable ANCHOR file the device already has unchanged, so a
+        # device with a wedged (too-full) SPIFFS can still apply it. Reconcile
+        # matches the anchor on disk and skips it (no write), the only SPIFFS
+        # write is the ~330-byte manifest, and the firmware flashes to the app
+        # partition. The manifest is not empty because devices reject a 0-entry
+        # manifest (f-manifest.c: entry_count == 0). The newer firmware then
+        # heals its filesystem and picks up the full file set from a later
+        # (higher) version. No web tree is copied under this version.
+        if not FIRMWARE.is_file():
+            sys.exit(f"error: {FIRMWARE} not found - run idf.py build first")
+        anchor = SPIFFS / ANCHOR_REL
+        if not anchor.is_file():
+            sys.exit(f"error: anchor {anchor} not found in spiffs tree")
+        age_min = (time.time() - FIRMWARE.stat().st_mtime) / 60
+        print(f"firmware: {FIRMWARE} ({FIRMWARE.stat().st_size} B, built {age_min:.0f} min ago)")
+        print(f"anchor:   {ANCHOR_REL} ({anchor.stat().st_size} B)")
+        old_generated = parse_manifest(manifest_out)[2] if manifest_out.is_file() else 0
+        ver_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(FIRMWARE, fw_bin)
+        # Serve the anchor too, so a device whose copy has drifted can still
+        # fetch it (if its SPIFFS has room); a matching device never asks.
+        shutil.copy2(anchor, ver_dir / ANCHOR_REL)
+        # Legacy (fw<=66) devices bootstrap off files.txt; list the anchor +
+        # manifest so they take the same firmware-only path.
+        (ver_dir / "files.txt").write_bytes(f"{ANCHOR_REL}\nmanifest.txt\n".encode())
+        make_manifest(args.version, None, FIRMWARE, manifest_out, args.pin,
+                      min_generated=old_generated, firmware_only=True,
+                      anchor=anchor, anchor_rel=ANCHOR_REL)
     else:
         if not FIRMWARE.is_file():
             sys.exit(f"error: {FIRMWARE} not found - run idf.py build first")
