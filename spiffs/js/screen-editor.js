@@ -3339,30 +3339,16 @@ function resetDevice() {
     .then(response => response.json())
     .then(data => {
         if (data.status === 'ok') {
-            showStatus(getMessage('device_restarting') + '15' + getMessage('device_restarting_seconds'), 'success');
-            
-            // Countdown timer for reconnecting
-            let countdown = 15;
-            const countdownInterval = setInterval(function() {
-                countdown--;
-                if (countdown <= 0) {
-                    clearInterval(countdownInterval);
-                    window.location.reload();
-                } else {
-                    showStatus(getMessage('device_restarting') + countdown + getMessage('device_restarting_seconds'), 'success');
-                }
-            }, 1000);
+            // Show the reboot overlay and reload once the device is reachable again.
+            waitForReboot();
         } else {
             showStatus(getMessage('failed_restart') + (data.message || 'Unknown error'), 'error');
         }
     })
     .catch(error => {
-        showStatus(getMessage('error_reset_connection'), 'error');
-
-        // Even if we got an error, likely the device is rebooting, so try to reconnect
-        setTimeout(function() {
-            window.location.reload();
-        }, 15000);
+        // A connection error here almost always means the device already began
+        // rebooting before it could answer, so wait for it to come back.
+        waitForReboot();
     });
 }
 

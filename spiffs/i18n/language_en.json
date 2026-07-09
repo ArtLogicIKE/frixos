@@ -522,7 +522,9 @@
     "confirm_title": "Confirm Restart",
     "confirm_message": "Are you sure you want to restart the device?",
     "unavailable_message": "The device will become temporarily unavailable during restart.",
-    "confirm_button": "Restart"
+    "confirm_button": "Restart",
+    "waiting_title": "Waiting for reboot to be completed",
+    "waiting_hint": "This page will reconnect automatically when your device is back online."
   },
   "messages": {
     "error_loading_settings": "Error loading settings",

@@ -101,7 +101,7 @@ uploadBtn.addEventListener('click', () => {
   xhr.addEventListener('load', () => {
     let d = {}; try { d = JSON.parse(xhr.responseText); } catch (e) { }
     if (xhr.status >= 200 && xhr.status < 300 && d.status === 'ok') {
-      if ((d.message || '').toLowerCase().includes('reboot')) { txt.textContent = getMessage('done_restarting'); toast(getMessage('firmware_update_success'), 'ok'); setTimeout(() => location.reload(), 8000); }
+      if ((d.message || '').toLowerCase().includes('reboot')) { txt.textContent = getMessage('done_restarting'); toast(getMessage('firmware_update_success'), 'ok'); waitForReboot(); }
       else { txt.textContent = getMessage('done'); toast(getMessage('file_upload_success'), 'ok'); }
     } else { toast(localizeServerMessage(d.message, 'upload_failed'), 'err'); }
     uploadBtn.disabled = false;
@@ -138,5 +138,5 @@ el('confirmReset').addEventListener('click', async () => {
   modal.classList.remove('open');
   await apiPostJson('/api/reset', {});
   toast(getMessage('device_restarting_short'), 'ok');
-  setTimeout(() => location.reload(), 8000);
+  waitForReboot();
 });

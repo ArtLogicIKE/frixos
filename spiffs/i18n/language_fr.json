@@ -512,7 +512,9 @@
     "confirm_title": "Confirmer le redémarrage",
     "confirm_message": "Êtes-vous sûr de vouloir redémarrer l'appareil?",
     "unavailable_message": "L'appareil sera temporairement indisponible pendant le redémarrage.",
-    "confirm_button": "Redémarrer"
+    "confirm_button": "Redémarrer",
+    "waiting_title": "En attente de la fin du redémarrage",
+    "waiting_hint": "Cette page se reconnectera automatiquement dès que votre appareil sera de nouveau en ligne."
   },
   "messages": {
     "error_loading_settings": "Erreur lors du chargement des paramètres",

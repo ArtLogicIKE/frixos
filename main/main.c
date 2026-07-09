@@ -50,9 +50,9 @@ static int rescue_mode_this_boot = 0; // Set by check_boot_fail_count() when 3 c
 
 // versioning variables
 const char app[10] = "Frixos";
-const char version[10] = "2.40b";
+const char version[10] = "2.50";
 static const char *TAG = "frixos main"; // in case we use ESP_LOGE -rror/W-arning/I-info (also D-ebug/V-erbose)
-const int fwversion = 67;
+const int fwversion = 68;
 const int rescuemode = 0; // 0 = normal, 1 = rescue mode
 const char revision[] = "E";
 

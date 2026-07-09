@@ -512,7 +512,9 @@
     "confirm_title": "Neustart bestätigen",
     "confirm_message": "Sind Sie sicher, dass Sie das Gerät neu starten möchten?",
     "unavailable_message": "Das Gerät wird während des Neustarts vorübergehend nicht verfügbar sein.",
-    "confirm_button": "Neu starten"
+    "confirm_button": "Neu starten",
+    "waiting_title": "Warten auf Abschluss des Neustarts",
+    "waiting_hint": "Diese Seite verbindet sich automatisch neu, sobald Ihr Gerät wieder online ist."
   },
   "messages": {
     "error_loading_settings": "Fehler beim Laden der Einstellungen",
