@@ -11,6 +11,7 @@
 #include "esp_log.h"
 #include "esp_wifi.h"
 #include "esp_http_client.h"
+#include <sys/stat.h>
 #include "esp_task_wdt.h"
 #include "esp_app_format.h"
 
@@ -210,12 +211,32 @@ static void ota_handle_failure_with_cleanup(const char *error_msg, update_status
  * The in-progress scratch uses a ".part" suffix (not ".update") so that when
  * the manifest is downloaded to its own "<manifest>.update" temp the suffix
  * only ever appears once, rather than stacking into ".update.update". */
+
+/* Create every missing parent directory of path. LittleFS has real
+ * directories - unlike SPIFFS, whose flat namespace treated "css/x.css" as
+ * a single filename with a slash in it - so fopen of a nested path fails
+ * with ENOENT until the directories exist (first hit: the post-format
+ * self-heal, which could write prune.txt but no css/js/i18n file). */
+static void ensure_parent_dirs(const char *path)
+{
+    char buf[512];
+    strlcpy(buf, path, sizeof(buf));
+    char *p = strchr(buf + 1, '/'); // '/' after the mount point ("/spiffs")
+    while (p != NULL && (p = strchr(p + 1, '/')) != NULL)
+    {
+        *p = '\0';
+        mkdir(buf, 0775); // EEXIST is fine
+        *p = '/';
+    }
+}
+
 static esp_err_t download_file(const char *url, const char *dest_path, int *progress,
                                const uint8_t *expected_sha256, uint32_t expected_size)
 {
     // Create scratch path with .part extension
     char update_path[512];
     snprintf(update_path, sizeof(update_path), "%s.part", dest_path);
+    ensure_parent_dirs(update_path);
 
     esp_http_client_config_t config = {
         .url = url,
