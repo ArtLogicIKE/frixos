@@ -752,13 +752,19 @@ static void ota_self_heal(void)
 
     ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Self-heal: verifying %d files against release %d",
                 m.entry_count, m.version);
+    // Show "Updating..." on the display (and pause integrations) while the
+    // file set downloads - after a filesystem reformat this is a ~1-2 minute
+    // full re-download, and the boot IP message must not mask it.
+    ota_update_in_progress = true;
+    ota_updating_message = false;
     xSemaphoreTake(http_mutex, portMAX_DELAY);
     // Prune stale files first, same order as the full-update and quiet-refresh
-    // paths, so a near-full SPIFFS has room to re-download a mismatched file.
+    // paths, so a near-full filesystem has room to re-download a mismatched file.
     // Without this a full disk makes self-heal fail the same way every boot.
     ota_prune_old_files(m.version);
     err = ota_reconcile_files(&m, 0, 0, false, failed, sizeof(failed));
     xSemaphoreGive(http_mutex);
+    ota_update_in_progress = false; // display restores the normal message
 
     if (err == ESP_OK)
     {
@@ -830,12 +836,16 @@ static void ota_quiet_refresh(void)
     ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Quiet refresh: applying generation %lu (files only)",
                 (unsigned long)m.generated);
     manifest_set_ota_in_progress(true);
+    // Show "Updating..." while files download (see self-heal note).
+    ota_update_in_progress = true;
+    ota_updating_message = false;
     // Same prune-before-reconcile order as a full update, so files-only
     // publishes reclaim stale files across the fleet without a version bump.
     ota_prune_old_files(fwversion);
     char failed[MANIFEST_MAX_PATH] = {0};
     err = ota_reconcile_files(&m, 0, 0, false, failed, sizeof(failed));
     xSemaphoreGive(http_mutex);
+    ota_update_in_progress = false; // display restores the normal message
 
     if (err == ESP_OK)
     {
