@@ -10,7 +10,6 @@
 #include "esp_task_wdt.h"
 #include "esp_log.h"
 #include "esp_wifi.h"
-#include "esp_spiffs.h"
 #include "esp_http_client.h"
 #include "esp_task_wdt.h"
 #include "esp_app_format.h"
@@ -286,12 +285,12 @@ static esp_err_t download_file(const char *url, const char *dest_path, int *prog
     {
         if (fwrite(buffer, 1, read_len, file) != (size_t)read_len)
         {
-            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "SPIFFS write failed at %d/%d bytes of %s",
+            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Filesystem write failed at %d/%d bytes of %s",
                         total_read, content_length, update_path);
             size_t fs_total = 0, fs_used = 0;
-            if (esp_spiffs_info(NULL, &fs_total, &fs_used) == ESP_OK)
+            if (esp_littlefs_info("spiffs", &fs_total, &fs_used) == ESP_OK)
             {
-                ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "SPIFFS at failure: %u used / %u total, %u free",
+                ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "LittleFS at failure: %u used / %u total, %u free",
                             (unsigned)fs_used, (unsigned)fs_total, (unsigned)(fs_total - fs_used));
             }
             write_failed = true;
@@ -382,46 +381,28 @@ static void ota_wait_for_heap(const char *who)
     ESP_LOG_WEB(ESP_LOG_WARN, TAG, "%s: proceeding despite low heap", who);
 }
 
-/* Make room on SPIFFS before writing `needed` bytes. SPIFFS garbage
- * collection otherwise runs synchronously inside fwrite when free pages run
- * out - a long stall mid-download that has watchdog-reset devices in the
- * field. Collecting deliberately between files keeps the stall bounded and
- * away from open sockets.
+/* Check free space on the filesystem before writing `needed` bytes.
  *
- * We must GC on high *usage*, not just low free bytes: esp_spiffs_info counts
- * deleted-but-not-yet-erased pages as free, but those pages are not writable
- * until GC erases their block, so once the FS is ~80% full a small write can
- * fail with SPIFFS_ERR_FULL while hundreds of KB still read as "free" (field
- * report 2026-07: a 9.6 KB manifest write failing at 1 KB with 258 KB free on
- * an 82%-full FS wedged every OTA/self-heal cycle). A GC pass reclaims those
- * dead pages so the write can land. */
+ * Under SPIFFS this ran an explicit GC pass (SPIFFS deadlocked at high
+ * utilization - "free" bytes were unwritable dead pages, which wedged field
+ * devices out of their own updates, 2026-07; the reason fw 70 moved to
+ * LittleFS). LittleFS reclaims blocks as part of every allocation, so there
+ * is no GC to run and no dead-page lie in the free count - this is now just
+ * an early low-space warning so a failing reconcile is explainable. */
 static void ota_prepare_space(uint32_t needed)
 {
     size_t total = 0, used = 0;
-    if (esp_spiffs_info(NULL, &total, &used) != ESP_OK)
+    if (esp_littlefs_info("spiffs", &total, &used) != ESP_OK)
     {
         return;
     }
     // The download needs room for the .part scratch copy; keep generous headroom.
     uint32_t want = needed + 64 * 1024;
     uint32_t free_bytes = (uint32_t)(total - used);
-    bool low_free = free_bytes < want;
-    // >75% full: the reported free space is likely fragmented dead pages that
-    // only GC can turn back into writable pages.
-    bool high_usage = used > (size_t)total * 3 / 4;
-    if (!low_free && !high_usage)
+    if (free_bytes < want)
     {
-        return;
-    }
-    // When free is genuinely low, target the shortfall; when it only looks full
-    // (fragmentation), force GC to guarantee a writable margin for this write.
-    uint32_t gc_target = low_free ? (want - free_bytes) : (needed + 32 * 1024);
-    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "SPIFFS gc: %u used / %u total, %u free, target %lu",
-                (unsigned)used, (unsigned)total, (unsigned)free_bytes, (unsigned long)gc_target);
-    esp_err_t err = esp_spiffs_gc(NULL, gc_target);
-    if (err != ESP_OK)
-    {
-        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "SPIFFS gc failed: %s", esp_err_to_name(err));
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "LittleFS space low: %u free, next write wants %lu",
+                    (unsigned)free_bytes, (unsigned long)want);
     }
 }
 
@@ -432,13 +413,13 @@ static esp_err_t ota_fetch_manifest(int version, manifest_t *m)
 {
     char url[512];
     char temp_path[64];
-    snprintf(url, sizeof(url), "%s/%d/manifest.txt", UPDATE_SERVER_BASE, version);
+    // The fw= marker tells the server this requester runs LittleFS-era
+    // firmware and can absorb the FULL manifest. Legacy (<70) firmwares never
+    // send it, so the server hands them the tiny firmware-only bootstrap
+    // instead - the only manifest a wedged SPIFFS device can still write.
+    snprintf(url, sizeof(url), "%s/%d/manifest.txt?fw=%d", UPDATE_SERVER_BASE, version, fwversion);
     snprintf(temp_path, sizeof(temp_path), "%s.update", MANIFEST_PATH);
 
-    // Compact/free SPIFFS before the first write. The reconcile path prepares
-    // space per file, but the manifest download had no such step - on a
-    // near-full or fragmented filesystem the very first fwrite could fail
-    // (SPIFFS_ERR_FULL) even with nominal free bytes, aborting the update.
     ota_prepare_space(16 * 1024);
 
     if (download_file(url, temp_path, NULL, NULL, 0) != ESP_OK)
@@ -691,15 +672,6 @@ static void ota_self_heal(void)
     manifest_t m;
     char failed[MANIFEST_MAX_PATH] = {0};
     esp_err_t err = manifest_load_and_verify(MANIFEST_PATH, &m);
-    if (err == ESP_ERR_NOT_FOUND)
-    {
-        // Pre-signed-era SPIFFS: nothing to verify against; a quiet refresh
-        // will fetch a manifest for this version soon.
-        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Self-heal: no stored manifest, skipping");
-        manifest_set_self_heal_pending(false);
-        manifest_set_ota_in_progress(false);
-        return;
-    }
     if (err == ESP_FAIL)
     {
         // Transient: the manifest could not be cryptographically evaluated at
@@ -712,29 +684,45 @@ static void ota_self_heal(void)
         manifest_set_ota_in_progress(false);
         return; // leave self_heal_pending set so it retries next boot
     }
-    if (err == ESP_ERR_INVALID_RESPONSE)
+    if (err == ESP_ERR_NOT_FOUND || err == ESP_ERR_INVALID_RESPONSE)
     {
-        // The stored manifest is genuinely bad (truncated/tampered/malformed).
-        // The dominant cause is the legacy (<=66) downloader, which judged a
-        // download successful by bytes-read and could silently install a
-        // truncated manifest while upgrading into this first signed firmware.
-        // That is an expected part of the legacy->signed bootstrap, not a
-        // security event - so instead of surfacing a scary signature failure
-        // and waiting for a later quiet refresh, discard it and re-fetch a
-        // fresh signed manifest now, then heal the whole file set this cycle.
-        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Self-heal: stored manifest invalid, re-fetching a fresh copy");
-        remove(MANIFEST_PATH);
+        // NOT_FOUND: fresh/empty filesystem. The first boot on LittleFS-era
+        // firmware formats the old SPIFFS partition (deliberately - that wipe
+        // is what frees devices whose SPIFFS was too full to update), so the
+        // whole file set, manifest included, must be rebuilt from the server.
+        // INVALID_RESPONSE: the stored manifest is genuinely bad (the legacy
+        // <=66 downloader could silently install a truncated one). Neither is
+        // a security event; the remedy is the same - fetch a fresh signed
+        // manifest now and heal the whole file set this cycle.
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, err == ESP_ERR_NOT_FOUND
+                        ? "Self-heal: no stored manifest (fresh filesystem), fetching"
+                        : "Self-heal: stored manifest invalid, re-fetching a fresh copy");
+        remove(MANIFEST_PATH); // no-op when already missing
         xSemaphoreTake(http_mutex, portMAX_DELAY);
-        err = ota_fetch_manifest(fwversion, &m);
+        // A few spaced attempts: a fresh filesystem has no web UI (or fonts)
+        // until files arrive, and the first try lands in the boot congestion
+        // window where transient alloc/connect failures are likely.
+        for (int attempt = 1; attempt <= 3; attempt++)
+        {
+            if (attempt > 1)
+            {
+                vTaskDelay(pdMS_TO_TICKS(60 * 1000));
+            }
+            err = ota_fetch_manifest(fwversion, &m);
+            if (err != ESP_FAIL) // OK or a definitive signature/downgrade verdict
+            {
+                break;
+            }
+        }
         xSemaphoreGive(http_mutex);
         if (err != ESP_OK)
         {
-            // No good manifest available right now; a later quiet refresh will
-            // retry. Report the honest (retryable) outcome, not a tampering code.
-            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Self-heal: manifest re-fetch failed (%s)",
+            // No good manifest available right now. Keep self_heal_pending
+            // set: an empty filesystem stays broken until this succeeds, so
+            // retry at every boot and every 8h check rather than giving up.
+            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Self-heal: manifest fetch failed (%s), will retry",
                         esp_err_to_name(err));
             f_ota_report_status(UPDATE_ERROR_DOWNLOAD, "Self-heal: manifest re-fetch failed");
-            manifest_set_self_heal_pending(false);
             manifest_set_ota_in_progress(false);
             return;
         }

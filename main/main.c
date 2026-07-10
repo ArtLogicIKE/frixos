@@ -18,8 +18,8 @@
 #include "esp_task_wdt.h"
 #include "esp_log.h"
 #include "esp_wifi.h"
-#include "esp_spiffs.h"
 #include "esp_http_server.h"
+#include <sys/stat.h>
 
 #include "frixos.h"
 #include "f-display.h"
@@ -50,9 +50,9 @@ static int rescue_mode_this_boot = 0; // Set by check_boot_fail_count() when 3 c
 
 // versioning variables
 const char app[10] = "Frixos";
-const char version[10] = "2.51";
+const char version[10] = "2.52";
 static const char *TAG = "frixos main"; // in case we use ESP_LOGE -rror/W-arning/I-info (also D-ebug/V-erbose)
-const int fwversion = 69;
+const int fwversion = 70;
 const int rescuemode = 0; // 0 = normal, 1 = rescue mode
 const char revision[] = "E";
 
@@ -972,30 +972,45 @@ void poh_timer_callback(void *arg)
 void startup_spiffs()
 {
 
-  ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Mounting SPIFFS filesystem...");
-  // Mount the SPIFF Filesystem
-  esp_vfs_spiffs_conf_t conf = {
-      .base_path = "/spiffs",        // mount point in the VFS
-      .partition_label = NULL,       // if partition label in partition.csv is "spiffs", match it here
-      .max_files = 5,                // how many files can be open simultaneously
-      .format_if_mount_failed = true // format if cannot mount
+  ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Mounting LittleFS filesystem...");
+  // LittleFS replaced SPIFFS in fw 70. Same partition and the same "/spiffs"
+  // VFS prefix (every file path in the firmware keeps working). On the first
+  // boot after upgrading from a SPIFFS firmware the mount fails (the
+  // partition still holds SPIFFS data) and format_if_mount_failed wipes it -
+  // that wipe is deliberate: it is what frees devices whose SPIFFS was too
+  // full/fragmented to ever write an update again. The file set is
+  // re-downloaded below via self-heal against the signed manifest.
+  esp_vfs_littlefs_conf_t conf = {
+      .base_path = "/spiffs",         // keep the historic VFS mount point
+      .partition_label = "spiffs",    // same data partition as before
+      .format_if_mount_failed = true, // first boot after SPIFFS: format
+      .dont_mount = false,
   };
 
-  esp_err_t ret = esp_vfs_spiffs_register(&conf);
+  esp_err_t ret = esp_vfs_littlefs_register(&conf);
 
   if (ret != ESP_OK)
   {
-    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Couldn't mount SPIFFS filesystem");
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Couldn't mount LittleFS filesystem");
   }
   else
   {
-    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "SPIFFS mounted ok");
     size_t total = 0, used = 0;
-    ret = esp_spiffs_info(NULL, &total, &used);
+    ret = esp_littlefs_info(conf.partition_label, &total, &used);
     if (ret != ESP_OK)
-      ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Failed to get SPIFFS partition information (%i)", ret);
+      ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Failed to get LittleFS partition information (%i)", ret);
     else
-      ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Partition size: total: %d used: %d", total, used);
+      ESP_LOG_WEB(ESP_LOG_INFO, TAG, "LittleFS mounted ok: total: %d used: %d", total, used);
+
+    // Empty or freshly-formatted filesystem (no stored manifest): flag
+    // self-heal so the OTA task re-downloads the full verified file set as
+    // soon as WiFi is up, instead of waiting for the next update check.
+    struct stat st;
+    if (stat(MANIFEST_PATH, &st) != 0)
+    {
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "No stored manifest (fresh filesystem) - scheduling self-heal");
+      manifest_set_self_heal_pending(true);
+    }
   }
 
   // register the filesystem with LVGL so we can open files

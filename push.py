@@ -8,10 +8,15 @@ Quiet file refresh (web files only, same firmware, devices pick it up on
 their ~10th update check without flashing or rebooting):
     python push.py --files-only 68 [--pin <piv-pin>]
 
-Recovery bootstrap (firmware + a 0-file manifest, no web tree) for devices
+Recovery bootstrap (firmware + a one-anchor manifest, no web tree) for devices
 whose SPIFFS is too full/fragmented to write the full manifest - they flash
 the firmware (app partition, no SPIFFS) and self-heal on a later version:
     python push.py --firmware-only 68 [--pin <piv-pin>]
+
+Releases >= 70 (LittleFS era) are DUAL-manifest, published automatically by
+the full push: manifest.txt is the tiny anchored bootstrap (served to legacy
+<70 requesters, who cannot write more), manifest_full.txt is the real file
+set (served when the device sends ?fw=<70+>). Two YubiKey touches per push.
 
 Every publish signs manifest.txt on the release YubiKey (touch required) and
 then re-hashes the COPIED server tree against the manifest, so the published
@@ -113,17 +118,44 @@ def main():
     print(f"pushing {'files-only refresh' if args.files_only else 'full release'} "
           f"v{args.version} at {time.strftime('%Y-%m-%d %H:%M:%S')}")
 
+    manifest_full_out = ver_dir / "manifest_full.txt"
+    # LittleFS-era releases (>= 70) are dual-manifest: manifest.txt is the tiny
+    # anchored bootstrap served to legacy (<70) requesters - the only manifest
+    # a device with a wedged SPIFFS can still write - and manifest_full.txt is
+    # the real file set, served when the device sends ?fw=<70+>.
+    dual = args.version >= 70
+    audit_manifest = manifest_full_out if dual else manifest_out
+
     if args.files_only:
-        if not manifest_out.is_file():
-            sys.exit(f"error: {manifest_out} does not exist - run a full push first")
-        fw_line, _, old_generated = parse_manifest(manifest_out)
+        src_manifest = manifest_full_out if dual else manifest_out
+        if not src_manifest.is_file():
+            sys.exit(f"error: {src_manifest} does not exist - run a full push first")
+        fw_line, _, old_generated = parse_manifest(src_manifest)
         if not fw_line:
-            sys.exit(f"error: {manifest_out} has no fw entry - corrupt manifest?")
+            sys.exit(f"error: {src_manifest} has no fw entry - corrupt manifest?")
         ver_dir.mkdir(parents=True, exist_ok=True)
         copy_tree(ver_dir)
-        write_files_txt(ver_dir / "files.txt")
-        make_manifest(args.version, SPIFFS, None, manifest_out, args.pin,
-                      fw_line=fw_line, min_generated=old_generated)
+        if dual:
+            # Re-sign BOTH manifests: the tiny one embeds the anchor's hash,
+            # which must match the refreshed tree. Tiny FIRST so the full one
+            # carries the higher generation (devices apply tiny, then fetch
+            # full; the anti-replay check requires generations to move forward).
+            anchor = SPIFFS / ANCHOR_REL
+            if not anchor.is_file():
+                sys.exit(f"error: anchor {anchor} not found in spiffs tree")
+            (ver_dir / "files.txt").write_bytes(f"{ANCHOR_REL}\nmanifest.txt\n".encode())
+            print("signing bootstrap manifest (1/2) - YubiKey touch...")
+            make_manifest(args.version, None, None, manifest_out, args.pin,
+                          fw_line=fw_line, min_generated=old_generated,
+                          firmware_only=True, anchor=anchor, anchor_rel=ANCHOR_REL)
+            print("signing full manifest (2/2) - YubiKey touch...")
+            make_manifest(args.version, SPIFFS, None, manifest_full_out, args.pin,
+                          fw_line=fw_line,
+                          min_generated=parse_manifest(manifest_out)[2])
+        else:
+            write_files_txt(ver_dir / "files.txt")
+            make_manifest(args.version, SPIFFS, None, manifest_out, args.pin,
+                          fw_line=fw_line, min_generated=old_generated)
     elif args.firmware_only:
         # Recovery bootstrap: publish the firmware + a manifest that lists only
         # a single stable ANCHOR file the device already has unchanged, so a
@@ -139,6 +171,7 @@ def main():
         anchor = SPIFFS / ANCHOR_REL
         if not anchor.is_file():
             sys.exit(f"error: anchor {anchor} not found in spiffs tree")
+        audit_manifest = manifest_out  # only the tiny manifest exists in this mode
         age_min = (time.time() - FIRMWARE.stat().st_mtime) / 60
         print(f"firmware: {FIRMWARE} ({FIRMWARE.stat().st_size} B, built {age_min:.0f} min ago)")
         print(f"anchor:   {ANCHOR_REL} ({anchor.stat().st_size} B)")
@@ -159,15 +192,36 @@ def main():
             sys.exit(f"error: {FIRMWARE} not found - run idf.py build first")
         age_min = (time.time() - FIRMWARE.stat().st_mtime) / 60
         print(f"firmware: {FIRMWARE} ({FIRMWARE.stat().st_size} B, built {age_min:.0f} min ago)")
-        old_generated = parse_manifest(manifest_out)[2] if manifest_out.is_file() else 0
+        old_generated = max(
+            parse_manifest(manifest_out)[2] if manifest_out.is_file() else 0,
+            parse_manifest(manifest_full_out)[2] if manifest_full_out.is_file() else 0,
+        )
         ver_dir.mkdir(parents=True, exist_ok=True)
         shutil.copy2(FIRMWARE, fw_bin)
         copy_tree(ver_dir)
-        write_files_txt(ver_dir / "files.txt")
-        make_manifest(args.version, SPIFFS, FIRMWARE, manifest_out, args.pin,
-                      min_generated=old_generated)
+        if dual:
+            anchor = SPIFFS / ANCHOR_REL
+            if not anchor.is_file():
+                sys.exit(f"error: anchor {anchor} not found in spiffs tree")
+            # Legacy (fw<=66) devices bootstrap off files.txt; the mini list
+            # sends them down the same tiny-write path as everyone else.
+            (ver_dir / "files.txt").write_bytes(f"{ANCHOR_REL}\nmanifest.txt\n".encode())
+            # Tiny FIRST so the full manifest carries the higher generation
+            # (devices apply tiny, then fetch full; the anti-replay check
+            # requires generations to move forward).
+            print("signing bootstrap manifest (1/2) - YubiKey touch...")
+            make_manifest(args.version, None, FIRMWARE, manifest_out, args.pin,
+                          min_generated=old_generated, firmware_only=True,
+                          anchor=anchor, anchor_rel=ANCHOR_REL)
+            print("signing full manifest (2/2) - YubiKey touch...")
+            make_manifest(args.version, SPIFFS, FIRMWARE, manifest_full_out, args.pin,
+                          min_generated=parse_manifest(manifest_out)[2])
+        else:
+            write_files_txt(ver_dir / "files.txt")
+            make_manifest(args.version, SPIFFS, FIRMWARE, manifest_out, args.pin,
+                          min_generated=old_generated)
 
-    audit_published(ver_dir, manifest_out, fw_bin)
+    audit_published(ver_dir, audit_manifest, fw_bin)
     print(f"published to {ver_dir}")
 
 

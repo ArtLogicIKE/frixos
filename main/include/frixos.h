@@ -43,7 +43,7 @@ Main task stack size
 #include "esp_system.h"
 #include "esp_mac.h"
 #include "esp_check.h"
-#include "esp_spiffs.h"
+#include "esp_littlefs.h"
 #include "nvs.h"
 
 #include "driver/i2c_master.h"

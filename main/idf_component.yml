@@ -19,3 +19,7 @@ dependencies:
   lvgl/lvgl: ^9.2.2
   espressif/esp_lvgl_port: ^2.4.4
   espressif/mdns: ^1.8.0
+  # LittleFS replaces SPIFFS (fw 70+): SPIFFS deadlocks at high utilization
+  # (GC needs a free block it cannot get), which wedged field devices out of
+  # their own OTA updates. Same partition, same /spiffs VFS prefix.
+  joltwallet/littlefs: ^1.20

@@ -8,7 +8,6 @@
 #include "esp_http_server.h"
 #include "lwip/ip_addr.h"
 #include "esp_log.h"
-#include "esp_spiffs.h"
 #include "mdns.h"
 #include <string.h>
 #include "lwip/dns.h"
