@@ -55,7 +55,9 @@ async function loadFiles() {
 }
 function renderFiles() {
   FILES.sort((a, b) => { const r = sortKey === 'size' ? a.size - b.size : a.name.localeCompare(b.name); return sortAsc ? r : -r; });
-  el('filesBody').innerHTML = FILES.map(f => `<tr><td class="cbx"><input type="checkbox" class="fcb" data-name="${(f.name || '').replace(/"/g, '&quot;')}"></td><td><a href="/${encodeURIComponent(f.name)}" download>${f.name}</a></td><td class="size">${formatBytes(f.size)}</td></tr>`).join('');
+  // Encode per path segment: files can live in subdirectories (css/x.css)
+  // and encodeURIComponent would break the URL by escaping the slashes.
+  el('filesBody').innerHTML = FILES.map(f => `<tr><td class="cbx"><input type="checkbox" class="fcb" data-name="${(f.name || '').replace(/"/g, '&quot;')}"></td><td><a href="/${(f.name || '').split('/').map(encodeURIComponent).join('/')}" download>${f.name}</a></td><td class="size">${formatBytes(f.size)}</td></tr>`).join('');
   $$('.fcb').forEach(cb => cb.addEventListener('change', () => { cb.closest('tr').classList.toggle('sel', cb.checked); updFileBtns(); }));
   el('filesSummary').textContent = FILES.length + ' files · ' + formatBytes(FILES.reduce((s, f) => s + (f.size || 0), 0)) + ' total';
   el('selAll').checked = false; updFileBtns();

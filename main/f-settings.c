@@ -3481,7 +3481,12 @@ static bool is_valid_spiffs_filename(const char *filename)
         return false;
     }
 
-    if (strstr(filename, "..") || strchr(filename, '/') || strchr(filename, '\\'))
+    // Forward slashes are allowed as path separators (LittleFS has real
+    // subdirectories - css/, js/, i18n/), but the path must stay relative,
+    // clean and inside the mount: no "..", no backslashes, no leading or
+    // trailing slash, no empty segments.
+    if (strstr(filename, "..") || strchr(filename, '\\') || strstr(filename, "//") ||
+        filename[0] == '/' || filename[strlen(filename) - 1] == '/')
     {
         return false;
     }
@@ -3544,30 +3549,33 @@ static esp_err_t read_json_body(httpd_req_t *req, cJSON **root_out)
     return ESP_OK;
 }
 
-esp_err_t files_list_handler(httpd_req_t *req)
-{
-    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "SPIFFS files list request received");
+// Subdirectory depth the file browser walks. LittleFS has real directories
+// (SPIFFS was flat, everything sat at the root); the shipped tree is one
+// level deep (css/, js/, i18n/) - 3 leaves margin without risking the 8 KB
+// httpd stack (each recursion frame is ~550 B).
+#define FILES_LIST_MAX_DEPTH 3
 
-    DIR *dir = opendir("/spiffs");
+/* Stream one directory level as JSON entries, recursing into
+ * subdirectories. `rel` is a caller-owned scratch buffer holding the path
+ * relative to /spiffs ("" at the root); it is extended for each entry and
+ * restored before moving to the next sibling. */
+static void files_list_walk(httpd_req_t *req, char *rel, size_t rel_cap,
+                            int depth, bool *first, int *count)
+{
+    char path[128];
+    make_spiffs_path(path, sizeof(path), rel);
+    DIR *dir = opendir(path);
     if (!dir)
     {
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to open SPIFFS directory: %s", strerror(errno));
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to open SPIFFS directory");
-        return ESP_FAIL;
+        return;
     }
 
-    httpd_resp_set_type(req, "application/json");
-    httpd_resp_set_hdr(req, "Cache-Control", "no-cache");
-    httpd_resp_send_chunk(req, "{\"files\":[", HTTPD_RESP_USE_STRLEN);
-
     struct dirent *ent;
-    bool first = true;
-    int count = 0;
-    char chunk[256];
-
     while ((ent = readdir(dir)) != NULL)
     {
         const char *name = ent->d_name;
+        // Legacy SPIFFS readdir returned full paths; LittleFS returns bare
+        // entry names. Normalize both.
         if (strncmp(name, "/spiffs/", 8) == 0)
         {
             name += 8;
@@ -3576,34 +3584,61 @@ esp_err_t files_list_handler(httpd_req_t *req)
         {
             name++;
         }
-
-        if (name[0] == '\0')
+        if (name[0] == '\0' || strcmp(name, ".") == 0 || strcmp(name, "..") == 0)
         {
             continue;
         }
 
-        char filepath[128];
-        make_spiffs_path(filepath, sizeof(filepath), name);
-
-        struct stat st;
-        size_t size = 0;
-        if (stat(filepath, &st) == 0)
+        size_t base_len = strlen(rel);
+        if (snprintf(rel + base_len, rel_cap - base_len, "%s%s",
+                     base_len ? "/" : "", name) >= (int)(rel_cap - base_len))
         {
-            size = st.st_size;
+            rel[base_len] = '\0';
+            continue; // path too long for the browser - skip
         }
 
-        char escaped_name[160];
-        format_json_string(escaped_name, sizeof(escaped_name), name);
-        snprintf(chunk, sizeof(chunk), "%s{\"name\":%s,\"size\":%u}",
-                 first ? "" : ",",
-                 escaped_name,
-                 (unsigned int)size);
-        httpd_resp_send_chunk(req, chunk, HTTPD_RESP_USE_STRLEN);
-        first = false;
-        count++;
+        make_spiffs_path(path, sizeof(path), rel);
+        struct stat st;
+        bool have_st = (stat(path, &st) == 0);
+        if (have_st && S_ISDIR(st.st_mode))
+        {
+            if (depth < FILES_LIST_MAX_DEPTH)
+            {
+                files_list_walk(req, rel, rel_cap, depth + 1, first, count);
+            }
+        }
+        else
+        {
+            char chunk[256];
+            char escaped_name[160];
+            format_json_string(escaped_name, sizeof(escaped_name), rel);
+            snprintf(chunk, sizeof(chunk), "%s{\"name\":%s,\"size\":%u}",
+                     *first ? "" : ",",
+                     escaped_name,
+                     (unsigned int)(have_st ? st.st_size : 0));
+            httpd_resp_send_chunk(req, chunk, HTTPD_RESP_USE_STRLEN);
+            *first = false;
+            (*count)++;
+        }
+        rel[base_len] = '\0'; // restore for the next sibling
     }
-
     closedir(dir);
+}
+
+esp_err_t files_list_handler(httpd_req_t *req)
+{
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Files list request received");
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-cache");
+    httpd_resp_send_chunk(req, "{\"files\":[", HTTPD_RESP_USE_STRLEN);
+
+    bool first = true;
+    int count = 0;
+    char rel[112] = ""; // matches the 110-char filename cap
+    files_list_walk(req, rel, sizeof(rel), 0, &first, &count);
+
+    char chunk[48];
     snprintf(chunk, sizeof(chunk), "],\"count\":%d}", count);
     httpd_resp_send_chunk(req, chunk, HTTPD_RESP_USE_STRLEN);
     httpd_resp_send_chunk(req, NULL, 0);
