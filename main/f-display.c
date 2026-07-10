@@ -2448,7 +2448,7 @@ static void handle_wifi_status_icon(void)
 
 static void handle_integration_and_messages(void)
 {
-  if (integration_tokens_updated || (timeinfo.tm_min == 0 && timeinfo.tm_hour != last_integration_update_hour) || (!ota_update_in_progress && ota_updating_message) || (show_ip_on_boot && !ip_message_set))
+  if (integration_tokens_updated || (timeinfo.tm_min == 0 && timeinfo.tm_hour != last_integration_update_hour) || (!ota_update_in_progress && ota_updating_message) || (ota_update_in_progress && !ota_updating_message) || (show_ip_on_boot && !ip_message_set))
   {
     // Glucose icon handling
     if (is_glucose_on())
@@ -2479,8 +2479,29 @@ static void handle_integration_and_messages(void)
       lvgl_port_unlock();
     }
 
-    // IP address and OTA "updating..." / "reinstalling..." message display handling
-    if (show_ip_on_boot && !ip_message_set)
+    // OTA "updating..." / IP address / normal message display handling.
+    // OTA wins over the boot IP window: while files or firmware are
+    // downloading (full update, self-heal repopulation, quiet refresh) the
+    // user should see "Updating...", not the IP address.
+    if (ota_update_in_progress)
+    {
+      if (!ota_updating_message)
+      {
+        set_scroll_message(ota_reinstall_in_progress ? "Reinstalling..." : "Updating...");
+        ota_updating_message = true;
+      }
+      if (ota_start_time == 0)
+        ota_start_time = time(NULL);
+      if (time(NULL) - ota_start_time > 300)
+      {
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "OTA timeout, restoring message");
+        ota_update_in_progress = false;
+        ota_reinstall_in_progress = false;
+        ota_updating_message = false;
+        ota_start_time = 0;
+      }
+    }
+    else if (show_ip_on_boot && !ip_message_set)
     {
       char ip_message[64];
       snprintf(ip_message, sizeof(ip_message), "%s ", boot_ip_address);
@@ -2491,7 +2512,7 @@ static void handle_integration_and_messages(void)
       ip_message_set = true;
       ip_display_start_time = esp_timer_get_time();
     }
-    else if (!ota_update_in_progress && !show_ip_on_boot)
+    else if (!show_ip_on_boot)
     {
       const screen_layout_profile_t *layout = &eeprom_screen_layout.profile[font_index];
       lvgl_port_lock(0);
@@ -2510,24 +2531,11 @@ static void handle_integration_and_messages(void)
       }
       update_static_text_labels();
       lvgl_port_unlock();
-    }
-    else if (ota_update_in_progress)
-    {
-      if (!ota_updating_message)
-      {
-        set_scroll_message(ota_reinstall_in_progress ? "Reinstalling..." : "Updating...");
-        ota_updating_message = true;
-      }
-      if (ota_start_time == 0)
-        ota_start_time = time(NULL);
-      if (time(NULL) - ota_start_time > 300)
-      {
-        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "OTA timeout, restoring message");
-        ota_update_in_progress = false;
-        ota_reinstall_in_progress = false;
-        ota_updating_message = false;
-        ota_start_time = 0;
-      }
+      // One-shot restore after an update ended: without this the
+      // "(!in_progress && updating_message)" refresh gate stays armed and
+      // re-runs this block every tick.
+      ota_updating_message = false;
+      ota_start_time = 0;
     }
 
     ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Scroll message: %s", msg_scrolling);

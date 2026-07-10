@@ -36,6 +36,8 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/main/config.h.in
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(frixos)
-spiffs_create_partition_image(spiffs ./spiffs FLASH_IN_PROJECT)
+# LittleFS since fw 70 (was spiffs_create_partition_image); same partition,
+# factory images are now LittleFS-formatted.
+littlefs_create_partition_image(spiffs ./spiffs FLASH_IN_PROJECT)
 
 # Remove the idf_component_register call from here - it belongs only in component directories
