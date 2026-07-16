@@ -302,7 +302,7 @@
       "located": "Ermittelt: {where}",
       "located_no_tz": "Ermittelt: {where} — Zeitzonensuche fehlgeschlagen, manuell einstellen.",
       "located_tz": "Ermittelt: {where} ({iana})",
-      "lon_placeholder": "z. B. -74.0470807",
+      "lon_placeholder": "z. B. -74.047081",
       "timezone_posix": "Zeitzone (POSIX)"
     },
     "wifi_hours": {

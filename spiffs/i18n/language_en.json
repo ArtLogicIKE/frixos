@@ -276,7 +276,7 @@
       "timezone_region": "Timezone region",
       "timezone_region_placeholder": "e.g. America/New_York",
       "lat_placeholder": "e.g. 40.6892494",
-      "lon_placeholder": "e.g. -74.0470807",
+      "lon_placeholder": "e.g. -74.047081",
       "detected": "Detected: {tz}",
       "help_text": "Find POSIX timezones <a href=\"https://leo.leung.xyz/wiki/Timezone\" target=\"_blank\" rel=\"noopener\">here</a>. Lat/Lon only affect weather data.",
       "restart_note": "* Changing location settings will restart the device.",

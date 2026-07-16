@@ -33,7 +33,8 @@ async function tzFromCoords(lat, lon) {
   return null;
 }
 function setCoords(lat, lon) {
-  el('lat').value = lat; el('lon').value = lon;
+  // Device rejects coords over 10 chars; matches maxlength on the inputs.
+  el('lat').value = String(lat).slice(0, 10); el('lon').value = String(lon).slice(0, 10);
   if (window.saveBar) window.saveBar.markDirty(); // programmatic set: no input event fires
 }
 /* Overwrite the timezone fields for a freshly chosen location. When the device

@@ -302,7 +302,7 @@
       "located": "Placeret: {where}",
       "located_no_tz": "Placeret: {where} — tidszoneopslag mislykkedes, angiv den manuelt.",
       "located_tz": "Placeret: {where} ({iana})",
-      "lon_placeholder": "f.eks. -74.0470807",
+      "lon_placeholder": "f.eks. -74.047081",
       "timezone_posix": "Tidszone (POSIX)"
     },
     "wifi_hours": {

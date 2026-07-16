@@ -302,7 +302,7 @@
       "located": "Ubicado: {where}",
       "located_no_tz": "Ubicado: {where} — no se pudo obtener la zona horaria, configúrela manualmente.",
       "located_tz": "Ubicado: {where} ({iana})",
-      "lon_placeholder": "p. ej. -74.0470807",
+      "lon_placeholder": "p. ej. -74.047081",
       "timezone_posix": "Zona horaria (POSIX)"
     },
     "wifi_hours": {

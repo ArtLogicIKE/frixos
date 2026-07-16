@@ -302,7 +302,7 @@
       "located": "Localizzato: {where}",
       "located_no_tz": "Localizzato: {where} — ricerca del fuso orario fallita, impostalo manualmente.",
       "located_tz": "Localizzato: {where} ({iana})",
-      "lon_placeholder": "es. -74.0470807",
+      "lon_placeholder": "es. -74.047081",
       "timezone_posix": "Fuso orario (POSIX)"
     },
     "wifi_hours": {

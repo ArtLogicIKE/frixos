@@ -302,7 +302,7 @@
       "located": "Zlokalizowano: {where}",
       "located_no_tz": "Zlokalizowano: {where} — nie udało się znaleźć strefy czasowej, ustaw ją ręcznie.",
       "located_tz": "Zlokalizowano: {where} ({iana})",
-      "lon_placeholder": "np. -74.0470807",
+      "lon_placeholder": "np. -74.047081",
       "timezone_posix": "Strefa czasowa (POSIX)"
     },
     "wifi_hours": {
