@@ -3,6 +3,14 @@
 
 static const char *TAG = "f-pwm";
 static bool led_pwm_configured = false;
+// Last brightness percent applied via set_led_pwm_brightness. Startup drives
+// the LED at effective max (see startup_led_pwm), i.e. 100% of the scale.
+static uint8_t current_brightness = 100;
+
+uint8_t pwm_get_current_brightness(void)
+{
+    return current_brightness;
+}
 
 uint16_t pwm_get_safe_maximum_power(void)
 {
@@ -138,6 +146,7 @@ void set_led_pwm_brightness(uint8_t duty)
         ESP_LOG_WEB(ESP_LOG_WARN, TAG, "LED brightness skipped: PWM not configured");
         return;
     }
+    current_brightness = duty;
 
     esp_err_t err = ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, pwm_duty);
     if (err != ESP_OK)

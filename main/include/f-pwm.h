@@ -9,6 +9,7 @@
 
 uint16_t pwm_get_safe_maximum_power(void);
 uint16_t pwm_get_effective_max_power(void);
+uint8_t pwm_get_current_brightness(void);
 
 void startup_led_pwm();
 void set_led_pwm_brightness(uint8_t duty);

@@ -1,0 +1,404 @@
+Executing action: all (aliases: build)
+Running ninja in directory C:\source\frixos\build
+Executing "ninja all"...
+[0/1] Re-running CMake...
+
+-- Component directory C:/Espressif/frameworks/esp-idf-v6.0.1/components/mqtt does not contain a CMakeLists.txt file. No component will be added
+-- Minimal build - OFF
+-- ccache will be used for faster recompilation
+-- Building ESP-IDF components for target esp32
+NOTICE: 
+
+Following dependencies have new versions available:
+
+Dependency "espressif/esp_lvgl_port": "2.7.2" -> "2.8.0~1"
+
+Dependency "espressif/mdns": "1.10.0" -> "1.11.3"
+
+Consider running "idf.py update-dependencies" to update your lock file.
+
+NOTICE: Processing 6 dependencies:
+
+NOTICE: [1/6] espressif/cjson (1.7.19~2)
+
+NOTICE: [2/6] espressif/esp_lvgl_port (2.7.2)
+
+NOTICE: [3/6] espressif/mdns (1.10.0)
+
+NOTICE: [4/6] joltwallet/littlefs (1.22.2)
+
+NOTICE: [5/6] lvgl/lvgl (9.5.0)
+
+NOTICE: [6/6] idf (6.0.1)
+
+-- ESP-TEE is currently supported only on the esp32c6;esp32h2;esp32c5;esp32c61 SoCs
+-- KCONFIG_REPORT_VERBOSITY not set, using default
+-- Project sdkconfig file C:/source/frixos/sdkconfig
+Loading defaults file C:/source/frixos/sdkconfig.defaults...
+
+warning: unknown kconfig symbol 'FREERTOS_PLACE_FUNCTIONS_INTO_FLASH' assigned to 'y' in C:/source/frixos/sdkconfig.defaults
+
+Configuration Report                                                           
+
+ ───────────────────────────────────────────────────────────────────────────── 
+
+   Parser Version: 1                                                           
+
+   Verbosity: default                                                          
+
+   Defaults policy: sdkconfig                                                  
+
+   Status: Finished with notifications                                         
+
+                                                                               
+
+  Disabled Symbols/Choices With User-Set Value                                 
+
+   ─────────────────────────────────────────────────────────────────────────   
+
+    * ESP_CONSOLE_UART_BAUDRATE (defined at                                    
+
+    C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_stdio/Kconfig:15…    
+
+    with user-set value 115200 from C:/source/frixos/sdkconfig                 
+
+   ─────────────────────────────────────────────────────────────────────────   
+
+ ───────────────────────────────────────────────────────────────────────────── 
+
+-- Compiler supported targets: xtensa-esp-elf
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- App "frixos" version: 65-164-g64ff89d-dirty
+-- Setting up mbedtls configuration
+-- Linkage type is PUBLIC
+-- Adding linker script C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_system/ld/esp32/memory.ld.in
+--   -> Preprocessing .in script: C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_system/ld/esp32/memory.ld.in
+-- Adding linker script C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_system/ld/esp32/sections.ld.in
+--   -> Preprocessing .in script: C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_system/ld/esp32/sections.ld.in
+--   -> Applying ldgen processing: C:/source/frixos/build/esp-idf/esp_system/ld/sections.ld.in
+-- Adding linker script C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_rom/esp32/ld/esp32.rom.ld
+-- Adding linker script C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_rom/esp32/ld/esp32.rom.api.ld
+-- Adding linker script C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_rom/esp32/ld/esp32.rom.libgcc.ld
+-- Adding linker script C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_rom/esp32/ld/esp32.rom.libc-funcs.ld
+-- Adding linker script C:/Espressif/frameworks/esp-idf-v6.0.1/components/soc/esp32/ld/esp32.peripherals.ld
+-- LVGL version: 9.5.0
+-- Component idf::esp_trace will be linked with -Wl,--whole-archive
+-- Components: app_trace app_update bootloader bootloader_support bt cmock console cxx driver efuse esp-tls esp_adc esp_app_format esp_blockdev esp_blockdev_util esp_bootloader_format esp_coex esp_common esp_driver_ana_cmpr esp_driver_bitscrambler esp_driver_cam esp_driver_dac esp_driver_dma esp_driver_gpio esp_driver_gptimer esp_driver_i2c esp_driver_i2s esp_driver_i3c esp_driver_isp esp_driver_jpeg esp_driver_ledc esp_driver_mcpwm esp_driver_parlio esp_driver_pcnt esp_driver_ppa esp_driver_rmt esp_driver_sd_intf esp_driver_sdio esp_driver_sdm esp_driver_sdmmc esp_driver_sdspi esp_driver_spi esp_driver_touch_sens esp_driver_tsens esp_driver_twai esp_driver_uart esp_driver_usb_serial_jtag esp_eth esp_event esp_gdbstub esp_hal_ana_cmpr esp_hal_ana_conv esp_hal_cam esp_hal_clock esp_hal_dma esp_hal_gpio esp_hal_gpspi esp_hal_i2c esp_hal_i2s esp_hal_ieee802154 esp_hal_jpeg esp_hal_lcd esp_hal_ledc esp_hal_mcpwm esp_hal_mspi esp_hal_parlio esp_hal_pcnt esp_hal_pmu esp_hal_ppa esp_hal_rmt esp_hal_rtc_timer esp_hal_sd esp_hal_security esp_hal_timg esp_hal_touch_sens esp_hal_twai esp_hal_uart esp_hal_usb esp_hal_wdt esp_hid esp_http_client esp_http_server esp_https_ota esp_https_server esp_hw_support esp_lcd esp_libc esp_local_ctrl esp_mm esp_netif esp_netif_stack esp_partition esp_phy esp_pm esp_psram esp_ringbuf esp_rom esp_security esp_stdio esp_system esp_timer esp_trace esp_usb_cdc_rom_console esp_wifi espcoredump espressif__cjson espressif__esp_lvgl_port espressif__mdns esptool_py fatfs freertos hal heap http_parser idf_test ieee802154 joltwallet__littlefs log lvgl__lvgl lwip main mbedtls nvs_flash nvs_sec_provider openthread partition_table perfmon protobuf-c protocomm pthread rt sdmmc soc spi_flash spiffs tcp_transport teriyakigod__esp_lcd_st7735 ulp unity vfs wear_levelling wpa_supplicant xtensa
+-- Component paths: C:/Espressif/frameworks/esp-idf-v6.0.1/components/app_trace C:/Espressif/frameworks/esp-idf-v6.0.1/components/app_update C:/Espressif/frameworks/esp-idf-v6.0.1/components/bootloader C:/Espressif/frameworks/esp-idf-v6.0.1/components/bootloader_support C:/Espressif/frameworks/esp-idf-v6.0.1/components/bt C:/Espressif/frameworks/esp-idf-v6.0.1/components/cmock C:/Espressif/frameworks/esp-idf-v6.0.1/components/console C:/Espressif/frameworks/esp-idf-v6.0.1/components/cxx C:/Espressif/frameworks/esp-idf-v6.0.1/components/driver C:/Espressif/frameworks/esp-idf-v6.0.1/components/efuse C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp-tls C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_adc C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_app_format C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_blockdev C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_blockdev_util C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_bootloader_format C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_coex C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_common C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_driver_ana_cmpr C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_driver_bitscrambler C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_driver_cam C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_driver_dac C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_driver_dma C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_driver_gpio C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_driver_gptimer C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_driver_i2c C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_driver_i2s C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_driver_i3c C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_driver_isp C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_driver_jpeg C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_driver_ledc C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_driver_mcpwm C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_driver_parlio C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_driver_pcnt C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_driver_ppa C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_driver_rmt C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_driver_sd_intf C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_driver_sdio C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_driver_sdm C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_driver_sdmmc C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_driver_sdspi C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_driver_spi C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_driver_touch_sens C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_driver_tsens C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_driver_twai C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_driver_uart C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_driver_usb_serial_jtag C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_eth C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_event C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_gdbstub C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_hal_ana_cmpr C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_hal_ana_conv C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_hal_cam C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_hal_clock C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_hal_dma C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_hal_gpio C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_hal_gpspi C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_hal_i2c C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_hal_i2s C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_hal_ieee802154 C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_hal_jpeg C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_hal_lcd C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_hal_ledc C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_hal_mcpwm C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_hal_mspi C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_hal_parlio C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_hal_pcnt C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_hal_pmu C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_hal_ppa C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_hal_rmt C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_hal_rtc_timer C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_hal_sd C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_hal_security C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_hal_timg C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_hal_touch_sens C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_hal_twai C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_hal_uart C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_hal_usb C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_hal_wdt C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_hid C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_http_client C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_http_server C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_https_ota C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_https_server C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_hw_support C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_lcd C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_libc C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_local_ctrl C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_mm C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_netif C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_netif_stack C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_partition C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_phy C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_pm C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_psram C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_ringbuf C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_rom C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_security C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_stdio C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_system C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_timer C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_trace C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_usb_cdc_rom_console C:/Espressif/frameworks/esp-idf-v6.0.1/components/esp_wifi C:/Espressif/frameworks/esp-idf-v6.0.1/components/espcoredump C:/source/frixos/managed_components/espressif__cjson C:/source/frixos/managed_components/espressif__esp_lvgl_port C:/source/frixos/managed_components/espressif__mdns C:/Espressif/frameworks/esp-idf-v6.0.1/components/esptool_py C:/Espressif/frameworks/esp-idf-v6.0.1/components/fatfs C:/Espressif/frameworks/esp-idf-v6.0.1/components/freertos C:/Espressif/frameworks/esp-idf-v6.0.1/components/hal C:/Espressif/frameworks/esp-idf-v6.0.1/components/heap C:/Espressif/frameworks/esp-idf-v6.0.1/components/http_parser C:/Espressif/frameworks/esp-idf-v6.0.1/components/idf_test C:/Espressif/frameworks/esp-idf-v6.0.1/components/ieee802154 C:/source/frixos/managed_components/joltwallet__littlefs C:/Espressif/frameworks/esp-idf-v6.0.1/components/log C:/source/frixos/managed_components/lvgl__lvgl C:/Espressif/frameworks/esp-idf-v6.0.1/components/lwip C:/source/frixos/main C:/Espressif/frameworks/esp-idf-v6.0.1/components/mbedtls C:/Espressif/frameworks/esp-idf-v6.0.1/components/nvs_flash C:/Espressif/frameworks/esp-idf-v6.0.1/components/nvs_sec_provider C:/Espressif/frameworks/esp-idf-v6.0.1/components/openthread C:/Espressif/frameworks/esp-idf-v6.0.1/components/partition_table C:/Espressif/frameworks/esp-idf-v6.0.1/components/perfmon C:/Espressif/frameworks/esp-idf-v6.0.1/components/protobuf-c C:/Espressif/frameworks/esp-idf-v6.0.1/components/protocomm C:/Espressif/frameworks/esp-idf-v6.0.1/components/pthread C:/Espressif/frameworks/esp-idf-v6.0.1/components/rt C:/Espressif/frameworks/esp-idf-v6.0.1/components/sdmmc C:/Espressif/frameworks/esp-idf-v6.0.1/components/soc C:/Espressif/frameworks/esp-idf-v6.0.1/components/spi_flash C:/Espressif/frameworks/esp-idf-v6.0.1/components/spiffs C:/Espressif/frameworks/esp-idf-v6.0.1/components/tcp_transport C:/source/frixos/components/teriyakigod__esp_lcd_st7735 C:/Espressif/frameworks/esp-idf-v6.0.1/components/ulp C:/Espressif/frameworks/esp-idf-v6.0.1/components/unity C:/Espressif/frameworks/esp-idf-v6.0.1/components/vfs C:/Espressif/frameworks/esp-idf-v6.0.1/components/wear_levelling C:/Espressif/frameworks/esp-idf-v6.0.1/components/wpa_supplicant C:/Espressif/frameworks/esp-idf-v6.0.1/components/xtensa
+-- Configuring done (24.5s)
+-- Generating done (2.1s)
+-- Build files have been written to: C:/source/frixos/build
+[1/16] Generating build timestamp
+
+[2/16] Performing build step for 'bootloader'
+
+[1/1] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\source\frixos\build\bootloader && C:\Espressif\python_env\idf6.0_py3.13_env\Scripts\python.exe C:/Espressif/frameworks/esp-idf-v6.0.1/components/partition_table/check_sizes.py --offset 0x8000 bootloader 0x1000 C:/source/frixos/build/bootloader/bootloader.bin"
+
+
+Bootloader binary size 0x5a60 bytes. 0x15a0 bytes (19%) free.
+
+
+
+[3/16] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\source\frixos\build && C:\source\frixos\build\littlefs_py_venv\Scripts\littlefs-python.exe create C:/source/frixos/spiffs C:/source/frixos/build/spiffs.bin -v --fs-size=0x180000 --name-max=64 --block-size=4096"
+
+LittleFS Configuration:
+
+  Block Size:       4096  /  0x1000
+
+  Image Size:    1572864  /  0x180000
+
+  Block Count:       384
+
+  Name Max:           64
+
+  Image:       C:\source\frixos\build\spiffs.bin
+
+Adding File:      bold-digit-label.jpg
+
+Adding File:      bold-font.jpg
+
+Adding File:      bold.jpg
+
+Adding Directory: css
+
+Adding File:      default-ampm.jpg
+
+Adding File:      default-dot.jpg
+
+Adding File:      default-font.jpg
+
+Adding File:      default-glucose.jpg
+
+Adding File:      default-graph.jpg
+
+Adding File:      default-grid.jpg
+
+Adding File:      default-moon.jpg
+
+Adding File:      default-settings.jpg
+
+Adding File:      default-trend.jpg
+
+Adding File:      default-units.jpg
+
+Adding File:      default-weather.jpg
+
+Adding File:      default-wifi-off.jpg
+
+Adding File:      Default.layout
+
+Adding File:      Diabetic.layout
+
+Adding File:      favicon.ico
+
+Adding File:      ficasso-ampm.jpg
+
+Adding File:      ficasso-dot.jpg
+
+Adding File:      ficasso-font.jpg
+
+Adding File:      ficasso-moon.jpg
+
+Adding File:      ficasso-trend.jpg
+
+Adding File:      ficasso-units.jpg
+
+Adding File:      ficasso-weather.jpg
+
+Adding File:      ficasso-wifi-off.jpg
+
+Adding File:      ficasso.jpg
+
+Adding File:      glucose.jpg
+
+Adding File:      HAGraph.layout
+
+Adding File:      HomeAssistant.layout
+
+Adding Directory: i18n
+
+Adding File:      index.html
+
+Adding Directory: js
+
+Adding File:      kablame-ampm.jpg
+
+Adding File:      kablame-dot.jpg
+
+Adding File:      kablame-font.jpg
+
+Adding File:      kablame-moon.jpg
+
+Adding File:      kablame-trend.jpg
+
+Adding File:      kablame-units.jpg
+
+Adding File:      kablame-weather.jpg
+
+Adding File:      kablame.jpg
+
+Adding File:      kablamo-font.jpg
+
+Adding File:      kablamo.jpg
+
+Adding File:      kaboom-dot.jpg
+
+Adding File:      kaboom-font.jpg
+
+Adding File:      kaboom.jpg
+
+Adding File:      lcd-ampm.jpg
+
+Adding File:      lcd-font.jpg
+
+Adding File:      lcd-moon.jpg
+
+Adding File:      lcd-units.jpg
+
+Adding File:      lcd-weather.jpg
+
+Adding File:      lcd.jpg
+
+Adding File:      lichten-ampm.jpg
+
+Adding File:      lichten-dot.jpg
+
+Adding File:      lichten-font.jpg
+
+Adding File:      lichten-moon.jpg
+
+Adding File:      lichten-units.jpg
+
+Adding File:      lichten-weather.jpg
+
+Adding File:      lichten-wifi-off.jpg
+
+Adding File:      lichten.jpg
+
+Adding File:      light-font.jpg
+
+Adding File:      light.jpg
+
+Adding File:      logo.jpg
+
+Adding File:      nixie-ampm.jpg
+
+Adding File:      nixie-dot.jpg
+
+Adding File:      nixie-font.jpg
+
+Adding File:      nixie-moon.jpg
+
+Adding File:      nixie-units.jpg
+
+Adding File:      nixie-weather.jpg
+
+Adding File:      nixie.jpg
+
+Adding File:      palette-glucose.png
+
+Adding File:      palette-graph.png
+
+Adding File:      palette-message.png
+
+Adding File:      palette-moon.jpg
+
+Adding File:      palette-trend.png
+
+Adding File:      palette-wifi-off.png
+
+Adding File:      prune.txt
+
+Adding File:      robrito-ampm.jpg
+
+Adding File:      robrito-dot.jpg
+
+Adding File:      robrito-font.jpg
+
+Adding File:      robrito.jpg
+
+Adding File:      text-ampm.jpg
+
+Adding File:      timezone.txt
+
+Adding File:      Weather.layout
+
+Adding File:      wifi-qr.jpg
+
+Adding File:      css\components.css
+
+Adding File:      css\forms.css
+
+Adding File:      css\layout.css
+
+Adding File:      css\screen-editor.css
+
+Adding File:      css\variables.css
+
+Adding File:      i18n\language_da.json
+
+Adding File:      i18n\language_de.json
+
+Adding File:      i18n\language_en.json
+
+Adding File:      i18n\language_es.json
+
+Adding File:      i18n\language_fr.json
+
+Adding File:      i18n\language_it.json
+
+
+Adding File:      i18n\language_pl.json
+
+
+Adding File:      i18n\language_pt.json
+
+
+Adding File:      i18n\language_sv.json
+
+
+Adding File:      js\core.js
+
+
+Adding File:      js\forms.js
+
+
+Adding File:      js\integrations.js
+
+
+Adding File:      js\savebar.js
+
+
+Adding File:      js\screen-editor.js
+
+
+Adding File:      js\support.js
+
+
+Adding File:      js\system.js
+
+
+Adding File:      js\utils.js
+
+
+Adding File:      js\wifi.js
+
+
+[4/16] No install step for 'bootloader'
+
+[5/16] Building C object esp-idf/esp_app_format/CMakeFiles/__idf_esp_app_format.dir/esp_app_desc.c.obj
+
+[6/16] Completed 'bootloader'
+
+[7/16] Linking C static library esp-idf\esp_app_format\libesp_app_format.a
+
+[8/16] Building C object esp-idf/main/CMakeFiles/__idf_main.dir/f-ota.c.obj
+
+[9/16] Building C object esp-idf/main/CMakeFiles/__idf_main.dir/f-display.c.obj
+
+[10/16] Building C object esp-idf/main/CMakeFiles/__idf_main.dir/f-settings.c.obj
+
+[11/16] Linking C static library esp-idf\main\libmain.a
+
+[12/16] Generating esp-idf/esp_system/ld/sections.ld
+
+[13/16] Linking CXX executable frixos.elf
+
+[14/16] Generating binary image from built executable
+
+esptool v5.3.0
+
+
+Creating ESP32 image...
+
+
+Merged 3 ELF sections.
+
+
+Successfully created ESP32 image.
+
+
+Generated C:/source/frixos/build/frixos.bin
+
+[15/16] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\source\frixos\build && C:\Espressif\python_env\idf6.0_py3.13_env\Scripts\python.exe C:/Espressif/frameworks/esp-idf-v6.0.1/components/partition_table/check_sizes.py --offset 0x8000 partition --type app C:/source/frixos/build/partition_table/partition-table.bin C:/source/frixos/build/frixos.bin"
+
+frixos.bin binary size 0x147d50 bytes. Smallest app partition is 0x330000 bytes. 0x1e82b0 bytes (60%) free.
+
+
+
+
+Project build complete. To flash, run:
+ idf.py flash
+or
+ idf.py -p PORT flash
+or
+ python -m esptool --chip esp32 -b 460800 --before default-reset --after hard-reset write-flash --flash-mode dio --flash-size 8MB --flash-freq 80m 0x1000 build\bootloader\bootloader.bin 0x8000 build\partition_table\partition-table.bin 0xe000 build\ota_data_initial.bin 0x10000 build\frixos.bin 0x670000 build\spiffs.bin
+or from the "C:\source\frixos\build" directory
+ python -m esptool --chip esp32 -b 460800 --before default-reset --after hard-reset write-flash "@flash_args"

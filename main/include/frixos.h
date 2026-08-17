@@ -401,6 +401,7 @@ static inline int screen_icon_index(screen_element_id_t id)
 void build_integration_message_corpus(char *out, size_t out_size);
 void screen_layout_apply_factory_defaults(screen_layout_t *layout);
 void screen_layout_sync_legacy_eeprom(const screen_layout_t *layout);
+void screen_layout_apply_legacy_message(const char *message);
 void screen_layout_ensure_valid(void);
 
 // TFT Displat ST7735S

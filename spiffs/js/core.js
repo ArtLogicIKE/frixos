@@ -250,7 +250,18 @@ async function boot() {
   if (sectionLoaders.settings) await sectionLoaders.settings();
 
   const st = await apiGet('/api/status'); const d = st.data || {};
-  el('heroStatus').textContent = (d.ip_address ? d.ip_address : 'frixos.local') + (d.version ? ' · v' + d.version : '');
+  const heroBits = [d.ip_address ? d.ip_address : 'frixos.local'];
+  if (d.version) heroBits.push('v' + d.version);
+  // eff. brightness = current brightness % x max power fraction.
+  // effective_max_power is in raw duty units (0..1023, see f-pwm.c);
+  // current_brightness is a percent (older firmware omits it -> assume 100).
+  if (d.effective_max_power != null) {
+    const b = d.current_brightness != null ? d.current_brightness : 100;
+    const eff = Math.round(b * d.effective_max_power * 10 / 1023) / 10;
+    heroBits.push('eff. brightness ' + eff + '%');
+  }
+  if (d.timezone) heroBits.push('TZ ' + d.timezone);
+  el('heroStatus').textContent = heroBits.join(' · ');
   const online = !!d.wifi_connected;
   window._heroOnline = online; // remembered so refreshDynamicI18n can re-localize on language switch
   el('heroOnline').textContent = online ? tr('common.online', 'Online') : tr('common.offline', 'Offline');

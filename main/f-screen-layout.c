@@ -172,6 +172,26 @@ void screen_layout_sync_legacy_eeprom(const screen_layout_t *layout)
   eeprom_quiet_weather = layout->profile[0].widget[SCREEN_ELEM_WEATHER].enabled;
 }
 
+/* Reverse of screen_layout_sync_legacy_eeprom for the message field: legacy
+ * POST /api/settings {"p16":...} clients (HA, scripts) must update the layout
+ * engine's scroll_text, which is what the display actually renders. */
+void screen_layout_apply_legacy_message(const char *message)
+{
+  if (!message)
+    message = "";
+
+  /* Ensure a valid layout exists without syncing legacy mirrors back into
+   * eeprom_message — the caller has already written the new p16 value. */
+  if (eeprom_screen_layout.version != FRIXOS_SCREEN_LAYOUT_VERSION)
+    screen_layout_apply_factory_defaults(&eeprom_screen_layout);
+
+  for (int profile = 0; profile < FRIXOS_SCREEN_LAYOUT_PROFILES; profile++)
+  {
+    strncpy(eeprom_screen_layout.profile[profile].scroll_text, message, SCROLL_MSG_LENGTH - 1);
+    eeprom_screen_layout.profile[profile].scroll_text[SCROLL_MSG_LENGTH - 1] = '\0';
+  }
+}
+
 void screen_layout_ensure_valid(void)
 {
   if (eeprom_screen_layout.version == FRIXOS_SCREEN_LAYOUT_VERSION)

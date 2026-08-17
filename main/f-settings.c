@@ -1874,6 +1874,8 @@ esp_err_t settings_post_handler(httpd_req_t *req)
     {
         strncpy(eeprom_message, message->valuestring, sizeof(eeprom_message) - 1);
         eeprom_message[sizeof(eeprom_message) - 1] = '\0'; // Ensure null termination
+        /* Keep layout.scroll_text (display source of truth) in sync with p16. */
+        screen_layout_apply_legacy_message(eeprom_message);
     }
 
     cJSON *quiet_scroll = cJSON_GetObjectItem(root, "p06");
@@ -2327,9 +2329,17 @@ esp_err_t settings_post_handler(httpd_req_t *req)
 
     // Check if message has changed and call parse_integrations if it has
     ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Orig message: %s, new message: %s", orig_message, eeprom_message);
-    if ((strcmp(orig_message, eeprom_message) != 0) || integration_settings_changed)
+    if (strcmp(orig_message, eeprom_message) != 0)
     {
-        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Message or integration settings changed, parsing integrations");
+        /* Same deferred path as POST /api/screen: avoid running the full
+         * integration scrape synchronously on the httpd task while shared
+         * HTTP buffers are still held. */
+        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Message changed, scheduling integration parse");
+        schedule_parse_integrations();
+    }
+    else if (integration_settings_changed)
+    {
+        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Integration settings changed, parsing integrations");
         parse_integrations();
     }
 
@@ -2509,6 +2519,7 @@ esp_err_t status_api_handler(httpd_req_t *req)
     cJSON_AddNumberToObject(root, "max_power", eeprom_max_power);
     cJSON_AddNumberToObject(root, "safe_max_power", pwm_get_safe_maximum_power());
     cJSON_AddNumberToObject(root, "effective_max_power", pwm_get_effective_max_power());
+    cJSON_AddNumberToObject(root, "current_brightness", pwm_get_current_brightness());
 
     // Add additional system information
     esp_chip_info_t chip_info;

@@ -43,7 +43,8 @@ static void f_ota_do_update(int version);
 static esp_err_t ota_fetch_manifest(int version, manifest_t *m);
 static void ota_prune_old_files(int version);
 static esp_err_t ota_reconcile_files(const manifest_t *m, int progress_lo, int progress_hi, bool show_progress,
-                                     char *failed_out, size_t failed_len);
+                                     char *failed_out, size_t failed_len,
+                                     int *downloaded_out, int *skipped_out);
 static void ota_self_heal(void);
 static void ota_quiet_refresh(void);
 
@@ -661,7 +662,8 @@ static esp_err_t reconcile_entry_cb(const manifest_entry_t *e, int index, void *
 }
 
 static esp_err_t ota_reconcile_files(const manifest_t *m, int progress_lo, int progress_hi, bool show_progress,
-                                     char *failed_out, size_t failed_len)
+                                     char *failed_out, size_t failed_len,
+                                     int *downloaded_out, int *skipped_out)
 {
     reconcile_ctx_t ctx = {
         .version = m->version,
@@ -680,6 +682,10 @@ static esp_err_t ota_reconcile_files(const manifest_t *m, int progress_lo, int p
         strncpy(failed_out, ctx.failed_path, failed_len - 1);
         failed_out[failed_len - 1] = '\0';
     }
+    if (downloaded_out)
+        *downloaded_out = ctx.downloaded;
+    if (skipped_out)
+        *skipped_out = ctx.skipped;
     return err;
 }
 
@@ -692,6 +698,10 @@ static void ota_self_heal(void)
 {
     manifest_t m;
     char failed[MANIFEST_MAX_PATH] = {0};
+    // Latched for the whole boot (not per call): if an attempt discovers the
+    // filesystem was reformatted but fails partway, the retry hours later
+    // must still know a restart is owed once the heal finally succeeds.
+    static bool fs_was_fresh = false;
     esp_err_t err = manifest_load_and_verify(MANIFEST_PATH, &m);
     if (err == ESP_FAIL)
     {
@@ -718,6 +728,8 @@ static void ota_self_heal(void)
         ESP_LOG_WEB(ESP_LOG_WARN, TAG, err == ESP_ERR_NOT_FOUND
                         ? "Self-heal: no stored manifest (fresh filesystem), fetching"
                         : "Self-heal: stored manifest invalid, re-fetching a fresh copy");
+        if (err == ESP_ERR_NOT_FOUND)
+            fs_was_fresh = true;
         remove(MANIFEST_PATH); // no-op when already missing
         xSemaphoreTake(http_mutex, portMAX_DELAY);
         // A few spaced attempts: a fresh filesystem has no web UI (or fonts)
@@ -762,7 +774,8 @@ static void ota_self_heal(void)
     // paths, so a near-full filesystem has room to re-download a mismatched file.
     // Without this a full disk makes self-heal fail the same way every boot.
     ota_prune_old_files(m.version);
-    err = ota_reconcile_files(&m, 0, 0, false, failed, sizeof(failed));
+    int downloaded = 0, skipped = 0;
+    err = ota_reconcile_files(&m, 0, 0, false, failed, sizeof(failed), &downloaded, &skipped);
     xSemaphoreGive(http_mutex);
     ota_update_in_progress = false; // display restores the normal message
 
@@ -772,6 +785,21 @@ static void ota_self_heal(void)
         manifest_set_self_heal_pending(false);
         manifest_set_ota_in_progress(false);
         ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Self-heal complete");
+        // A reformatted filesystem means this boot ran without fonts, images
+        // and web files, so the display stays almost empty even after the
+        // full set is re-downloaded - only a restart reloads the UI assets.
+        // skipped == 0 catches the reformat-with-manifest-only case the
+        // fs_was_fresh latch misses (manifest fetched, then power-cycled).
+        // A routine heal of a few files on a populated filesystem (skipped
+        // is large) keeps the device running.
+        if (fs_was_fresh || (downloaded > 0 && skipped == 0))
+        {
+            ESP_LOG_WEB(ESP_LOG_WARN, TAG,
+                        "Filesystem was repopulated from scratch (%d files) - restarting to load UI assets",
+                        downloaded);
+            vTaskDelay(pdMS_TO_TICKS(1000)); // let the log lines drain
+            esp_restart();
+        }
     }
     else
     {
@@ -843,7 +871,7 @@ static void ota_quiet_refresh(void)
     // publishes reclaim stale files across the fleet without a version bump.
     ota_prune_old_files(fwversion);
     char failed[MANIFEST_MAX_PATH] = {0};
-    err = ota_reconcile_files(&m, 0, 0, false, failed, sizeof(failed));
+    err = ota_reconcile_files(&m, 0, 0, false, failed, sizeof(failed), NULL, NULL);
     xSemaphoreGive(http_mutex);
     ota_update_in_progress = false; // display restores the normal message
 
@@ -1203,7 +1231,7 @@ static void f_ota_do_update(int version)
 
     // Bring SPIFFS files in line with the manifest (unchanged files are skipped).
     char failed[MANIFEST_MAX_PATH] = {0};
-    if (ota_reconcile_files(&m, 5, 50, true, failed, sizeof(failed)) != ESP_OK)
+    if (ota_reconcile_files(&m, 5, 50, true, failed, sizeof(failed), NULL, NULL) != ESP_OK)
     {
         char msg[MANIFEST_MAX_PATH + 48];
         if (failed[0])
