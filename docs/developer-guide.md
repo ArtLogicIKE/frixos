@@ -361,5 +361,6 @@ The device uses a custom 8 MB partition table:
 
 - [kb-flashing-esp32-p1-pgm.md](kb-flashing-esp32-p1-pgm.md) — Detailed UART flashing guide (P1 PGM connector, wiring, boot mode)
 - [kb-user-font-guide.md](kb-user-font-guide.md) — How to create and install custom fonts
+- [kb-http-api.md](kb-http-api.md) — Set every parameter and the screen-layout blob over HTTP (curl)
 - [ESP-IDF documentation](https://docs.espressif.com/projects/esp-idf/en/stable/esp32/)
 - [LVGL documentation](https://docs.lvgl.io/master/)
