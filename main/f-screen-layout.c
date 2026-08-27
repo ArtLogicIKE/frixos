@@ -39,7 +39,7 @@ void screen_layout_apply_factory_defaults(screen_layout_t *layout)
 {
   memset(layout, 0, sizeof(*layout));
   layout->version = FRIXOS_SCREEN_LAYOUT_VERSION;
-  layout->scroll_delay = eeprom_scroll_delay > 0 ? eeprom_scroll_delay : 65;
+  layout->scroll_delay = eeprom_scroll_delay > 0 ? eeprom_scroll_delay : 60;
 
   for (int profile = 0; profile < FRIXOS_SCREEN_LAYOUT_PROFILES; profile++)
   {
@@ -155,7 +155,7 @@ void screen_layout_sync_legacy_eeprom(const screen_layout_t *layout)
 
   strncpy(eeprom_message, layout->profile[0].scroll_text, sizeof(eeprom_message) - 1);
   eeprom_message[sizeof(eeprom_message) - 1] = '\0';
-  eeprom_scroll_delay = layout->scroll_delay > 0 ? layout->scroll_delay : 65;
+  eeprom_scroll_delay = layout->scroll_delay > 0 ? layout->scroll_delay : 60;
 
   for (int profile = 0; profile < FRIXOS_SCREEN_LAYOUT_PROFILES; profile++)
   {

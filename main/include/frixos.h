@@ -408,8 +408,8 @@ void screen_layout_ensure_valid(void);
 /* LCD size */
 #define LCD_H_RES   (128)
 #define LCD_V_RES   (128)
-#define LCD_DRAW_BUFF_DOUBLE (1)  // Enable double buffering to prevent tearing
-#define LCD_DRAW_BUFF_HEIGHT (8) // Optimized buffer size for smooth animations
+#define LCD_DRAW_BUFF_DOUBLE (0)  // single 16-row buffer: same 4 KB as the old 8-row pair
+#define LCD_DRAW_BUFF_HEIGHT (16) // one SPI burst covers a 16 px message strip
 
 /* LCD settings */
 #define LCD_SPI_NUM         (SPI3_HOST)

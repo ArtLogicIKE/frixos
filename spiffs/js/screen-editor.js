@@ -1273,7 +1273,7 @@ function encodeScreenLayoutBinary(layout) {
     view.setUint32(0, SCREEN_BIN_MAGIC, true);
     view.setUint8(4, SCREEN_BIN_FORMAT);
     view.setUint8(5, SCREEN_LAYOUT_VERSION);
-    view.setUint8(6, layout.scroll_delay != null ? layout.scroll_delay : 65);
+    view.setUint8(6, layout.scroll_delay != null ? layout.scroll_delay : 60);
     view.setUint8(7, layout.day_color_filter != null ? layout.day_color_filter : 0);
     view.setUint8(8, layout.night_color_filter != null ? layout.night_color_filter : 0);
     screenWriteFixedString(view, 12, SCREEN_BIN_FONT_LEN, layout.day_font || 'bold');
@@ -1315,7 +1315,7 @@ function encodeScreenLayoutBinary(layout) {
 
 const SCREEN_DEFAULT_LAYOUT = {
     version: SCREEN_LAYOUT_VERSION,
-    scroll_delay: 65,
+    scroll_delay: 60,
     day_font: 'bold',
     night_font: 'bold',
     day_aux_font: 'bold',
@@ -1529,7 +1529,7 @@ function cloneScreenDefaults() {
 function prepareScreenLayout(layout) {
     if (!layout || !layout.profiles) return layout;
     if (!layout.scroll_delay) {
-        layout.scroll_delay = (window.settings && window.settings.p14) || 65;
+        layout.scroll_delay = (window.settings && window.settings.p14) || 60;
     }
     ['day', 'night'].forEach(mode => {
         const profile = layout.profiles[mode];
@@ -2968,9 +2968,9 @@ function renderScreenOptions() {
             delayInput.type = 'number';
             delayInput.min = '30';
             delayInput.max = '255';
-            delayInput.value = String(window.screenLayout.scroll_delay || 65);
+            delayInput.value = String(window.screenLayout.scroll_delay || 60);
             delayInput.addEventListener('change', () => {
-                window.screenLayout.scroll_delay = clamp(parseInt(delayInput.value, 10) || 65, 30, 255);
+                window.screenLayout.scroll_delay = clamp(parseInt(delayInput.value, 10) || 60, 30, 255);
             });
             delayRow.appendChild(delayLabel);
             delayRow.appendChild(delayInput);

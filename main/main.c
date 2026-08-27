@@ -51,7 +51,7 @@ static int rescue_mode_this_boot = 0; // Set by check_boot_fail_count() when 3 c
 
 // versioning variables
 const char app[10] = "Frixos";
-const char version[10] = "2.55";
+const char version[10] = "2.56";
 static const char *TAG = "frixos main"; // in case we use ESP_LOGE -rror/W-arning/I-info (also D-ebug/V-erbose)
 const int fwversion = 71;
 const int rescuemode = 0; // 0 = normal, 1 = rescue mode
@@ -131,7 +131,7 @@ uint8_t eeprom_update_firmware = 1; // yes, auto update firmware
 uint8_t eeprom_dark_theme = 1;      // Default to dark theme (1 = dark, 0 = light)
 uint8_t eeprom_language = 0;        // Default to English (0=en, 1=de, 2=fr, 3=it, 4=pt, 5=sv, 6=da, 7=pl)
 uint8_t eeprom_scroll_speed = 10;   // Default scroll speed in pixels per second
-uint8_t eeprom_scroll_delay = 60;   // Default scroll delay in milliseconds (30-500)
+uint8_t eeprom_scroll_delay = 60;   // Default scroll delay in milliseconds (30-255)
 char eeprom_message[SCROLL_MSG_LENGTH] = "[device]: [greeting] [day], [date] [mon], now [temp] today [high]-[low], hum. [hum], sun [rise]-[set]";
 
 screen_layout_t eeprom_screen_layout = {0};
@@ -776,14 +776,13 @@ void startup_read_eeprom(void)
     if (eeprom_pwm_frequency > PWM_MAX_FREQUENCY_HZ)
       eeprom_pwm_frequency = PWM_MAX_FREQUENCY_HZ;
 
-    // Migrate the old default scroll delay (65 ms) to the new default (60 ms).
-    // 65 ms beats against the ~33 Hz panel refresh and stutters; 60 ms is a clean
-    // multiple and scrolls smoothly. The per-layout copy is migrated after the
-    // LittleFS layout file is loaded (startup_spiffs).
-    if (eeprom_scroll_delay == 65)
+    // 30 ms/px (brief default) was twice as fast as intended; 65 ms beats
+    // the panel refresh. Custom values are left alone.
+    if (eeprom_scroll_delay == 65 || eeprom_scroll_delay == 30)
     {
+      uint8_t from = eeprom_scroll_delay;
       eeprom_scroll_delay = 60;
-      ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Migrated scroll delay 65ms -> 60ms");
+      ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Migrated scroll delay %ums -> 60ms", (unsigned)from);
       write_nvs_parameters();
     }
 
@@ -1188,7 +1187,7 @@ void startup_threads()
       "display_task", /* name of task, from f-display.c */
       8960,           /* Stack size of task (reduced proportionally) */
       NULL,           /* parameter of the task */
-      3,              /* priority of the task */
+      4,              /* above wifi_task so a 1 s notify cannot preempt a blit */
       NULL,           /* Task handle to keep track of created task */
       1);             /* ping to the APP core */
 
@@ -1294,11 +1293,12 @@ void app_main(void)
   else
   {
     screen_layout_file_load();
-    if (eeprom_screen_layout.scroll_delay == 65)
+    if (eeprom_screen_layout.scroll_delay == 65 || eeprom_screen_layout.scroll_delay == 30)
     {
+      uint8_t from = eeprom_screen_layout.scroll_delay;
       eeprom_screen_layout.scroll_delay = 60;
       eeprom_scroll_delay = 60;
-      ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Migrated layout scroll delay 65ms -> 60ms");
+      ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Migrated layout scroll delay %ums -> 60ms", (unsigned)from);
       write_nvs_parameters();
     }
   }
