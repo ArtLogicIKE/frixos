@@ -5,7 +5,7 @@
 
 #define PWM_MIN_FREQUENCY_HZ 60
 #define PWM_MAX_FREQUENCY_HZ 50000
-#define PWM_SETTINGS_MAX_POWER 1023
+#define PWM_SETTINGS_MAX_POWER 1023 /* 10-bit PWM on GPIO32; DAC on GPIO25 is 8-bit */
 
 uint16_t pwm_get_safe_maximum_power(void);
 uint16_t pwm_get_effective_max_power(void);

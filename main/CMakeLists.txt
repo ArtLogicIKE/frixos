@@ -48,6 +48,7 @@ idf_component_register(SRCS
     REQUIRES esp_driver_i2c
     REQUIRES esp_driver_spi
     REQUIRES esp_driver_ledc
+    REQUIRES esp_driver_dac
     REQUIRES esp_timer
     REQUIRES esp_lcd
     REQUIRES esp_netif

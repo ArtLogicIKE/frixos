@@ -3,6 +3,7 @@ build/
 sdkconfig
 sdkconfig.old
 main/include/config.h
+CMakeUserPresets.json
 
 # Environment file with API keys (copy from env.example)
 .env

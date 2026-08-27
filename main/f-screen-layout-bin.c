@@ -1,7 +1,15 @@
+#include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 #include "f-screen-layout-bin.h"
 #include "frixos.h"
 #include "esp_log.h"
+#include "nvs_flash.h"
+#include "nvs.h"
+#include "esp_littlefs.h"
+
+#define SCREEN_LAYOUT_NVS_NAMESPACE "frixos"
+#define SCREEN_LAYOUT_NVS_KEY "screen_layout"
 
 static const char *TAG = "f-screen-bin";
 
@@ -81,6 +89,156 @@ static void copy_font_field(char *dst, size_t dst_len, const char *src)
     dst[dst_len - 1] = '\0';
 }
 
+static void fill_wire_header(screen_layout_bin_header_t *header)
+{
+    memset(header, 0, sizeof(*header));
+    header->magic = FRIXOS_SCREEN_BIN_MAGIC;
+    header->format = FRIXOS_SCREEN_BIN_FORMAT;
+    header->layout_version = eeprom_screen_layout.version;
+    header->scroll_delay = eeprom_screen_layout.scroll_delay;
+    header->day_color_filter = eeprom_color_filter[0];
+    header->night_color_filter = eeprom_color_filter[1];
+    copy_font_field(header->day_font, sizeof(header->day_font), eeprom_font[0]);
+    copy_font_field(header->night_font, sizeof(header->night_font), eeprom_font[1]);
+    copy_font_field(header->day_aux_font, sizeof(header->day_aux_font), eeprom_aux_font[0]);
+    copy_font_field(header->night_aux_font, sizeof(header->night_aux_font), eeprom_aux_font[1]);
+    header->w = LCD_H_RES;
+    header->h = LCD_V_RES;
+}
+
+static void screen_layout_nvs_erase(void)
+{
+    nvs_handle_t h;
+    if (nvs_open(SCREEN_LAYOUT_NVS_NAMESPACE, NVS_READWRITE, &h) != ESP_OK)
+        return;
+    if (nvs_erase_key(h, SCREEN_LAYOUT_NVS_KEY) == ESP_OK)
+        nvs_commit(h);
+    nvs_close(h);
+}
+
+static bool littlefs_is_mounted(void)
+{
+    size_t total = 0, used = 0;
+    return esp_littlefs_info("spiffs", &total, &used) == ESP_OK;
+}
+
+static void apply_factory_layout(void)
+{
+    screen_layout_apply_factory_defaults(&eeprom_screen_layout);
+    screen_layout_sync_legacy_eeprom(&eeprom_screen_layout);
+}
+
+esp_err_t screen_layout_file_save(void)
+{
+    if (!littlefs_is_mounted())
+        return ESP_ERR_INVALID_STATE;
+
+    screen_layout_ensure_valid();
+
+    screen_layout_bin_header_t header;
+    fill_wire_header(&header);
+
+    FILE *f = fopen(SCREEN_LAYOUT_FILE_PATH, "wb");
+    if (!f)
+    {
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Cannot write %s", SCREEN_LAYOUT_FILE_PATH);
+        return ESP_FAIL;
+    }
+
+    const size_t profile_bytes = sizeof(eeprom_screen_layout.profile);
+    bool ok = fwrite(&header, 1, sizeof(header), f) == sizeof(header) &&
+              fwrite(eeprom_screen_layout.profile, 1, profile_bytes, f) == profile_bytes;
+    fclose(f);
+    if (!ok)
+    {
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed writing %s", SCREEN_LAYOUT_FILE_PATH);
+        unlink(SCREEN_LAYOUT_FILE_PATH);
+        return ESP_FAIL;
+    }
+
+    screen_layout_nvs_erase();
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Layout saved to %s", SCREEN_LAYOUT_FILE_PATH);
+    return ESP_OK;
+}
+
+static esp_err_t screen_layout_migrate_from_nvs(void)
+{
+    nvs_handle_t h;
+    if (nvs_open(SCREEN_LAYOUT_NVS_NAMESPACE, NVS_READONLY, &h) != ESP_OK)
+        return ESP_ERR_NOT_FOUND;
+
+    size_t sz = 0;
+    esp_err_t err = nvs_get_blob(h, SCREEN_LAYOUT_NVS_KEY, NULL, &sz);
+    if (err != ESP_OK || sz != sizeof(eeprom_screen_layout))
+    {
+        nvs_close(h);
+        if (err != ESP_ERR_NVS_NOT_FOUND)
+            screen_layout_nvs_erase();
+        return ESP_ERR_NOT_FOUND;
+    }
+
+    sz = sizeof(eeprom_screen_layout);
+    err = nvs_get_blob(h, SCREEN_LAYOUT_NVS_KEY, &eeprom_screen_layout, &sz);
+    nvs_close(h);
+    if (err != ESP_OK)
+        return ESP_ERR_NOT_FOUND;
+
+    screen_layout_ensure_valid();
+    err = screen_layout_file_save();
+    if (err == ESP_OK)
+        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Migrated screen_layout from NVS to %s", SCREEN_LAYOUT_FILE_PATH);
+    else
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Layout in RAM from NVS; file save failed (%s)", esp_err_to_name(err));
+    return ESP_OK;
+}
+
+void screen_layout_file_load(void)
+{
+    FILE *f = fopen(SCREEN_LAYOUT_FILE_PATH, "rb");
+    if (!f)
+    {
+        if (screen_layout_migrate_from_nvs() == ESP_OK)
+            return;
+        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "No layout file, using factory defaults");
+        apply_factory_layout();
+        return;
+    }
+
+    screen_layout_bin_header_t header;
+    const size_t profile_bytes = sizeof(eeprom_screen_layout.profile);
+    size_t nheader = fread(&header, 1, sizeof(header), f);
+    size_t nprof = fread(eeprom_screen_layout.profile, 1, profile_bytes, f);
+    fclose(f);
+
+    if (nheader != sizeof(header) || nprof != profile_bytes ||
+        header.magic != FRIXOS_SCREEN_BIN_MAGIC ||
+        header.format != FRIXOS_SCREEN_BIN_FORMAT ||
+        header.layout_version > FRIXOS_SCREEN_LAYOUT_VERSION)
+    {
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Invalid %s, using factory defaults", SCREEN_LAYOUT_FILE_PATH);
+        unlink(SCREEN_LAYOUT_FILE_PATH);
+        apply_factory_layout();
+        screen_layout_nvs_erase();
+        return;
+    }
+
+    eeprom_screen_layout.version = FRIXOS_SCREEN_LAYOUT_VERSION;
+    eeprom_screen_layout.scroll_delay = (uint8_t)clamp_int(header.scroll_delay, 30, 255);
+    eeprom_screen_layout.reserved = 0;
+    for (int pi = 0; pi < FRIXOS_SCREEN_LAYOUT_PROFILES; pi++)
+        sanitize_profile(&eeprom_screen_layout.profile[pi]);
+    screen_layout_sync_legacy_eeprom(&eeprom_screen_layout);
+    screen_layout_nvs_erase();
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Loaded layout from %s", SCREEN_LAYOUT_FILE_PATH);
+}
+
+void screen_layout_file_remove(void)
+{
+    if (unlink(SCREEN_LAYOUT_FILE_PATH) == 0)
+        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Removed %s", SCREEN_LAYOUT_FILE_PATH);
+    screen_layout_nvs_erase();
+}
+
 bool screen_layout_wire_encode(uint8_t *out, size_t out_size, size_t *written)
 {
     if (!out || out_size < FRIXOS_SCREEN_LAYOUT_WIRE_SIZE)
@@ -88,19 +246,7 @@ bool screen_layout_wire_encode(uint8_t *out, size_t out_size, size_t *written)
 
     screen_layout_wire_t *wire = (screen_layout_wire_t *)out;
     memset(wire, 0, sizeof(*wire));
-
-    wire->header.magic = FRIXOS_SCREEN_BIN_MAGIC;
-    wire->header.format = FRIXOS_SCREEN_BIN_FORMAT;
-    wire->header.layout_version = eeprom_screen_layout.version;
-    wire->header.scroll_delay = eeprom_screen_layout.scroll_delay;
-    wire->header.day_color_filter = eeprom_color_filter[0];
-    wire->header.night_color_filter = eeprom_color_filter[1];
-    copy_font_field(wire->header.day_font, sizeof(wire->header.day_font), eeprom_font[0]);
-    copy_font_field(wire->header.night_font, sizeof(wire->header.night_font), eeprom_font[1]);
-    copy_font_field(wire->header.day_aux_font, sizeof(wire->header.day_aux_font), eeprom_aux_font[0]);
-    copy_font_field(wire->header.night_aux_font, sizeof(wire->header.night_aux_font), eeprom_aux_font[1]);
-    wire->header.w = LCD_H_RES;
-    wire->header.h = LCD_V_RES;
+    fill_wire_header(&wire->header);
 
     memcpy(wire->profile, eeprom_screen_layout.profile, sizeof(wire->profile));
 

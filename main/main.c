@@ -37,6 +37,7 @@
 #include "nvs.h"
 #include "esp_timer.h"
 #include "f-manifest.h"
+#include "f-screen-layout-bin.h"
 
 // Boot fail count for auto-rescue mode (3 failed boots -> rescue once).
 // While OTA writes SPIFFS the bar is raised - see check_boot_fail_count().
@@ -50,9 +51,9 @@ static int rescue_mode_this_boot = 0; // Set by check_boot_fail_count() when 3 c
 
 // versioning variables
 const char app[10] = "Frixos";
-const char version[10] = "2.53";
+const char version[10] = "2.55";
 static const char *TAG = "frixos main"; // in case we use ESP_LOGE -rror/W-arning/I-info (also D-ebug/V-erbose)
-const int fwversion = 70;
+const int fwversion = 71;
 const int rescuemode = 0; // 0 = normal, 1 = rescue mode
 const char revision[] = "E";
 
@@ -65,6 +66,8 @@ SemaphoreHandle_t http_mutex = NULL;
 #define EEPROM_SIZE 512                // ACTUAL EEPROM_SIZE from old code
 #define EEPROM_SIG_1 0xF0              // As mentioned in comments
 #define EEPROM_NAMESPACE "frixos"      // Define the NEW NVS namespace
+#define SETTINGS_LOCAL_PATH "/spiffs/settings.local"
+#define SETTINGS_LOCAL_TMP_PATH "/spiffs/settings.local.tmp"
 
 /* Local setting types - avoid conflict with ESP-IDF nvs_type_t (NVS_TYPE_*) */
 typedef enum {
@@ -177,7 +180,6 @@ static const nvs_setting_t settings_table[] = {
     {"lux_sens", SETTING_TYPE_BLOB, &eeprom_lux_sensitivity, sizeof(eeprom_lux_sensitivity)},
     {"lux_thresh", SETTING_TYPE_BLOB, &eeprom_lux_threshold, sizeof(eeprom_lux_threshold)},
     {"message", SETTING_TYPE_STR, eeprom_message, sizeof(eeprom_message)},
-    {"screen_layout", SETTING_TYPE_BLOB, &eeprom_screen_layout, sizeof(eeprom_screen_layout)},
     {"ha_url", SETTING_TYPE_STR, eeprom_ha_url, sizeof(eeprom_ha_url)},
     {"ha_token", SETTING_TYPE_STR, eeprom_ha_token, sizeof(eeprom_ha_token)},
     {"ha_refresh", SETTING_TYPE_U16, &eeprom_ha_refresh_mins, 0},
@@ -200,7 +202,6 @@ static const nvs_setting_t settings_table[] = {
     {"cgm_unit", SETTING_TYPE_U8, &eeprom_glucose_unit, 0},
     {"pwm_frequency", SETTING_TYPE_U32, &eeprom_pwm_frequency, 0},
     {"max_power", SETTING_TYPE_U16, &eeprom_max_power, 0},
-    {"poh", SETTING_TYPE_U32, &eeprom_poh, 0},
     {"static_ip",  SETTING_TYPE_STR, eeprom_static_ip,  sizeof(eeprom_static_ip)},
     {"static_gw",  SETTING_TYPE_STR, eeprom_static_gw,  sizeof(eeprom_static_gw)},
     {"static_nm",  SETTING_TYPE_STR, eeprom_static_nm,  sizeof(eeprom_static_nm)},
@@ -273,7 +274,7 @@ uint16_t eeprom_glucose_low = 70;     // Default low threshold in mg/dL
 uint8_t eeprom_glucose_unit = 0;      // Glucose display unit: 0=mg/dL, 1=mmol/L
 uint32_t eeprom_pwm_frequency = 200;  // Default PWM frequency in Hz (range 60-50000)
 uint16_t eeprom_max_power = PWM_SETTINGS_MAX_POWER; // Default max power (range 1-1023)
-// Board revision read-only key in NVS (drives safe_maximum_power in f-pwm.c):
+// Board revision in NVS (drives safe_maximum_power in f-pwm.c):
 // rev 0: safe max 750; rev 1: safe max 850; rev 2: safe max 1023
 uint8_t eeprom_board_rev = 0;
 
@@ -307,8 +308,8 @@ glucose_data_t glucose_data = {0};
 
 // Power On Hours tracking
 uint32_t eeprom_poh = 0;  // Power on hours counter
-uint32_t current_poh = 0; // Current runtime POH counter (not saved to EEPROM)
-time_t last_poh_save = 0; // Last time POH was saved to EEPROM
+uint32_t current_poh = 0; // Current runtime POH counter (not yet flushed)
+time_t last_poh_save = 0; // Last time POH was saved to settings.local
 
 int weather_icon_index = -1;
 int moon_icon_index = -1;
@@ -592,7 +593,7 @@ static void check_boot_fail_count(void)
   if (fail_count > threshold) // at least threshold failed boots, next one resets settings
   {
     rescue_mode_this_boot = 1;
-    ESP_LOGW(TAG, "Auto-rescue: %u failed boots, entering rescue mode (reset settings except WiFi)", (unsigned)fail_count);
+    ESP_LOGW(TAG, "Auto-rescue: %u failed boots, entering rescue mode (erase NVS, keep WiFi and POH)", (unsigned)fail_count);
     nvs_set_u8(h, NVS_BOOT_FAIL_KEY, 0); // reset after entering rescue
     nvs_commit(h);
   }
@@ -629,6 +630,60 @@ static void boot_success_timer_cb(void *arg)
   }
 }
 
+/** Wipe the NVS partition so stale pages are actually reclaimed, then write
+ *  back only WiFi and board revision (already loaded in RAM). POH lives in
+ *  settings.local on LittleFS and is not touched. Other keys stay absent and
+ *  fall back to compile-time defaults on the next boot.
+ *  If the erase fails, fall back to overwriting the settings table in place. */
+static void rescue_erase_nvs(void)
+{
+  ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Rescue: erasing NVS partition to reclaim pages");
+
+  esp_err_t err = nvs_flash_deinit();
+  if (err != ESP_OK && err != ESP_ERR_NVS_NOT_INITIALIZED)
+  {
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Rescue NVS deinit failed: %s", esp_err_to_name(err));
+  }
+
+  err = nvs_flash_erase();
+  if (err != ESP_OK)
+  {
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Rescue NVS erase failed: %s", esp_err_to_name(err));
+    write_nvs_parameters();
+    return;
+  }
+
+  err = nvs_flash_init();
+  if (err != ESP_OK)
+  {
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Rescue NVS re-init failed: %s", esp_err_to_name(err));
+    return;
+  }
+
+  nvs_handle_t h;
+  err = nvs_open(EEPROM_NAMESPACE, NVS_READWRITE, &h);
+  if (err != ESP_OK)
+  {
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Rescue NVS reopen failed: %s", esp_err_to_name(err));
+    return;
+  }
+
+  esp_err_t set_err;
+  if ((set_err = nvs_set_str(h, "wifi_ssid", eeprom_wifi_ssid)) != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Rescue restore wifi_ssid: %s", esp_err_to_name(set_err));
+  if ((set_err = nvs_set_str(h, "wifi_pass", eeprom_wifi_pass)) != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Rescue restore wifi_pass: %s", esp_err_to_name(set_err));
+  if ((set_err = nvs_set_u8(h, "board_rev", eeprom_board_rev)) != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Rescue restore board_rev: %s", esp_err_to_name(set_err));
+
+  err = nvs_commit(h);
+  nvs_close(h);
+  if (err != ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Rescue restore commit failed: %s", esp_err_to_name(err));
+  else
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Rescue: restored WiFi and board_rev after NVS erase");
+}
+
 void startup_read_eeprom(void)
 {
   esp_err_t err;
@@ -660,12 +715,20 @@ void startup_read_eeprom(void)
       ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error eeprom_board_rev: %s", esp_err_to_name(err));
     }
 
+    /* Migration: POH used to live in NVS. Keep a copy in RAM until
+     * settings.local is loaded (and the NVS key is erased) after LittleFS mounts. */
+    err = nvs_get_u32(nvs_handle, "poh", &eeprom_poh);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
+    {
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error poh: %s", esp_err_to_name(err));
+    }
+
     for (int i = 0; i < SETTINGS_COUNT; i++)
     {
       const nvs_setting_t *s = &settings_table[i];
 
-      // In rescue mode, read only WiFi credentials and power-on hours; other keys use in-RAM defaults then get written.
-      if ((rescuemode == 1 || rescue_mode_this_boot) && i > 1 && strcmp(s->key, "poh") != 0)
+      // In rescue mode, read only WiFi credentials; other keys stay at in-RAM defaults.
+      if ((rescuemode == 1 || rescue_mode_this_boot) && i > 1)
         continue;
 
       err = nvs_read_setting(nvs_handle, s);
@@ -680,12 +743,6 @@ void startup_read_eeprom(void)
           err = ESP_OK;
         }
       }
-      else if (err == ESP_ERR_NVS_INVALID_LENGTH && s->type == SETTING_TYPE_BLOB && strcmp(s->key, "screen_layout") == 0)
-      {
-        screen_layout_apply_factory_defaults(&eeprom_screen_layout);
-        screen_layout_sync_legacy_eeprom(&eeprom_screen_layout);
-        err = ESP_OK;
-      }
 
       if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
       {
@@ -695,11 +752,8 @@ void startup_read_eeprom(void)
 
     if (rescuemode == 1 || rescue_mode_this_boot)
     {
-      // save all default values back to eeprom (WiFi + poh were read from NVS above)
-      current_poh = eeprom_poh;
-      last_poh_save = time(NULL);
-
-      // Rescue skips most NVS keys; screen_layout stays zero unless initialized here.
+      // WiFi + board_rev were read from NVS above; POH is in settings.local (or RAM from NVS migration).
+      // Layout file is deleted after LittleFS mounts.
       screen_layout_apply_factory_defaults(&eeprom_screen_layout);
       screen_layout_sync_legacy_eeprom(&eeprom_screen_layout);
       strcpy(my_lat, eeprom_lat);
@@ -708,7 +762,7 @@ void startup_read_eeprom(void)
       migrate_schedule_from_legacy();
 
       nvs_close(nvs_handle);
-      write_nvs_parameters();
+      rescue_erase_nvs();
       return;
     }
 
@@ -716,12 +770,6 @@ void startup_read_eeprom(void)
     strcpy(my_lat, eeprom_lat);
     strcpy(my_lon, eeprom_lon);
     strcpy(my_timezone, eeprom_timezone);
-    {
-      uint8_t layout_version_before = eeprom_screen_layout.version;
-      screen_layout_ensure_valid();
-      if (layout_version_before != eeprom_screen_layout.version)
-        write_nvs_parameters();
-    }
 
     if (eeprom_pwm_frequency < PWM_MIN_FREQUENCY_HZ)
       eeprom_pwm_frequency = PWM_MIN_FREQUENCY_HZ;
@@ -730,30 +778,14 @@ void startup_read_eeprom(void)
 
     // Migrate the old default scroll delay (65 ms) to the new default (60 ms).
     // 65 ms beats against the ~33 Hz panel refresh and stutters; 60 ms is a clean
-    // multiple and scrolls smoothly. Fix both the global and the per-layout copy
-    // (screen_scroll_delay_ms() prefers the layout value) and persist if changed.
+    // multiple and scrolls smoothly. The per-layout copy is migrated after the
+    // LittleFS layout file is loaded (startup_spiffs).
+    if (eeprom_scroll_delay == 65)
     {
-      bool scroll_migrated = false;
-      if (eeprom_scroll_delay == 65)
-      {
-        eeprom_scroll_delay = 60;
-        scroll_migrated = true;
-      }
-      if (eeprom_screen_layout.scroll_delay == 65)
-      {
-        eeprom_screen_layout.scroll_delay = 60;
-        scroll_migrated = true;
-      }
-      if (scroll_migrated)
-      {
-        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Migrated scroll delay 65ms -> 60ms");
-        write_nvs_parameters();
-      }
+      eeprom_scroll_delay = 60;
+      ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Migrated scroll delay 65ms -> 60ms");
+      write_nvs_parameters();
     }
-
-    // Initialize current POH counter and last save time
-    current_poh = eeprom_poh;
-    last_poh_save = time(NULL);
 
     // Load display schedule from JSON; migrate from legacy params if absent
     if (eeprom_disp_sched[0] != '\0')
@@ -814,62 +846,138 @@ void startup_read_eeprom(void)
   }
 
 } // end startup_read_eeprom
-// Function to write all parameters to NVS
-esp_err_t write_nvs_parameters(void)
+
+static bool nvs_is_full(esp_err_t err)
 {
-  nvs_handle_t nvs_handle;
-  esp_err_t err;
+  return err == ESP_ERR_NVS_NOT_ENOUGH_SPACE || err == ESP_ERR_NVS_NO_FREE_PAGES;
+}
 
-  // Initialize NVS if not initialized
-  err = nvs_flash_init();
-  if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND)
-  {
-    ESP_ERROR_CHECK(nvs_flash_erase());
-    err = nvs_flash_init();
-  }
-  ESP_ERROR_CHECK(err);
-
-  // Open NVS using the defined EEPROM_NAMESPACE
-  err = nvs_open(EEPROM_NAMESPACE, NVS_READWRITE, &nvs_handle);
-  if (err != ESP_OK)
-  {
-    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Error opening NVS handle: %s", esp_err_to_name(err));
-    return err;
-  }
-
-  // Backwards compatibility for PWM frequency
+static esp_err_t write_nvs_settings(nvs_handle_t nvs_handle)
+{
   if (eeprom_pwm_frequency == 133)
     eeprom_pwm_frequency = 200;
 
-  // Write all settings from table
+  esp_err_t first_err = ESP_OK;
   for (int i = 0; i < SETTINGS_COUNT; i++)
   {
     const nvs_setting_t *s = &settings_table[i];
 
-    // Skip hostname in manufacturer mode
     if (manufacturer_mode && strcmp(s->key, "hostname") == 0)
       continue;
 
-    err = nvs_write_setting(nvs_handle, s);
+    esp_err_t err = nvs_write_setting(nvs_handle, s);
     if (err != ESP_OK)
     {
       ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error %s: %s", s->key, esp_err_to_name(err));
+      if (first_err == ESP_OK)
+        first_err = err;
+      if (nvs_is_full(err))
+        return err;
     }
   }
 
-  // Commit changes
+  esp_err_t err = nvs_set_u8(nvs_handle, "board_rev", eeprom_board_rev);
+  if (err != ESP_OK)
+  {
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS Write Error board_rev: %s", esp_err_to_name(err));
+    if (first_err == ESP_OK)
+      first_err = err;
+    if (nvs_is_full(err))
+      return err;
+  }
+
   err = nvs_commit(nvs_handle);
   if (err != ESP_OK)
   {
     ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to commit NVS data: %s", esp_err_to_name(err));
+    return err;
+  }
+  if (first_err == ESP_OK)
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Parameters saved to NVS successfully");
+  return first_err;
+}
+
+/** Wipe the NVS partition and rewrite current RAM settings plus board_rev and
+ *  OTA flags. One-shot: if the live dataset still does not fit, return the error. */
+static esp_err_t nvs_reformat_and_rewrite(void)
+{
+  uint32_t gen = manifest_get_applied_generation();
+  bool ota_in_prog = manifest_get_ota_in_progress();
+  bool self_heal = manifest_get_self_heal_pending();
+
+  ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS full; erasing partition and rewriting settings from RAM");
+
+  esp_err_t err = nvs_flash_deinit();
+  if (err != ESP_OK && err != ESP_ERR_NVS_NOT_INITIALIZED)
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS deinit failed: %s", esp_err_to_name(err));
+
+  err = nvs_flash_erase();
+  if (err != ESP_OK)
+  {
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS erase failed: %s", esp_err_to_name(err));
+    return err;
+  }
+
+  err = nvs_flash_init();
+  if (err != ESP_OK)
+  {
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS re-init failed: %s", esp_err_to_name(err));
+    return err;
+  }
+
+  nvs_handle_t h;
+  err = nvs_open(EEPROM_NAMESPACE, NVS_READWRITE, &h);
+  if (err != ESP_OK)
+  {
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "NVS reopen after erase failed: %s", esp_err_to_name(err));
+    return err;
+  }
+
+  err = write_nvs_settings(h);
+  nvs_close(h);
+
+  manifest_set_applied_generation(gen);
+  manifest_set_ota_in_progress(ota_in_prog);
+  manifest_set_self_heal_pending(self_heal);
+  return err;
+}
+
+esp_err_t write_nvs_parameters(void)
+{
+  esp_err_t err = nvs_flash_init();
+  if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND)
+  {
+    err = nvs_reformat_and_rewrite();
+  }
+  else if (err != ESP_OK)
+  {
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "nvs_flash_init: %s", esp_err_to_name(err));
+    return err;
   }
   else
   {
-    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Parameters saved to NVS successfully");
+    nvs_handle_t nvs_handle;
+    err = nvs_open(EEPROM_NAMESPACE, NVS_READWRITE, &nvs_handle);
+    if (err != ESP_OK)
+    {
+      ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Error opening NVS handle: %s", esp_err_to_name(err));
+      return err;
+    }
+
+    err = write_nvs_settings(nvs_handle);
+    nvs_close(nvs_handle);
+    if (nvs_is_full(err))
+      err = nvs_reformat_and_rewrite();
   }
 
-  // Close NVS
-  nvs_close(nvs_handle);
+  if (err != ESP_OK)
+    return err;
+
+  esp_err_t layout_err = screen_layout_file_save();
+  if (layout_err == ESP_ERR_INVALID_STATE)
+    return err; // LittleFS not mounted yet (early boot / rescue NVS rewrite)
+  if (layout_err != ESP_OK)
+    return layout_err;
 
   return err;
 }
@@ -928,45 +1036,100 @@ void ota_progress_callback(int progress, const char *message)
   // ESP_LOG_WEB(ESP_LOG_INFO, TAG, "OTA Progress: %d%% - %s", progress, message);
 }
 
+static void nvs_erase_poh_key(void)
+{
+  nvs_handle_t h;
+  if (nvs_open(EEPROM_NAMESPACE, NVS_READWRITE, &h) != ESP_OK)
+    return;
+  if (nvs_erase_key(h, "poh") == ESP_OK)
+    nvs_commit(h);
+  nvs_close(h);
+}
+
+static esp_err_t settings_local_save(void)
+{
+  FILE *f = fopen(SETTINGS_LOCAL_TMP_PATH, "w");
+  if (!f)
+  {
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Cannot write %s", SETTINGS_LOCAL_TMP_PATH);
+    return ESP_FAIL;
+  }
+
+  int n = fprintf(f, "# Local device settings (not shipped by OTA)\npoh=%" PRIu32 "\n", eeprom_poh);
+  fclose(f);
+  if (n < 0)
+  {
+    remove(SETTINGS_LOCAL_TMP_PATH);
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed writing %s", SETTINGS_LOCAL_TMP_PATH);
+    return ESP_FAIL;
+  }
+
+  remove(SETTINGS_LOCAL_PATH);
+  if (rename(SETTINGS_LOCAL_TMP_PATH, SETTINGS_LOCAL_PATH) != 0)
+  {
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Cannot install %s", SETTINGS_LOCAL_PATH);
+    remove(SETTINGS_LOCAL_TMP_PATH);
+    return ESP_FAIL;
+  }
+
+  ESP_LOG_WEB(ESP_LOG_INFO, TAG, "POH saved to %s: %" PRIu32 " hours", SETTINGS_LOCAL_PATH, eeprom_poh);
+  return ESP_OK;
+}
+
+static void settings_local_load(void)
+{
+  FILE *f = fopen(SETTINGS_LOCAL_PATH, "r");
+  bool from_file = false;
+  if (f)
+  {
+    char line[64];
+    while (fgets(line, sizeof(line), f))
+    {
+      char *s = line;
+      while (*s == ' ' || *s == '\t')
+        s++;
+      if (*s == '#' || *s == '\0' || *s == '\n' || *s == '\r')
+        continue;
+      if (strncmp(s, "poh=", 4) == 0)
+      {
+        eeprom_poh = (uint32_t)strtoul(s + 4, NULL, 10);
+        from_file = true;
+      }
+    }
+    fclose(f);
+  }
+
+  current_poh = eeprom_poh;
+  last_poh_save = time(NULL);
+
+  if (!from_file)
+  {
+    if (settings_local_save() != ESP_OK)
+      return; // keep the NVS copy until the file write succeeds
+  }
+  else
+  {
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "POH %" PRIu32 " from %s", eeprom_poh, SETTINGS_LOCAL_PATH);
+  }
+
+  nvs_erase_poh_key();
+}
+
 // POH timer callback function - called every hour
 void poh_timer_callback(void *arg)
 {
   current_poh++;
   ESP_LOG_WEB(ESP_LOG_INFO, TAG, "POH incremented to %u hours", current_poh);
 
-  // Check if we need to save to EEPROM (every 8 hours)
   time_t now = time(NULL);
-  // only update POH if we are not in manufacturer mode
-  if (!manufacturer_mode)
-  {
-    if (now - last_poh_save >= 8 * 3600) // 8 hours in seconds
-    {
-      eeprom_poh = current_poh;
-      last_poh_save = now;
+  if (manufacturer_mode)
+    return;
+  if (now - last_poh_save < 8 * 3600)
+    return;
 
-      // Save to NVS
-      nvs_handle_t nvs_handle;
-      esp_err_t err = nvs_open(EEPROM_NAMESPACE, NVS_READWRITE, &nvs_handle);
-      if (err == ESP_OK)
-      {
-        err = nvs_set_u32(nvs_handle, "poh", eeprom_poh);
-        if (err == ESP_OK)
-        {
-          nvs_commit(nvs_handle);
-          ESP_LOG_WEB(ESP_LOG_INFO, TAG, "POH saved to EEPROM: %u hours", eeprom_poh);
-        }
-        else
-        {
-          ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to save POH to NVS: %s", esp_err_to_name(err));
-        }
-        nvs_close(nvs_handle);
-      }
-      else
-      {
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to open NVS for POH save: %s", esp_err_to_name(err));
-      }
-    }
-  }
+  eeprom_poh = current_poh;
+  if (settings_local_save() == ESP_OK)
+    last_poh_save = now;
 }
 
 void startup_spiffs()
@@ -1123,6 +1286,22 @@ void app_main(void)
   startup_lcd();
   startup_lvgl();
   startup_spiffs();
+  settings_local_load();
+  if (rescue_mode_this_boot || rescuemode == 1)
+  {
+    screen_layout_file_remove();
+  }
+  else
+  {
+    screen_layout_file_load();
+    if (eeprom_screen_layout.scroll_delay == 65)
+    {
+      eeprom_screen_layout.scroll_delay = 60;
+      eeprom_scroll_delay = 60;
+      ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Migrated layout scroll delay 65ms -> 60ms");
+      write_nvs_parameters();
+    }
+  }
   startup_integrations();
   startup_display();
   startup_threads();   // threads need to start before provisioning, if we want a functioning display

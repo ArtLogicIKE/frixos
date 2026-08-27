@@ -54,7 +54,7 @@ bool wifi_first_connect = false;
 bool mdns_initialized = false;
 bool manufacturer_mode = false;
 // Added for OTA updates
-#define OTA_CHECK_DELAY_MS (7 * 1000) // 7 seconds delay
+#define OTA_CHECK_DELAY_MS (60 * 1000) // after boot storm (weather + CGM TLS)
 esp_timer_handle_t ota_update_timer = NULL;
 // Added for mDNS periodic announcements
 #define MDNS_ANNOUNCEMENT_INTERVAL_MS (20 * 1000) // 20 seconds
@@ -411,11 +411,12 @@ void wifi_event_handler(void *arg, esp_event_base_t event_base,
             ESP_LOG_WEB(ESP_LOG_INFO, TAG, "WiFi disconnected, retry %d", retry_count);
             wifi_connected = false;
 
-            // Stop OTA update timer when disconnected
+            // Stop OTA update timer when disconnected. Keep the handle so
+            // GOT_IP can reuse it - NULLing without delete leaked a timer
+            // on every roam/flap.
             if (ota_update_timer != NULL)
             {
                 esp_timer_stop(ota_update_timer);
-                ota_update_timer = NULL;
             }
 
             shutdown_mdns_on_link_loss();
@@ -501,6 +502,10 @@ void wifi_event_handler(void *arg, esp_event_base_t event_base,
                     .callback = &ota_update_timer_callback,
                     .name = "ota_update_timer"};
                 ESP_ERROR_CHECK(esp_timer_create(&ota_timer_args, &ota_update_timer));
+            }
+            else
+            {
+                esp_timer_stop(ota_update_timer);
             }
 
             // Start OTA update timer with initial delay

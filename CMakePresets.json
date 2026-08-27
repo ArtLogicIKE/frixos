@@ -1,0 +1,47 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 21,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "default",
+      "displayName": "ESP-IDF 6.0.1 (esp32)",
+      "description": "Frixos firmware built with the kept ESP-IDF v6.0.1 install",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "IDF_TARGET": "esp32",
+        "SDKCONFIG_DEFAULTS": "sdkconfig.defaults"
+      },
+      "environment": {
+        "IDF_PATH": "C:/Espressif/frameworks/esp-idf-v6.0.1",
+        "IDF_TOOLS_PATH": "C:/Espressif/tools",
+        "IDF_PYTHON_ENV_PATH": "C:/Espressif/python_env/idf6.0_py3.13_env"
+      },
+      "vendor": {
+        "espressif/vscode-esp-idf": {
+          "schemaVersion": 1,
+          "settings": [
+            {
+              "type": "openOCD",
+              "value": {
+                "debugLevel": 2,
+                "configs": ["board/esp32-wrover-kit-3.3v.cfg"],
+                "args": []
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "default",
+      "configurePreset": "default"
+    }
+  ]
+}

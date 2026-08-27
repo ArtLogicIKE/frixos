@@ -1,12 +1,13 @@
 {
   "C_Cpp.intelliSenseEngine": "default",
-  "idf.espIdfPathWin": "c:\\Espressif\\frameworks\\esp-idf-v6.0.1",
+  "C_Cpp.default.compileCommands": "${workspaceFolder}/build/compile_commands.json",
+  "idf.espIdfPathWin": "C:\\Espressif\\frameworks\\esp-idf-v6.0.1",
   "idf.openOcdConfigs": [
     "board/esp32-wrover-kit-3.3v.cfg"
   ],
   "idf.portWin": "COM6",
-  "idf.toolsPathWin": "c:\\Espressif\\tools",
-  "idf.gitPathWin": "c:\\Espressif\\tools\\idf-git\\2.44.0\\cmd\\git.exe",
+  "idf.toolsPathWin": "C:\\Espressif\\tools",
+  "idf.gitPathWin": "C:\\Espressif\\tools\\idf-git\\2.44.0\\cmd\\git.exe",
   "idf.flashType": "UART",
   "files.associations": {
     "sdkconfig.h": "c",
@@ -30,11 +31,31 @@
     "f-dexcom.h": "c",
     "lv_image_decoder.h": "c"
   },
-  "idf.pythonInstallPath": "c:\\Espressif\\python_env\\idf6.0_py3.13_env\\Scripts\\python.exe",
-  "idf.currentSetup": "c:\\Espressif\\frameworks\\esp-idf-v6.0.1",
+  "idf.pythonInstallPath": "C:\\Espressif\\python_env\\idf6.0_py3.13_env\\Scripts\\python.exe",
+  "idf.currentSetup": "C:\\Espressif\\frameworks\\esp-idf-v6.0.1",
+  "idf.eimIdfJsonPath": "C:\\Espressif\\tools\\eim_idf.json",
   "idf.buildPath": "${workspaceFolder}/build",
-  "idf.customExtraVars": {
-    "ESP_IDF_VERSION": "6.0.1"
+  "idf.extensionActivationMode": "always",
+  "idf.saveLastProjectConfiguration": true,
+  "cmake.cmakePath": "C:\\Espressif\\tools\\cmake\\4.0.3\\bin\\cmake.exe",
+  "cmake.generator": "Ninja",
+  "cmake.useCMakePresets": "always",
+  "cmake.sourceDirectory": "${workspaceFolder}",
+  "cmake.preferredGenerators": ["Ninja"],
+  "cmake.configureEnvironment": {
+    "IDF_PATH": "C:\\Espressif\\frameworks\\esp-idf-v6.0.1",
+    "IDF_TOOLS_PATH": "C:\\Espressif\\tools",
+    "IDF_PYTHON_ENV_PATH": "C:\\Espressif\\python_env\\idf6.0_py3.13_env"
+  },
+  "cmake.environment": {
+    "IDF_PATH": "C:\\Espressif\\frameworks\\esp-idf-v6.0.1",
+    "IDF_TOOLS_PATH": "C:\\Espressif\\tools",
+    "IDF_PYTHON_ENV_PATH": "C:\\Espressif\\python_env\\idf6.0_py3.13_env"
+  },
+  "terminal.integrated.env.windows": {
+    "IDF_PATH": "C:\\Espressif\\frameworks\\esp-idf-v6.0.1",
+    "IDF_TOOLS_PATH": "C:\\Espressif\\tools",
+    "IDF_PYTHON_ENV_PATH": "C:\\Espressif\\python_env\\idf6.0_py3.13_env"
   },
   "clangd.path": "C:\\Espressif\\tools\\esp-clang\\esp-20.1.1_20250829\\esp-clang\\bin\\clangd.exe",
   "clangd.arguments": [

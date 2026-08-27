@@ -23,7 +23,10 @@
 
 static const char *TAG = "f-ota";
 static update_progress_callback_t progress_callback = NULL;
-static time_t last_check_time = 0;
+// Monotonic us since boot. Wall-clock time() is still epoch until NTP, so
+// using it as a throttle skipped the first GOT_IP check and then allowed
+// every reconnect after NTP (last_check was still 0). 0 = never attempted.
+static int64_t last_check_us = 0;
 
 // OTA update thread control
 TaskHandle_t ota_update_task_handle = NULL;
@@ -46,6 +49,8 @@ static esp_err_t ota_reconcile_files(const manifest_t *m, int progress_lo, int p
                                      char *failed_out, size_t failed_len,
                                      int *downloaded_out, int *skipped_out);
 static void ota_self_heal(void);
+static void ota_self_heal_if_needed(void);
+static bool ota_query_latest(int *new_version);
 static void ota_quiet_refresh(void);
 
 // Add this function before f_ota_init
@@ -63,7 +68,7 @@ static void log_partition_info(const esp_partition_t *partition, const char *pre
 
 void f_ota_verify(void)
 {
-    last_check_time = 0;
+    last_check_us = 0;
     ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Initializing OTA, checking partitions");
 
     // Get all relevant partitions
@@ -148,7 +153,11 @@ static void ota_handle_failure(const char *error_msg, update_status_t status, bo
     // Report status to update server after UI is restored (report may block on timeout)
     f_ota_report_status(status, error_msg);
 
-    last_check_time = time(NULL) - (UPDATE_CHECK_INTERVAL / 2); // Reset to half interval ago so device can try again in half the time
+    // Allow another attempt in half the usual interval. Use boot-monotonic
+    // time so an NTP step cannot make this look like "never checked".
+    int64_t now_us = esp_timer_get_time();
+    int64_t half_us = (int64_t)(UPDATE_CHECK_INTERVAL / 2) * 1000000LL;
+    last_check_us = (now_us > half_us) ? now_us - half_us : 1;
 }
 
 // Unified failure handling function with cleanup
@@ -813,6 +822,21 @@ static void ota_self_heal(void)
     }
 }
 
+static void ota_self_heal_if_needed(void)
+{
+    if (manifest_get_self_heal_pending())
+    {
+        ota_self_heal();
+        return;
+    }
+    if (manifest_get_applied_generation() == 0)
+    {
+        struct stat heal_st;
+        if (stat(MANIFEST_PATH, &heal_st) == 0)
+            ota_self_heal();
+    }
+}
+
 /* Re-fetch the current release's manifest so web-file-only fixes published
  * with `push.py --files-only` reach the fleet without a version bump, flash
  * write, or reboot. Files are only touched when the publisher stamped a NEWER
@@ -973,51 +997,11 @@ static esp_err_t ota_check_event_handler(esp_http_client_event_t *evt)
     return ESP_OK;
 }
 
-void f_ota_check_update(void)
+/* Poll /latest. true and *new_version set when the body parses; false on
+ * transport/HTTP/parse failure. Sets last_check_us even on failure so a
+ * flapping STA does not retry every GOT_IP. */
+static bool ota_query_latest(int *new_version)
 {
-    ESP_LOGI_STACK(TAG, "OTA Check Update");
-
-    if (!wifi_connected)
-    {
-        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "WiFi not connected, skipping OTA check");
-        return;
-    }
-
-    // First boot after an update - or first boot of the first signed
-    // firmware, whose files arrived via the legacy path - verify the SPIFFS
-    // file set against the stored manifest before doing anything else.
-    if (manifest_get_self_heal_pending())
-    {
-        ota_self_heal();
-    }
-    else if (manifest_get_applied_generation() == 0)
-    {
-        struct stat heal_st;
-        if (stat(MANIFEST_PATH, &heal_st) == 0)
-        {
-            ota_self_heal();
-        }
-    }
-
-    // Thread-safe time check
-    static portMUX_TYPE time_check_mutex = portMUX_INITIALIZER_UNLOCKED;
-    portENTER_CRITICAL(&time_check_mutex);
-    time_t current_time = time(NULL);
-    if (current_time - last_check_time < UPDATE_CHECK_INTERVAL)
-    {
-        portEXIT_CRITICAL(&time_check_mutex);
-        return;
-    }
-    last_check_time = current_time;
-    portEXIT_CRITICAL(&time_check_mutex);
-
-    if (!eeprom_update_firmware)
-    {
-        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Firmware updates are disabled");
-        return;
-    }
-
-    // Use dynamic allocation for query params to avoid buffer overflow
     char url[512] = "";
 
     uint8_t mac[6];
@@ -1037,8 +1021,8 @@ void f_ota_check_update(void)
     esp_partition_iterator_release(it);
     uint16_t app_size = total_size / 1024; // Convert to KB
 
-    // Build integration string (A=HA, B=Stock, C=Dexcom, D=Freestyle)
-    char integrations[5] = ""; // Max 4 letters + null terminator
+    // Build integration string (A=HA, B=Stock, C=Dexcom, D=Freestyle, E=Nightscout)
+    char integrations[8] = "";
     int int_idx = 0;
     if (integration_active[INTEGRATION_HA])
     {
@@ -1073,61 +1057,98 @@ void f_ota_check_update(void)
 
     ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Checking for updates at %s", url);
 
+    // A version poll is not an update. Transient connect/timeout/heap errors
+    // must not restart the webserver or report UPDATE_ERROR_DOWNLOAD — that
+    // is what flooded the update-server log on FW70 (GET 7s after GOT_IP,
+    // overlapping weather/CGM TLS, then every flap after NTP).
+    ota_wait_for_heap("check");
+
     // Isolated response buffer (see ota_check_ctx_t). Not the shared
     // wifi_http_buffer — that belongs to the weather fetch on another task.
     char resp_buf[256];
     resp_buf[0] = '\0';
     ota_check_ctx_t ctx = {.buf = resp_buf, .len = 0, .cap = (int)sizeof(resp_buf)};
 
-    esp_http_client_config_t config = {
-        .url = url,
-        .timeout_ms = UPDATE_TIMEOUT_MS,
-        .event_handler = ota_check_event_handler,
-        .user_data = &ctx,
-        .transport_type = HTTP_TRANSPORT_OVER_TCP,
-    };
+    bool got_ok = false;
+    int status_code = -1;
+    const int check_attempts = 3;
+    last_check_us = esp_timer_get_time();
 
-    esp_http_client_handle_t client = esp_http_client_init(&config);
-    if (client == NULL)
+    for (int attempt = 1; attempt <= check_attempts; attempt++)
     {
-        ota_handle_failure("Failed to initialize HTTP client", UPDATE_ERROR_DOWNLOAD, false);
-        return;
+        if (attempt > 1)
+        {
+            vTaskDelay(pdMS_TO_TICKS(5000));
+            ctx.len = 0;
+            resp_buf[0] = '\0';
+        }
+
+        if (xSemaphoreTake(http_mutex, pdMS_TO_TICKS(10000)) != pdTRUE)
+        {
+            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Update check: http busy, attempt %d/%d",
+                        attempt, check_attempts);
+            continue;
+        }
+
+        esp_http_client_config_t config = {
+            .url = url,
+            .timeout_ms = 10000,
+            .event_handler = ota_check_event_handler,
+            .user_data = &ctx,
+            .transport_type = HTTP_TRANSPORT_OVER_TCP,
+            .buffer_size = 512,
+            .buffer_size_tx = 512,
+            .keep_alive_enable = false,
+        };
+
+        esp_http_client_handle_t client = esp_http_client_init(&config);
+        if (client == NULL)
+        {
+            xSemaphoreGive(http_mutex);
+            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Update check: client init failed (heap %lu), attempt %d/%d",
+                        (unsigned long)esp_get_free_heap_size(), attempt, check_attempts);
+            continue;
+        }
+
+        esp_http_client_set_header(client, "Accept", "application/json, text/plain");
+        esp_http_client_set_header(client, "Connection", "close");
+
+        esp_err_t err = esp_http_client_perform(client);
+        status_code = (err == ESP_OK) ? esp_http_client_get_status_code(client) : -1;
+        esp_http_client_cleanup(client);
+        xSemaphoreGive(http_mutex);
+        if (err == ESP_OK)
+        {
+            got_ok = true;
+            break;
+        }
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Update check: GET failed (%s) heap %lu, attempt %d/%d",
+                    esp_err_to_name(err), (unsigned long)esp_get_free_heap_size(),
+                    attempt, check_attempts);
     }
 
-    // Add content type validation
-    esp_http_client_set_header(client, "Accept", "application/json, text/plain");
-
-    esp_err_t err = esp_http_client_perform(client);
-    int status_code = (err == ESP_OK) ? esp_http_client_get_status_code(client) : -1;
-    esp_http_client_cleanup(client); // client no longer needed; parse the local buffer
-    if (err != ESP_OK)
+    if (!got_ok)
     {
-        ota_handle_failure("OTA Latest FW GET request failed", UPDATE_ERROR_DOWNLOAD, false);
-        return;
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Update check: GET failed after retries, skipping");
+        return false;
     }
 
-    // --- Hardened parse (#3) -------------------------------------------------
-    // Skip leading whitespace; the buffer is always a valid local array.
     const char *resp = resp_buf;
     while (*resp == ' ' || *resp == '\t' || *resp == '\r' || *resp == '\n')
         resp++;
 
-    // An empty / non-200 / unrecognised response must NOT fail the device — just
-    // skip this cycle and retry later. (Previously any id-less JSON, e.g. stale
-    // weather data, was logged as a hard "Invalid FW" failure.)
     if (status_code != 200 || *resp == '\0')
     {
         ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Update check: status %d, %d bytes; skipping",
                     status_code, ctx.len);
-        return;
+        return false;
     }
 
-    int new_version = 0;
     bool version_parsed = false;
 
     if (resp[0] >= '0' && resp[0] <= '9')
     {
-        new_version = atoi(resp);
+        *new_version = atoi(resp);
         version_parsed = true;
     }
     else if (resp[0] == '{' || resp[0] == '[')
@@ -1142,7 +1163,7 @@ void f_ota_check_update(void)
                 id = cJSON_GetObjectItem(root, "latest");
             if (cJSON_IsNumber(id))
             {
-                new_version = id->valueint;
+                *new_version = id->valueint;
                 version_parsed = true;
             }
             cJSON_Delete(root);
@@ -1151,21 +1172,73 @@ void f_ota_check_update(void)
 
     if (!version_parsed)
     {
-        // Unrecognised body (stale weather JSON, an HTML error page, etc.).
-        // Log a short preview and skip — do not mark a firmware failure.
         char preview[20];
         size_t p = 0;
         for (size_t i = 0; resp[i] != '\0' && i < 16 && p < sizeof(preview) - 1; i++)
             preview[p++] = (resp[i] >= 32 && resp[i] < 127) ? resp[i] : '.';
         preview[p] = '\0';
         ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Update check: unrecognised response '%s', skipping", preview);
+        return false;
+    }
+
+    return true;
+}
+
+void f_ota_check_update(void)
+{
+    ESP_LOGI_STACK(TAG, "OTA Check Update");
+
+    if (!wifi_connected)
+    {
+        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "WiFi not connected, skipping OTA check");
         return;
     }
 
-    if (new_version <= fwversion)
+    // This task is the only writer. Boot-monotonic so NTP cannot reopen the
+    // "never checked" window and turn every WiFi flap into another GET.
+    int64_t now_us = esp_timer_get_time();
+    if (last_check_us != 0 &&
+        (now_us - last_check_us) < (int64_t)UPDATE_CHECK_INTERVAL * 1000000LL)
+    {
+        return;
+    }
+
+    // /latest first: a newer image reboots and heals itself, so repairing
+    // this version's files would be discarded. The GET is cheap; self-heal
+    // (and the firmware download) are not, so we never do both this pass.
+    int new_version = 0;
+    bool have_latest = false;
+    if (!eeprom_update_firmware)
+    {
+        last_check_us = now_us;
+        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Firmware updates are disabled");
+    }
+    else
+    {
+        have_latest = ota_query_latest(&new_version);
+        if (have_latest && new_version > fwversion)
+        {
+            if (manifest_get_self_heal_pending() ||
+                manifest_get_applied_generation() == 0)
+            {
+                ESP_LOG_WEB(ESP_LOG_INFO, TAG,
+                            "Update %d available, skipping self-heal", new_version);
+            }
+            ota_reinstall_in_progress = false;
+            f_ota_do_update(new_version);
+            return;
+        }
+    }
+
+    if (have_latest && new_version <= fwversion)
     {
         ESP_LOG_WEB(ESP_LOG_INFO, TAG, "No update available, latest %d, current %d", new_version, fwversion);
+    }
 
+    ota_self_heal_if_needed();
+
+    if (have_latest && new_version <= fwversion)
+    {
         // Every QUIET_REFRESH_EVERY_CHECKS idle checks (or right away while no
         // release has ever been applied), pick up web-file-only publishes.
         static int quiet_refresh_counter = 0;
@@ -1176,11 +1249,7 @@ void f_ota_check_update(void)
             quiet_refresh_counter = 0;
             ota_quiet_refresh();
         }
-        return;
     }
-
-    ota_reinstall_in_progress = false;
-    f_ota_do_update(new_version);
 }
 
 static void f_ota_do_update(int version)
