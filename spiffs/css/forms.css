@@ -11,7 +11,7 @@
 @media(max-width:560px){ .grid2{ grid-template-columns:1fr; } }
 
 input[type=text],input[type=password],input[type=number],input[type=time],textarea,select{
-  width:100%; font-family:var(--ui); font-size:14px; color:var(--ink);
+  width:100%; font-family:var(--ui); font-size:16px; color:var(--ink);
   border:1px solid var(--input-border); background:var(--input-bg);
   box-shadow:0 1px 2px rgba(40,44,52,.06) inset; transition:border-color .2s, box-shadow .2s;
 }

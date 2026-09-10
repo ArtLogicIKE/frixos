@@ -3,14 +3,23 @@
    ============================================================ */
 
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{min-height:100%}
+html{
+  min-height:100%;
+  -webkit-text-size-adjust:100%;
+  text-size-adjust:100%;
+}
 body{
   font-family:var(--ui); color:var(--ink); background:var(--bg-solid); background-image:var(--bg);
   background-attachment:fixed; -webkit-font-smoothing:antialiased; line-height:1.5;
   font-size:14px; min-height:100vh; transition:color .3s, background-color .3s;
+  touch-action:manipulation;
 }
 a{color:var(--cyan-deep); text-decoration:none}
-.wrap{ max-width:920px; margin:0 auto; padding:22px 20px 60px; }
+.wrap{ max-width:920px; margin:0 auto; padding:22px 20px 60px; overflow-x:clip; }
+body.has-savebar .wrap{ padding-bottom:96px; }
+@media (max-width:560px){
+  body.has-savebar .wrap{ padding-bottom:calc(108px + env(safe-area-inset-bottom, 0px)); }
+}
 
 /* ---------- HEADER ---------- */
 .topbar{

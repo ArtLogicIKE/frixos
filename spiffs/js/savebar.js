@@ -11,10 +11,58 @@
   const bar = el('saveBar');
   if (!bar) return;
   let dirty = false;
+  const MOBILE = '(max-width: 560px)';
 
-  function markDirty() { if (!dirty) { dirty = true; bar.hidden = false; } }
-  function clearDirty() { dirty = false; bar.hidden = true; }
+  /* Keep the bar inside the visual viewport so iOS zoom / the on-screen
+     keyboard cannot push Save off-screen. */
+  function pinBar() {
+    if (!dirty || bar.hidden) return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const inset = Math.max(0, window.innerHeight - vv.offsetTop - vv.height);
+    if (window.matchMedia(MOBILE).matches) {
+      bar.style.left = vv.offsetLeft + 'px';
+      bar.style.width = vv.width + 'px';
+      bar.style.right = 'auto';
+      bar.style.bottom = inset + 'px';
+      bar.style.transform = 'none';
+    } else {
+      bar.style.left = (vv.offsetLeft + vv.width / 2) + 'px';
+      bar.style.width = '';
+      bar.style.right = 'auto';
+      bar.style.bottom = (inset + 18) + 'px';
+      bar.style.transform = 'translateX(-50%)';
+    }
+  }
+  function clearPin() {
+    bar.style.left = '';
+    bar.style.width = '';
+    bar.style.right = '';
+    bar.style.bottom = '';
+    bar.style.transform = '';
+  }
+
+  function markDirty() {
+    if (dirty) return;
+    dirty = true;
+    bar.hidden = false;
+    document.body.classList.add('has-savebar');
+    requestAnimationFrame(pinBar);
+  }
+  function clearDirty() {
+    dirty = false;
+    bar.hidden = true;
+    document.body.classList.remove('has-savebar');
+    clearPin();
+  }
   window.saveBar = { markDirty, clearDirty, isDirty: () => dirty };
+
+  const vv = window.visualViewport;
+  if (vv) {
+    vv.addEventListener('resize', pinBar);
+    vv.addEventListener('scroll', pinBar);
+  }
+  window.addEventListener('resize', pinBar);
 
   /* Any edit to a form control inside the watched tabs counts as dirty.
      Programmatic value changes don't fire these events; the code paths that
