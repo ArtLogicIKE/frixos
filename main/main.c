@@ -310,6 +310,7 @@ glucose_data_t glucose_data = {0};
 uint32_t eeprom_poh = 0;  // Power on hours counter
 uint32_t current_poh = 0; // Current runtime POH counter (not yet flushed)
 time_t last_poh_save = 0; // Last time POH was saved to settings.local
+static bool poh_from_settings_local = false; // true if settings.local already had poh at boot
 
 int weather_icon_index = -1;
 int moon_icon_index = -1;
@@ -1108,21 +1109,36 @@ static void settings_local_load(void)
   }
   else
   {
+    poh_from_settings_local = true;
     ESP_LOG_WEB(ESP_LOG_INFO, TAG, "POH %" PRIu32 " from %s", eeprom_poh, SETTINGS_LOCAL_PATH);
   }
 
   nvs_erase_poh_key();
 }
 
+void poh_reset_for_manufacturer_mode(void)
+{
+  if (poh_from_settings_local)
+    return;
+  if (current_poh == 0 && eeprom_poh == 0)
+    return;
+  current_poh = 0;
+  eeprom_poh = 0;
+  if (settings_local_save() == ESP_OK)
+    last_poh_save = time(NULL);
+  ESP_LOG_WEB(ESP_LOG_INFO, TAG, "POH reset to 0 (manufacturer mode)");
+}
+
 // POH timer callback function - called every hour
 void poh_timer_callback(void *arg)
 {
+  if (manufacturer_mode)
+    return;
+
   current_poh++;
   ESP_LOG_WEB(ESP_LOG_INFO, TAG, "POH incremented to %u hours", current_poh);
 
   time_t now = time(NULL);
-  if (manufacturer_mode)
-    return;
   if (now - last_poh_save < 8 * 3600)
     return;
 

@@ -19,7 +19,9 @@ async function loadStatus() {
   txt('mac_address', (d.mac_address || '').replace(/(..)(?=.)/g, '$1:'));
   txt('ip_address', d.ip_address); txt('chip_revision', d.chip_revision);
   txt('flash_size', d.flash_size != null ? formatBytes(d.flash_size) : '—');
-  txt('cpu_freq', d.cpu_freq != null ? (d.cpu_freq / 1e6) + ' MHz' : '—');
+  txt('revision_pwm', (d.board_rev != null && d.revision && d.max_power != null)
+    ? d.board_rev + ' (' + d.revision + ') - ' + d.max_power
+    : '—');
   txt('compile_time', d.compile_time);
   txt('free_heap', d.free_heap != null ? formatBytes(d.free_heap) : '—');
   txt('min_free_heap', d.min_free_heap != null ? formatBytes(d.min_free_heap) : '—');

@@ -475,8 +475,8 @@ void wifi_event_handler(void *arg, esp_event_base_t event_base,
             {
                 uint8_t mac[6];
                 esp_efuse_mac_get_default(mac);
-                snprintf(eeprom_hostname, sizeof(eeprom_hostname), "frixos-%02X%02X%02X",
-                         mac[3], mac[4], mac[5]);
+                snprintf(eeprom_hostname, sizeof(eeprom_hostname), "frixos-%02X", mac[5]);
+                poh_reset_for_manufacturer_mode();
             }
             wifi_connected = true;
             

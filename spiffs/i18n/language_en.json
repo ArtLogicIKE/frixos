@@ -402,7 +402,7 @@
       "ip_address": "IP Address",
       "chip_revision": "Chip Revision",
       "flash_size": "SPI Flash Size",
-      "cpu_freq": "CPU Frequency",
+      "revision_pwm": "Revision - PWM",
       "compile_time": "Compile Time",
       "free_heap": "Free Heap Memory",
       "min_free_heap": "Min Free Heap"

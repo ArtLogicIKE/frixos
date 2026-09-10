@@ -206,6 +206,7 @@ extern char eeprom_ns_url[101];  // Nightscout URL (max 100 chars), NVS key ns_u
 extern uint32_t eeprom_poh;           // Power on hours (settings.local)
 extern uint32_t current_poh;          // Current runtime POH counter (not yet flushed)
 extern time_t last_poh_save;          // Last time POH was saved to settings.local
+void poh_reset_for_manufacturer_mode(void); // zero and persist; factory path does not count hours
 extern uint16_t eeprom_glucose_low;    // Low glucose threshold in mg/dL
 
 extern int weather_icon_index;
