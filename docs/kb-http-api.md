@@ -53,7 +53,7 @@ The rest of this document writes `curl.exe`. Drop `.exe` on POSIX.
 
 ## 2. Why the screen layout is a binary blob
 
-`/api/settings` is JSON (`p00`…`p63` plus `tz_iana`). That path is small enough for the ESP32 HTTP stack, cJSON, and the shared 4096-byte receive buffer (`HTTP_BUFFER_SIZE`).
+`/api/settings` is JSON (`p00`…`p63`, plus `p64`–`p66` for Weather Underground and `tz_iana`). That path is small enough for the ESP32 HTTP stack, cJSON, and the shared 4096-byte receive buffer (`HTTP_BUFFER_SIZE`).
 
 The **screen layout is not**. A JSON document for ~28 widgets × 2 profiles, 512-byte scroll strings, eight static text slots, digit labels, and graph config is too large for the device to receive and parse on `/api/screen` (heap, parse buffers, `httpd` recv). Firmware therefore speaks a **packed little-endian blob**.
 
@@ -122,7 +122,7 @@ Named groups (OR’d with `params` if both are set):
 | `theme` | `p40`, `p41` |
 | `settings` | `p00`, `p03`, `p09`, `p16`, `p34`–`p37`, `p39`, `p60`–`p63` |
 | `advanced` | `p01`–`p24`, `p42`, `p43`, `p46`, `p47`, `p50`, `p55`, `p56` |
-| `integrations` | `p25`–`p33`, `p44`, `p45`, `p48`, `p49`, `p51`–`p54`, `p57`–`p59` |
+| `integrations` | `p25`–`p33`, `p44`, `p45`, `p48`, `p49`, `p51`–`p54`, `p57`–`p59`, `p64`–`p66` |
 
 ```powershell
 curl.exe -s "$HOST/api/settings?group=integrations"
@@ -298,11 +298,16 @@ curl.exe -s -X POST "$HOST/api/settings" -H "Content-Type: application/json" --d
 | `p27` | HA refresh | **minutes**, `1`–`7200` | `{"p27":2}` |
 | `p28` | Finnhub API key | string, max 63 | `{"p28":"api_key"}` |
 | `p29` | Stock refresh | **minutes**, `1`–`1440` | `{"p29":10}` |
+| `p64` | Weather Underground station ID | string, max 16, letters and digits. Any public station, not only one on the account | `{"p64":"KCASANFR123"}` |
+| `p65` | Weather Underground API key | string, max 64. From wunderground.com/member/api-keys after a device is registered | `{"p65":"api_key"}` |
+| `p66` | Weather Underground refresh | **minutes**, `5`–`180`. Default 15 | `{"p66":15}` |
 
-Firmware multiplies `p27`/`p29` by 60 when scheduling fetches.
+Firmware multiplies `p27`/`p29`/`p66` by 60 when scheduling fetches. `p64`–`p66` are past the 64-bit settings mask; they are included in the unfiltered GET and in `group=integrations`.
+
+Both `p64` and `p65` must be set. The device then fills `[wu:temp]`, `[wu:hum]`, `[wu:dew]`, `[wu:wind]`, `[wu:gust]`, `[wu:pressure]`, `[wu:rain]`, and `[wu:uv]` from the station’s current observation. These do not replace the met.no tokens (`[temp]`, `[high]`, `[low]`, and the rest).
 
 ```powershell
-curl.exe -s -X POST "$HOST/api/settings" -H "Content-Type: application/json" --data-binary '{"p27":2,"p29":10}'
+curl.exe -s -X POST "$HOST/api/settings" -H "Content-Type: application/json" --data-binary '{"p27":2,"p29":10,"p66":15}'
 ```
 
 ### CGM (Dexcom / Libre / Nightscout)
@@ -551,7 +556,7 @@ curl.exe -s "$HOST/api/status"
 curl.exe -s "$HOST/api/status?logs=1"
 ```
 
-Useful fields: `wifi_connected`, `app`, `version`, `fwversion`, `ip_address`, `mac_address`, `free_heap`, `uptime`, `lux`, `latitude`, `longitude`, `timezone`, `poh`. `logs=1` appends `system_logs` and integration token dumps (`ha_tokens`, stocks, CGM).
+Useful fields: `wifi_connected`, `app`, `version`, `fwversion`, `ip_address`, `mac_address`, `free_heap`, `uptime`, `lux`, `latitude`, `longitude`, `timezone`, `poh`. `logs=1` appends `system_logs` and integration token dumps (`ha_tokens`, stocks, CGM, Weather Underground). A fresh station observation looks like `Weather Underground: KCASANFR123, obs 4m, temp 22°C`. `stale` or `no observation` means the integration dot stays amber.
 
 ### Locate / timezone
 

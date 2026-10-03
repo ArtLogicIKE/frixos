@@ -366,6 +366,14 @@
       "token_cgm_glucose": "Dernière lecture de glucose de votre appareil CGM, formatée, p.ex. 157 mg/dl (+3 @ 12:01). (nécessite une intégration CGM active)",
       "token_cgm_reading": "Dernière lecture de glucose, simple, p.ex. 157",
       "token_cgm_time": "Heure de la dernière mesure CGM, p.ex. 12:01apr. (nécessite une intégration CGM active)",
+      "token_wu_temp": "Température de la station météo",
+      "token_wu_hum": "Humidité de la station météo",
+      "token_wu_dew": "Point de rosée de la station météo",
+      "token_wu_wind": "Vitesse et direction du vent de la station",
+      "token_wu_gust": "Rafale et direction du vent de la station",
+      "token_wu_pressure": "Pression de la station météo",
+      "token_wu_rain": "Pluie du jour à la station",
+      "token_wu_uv": "Indice UV de la station météo",
       "tokens_note": "Remarque: Les jetons sont sensibles à la casse et doivent être placés entre crochets.",
       "default_message": "Message par défaut: [device].local/ [greeting] [day], [date] [mon], maintenant [temp] aujourd'hui [high]-[low], hum. [hum], soleil [rise]-[set]"
     }
@@ -433,6 +441,15 @@
       "api_key_placeholder": "Entrez votre clé API Finnhub",
       "refresh_interval": "Actualisation (min.)",
       "via": "Via Finnhub.io."
+    },
+    "wu": {
+      "title": "Weather Underground",
+      "help": "Enregistrez un appareil sur votre compte Weather Underground, générez une clé sur wunderground.com/member/api-keys, puis saisissez l'identifiant d'une station publique active. Jetons : [wu:temp] [wu:hum] [wu:dew] [wu:wind] [wu:gust] [wu:pressure] [wu:rain] [wu:uv].",
+      "station_id": "Identifiant de station",
+      "station_id_placeholder": "p. ex. KCASANFR123",
+      "api_key": "Clé API",
+      "api_key_placeholder": "Collez la clé API",
+      "refresh_interval": "Actualisation (min.)"
     },
     "dexcom": {
       "title": "Dexcom G5/6",

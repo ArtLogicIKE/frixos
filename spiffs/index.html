@@ -292,6 +292,24 @@
       </details>
     </div>
 
+    <div class="panel">
+      <div class="ptitle"><h2><span class="dot off" id="dot-wu"></span><span data-i18n="integrations.wu.title">Weather Underground</span></h2><span class="rule"></span><span class="int-state" id="state-wu"></span></div>
+      <p class="muted-p tight" data-i18n="integrations.wu.help">Register a device on your Weather Underground account, generate a key at wunderground.com/member/api-keys, then enter any live public station ID. Tokens: [wu:temp] [wu:hum] [wu:dew] [wu:wind] [wu:gust] [wu:pressure] [wu:rain] [wu:uv].</p>
+      <div class="field"><label data-i18n="integrations.wu.station_id">Station ID</label>
+        <input type="text" id="eeprom_wu_station" maxlength="16" data-i18n-placeholder="integrations.wu.station_id_placeholder" placeholder="e.g. KCASANFR123" autocapitalize="characters" spellcheck="false">
+      </div>
+      <div class="field"><label data-i18n="integrations.wu.api_key">API key</label>
+        <div class="pw"><input type="password" id="eeprom_wu_key" maxlength="64" data-i18n-placeholder="integrations.wu.api_key_placeholder" placeholder="Paste API key"><button class="eye" type="button" aria-label="Show key">👁</button></div>
+        <div id="eeprom_wu_key-counter" class="counter"></div>
+      </div>
+      <details class="adv-box">
+        <summary data-i18n="common.advanced">Advanced</summary>
+        <div class="adv-body">
+          <div class="field"><label data-i18n="integrations.wu.refresh_interval">Refresh (min.)</label><input type="number" id="eeprom_wu_refresh_mins" min="5" max="180" value="15"></div>
+        </div>
+      </details>
+    </div>
+
 </section>
 
   <!-- ===================== LAYOUT (screen editor) ===================== -->

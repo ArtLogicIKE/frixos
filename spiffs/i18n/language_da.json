@@ -366,6 +366,14 @@
       "token_cgm_glucose": "Seneste glukoseaflæsning fra din CGM-enhed, formateret, f.eks. 157 mg/dl (+3 @ 12:01). (kræver aktiv CGM-integration)",
       "token_cgm_reading": "Seneste glukoseaflæsning, ren, f.eks. 157",
       "token_cgm_time": "Tidspunkt for seneste CGM-måling, f.eks. 12:01em (kræver aktiv CGM-integration)",
+      "token_wu_temp": "Temperatur fra vejrstationen",
+      "token_wu_hum": "Luftfugtighed fra vejrstationen",
+      "token_wu_dew": "Dugpunkt fra vejrstationen",
+      "token_wu_wind": "Vindhastighed og retning fra stationen",
+      "token_wu_gust": "Vindstød og retning fra stationen",
+      "token_wu_pressure": "Lufttryk fra vejrstationen",
+      "token_wu_rain": "Dagens nedbør ved stationen",
+      "token_wu_uv": "UV-indeks fra vejrstationen",
       "tokens_note": "Bemærk: Tokens er store og små bogstaver og skal være i kantede parenteser.",
       "default_message": "Standardbesked: [device].local/ [greeting] [day], [date] [mon], nu [temp] i dag [high]-[low], fugt. [hum], sol [rise]-[set]"
     }
@@ -433,6 +441,15 @@
       "api_key_placeholder": "Indtast din Finnhub API-nøgle",
       "refresh_interval": "Opdatering (min.)",
       "via": "Via Finnhub.io."
+    },
+    "wu": {
+      "title": "Weather Underground",
+      "help": "Registrer en enhed på din Weather Underground-konto, opret en nøgle på wunderground.com/member/api-keys, og indtast derefter ID for en aktiv offentlig station. Tokens: [wu:temp] [wu:hum] [wu:dew] [wu:wind] [wu:gust] [wu:pressure] [wu:rain] [wu:uv].",
+      "station_id": "Stations-ID",
+      "station_id_placeholder": "f.eks. KCASANFR123",
+      "api_key": "API-nøgle",
+      "api_key_placeholder": "Indsæt API-nøgle",
+      "refresh_interval": "Opdatering (min.)"
     },
     "dexcom": {
       "title": "Dexcom G5/6",

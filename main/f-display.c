@@ -18,6 +18,7 @@
 #include "f-integrations.h"
 #include "f-dexcom.h"
 #include "f-graph.h"
+#include "f-wu.h"
 
 #include "time.h"
 #include "math.h"
@@ -3063,6 +3064,7 @@ typedef enum
   TOKEN_TYPE_STOCK,    // Stock tokens
   TOKEN_TYPE_GLUCOSE,  // Any CGM Meter (Dexcom, Freestyle, etc.)
   TOKEN_TYPE_WEATHER,  // Weather tokens
+  TOKEN_TYPE_WU,       // Weather Underground PWS tokens
   TOKEN_TYPE_TIME,     // Time-related tokens
                        // Add new token types here
 } token_type_t;
@@ -3190,6 +3192,32 @@ bool token_numeric_value(const char *tok, float *out)
     case TOKEN_TYPE_HA:
     case TOKEN_TYPE_STOCK:
       return parse_string_value(t->value, out);
+    case TOKEN_TYPE_WU:
+    {
+      if (!wu_obs.valid)
+        return false;
+      double v;
+      if (strcmp(tok, "[wu:temp]") == 0 && wu_obs.has_temp)
+        v = eeprom_fahrenheit ? (wu_obs.temp_c * 9.0 / 5.0) + 32 : wu_obs.temp_c;
+      else if (strcmp(tok, "[wu:hum]") == 0 && wu_obs.has_hum)
+        v = wu_obs.humidity;
+      else if (strcmp(tok, "[wu:dew]") == 0 && wu_obs.has_dew)
+        v = eeprom_fahrenheit ? (wu_obs.dew_c * 9.0 / 5.0) + 32 : wu_obs.dew_c;
+      else if (strcmp(tok, "[wu:wind]") == 0 && wu_obs.has_wind)
+        v = wu_obs.wind_mps;
+      else if (strcmp(tok, "[wu:gust]") == 0 && wu_obs.has_gust)
+        v = wu_obs.gust_mps;
+      else if (strcmp(tok, "[wu:pressure]") == 0 && wu_obs.has_pressure)
+        v = wu_obs.pressure_hpa;
+      else if (strcmp(tok, "[wu:rain]") == 0 && wu_obs.has_rain)
+        v = wu_obs.rain_mm;
+      else if (strcmp(tok, "[wu:uv]") == 0 && wu_obs.has_uv)
+        v = wu_obs.uv;
+      else
+        return false;
+      *out = (float)v;
+      return true;
+    }
     default:
       return false; // BASE / TIME tokens are not graphable
     }
@@ -3229,6 +3257,9 @@ void prepare_tokens(void)
   {
     tokencount += 3;
   }
+
+  if (integration_active[INTEGRATION_WU])
+    tokencount += 8;
 
   // Add safety check for reasonable token count
   if (tokencount > MAX_TOKEN_COUNT)
@@ -3361,6 +3392,22 @@ void prepare_tokens(void)
     all_tokens[prepared_tokens_count].value = NULL;
     all_tokens[prepared_tokens_count].len = strlen(all_tokens[prepared_tokens_count].token);
     prepared_tokens_count++;
+  }
+
+  if (integration_active[INTEGRATION_WU])
+  {
+    static const char *wu_names[] = {
+        "[wu:temp]", "[wu:hum]", "[wu:dew]", "[wu:wind]",
+        "[wu:gust]", "[wu:pressure]", "[wu:rain]", "[wu:uv]"};
+    for (int i = 0; i < 8; i++)
+    {
+      all_tokens[prepared_tokens_count].token = wu_names[i];
+      all_tokens[prepared_tokens_count].id = prepared_tokens_count + 1;
+      all_tokens[prepared_tokens_count].type = TOKEN_TYPE_WU;
+      all_tokens[prepared_tokens_count].value = NULL;
+      all_tokens[prepared_tokens_count].len = strlen(wu_names[i]);
+      prepared_tokens_count++;
+    }
   }
 
   // Add end marker
@@ -3659,6 +3706,10 @@ void replace_placeholders(const char *input, char *output, size_t output_size)
             }
             break;
             }
+            break;
+
+          case TOKEN_TYPE_WU:
+            wu_format_token(token->token, replacement, sizeof(replacement), eeprom_fahrenheit);
             break;
 
           case TOKEN_TYPE_HA:

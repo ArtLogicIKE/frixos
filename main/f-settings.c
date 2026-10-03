@@ -13,6 +13,7 @@
 #include "f-pwm.h"
 #include "f-wifi.h"
 #include "f-ota.h"
+#include "f-wu.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -92,6 +93,9 @@
  * - p27 = eeprom_ha_refresh_mins (HA refresh interval)
  * - p28 = eeprom_stock_key (Stock API key)
  * - p29 = eeprom_stock_refresh_mins (Stock refresh interval)
+ * - p64 = eeprom_wu_station (Weather Underground station ID)
+ * - p65 = eeprom_wu_key (Weather Underground API key)
+ * - p66 = eeprom_wu_refresh_mins (Weather Underground refresh interval)
  * - p30 = eeprom_dexcom_region (Dexcom region)
  * - p31 = eeprom_glucose_username (Shared glucose username)
  * - p32 = eeprom_glucose_password (Shared glucose password)
@@ -727,9 +731,10 @@ static uint64_t calculate_include_mask(const char *group, const char *params)
             mask |= (1ULL << 42) | (1ULL << 43) | (1ULL << 46) |
                     (1ULL << 47) | (1ULL << 50) | (1ULL << 55) | (1ULL << 56);
         }
-        else if (strcmp(group, "integrations") == 0)
+            else if (strcmp(group, "integrations") == 0)
         {
             // p25-p33, p44, p45, p48, p49, p51-p54, p57-p59
+            // p64-p66 (Weather Underground) are outside this mask; wu_settings_mask adds them.
             for (int i = 25; i <= 33; i++) mask |= (1ULL << i);
             mask |= (1ULL << 44) | (1ULL << 45) | (1ULL << 48) |
                     (1ULL << 49) | (1ULL << 51) | (1ULL << 52) |
@@ -759,6 +764,33 @@ static uint64_t calculate_include_mask(const char *group, const char *params)
     return mask;
 }
 
+/* p64–p66 sit past the uint64 settings mask. Bits: 1=p64, 2=p65, 4=p66. */
+static uint8_t wu_settings_mask(const char *group, const char *params)
+{
+    if ((!group || group[0] == '\0') && (!params || params[0] == '\0'))
+        return 0x7;
+
+    uint8_t bits = 0;
+    if (group && strcmp(group, "integrations") == 0)
+        bits |= 0x7;
+
+    if (params && params[0] != '\0')
+    {
+        const char *p = params;
+        while ((p = strchr(p, 'p')) != NULL)
+        {
+            p++;
+            if (strncmp(p, "64", 2) == 0 && !isdigit((unsigned char)p[2]))
+                bits |= 0x1;
+            else if (strncmp(p, "65", 2) == 0 && !isdigit((unsigned char)p[2]))
+                bits |= 0x2;
+            else if (strncmp(p, "66", 2) == 0 && !isdigit((unsigned char)p[2]))
+                bits |= 0x4;
+        }
+    }
+    return bits;
+}
+
 esp_err_t send_json_settings(httpd_req_t *req)
 {
     ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Settings GET request received");
@@ -780,6 +812,7 @@ esp_err_t send_json_settings(httpd_req_t *req)
 
     // Pre-calculate inclusion mask once to optimize performance from O(N*M) to O(1)
     uint64_t mask = calculate_include_mask(group_local, params_local);
+    uint8_t wu_mask = wu_settings_mask(group_local, params_local);
 
     // Add parameters based on mask
     if (mask & (1ULL << 0)) cJSON_AddStringToObject(root, "p00", eeprom_hostname);
@@ -865,6 +898,9 @@ esp_err_t send_json_settings(httpd_req_t *req)
     // Add Stock Quote Service settings
     if (mask & (1ULL << 28)) cJSON_AddStringToObject(root, "p28", eeprom_stock_key);
     if (mask & (1ULL << 29)) cJSON_AddNumberToObject(root, "p29", eeprom_stock_refresh_mins);
+    if (wu_mask & 0x1) cJSON_AddStringToObject(root, "p64", eeprom_wu_station);
+    if (wu_mask & 0x2) cJSON_AddStringToObject(root, "p65", eeprom_wu_key);
+    if (wu_mask & 0x4) cJSON_AddNumberToObject(root, "p66", eeprom_wu_refresh_mins);
 
     // Add Dexcom settings
     if (mask & (1ULL << 30)) cJSON_AddNumberToObject(root, "p30", eeprom_dexcom_region);
@@ -1313,6 +1349,29 @@ static bool validate_json_params(cJSON *root, char *err_buf, size_t err_size)
     /* p29 stock_refresh_mins */
     if ((item = cJSON_GetObjectItem(root, "p29")) && cJSON_IsNumber(item))
         CHECK_RANGE("stock_refresh_mins", item->valueint, 1, 1440);
+
+    if ((item = cJSON_GetObjectItem(root, "p64")) && cJSON_IsString(item))
+    {
+        size_t n = strlen(item->valuestring);
+        if (n > sizeof(eeprom_wu_station) - 1)
+        {
+            snprintf(err_buf, err_size, "Invalid wu_station: length %d exceeds max %d",
+                     (int)n, (int)(sizeof(eeprom_wu_station) - 1));
+            return false;
+        }
+        for (size_t i = 0; i < n; i++)
+        {
+            if (!isalnum((unsigned char)item->valuestring[i]))
+            {
+                snprintf(err_buf, err_size, "Invalid wu_station: use letters and digits only");
+                return false;
+            }
+        }
+    }
+    if ((item = cJSON_GetObjectItem(root, "p65")) && cJSON_IsString(item))
+        CHECK_STR_LEN("wu_key", item->valuestring, sizeof(eeprom_wu_key) - 1);
+    if ((item = cJSON_GetObjectItem(root, "p66")) && cJSON_IsNumber(item))
+        CHECK_RANGE("wu_refresh_mins", item->valueint, 5, 180);
 
     /* p30 dexcom_region */
     if ((item = cJSON_GetObjectItem(root, "p30")) && cJSON_IsNumber(item))
@@ -2118,6 +2177,33 @@ esp_err_t settings_post_handler(httpd_req_t *req)
         eeprom_stock_refresh_mins = (uint16_t)stock_refresh_mins->valueint;
     }
 
+    cJSON *wu_station = cJSON_GetObjectItem(root, "p64");
+    if (cJSON_IsString(wu_station))
+    {
+        integration_settings_changed = true;
+        memset(&wu_obs, 0, sizeof(wu_obs));
+        strncpy(eeprom_wu_station, wu_station->valuestring, sizeof(eeprom_wu_station) - 1);
+        eeprom_wu_station[sizeof(eeprom_wu_station) - 1] = '\0';
+    }
+
+    cJSON *wu_key = cJSON_GetObjectItem(root, "p65");
+    if (cJSON_IsString(wu_key))
+    {
+        integration_settings_changed = true;
+        memset(&wu_obs, 0, sizeof(wu_obs));
+        strncpy(eeprom_wu_key, wu_key->valuestring, sizeof(eeprom_wu_key) - 1);
+        eeprom_wu_key[sizeof(eeprom_wu_key) - 1] = '\0';
+    }
+
+    cJSON *wu_refresh_mins = cJSON_GetObjectItem(root, "p66");
+    if (cJSON_IsNumber(wu_refresh_mins))
+    {
+        integration_settings_changed = true;
+        int mins = wu_refresh_mins->valueint;
+        if (mins >= 5 && mins <= 180)
+            eeprom_wu_refresh_mins = (uint16_t)mins;
+    }
+
     // Dexcom settings
     if (cJSON_HasObjectItem(root, "p30"))
     {
@@ -2796,6 +2882,38 @@ esp_err_t status_api_handler(httpd_req_t *req)
             else
             {
                 snprintf(info, sizeof(info), "\nNightscout not active");
+                stream_json_array_string(req, info, &first_entry);
+            }
+
+            if (integration_active[INTEGRATION_WU])
+            {
+                char temp[16];
+                char age[8];
+                time_t now = time(NULL);
+                temp[0] = '-';
+                temp[1] = '\0';
+                wu_format_token("[wu:temp]", temp, sizeof(temp), eeprom_fahrenheit);
+                wu_format_age(&wu_obs, now, age, sizeof(age));
+                if (!wu_obs.valid)
+                {
+                    snprintf(info, sizeof(info), "\nWeather Underground: %s, no observation",
+                             eeprom_wu_station);
+                }
+                else if (wu_obs_is_fresh(&wu_obs, now))
+                {
+                    snprintf(info, sizeof(info), "\nWeather Underground: %s, obs %s, temp %s",
+                             eeprom_wu_station, age, temp);
+                }
+                else
+                {
+                    snprintf(info, sizeof(info), "\nWeather Underground: %s, stale %s, temp %s",
+                             eeprom_wu_station, age, temp);
+                }
+                stream_json_array_string(req, info, &first_entry);
+            }
+            else
+            {
+                snprintf(info, sizeof(info), "\nWeather Underground not active");
                 stream_json_array_string(req, info, &first_entry);
             }
         }

@@ -185,6 +185,9 @@ static const nvs_setting_t settings_table[] = {
     {"ha_refresh", SETTING_TYPE_U16, &eeprom_ha_refresh_mins, 0},
     {"stock_key", SETTING_TYPE_STR, eeprom_stock_key, sizeof(eeprom_stock_key)},
     {"stock_refresh", SETTING_TYPE_U16, &eeprom_stock_refresh_mins, 0},
+    {"wu_station", SETTING_TYPE_STR, eeprom_wu_station, sizeof(eeprom_wu_station)},
+    {"wu_key", SETTING_TYPE_STR, eeprom_wu_key, sizeof(eeprom_wu_key)},
+    {"wu_refresh", SETTING_TYPE_U16, &eeprom_wu_refresh_mins, 0},
     {"dexcom_region", SETTING_TYPE_U8, &eeprom_dexcom_region, 0},
     {"glucose_high", SETTING_TYPE_U16, &eeprom_glucose_high, 0},
     {"glucose_low", SETTING_TYPE_U16, &eeprom_glucose_low, 0},
@@ -266,6 +269,10 @@ uint16_t eeprom_ha_refresh_mins = 1;
 // Add Stock Quote Service variables
 char eeprom_stock_key[64] = {0};
 uint16_t eeprom_stock_refresh_mins = 5;
+
+char eeprom_wu_station[17] = {0};
+char eeprom_wu_key[65] = {0};
+uint16_t eeprom_wu_refresh_mins = 15;
 
 // Dexcom settings
 uint8_t eeprom_dexcom_region = 0;     // 0=disabled, 1=US, 2=Japan, 3=Rest of World

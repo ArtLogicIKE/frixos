@@ -127,6 +127,11 @@ extern bool manufacturer_mode; // true if we are in manufacturer mode
 extern char eeprom_stock_key[64];    // Finnhub API key
 extern uint16_t eeprom_stock_refresh_mins;  // Stock quote refresh interval in seconds
 
+// Weather Underground PWS (station ID is public; the key is per account)
+extern char eeprom_wu_station[17];
+extern char eeprom_wu_key[65];
+extern uint16_t eeprom_wu_refresh_mins;
+
 // Dexcom settings
 extern uint8_t eeprom_dexcom_region;  // 0=disabled, 1=US, 2=Japan, 3=Rest of World
 extern uint16_t eeprom_glucose_high;   // High glucose threshold in mg/dL

@@ -1021,7 +1021,7 @@ static bool ota_query_latest(int *new_version)
     esp_partition_iterator_release(it);
     uint16_t app_size = total_size / 1024; // Convert to KB
 
-    // Build integration string (A=HA, B=Stock, C=Dexcom, D=Freestyle, E=Nightscout)
+    // Build integration string (A=HA, B=Stock, C=Dexcom, D=Freestyle, E=Nightscout, F=WU)
     char integrations[8] = "";
     int int_idx = 0;
     if (integration_active[INTEGRATION_HA])
@@ -1043,6 +1043,10 @@ static bool ota_query_latest(int *new_version)
     if (integration_active[INTEGRATION_NIGHTSCOUT])
     {
         integrations[int_idx++] = 'E';
+    }
+    if (integration_active[INTEGRATION_WU])
+    {
+        integrations[int_idx++] = 'F';
     }
     integrations[int_idx] = '\0';
 

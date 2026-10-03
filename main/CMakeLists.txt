@@ -33,6 +33,7 @@ idf_component_register(SRCS
     "f-freestyle.c"
     "f-nightscout.c"
     "f-stocks.c"
+    "f-wu.c"
     # "../managed_components/lvgl__lvgl/src/font/lv_font_montserrat_8.c"
     INCLUDE_DIRS "include"
     INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/include"

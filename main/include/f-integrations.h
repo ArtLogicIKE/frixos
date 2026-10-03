@@ -6,12 +6,13 @@
 #include "esp_crt_bundle.h"
 #include "cJSON.h"
 
-#define AVAILABLE_INTEGRATIONS 5
+#define AVAILABLE_INTEGRATIONS 6
 #define INTEGRATION_HA    0  // Home Assistant integration index
 #define INTEGRATION_STOCK 1  // Stock quote integration index
 #define INTEGRATION_DEXCOM 2  // Dexcom integration index
 #define INTEGRATION_FREESTYLE 3 // Freestyle Libre integration index
 #define INTEGRATION_NIGHTSCOUT 4 // Nightscout integration index
+#define INTEGRATION_WU    5  // Weather Underground PWS integration index
 
 // Stack monitoring
 #define STACK_WARNING_THRESHOLD 512 // Warning when less than 512 bytes free

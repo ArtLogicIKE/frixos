@@ -7,6 +7,7 @@
 const INT_MAP = {
   eeprom_ha_url: 'p25', eeprom_ha_token: 'p26', eeprom_ha_refresh_mins: 'p27',
   eeprom_stock_key: 'p28', eeprom_stock_refresh_mins: 'p29',
+  eeprom_wu_station: 'p64', eeprom_wu_key: 'p65', eeprom_wu_refresh_mins: 'p66',
   eeprom_dexcom_region: 'p30', eeprom_glucose_username: 'p31', eeprom_glucose_password: 'p32',
   eeprom_glucose_refresh: 'p33', eeprom_libre_region: 'p44', glucose_validity_duration: 'p45',
   eeprom_glucose_high: 'p51', eeprom_glucose_low: 'p52', eeprom_glucose_unit: 'p53', eeprom_ns_url: 'p54'
@@ -51,6 +52,7 @@ function updateIntegrationDots() {
   };
   setDot('dot-ha', 'state-ha', !!(s.p25 && String(s.p25).trim()), /Home Assistant tokens:\s*[1-9]/);
   setDot('dot-stock', 'state-stock', !!(s.p28 && String(s.p28).trim()), /Stock \(finnhub\.io\) tokens:\s*[1-9]/);
+  setDot('dot-wu', 'state-wu', !!(s.p64 && String(s.p64).trim() && s.p65 && String(s.p65).trim()), /Weather Underground: \S+, obs /);
   setDot('dot-cgm', 'state-cgm', deriveCgmType() !== 'none', /(Dexcom|FreeStyle Libre|Nightscout) active:/);
 }
 
@@ -104,7 +106,7 @@ function initCgmDeviceType() {
 /* Diff the Integrations fields against stored settings (for savebar.js). */
 function collectIntegrationsPayload() {
   const p = {};
-  const secrets = ['eeprom_ha_token', 'eeprom_stock_key', 'eeprom_glucose_password'];
+  const secrets = ['eeprom_ha_token', 'eeprom_stock_key', 'eeprom_wu_key', 'eeprom_glucose_password'];
   for (const [id, key] of Object.entries(INT_MAP)) {
     const e = el(id); if (!e) continue;
     const v = (e.tagName === 'SELECT') ? (parseInt(e.value, 10) || 0)

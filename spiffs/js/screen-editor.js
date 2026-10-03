@@ -85,6 +85,7 @@ const SCREEN_TOKEN_CODES = [
     '[device]', '[greeting]', '[day]', '[date]', '[mon]', '[time]', '[hour12]', '[hour24]', '[min]', '[ampm]',
     '[temp]', '[hum]', '[high]', '[low]',
     '[rise]', '[set]', '[wind]', '[gust]', '[precip]', '[uv]', '[pressure]', '[3high]', '[3low]',
+    '[wu:temp]', '[wu:hum]', '[wu:dew]', '[wu:wind]', '[wu:gust]', '[wu:pressure]', '[wu:rain]', '[wu:uv]',
     '[HA:entity_id:path]', '[$:symbol]', '[CGM:glucose]', '[CGM:reading]', '[CGM:time]'
 ];
 const TOKEN_HELP = {
@@ -115,7 +116,15 @@ const TOKEN_HELP = {
     '[$:symbol]': { i18nKey: 'advanced.message.token_stock', example: '$182.45' },
     '[CGM:glucose]': { i18nKey: 'advanced.message.token_cgm_glucose', example: '157 mg/dl (+3 @ 12:01)' },
     '[CGM:reading]': { i18nKey: 'advanced.message.token_cgm_reading', example: '157' },
-    '[CGM:time]': { i18nKey: 'advanced.message.token_cgm_time', example: '12:01pm' }
+    '[CGM:time]': { i18nKey: 'advanced.message.token_cgm_time', example: '12:01pm' },
+    '[wu:temp]': { i18nKey: 'advanced.message.token_wu_temp', example: '72°F' },
+    '[wu:hum]': { i18nKey: 'advanced.message.token_wu_hum', example: '45%' },
+    '[wu:dew]': { i18nKey: 'advanced.message.token_wu_dew', example: '50°F' },
+    '[wu:wind]': { i18nKey: 'advanced.message.token_wu_wind', example: '11.2 mph NW' },
+    '[wu:gust]': { i18nKey: 'advanced.message.token_wu_gust', example: '17.9 mph NW' },
+    '[wu:pressure]': { i18nKey: 'advanced.message.token_wu_pressure', example: '29.92 inHg' },
+    '[wu:rain]': { i18nKey: 'advanced.message.token_wu_rain', example: '0.06 in.' },
+    '[wu:uv]': { i18nKey: 'advanced.message.token_wu_uv', example: '6.2' }
 };
 
 function getTokenCode(btn) {
@@ -2631,7 +2640,9 @@ function ensureScreenGraphOptions(e) {
 // (e.g. an [HA:...] token), so this is only a convenience datalist.
 function getGraphNumericTokens() {
     const base = ['[temp]', '[hum]', '[high]', '[low]', '[wind]', '[gust]',
-        '[precip]', '[uv]', '[pressure]', '[3high]', '[3low]', '[CGM:reading]'];
+        '[precip]', '[uv]', '[pressure]', '[3high]', '[3low]', '[CGM:reading]',
+        '[wu:temp]', '[wu:hum]', '[wu:dew]', '[wu:wind]', '[wu:gust]',
+        '[wu:pressure]', '[wu:rain]', '[wu:uv]'];
     const found = new Set(base);
     // Scrape [HA:...] and stock-style tokens from the configured message + texts.
     const scrape = (s) => {

@@ -44,6 +44,9 @@ TEST_VALUES: dict[str, Any] = {
     "p08": 1,
     "p27": 2,
     "p29": 10,
+    "p64": "KCASANFR123",
+    "p65": "0123456789abcdef0123456789abcdef",
+    "p66": 20,
     "p30": 0,
     "p33": 3,
     "p44": 0,
@@ -141,7 +144,7 @@ def test_group_masks(client: DeviceClient, results: list[str]) -> None:
     cases = [
         ("settings", "p03,p09,p16", {"p03", "p09", "p16", "p00"}),
         ("advanced", "", {"p17", "p22", "p23", "p42"}),
-        ("integrations", "", {"p27", "p51", "p58"}),
+        ("integrations", "", {"p27", "p51", "p58", "p64", "p65", "p66"}),
         ("theme", "", {"p40", "p41"}),
     ]
     for group, params, expect_any in cases:

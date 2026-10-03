@@ -25,6 +25,7 @@
 #include "f-freestyle.h"
 #include "f-nightscout.h"
 #include "f-graph.h"
+#include "f-wu.h"
 
 static const char *TAG = "f-integrations";
 
@@ -795,6 +796,7 @@ static void integration_update_task(void *pvParameters)
             update_ok[INTEGRATION_DEXCOM] = false;
             update_ok[INTEGRATION_FREESTYLE] = false;
             update_ok[INTEGRATION_NIGHTSCOUT] = false;
+            update_ok[INTEGRATION_WU] = false;
 
             // Check WiFi connection before attempting updates
             if (is_wifi_connected())
@@ -918,6 +920,35 @@ static void integration_update_task(void *pvParameters)
                             if (!stock_mutex_failed && !update_ok[INTEGRATION_STOCK])
                                 ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Stock update failed");
                             // Small delay to allow memory cleanup before next integration
+                            vTaskDelay(pdMS_TO_TICKS(100));
+                        }
+                    }
+                }
+
+                if (integration_active[INTEGRATION_WU])
+                {
+                    uint16_t wu_mins = eeprom_wu_refresh_mins;
+                    if (wu_mins < 5 || wu_mins > 180)
+                        wu_mins = 15;
+                    if (integration_last_update[INTEGRATION_WU] + (wu_mins * 60) < time(NULL))
+                    {
+                        size_t wu_heap = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+                        if (wu_heap < 15000)
+                        {
+                            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Skipping WU update - low heap: %u", (unsigned)wu_heap);
+                        }
+                        else if (xSemaphoreTake(http_mutex, pdMS_TO_TICKS(5000)) != pdTRUE)
+                        {
+                            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "http_mutex timeout (WU)");
+                        }
+                        else
+                        {
+                            bool ok = fetch_wu_observation();
+                            xSemaphoreGive(http_mutex);
+                            if (ok)
+                                update_ok[INTEGRATION_WU] = true;
+                            else
+                                ESP_LOG_WEB(ESP_LOG_INFO, TAG, "WU update failed");
                             vTaskDelay(pdMS_TO_TICKS(100));
                         }
                     }
@@ -1300,6 +1331,7 @@ void parse_integrations(void)
     // determine active integrations
     integration_active[INTEGRATION_HA] = (eeprom_ha_url[0] != '\0' && eeprom_ha_token[0] != '\0');
     integration_active[INTEGRATION_STOCK] = (eeprom_stock_key[0] != '\0');
+    integration_active[INTEGRATION_WU] = (eeprom_wu_station[0] != '\0' && eeprom_wu_key[0] != '\0');
 
     // Enforce mutual exclusivity: the last integration takes precedence if configured
     integration_active[INTEGRATION_DEXCOM] = 0;
@@ -1352,6 +1384,7 @@ void parse_integrations(void)
     integration_last_update[INTEGRATION_DEXCOM] = 0;
     integration_last_update[INTEGRATION_FREESTYLE] = 0;
     integration_last_update[INTEGRATION_NIGHTSCOUT] = 0;
+    integration_last_update[INTEGRATION_WU] = 0;
 
     // prepare the tokens for display
     prepare_tokens();
@@ -1484,6 +1517,7 @@ void force_integration_update(void)
     integration_last_update[INTEGRATION_DEXCOM] = 0;
     integration_last_update[INTEGRATION_FREESTYLE] = 0;
     integration_last_update[INTEGRATION_NIGHTSCOUT] = 0;
+    integration_last_update[INTEGRATION_WU] = 0;
 
     // Signal the integration task to run immediately
     if (integration_update_task_handle != NULL)

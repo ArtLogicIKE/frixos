@@ -366,6 +366,14 @@
       "token_cgm_glucose": "Latest glucose reading from your CGM device, formatted, e.g. 157 mg/dl (+3 @ 12:01). (needs active CGM integration)",
       "token_cgm_reading": "Latest glucose reading, plain, e.g. 157",
       "token_cgm_time": "Time of latest CGM measurement, e.g. 12:01pm (needs active CGM integration)",
+      "token_wu_temp": "Personal weather station temperature",
+      "token_wu_hum": "Personal weather station humidity",
+      "token_wu_dew": "Personal weather station dew point",
+      "token_wu_wind": "Personal weather station wind speed and direction",
+      "token_wu_gust": "Personal weather station wind gust and direction",
+      "token_wu_pressure": "Personal weather station pressure",
+      "token_wu_rain": "Personal weather station rainfall today",
+      "token_wu_uv": "Personal weather station UV index",
       "tokens_note": "Note: Tokens are case-sensitive and must be enclosed in square brackets.",
       "default_message": "Default message: [device].local/ [greeting] [day], [date] [mon], now [temp] today [high]-[low], hum. [hum], sun [rise]-[set]"
     }
@@ -430,6 +438,15 @@
       "title": "Stock quotes",
       "via": "Via Finnhub.io.",
       "kb_help": "For setup instructions, visit <a href=\"https://buyfrixos.com/knowledge-base/get-stock-crypto-etf-fx-quotes-on-your-ceiling/\" target=\"_blank\" rel=\"noopener noreferrer\">this KB article</a>.",
+      "api_key": "API key",
+      "api_key_placeholder": "Paste API key",
+      "refresh_interval": "Refresh (min.)"
+    },
+    "wu": {
+      "title": "Weather Underground",
+      "help": "Register a device on your Weather Underground account, generate a key at wunderground.com/member/api-keys, then enter any live public station ID. Tokens: [wu:temp] [wu:hum] [wu:dew] [wu:wind] [wu:gust] [wu:pressure] [wu:rain] [wu:uv].",
+      "station_id": "Station ID",
+      "station_id_placeholder": "e.g. KCASANFR123",
       "api_key": "API key",
       "api_key_placeholder": "Paste API key",
       "refresh_interval": "Refresh (min.)"

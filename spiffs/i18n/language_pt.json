@@ -366,6 +366,14 @@
       "token_cgm_glucose": "Última leitura de glicose do seu dispositivo CGM, formatada, ex. 157 mg/dl (+3 @ 12:01). (requer integração CGM ativa)",
       "token_cgm_reading": "Última leitura de glicose, simples, ex. 157",
       "token_cgm_time": "Hora da última medição CGM, ex. 12:01tar. (requer integração CGM ativa)",
+      "token_wu_temp": "Temperatura da estação meteorológica",
+      "token_wu_hum": "Humidade da estação meteorológica",
+      "token_wu_dew": "Ponto de orvalho da estação meteorológica",
+      "token_wu_wind": "Velocidade e direção do vento da estação",
+      "token_wu_gust": "Rajada e direção do vento da estação",
+      "token_wu_pressure": "Pressão da estação meteorológica",
+      "token_wu_rain": "Chuva de hoje na estação",
+      "token_wu_uv": "Índice UV da estação meteorológica",
       "tokens_note": "Nota: Os tokens são sensíveis a maiúsculas e minúsculas e devem estar entre parênteses retos.",
       "default_message": "Mensagem predefinida: [device].local/ [greeting] [day], [date] [mon], agora [temp] hoje [high]-[low], hum. [hum], sol [rise]-[set]"
     }
@@ -433,6 +441,15 @@
       "api_key_placeholder": "Insira a sua chave API Finnhub",
       "refresh_interval": "Atualização (min.)",
       "via": "Via Finnhub.io."
+    },
+    "wu": {
+      "title": "Weather Underground",
+      "help": "Registe um dispositivo na conta Weather Underground, gere uma chave em wunderground.com/member/api-keys e introduza o ID de uma estação pública ativa. Tokens: [wu:temp] [wu:hum] [wu:dew] [wu:wind] [wu:gust] [wu:pressure] [wu:rain] [wu:uv].",
+      "station_id": "ID da estação",
+      "station_id_placeholder": "ex. KCASANFR123",
+      "api_key": "Chave API",
+      "api_key_placeholder": "Cole a chave API",
+      "refresh_interval": "Atualização (min.)"
     },
     "dexcom": {
       "title": "Dexcom G5/6",

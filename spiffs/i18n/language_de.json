@@ -366,6 +366,14 @@
       "token_cgm_glucose": "Neueste Glukosewerte von Ihrem CGM-Gerät, formatiert, z.B. 157 mg/dl (+3 @ 12:01). (benötigt aktive CGM-Integration)",
       "token_cgm_reading": "Neuester Glukosewert, einfach, z.B. 157",
       "token_cgm_time": "Uhrzeit der letzten CGM-Messung, z.B. 12:01nachm. (benötigt aktive CGM-Integration)",
+      "token_wu_temp": "Temperatur der Wetterstation",
+      "token_wu_hum": "Luftfeuchtigkeit der Wetterstation",
+      "token_wu_dew": "Taupunkt der Wetterstation",
+      "token_wu_wind": "Windgeschwindigkeit und Richtung der Wetterstation",
+      "token_wu_gust": "Windböe und Richtung der Wetterstation",
+      "token_wu_pressure": "Luftdruck der Wetterstation",
+      "token_wu_rain": "Niederschlag der Wetterstation heute",
+      "token_wu_uv": "UV-Index der Wetterstation",
       "tokens_note": "Hinweis: Token sind Groß-/Kleinschreibung beachtend und müssen in eckigen Klammern stehen.",
       "default_message": "Standardnachricht: [device].local/ [greeting] [day], [date] [mon], jetzt [temp] heute [high]-[low], Feuchte [hum], Sonne [rise]-[set]"
     }
@@ -433,6 +441,15 @@
       "api_key_placeholder": "Geben Sie Ihren Finnhub API-Schlüssel ein",
       "refresh_interval": "Aktualisierung (Min.)",
       "via": "Via Finnhub.io."
+    },
+    "wu": {
+      "title": "Weather Underground",
+      "help": "Registrieren Sie ein Gerät in Ihrem Weather-Underground-Konto, erzeugen Sie einen Schlüssel unter wunderground.com/member/api-keys und geben Sie dann eine beliebige aktive öffentliche Stationskennung ein. Token: [wu:temp] [wu:hum] [wu:dew] [wu:wind] [wu:gust] [wu:pressure] [wu:rain] [wu:uv].",
+      "station_id": "Stationskennung",
+      "station_id_placeholder": "z.B. KCASANFR123",
+      "api_key": "API-Schlüssel",
+      "api_key_placeholder": "API-Schlüssel einfügen",
+      "refresh_interval": "Aktualisierung (Min.)"
     },
     "dexcom": {
       "title": "Dexcom G5/6",

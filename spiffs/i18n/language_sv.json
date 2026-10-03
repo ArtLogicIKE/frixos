@@ -366,6 +366,14 @@
       "token_cgm_glucose": "Senaste glukosavläsningen från din CGM-enhet, formaterad, t.ex. 157 mg/dl (+3 @ 12:01). (kräver aktiv CGM-integration)",
       "token_cgm_reading": "Senaste glukosavläsningen, enkel, t.ex. 157",
       "token_cgm_time": "Tid för senaste CGM-mätning, t.ex. 12:01em (kräver aktiv CGM-integration)",
+      "token_wu_temp": "Temperatur från väderstationen",
+      "token_wu_hum": "Luftfuktighet från väderstationen",
+      "token_wu_dew": "Daggpunkt från väderstationen",
+      "token_wu_wind": "Vindhastighet och riktning från stationen",
+      "token_wu_gust": "Vindby och riktning från stationen",
+      "token_wu_pressure": "Lufttryck från väderstationen",
+      "token_wu_rain": "Dagens nederbörd vid stationen",
+      "token_wu_uv": "UV-index från väderstationen",
       "tokens_note": "Obs: Tokens är skiftlägeskänsliga och måste vara inom hakparenteser.",
       "default_message": "Standardmeddelande: [device].local/ [greeting] [day], [date] [mon], nu [temp] idag [high]-[low], fukt. [hum], sol [rise]-[set]"
     }
@@ -433,6 +441,15 @@
       "api_key_placeholder": "Ange din Finnhub API-nyckel",
       "refresh_interval": "Uppdatering (min.)",
       "via": "Via Finnhub.io."
+    },
+    "wu": {
+      "title": "Weather Underground",
+      "help": "Registrera en enhet på ditt Weather Underground-konto, skapa en nyckel på wunderground.com/member/api-keys och ange sedan ID för en aktiv publik station. Token: [wu:temp] [wu:hum] [wu:dew] [wu:wind] [wu:gust] [wu:pressure] [wu:rain] [wu:uv].",
+      "station_id": "Stations-ID",
+      "station_id_placeholder": "t.ex. KCASANFR123",
+      "api_key": "API-nyckel",
+      "api_key_placeholder": "Klistra in API-nyckel",
+      "refresh_interval": "Uppdatering (min.)"
     },
     "dexcom": {
       "title": "Dexcom G5/6",
