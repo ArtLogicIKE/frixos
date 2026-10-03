@@ -6,8 +6,9 @@ static const char *TAG = "f-pwm";
 static bool led_pwm_configured = false;
 static bool led_dac_configured = false;
 static dac_oneshot_handle_t led_dac_handle = NULL;
-// Last brightness percent applied via set_led_pwm_brightness. Startup drives
-// the LED at effective max (see startup_led_pwm), i.e. 100% of the scale.
+// Last brightness percent applied via set_led_pwm_brightness.
+// Until startup_led_pwm() runs, the hardware is not driven; 100 is the
+// pre-init placeholder only.
 static uint8_t current_brightness = 100;
 
 #define LED_PWM_GPIO GPIO_NUM_32
@@ -36,6 +37,22 @@ uint16_t pwm_get_effective_max_power(void)
 {
     uint32_t safe = pwm_get_safe_maximum_power();
     return (uint16_t)((safe * eeprom_max_power) / PWM_SETTINGS_MAX_POWER);
+}
+
+static uint8_t active_brightness_percent(void)
+{
+    uint8_t profile = (font_index <= 1) ? font_index : 0;
+    uint8_t pct = eeprom_brightness_LED[profile];
+    if (pct > 100)
+        pct = 100;
+    return pct;
+}
+
+static uint16_t duty_from_percent(uint8_t pct)
+{
+    if (pct > 100)
+        pct = 100;
+    return (uint16_t)(((uint32_t)pct * pwm_get_effective_max_power()) / 100);
 }
 
 static uint32_t normalize_pwm_frequency(uint32_t freq)
@@ -107,7 +124,8 @@ void startup_led_pwm()
     ledc_timer_t timer = LEDC_TIMER_0;
     ledc_channel_t channel = LEDC_CHANNEL_0;
     uint32_t freq = normalize_pwm_frequency(eeprom_pwm_frequency);
-    uint16_t initial_duty = pwm_get_effective_max_power();
+    uint8_t initial_pct = active_brightness_percent();
+    uint16_t initial_duty = duty_from_percent(initial_pct);
 
     // Configure the LEDC timer
     ledc_timer_config_t ledc_timer = {
@@ -133,7 +151,7 @@ void startup_led_pwm()
             .timer_sel = timer, // Use timer 0
             .intr_type = LEDC_INTR_DISABLE,
             .gpio_num = LED_PWM_GPIO, // LED PWM GPIO pin is pin32
-            .duty = initial_duty, // Start at scaled max power
+            .duty = initial_duty, // Start at the active day/night percent
             .hpoint = 0};
         err = ledc_channel_config(&ledc_channel);
         if (err != ESP_OK)
@@ -144,8 +162,9 @@ void startup_led_pwm()
         else
         {
             led_pwm_configured = true;
-            ESP_LOG_WEB(ESP_LOG_INFO, TAG, "PWM LED GPIO32 %lu Hz 10bit safe_max=%u effective_max=%u",
-                        (unsigned long)freq, pwm_get_safe_maximum_power(), initial_duty);
+            ESP_LOG_WEB(ESP_LOG_INFO, TAG, "PWM LED GPIO32 %lu Hz 10bit safe_max=%u effective_max=%u start=%u%% duty=%u",
+                        (unsigned long)freq, pwm_get_safe_maximum_power(),
+                        pwm_get_effective_max_power(), initial_pct, initial_duty);
         }
     }
 
@@ -153,7 +172,9 @@ void startup_led_pwm()
     // analog-driver boards ignore IO32.
     startup_led_dac(initial_duty);
 
-    // set_led_pwm_brightness(eeprom_brightness_LED[0]); // Set initial brightness
+    // Display only reapplies brightness when font_index changes, so boot must
+    // set the saved day/night level here or the LED stays at the init duty.
+    set_led_pwm_brightness(active_brightness_percent());
 }
 
 // Reconfigure PWM frequency (called when settings are updated)
@@ -192,8 +213,7 @@ void set_led_pwm_brightness(uint8_t duty)
 {
 
     (duty > 100) ? (duty = 100) : (duty = duty);  // Ensure duty cycle is between 0 and 100
-    uint16_t effective_max = pwm_get_effective_max_power();
-    int pwm_duty = (int)(((uint32_t)duty * effective_max) / 100);
+    int pwm_duty = (int)duty_from_percent(duty);
     uint8_t dac_val = scale_10bit_to_dac8((uint16_t)pwm_duty);
     ESP_LOG_WEB(ESP_LOG_INFO, TAG, "LED brightness %i%% (pwm duty %i, dac %u)", duty, pwm_duty, dac_val);
     if (!led_pwm_configured && !led_dac_configured)

@@ -113,6 +113,30 @@ def wait_online(client: DeviceClient, timeout: int = 90) -> bool:
     return False
 
 
+def test_applied_brightness(client: DeviceClient, results: list[str]) -> None:
+    """Saved day/night percents must be what the LED is actually running.
+
+    Catches the boot bug where PWM starts at 100% and the display loop never
+    reapplies p23 unless font_index changes.
+    """
+    settings = client.get_settings()
+    status = client.get_status()
+    p23 = settings.get("p23")
+    current = status.get("current_brightness")
+    if not isinstance(p23, list) or len(p23) < 1:
+        results.append("FAIL brightness: missing p23")
+        return
+    allowed = {int(p23[0])}
+    if len(p23) > 1:
+        allowed.add(int(p23[1]))
+    if current is None:
+        results.append("FAIL brightness: current_brightness missing")
+    elif int(current) in allowed:
+        results.append(f"PASS brightness: current={current} in {sorted(allowed)}")
+    else:
+        results.append(f"FAIL brightness: current={current} not in saved {sorted(allowed)}")
+
+
 def test_group_masks(client: DeviceClient, results: list[str]) -> None:
     cases = [
         ("settings", "p03,p09,p16", {"p03", "p09", "p16", "p00"}),
@@ -182,6 +206,7 @@ def main() -> int:
     backup = client.get_settings()
     print(f"Backed up {len(backup)} settings keys")
 
+    test_applied_brightness(client, results)
     test_group_masks(client, results)
     test_roundtrip(client, backup, results)
 

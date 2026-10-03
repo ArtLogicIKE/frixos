@@ -116,6 +116,7 @@ async function saveSettings(payload, networkKeys) {
     const reboot = (res.data.message || '').toLowerCase().includes('reboot') || (networkKeys || []).some(k => k in payload);
     toast(reboot ? getMessage('saved_restarting') : getMessage('settings_saved'), 'ok');
     if (reboot) waitForReboot();
+    else await refreshHeroStatus();
     return true;
   }
   toast(localizeServerMessage(res.data && res.data.message, 'save_failed'), 'err');
@@ -228,6 +229,38 @@ window.addEventListener('resize', updateNavEdges);
 el('navLeft').addEventListener('click', () => nav.scrollBy({ left: -160, behavior: 'smooth' }));
 el('navRight').addEventListener('click', () => nav.scrollBy({ left: 160, behavior: 'smooth' }));
 
+/* Device-tab hero: IP · 2.56 (71) - rev 2 (E) · actual 70% · TZ … */
+function applyHeroStatus(d) {
+  const heroBits = [d.ip_address ? d.ip_address : 'frixos.local'];
+  const verBits = [];
+  if (d.version) verBits.push(d.fwversion != null ? d.version + ' (' + d.fwversion + ')' : d.version);
+  else if (d.fwversion != null) verBits.push(String(d.fwversion));
+  if (d.board_rev != null) {
+    verBits.push(d.revision ? 'rev ' + d.board_rev + ' (' + d.revision + ')' : 'rev ' + d.board_rev);
+  } else if (d.revision) {
+    verBits.push('rev (' + d.revision + ')');
+  }
+  if (verBits.length) heroBits.push(verBits.join(' - '));
+  // actual = current brightness % × max power fraction.
+  // effective_max_power is in raw duty units (0..1023, see f-pwm.c);
+  // current_brightness is a percent (older firmware omits it -> assume 100).
+  if (d.effective_max_power != null) {
+    const b = d.current_brightness != null ? d.current_brightness : 100;
+    const actual = Math.round(b * d.effective_max_power * 10 / 1023) / 10;
+    heroBits.push('actual ' + actual + '%');
+  }
+  if (d.timezone) heroBits.push('TZ ' + d.timezone);
+  el('heroStatus').textContent = heroBits.join(' · ');
+  const online = !!d.wifi_connected;
+  window._heroOnline = online; // remembered so refreshDynamicI18n can re-localize on language switch
+  el('heroOnline').textContent = online ? tr('common.online', 'Online') : tr('common.offline', 'Offline');
+  el('heroDot').style.opacity = online ? '1' : '.3';
+}
+async function refreshHeroStatus() {
+  const st = await apiGet('/api/status?_=' + Date.now());
+  applyHeroStatus(st.data || {});
+}
+
 /* ---------- boot ---------- */
 async function boot() {
   // Apply the cached language immediately so the UI isn't briefly all-English
@@ -249,23 +282,7 @@ async function boot() {
   loadedSections.settings = true;
   if (sectionLoaders.settings) await sectionLoaders.settings();
 
-  const st = await apiGet('/api/status'); const d = st.data || {};
-  const heroBits = [d.ip_address ? d.ip_address : 'frixos.local'];
-  if (d.version) heroBits.push('v' + d.version);
-  // eff. brightness = current brightness % x max power fraction.
-  // effective_max_power is in raw duty units (0..1023, see f-pwm.c);
-  // current_brightness is a percent (older firmware omits it -> assume 100).
-  if (d.effective_max_power != null) {
-    const b = d.current_brightness != null ? d.current_brightness : 100;
-    const eff = Math.round(b * d.effective_max_power * 10 / 1023) / 10;
-    heroBits.push('eff. brightness ' + eff + '%');
-  }
-  if (d.timezone) heroBits.push('TZ ' + d.timezone);
-  el('heroStatus').textContent = heroBits.join(' · ');
-  const online = !!d.wifi_connected;
-  window._heroOnline = online; // remembered so refreshDynamicI18n can re-localize on language switch
-  el('heroOnline').textContent = online ? tr('common.online', 'Online') : tr('common.offline', 'Offline');
-  el('heroDot').style.opacity = online ? '1' : '.3';
+  await refreshHeroStatus();
   updateNavEdges();
 }
 document.addEventListener('DOMContentLoaded', boot);

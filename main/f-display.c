@@ -2845,12 +2845,12 @@ static void update_display_content(time_t now)
 {
   localtime_r(&now, &timeinfo);
 
-  if (timeinfo.tm_min % 10 == 1)
-  {
-    char buf[128];
-    snprintf(buf, sizeof(buf), "Tck %li", (int32_t)(now - lastrun));
-    ESP_LOGI_STACK(TAG, buf);
-  }
+  // if (timeinfo.tm_min % 10 == 1)
+  // {
+  //   char buf[128];
+  //   snprintf(buf, sizeof(buf), "Tck %li", (int32_t)(now - lastrun));
+  //   ESP_LOGI_STACK(TAG, buf);
+  // }
 
   sync_schedule_runners();
   const screen_layout_profile_t *layout = &eeprom_screen_layout.profile[font_index];

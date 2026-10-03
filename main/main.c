@@ -55,7 +55,7 @@ const char version[10] = "2.56";
 static const char *TAG = "frixos main"; // in case we use ESP_LOGE -rror/W-arning/I-info (also D-ebug/V-erbose)
 const int fwversion = 71;
 const int rescuemode = 0; // 0 = normal, 1 = rescue mode
-const char revision[] = "E";
+const char *revision = "A-G"; // 0=A-G, 1=H, 2=I; set from eeprom_board_rev
 
 // Mutex for HTTP operations
 SemaphoreHandle_t http_mutex = NULL;
@@ -274,9 +274,24 @@ uint16_t eeprom_glucose_low = 70;     // Default low threshold in mg/dL
 uint8_t eeprom_glucose_unit = 0;      // Glucose display unit: 0=mg/dL, 1=mmol/L
 uint32_t eeprom_pwm_frequency = 200;  // Default PWM frequency in Hz (range 60-50000)
 uint16_t eeprom_max_power = PWM_SETTINGS_MAX_POWER; // Default max power (range 1-1023)
-// Board revision in NVS (drives safe_maximum_power in f-pwm.c):
-// rev 0: safe max 750; rev 1: safe max 850; rev 2: safe max 1023
+// Board revision in NVS: 0=A-G (safe 750), 1=H (850), 2=I (1023)
 uint8_t eeprom_board_rev = 0;
+
+static void apply_board_rev_label(void)
+{
+  switch (eeprom_board_rev)
+  {
+  case 1:
+    revision = "H";
+    break;
+  case 2:
+    revision = "I";
+    break;
+  default:
+    revision = "A-G";
+    break;
+  }
+}
 
 // LibreLinkUp settings
 uint8_t eeprom_libre_region = 0; // 0=disabled, 1=US, 2=Japan, 3=Rest of World
@@ -715,6 +730,7 @@ void startup_read_eeprom(void)
     {
       ESP_LOG_WEB(ESP_LOG_WARN, TAG, "NVS Read Error eeprom_board_rev: %s", esp_err_to_name(err));
     }
+    apply_board_rev_label();
 
     /* Migration: POH used to live in NVS. Keep a copy in RAM until
      * settings.local is loaded (and the NVS key is erased) after LittleFS mounts. */

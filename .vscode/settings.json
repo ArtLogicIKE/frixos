@@ -61,6 +61,6 @@
   "clangd.arguments": [
     "--background-index",
     "--query-driver=**",
-    "--compile-commands-dir=c:\\source\\frixos\\build"
+    "--compile-commands-dir=${workspaceFolder}/build"
   ]
 }

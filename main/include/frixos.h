@@ -60,7 +60,7 @@ Main task stack size
 extern const char app[];
 extern const char version[];
 extern const int fwversion;
-extern const char revision[];
+extern const char *revision; // board letter: 0=A-G, 1=H, 2=I
 
 extern ltr303_dev_t ltr_dev;
 extern char ltr303_gain;
@@ -132,7 +132,7 @@ extern uint8_t eeprom_dexcom_region;  // 0=disabled, 1=US, 2=Japan, 3=Rest of Wo
 extern uint16_t eeprom_glucose_high;   // High glucose threshold in mg/dL
 extern uint32_t eeprom_pwm_frequency;  // PWM frequency in Hz (range 60-50000)
 extern uint16_t eeprom_max_power;      // Max power (range 1-1023, scaled to safe cap at runtime)
-extern uint8_t eeprom_board_rev;       // Board revision read from NVS (0/1/2, drives safe max power)
+extern uint8_t eeprom_board_rev;       // 0=A-G, 1=H, 2=I (also drives safe max power)
 
 // LibreLinkUp settings
 extern uint8_t eeprom_libre_region;    // 0=disabled, 1=US, 2=Japan, 3=Rest of World

@@ -41,7 +41,7 @@ from make_manifest import EXCLUDE, make_manifest, sha256_file  # noqa: E402
 REPO = Path(__file__).resolve().parent
 SPIFFS = REPO / "spiffs"
 FIRMWARE = REPO / "build" / "frixos.bin"
-WWW = Path(r"C:\source\frixos-web\www")
+WWW = REPO.parent / "frixos-web" / "www"
 
 # Anchor for --firmware-only: a small, stable, universally-present file. A
 # self-healed device is guaranteed to have it byte-for-byte (it is a signed
