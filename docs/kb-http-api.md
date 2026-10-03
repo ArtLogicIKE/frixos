@@ -174,11 +174,12 @@ Curl bodies below are the `--data-binary` argument. Prefix with the POST command
 | `p46` | Wi‑Fi active-hours start | number, minutes from midnight | no | see note |
 | `p47` | Wi‑Fi active-hours end | number, minutes from midnight | no | see note |
 
-`p46`/`p47`: UI and runtime use **minutes** (`0`–`1439`). Both `0` = Wi‑Fi always on. Validation accepts `0`–`1439`. **POST apply currently only stores `0`–`23`**; values `24`–`1439` pass validation then are ignored. Runtime compares the stored number to `hour*60+minute`.
+`p46`/`p47`: minutes from midnight (`0`–`1439`). Both `0` = Wi‑Fi always on. Validation and apply both store that range. Runtime compares the stored number to `hour*60+minute`.
 
 ```powershell
 curl.exe -s -X POST "$HOST/api/settings" -H "Content-Type: application/json" --data-binary '{"p00":"frixos"}'
 curl.exe -s -X POST "$HOST/api/settings" -H "Content-Type: application/json" --data-binary '{"p34":"MyNetwork","p35":"secret"}'
+curl.exe -s -X POST "$HOST/api/settings" -H "Content-Type: application/json" --data-binary '{"p46":480,"p47":1320}'
 curl.exe -s -X POST "$HOST/api/settings" -H "Content-Type: application/json" --data-binary '{"p60":"","p61":"","p62":"255.255.255.0","p63":""}'
 ```
 
@@ -264,8 +265,8 @@ curl.exe -s -X POST "$HOST/api/settings" -H "Content-Type: application/json" --d
 | `p20` | Lux sensitivity | float `0`–`50` | `{"p20":8.0}` |
 | `p21` | Lux threshold (day/night switch) | float `0`–`500` | `{"p21":20.0}` |
 | `p22` | Dim mode | `0`=brightness, `1`=full, `2`=time-of-day | `{"p22":0}` |
-| `p55` | Dim window start | minutes from midnight (same caveat as `p46`) | `{"p55":0}` |
-| `p56` | Dim window end | same | `{"p56":0}` |
+| `p55` | Dim window start | minutes from midnight, `0`–`1439` | `{"p55":450}` |
+| `p56` | Dim window end | minutes from midnight, `0`–`1439` | `{"p56":1365}` |
 | `p42` | PWM frequency Hz | `60`–`50000`. Applied immediately; failed reconfigure rolls back | `{"p42":250}` |
 | `p43` | Max power | `1`–`1023` (runtime may cap by board rev) | `{"p43":900}` |
 
@@ -275,7 +276,11 @@ curl.exe -s -X POST "$HOST/api/settings" -H "Content-Type: application/json" --d
 curl.exe -s -X POST "$HOST/api/settings" -H "Content-Type: application/json" --data-binary '{"p23":[80,40]}'
 ```
 
-`p55`/`p56` share the `p46`/`p47` mismatch: validation `0`–`1439`, apply currently stores only `0`–`23`. Runtime uses minutes.
+`p55`/`p56` are minutes from midnight (`0`–`1439`), same as `p46`/`p47`. `450` is 07:30.
+
+```powershell
+curl.exe -s -X POST "$HOST/api/settings" -H "Content-Type: application/json" --data-binary '{"p55":450,"p56":1365}'
+```
 
 ### Theme / language / updates
 

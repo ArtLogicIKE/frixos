@@ -97,10 +97,10 @@ char eeprom_static_ip[16]  = "";             // p60: Static IP (empty = DHCP)
 char eeprom_static_gw[16]  = "";             // p61: Default gateway
 char eeprom_static_nm[16]  = "255.255.255.0"; // p62: Subnet mask
 char eeprom_static_dns[40] = "";             // p63: DNS servers, comma-separated
-uint16_t eeprom_wifi_start = 0;                                     // WiFi Active Hours Start (0-23), default 0
-uint16_t eeprom_wifi_end = 0;                                       // WiFi Active Hours End (0-23), default 0
-uint16_t eeprom_dim_start = 0;                                      // Time-of-day dimming start (0-23), default 0
-uint16_t eeprom_dim_end = 0;                                        // Time-of-day dimming end (0-23), default 0
+uint16_t eeprom_wifi_start = 0;                                     // WiFi active-hours start, minutes from midnight (0-1439)
+uint16_t eeprom_wifi_end = 0;                                       // WiFi active-hours end, minutes from midnight (0-1439)
+uint16_t eeprom_dim_start = 0;                                      // Time-of-day dimming start, minutes from midnight (0-1439)
+uint16_t eeprom_dim_end = 0;                                        // Time-of-day dimming end, minutes from midnight (0-1439)
 char eeprom_lat[12] = "", my_lat[12] = "";                         // "48.123456";
 char eeprom_lon[12] = "", my_lon[12] = "";                         // "16.123456";
 char eeprom_timezone[TZ_LENGTH] = "", my_timezone[TZ_LENGTH] = ""; // EET-2EEST,M3.5.0/3,M10.5.0/4";
@@ -281,7 +281,7 @@ uint16_t eeprom_glucose_low = 70;     // Default low threshold in mg/dL
 uint8_t eeprom_glucose_unit = 0;      // Glucose display unit: 0=mg/dL, 1=mmol/L
 uint32_t eeprom_pwm_frequency = 200;  // Default PWM frequency in Hz (range 60-50000)
 uint16_t eeprom_max_power = PWM_SETTINGS_MAX_POWER; // Default max power (range 1-1023)
-// Board revision in NVS: 0=A-G (safe 750), 1=H (850), 2=I (1023)
+// Board revision in NVS: 0=A-G (safe 750), 1=H (850), 2=I (700)
 uint8_t eeprom_board_rev = 0;
 
 static void apply_board_rev_label(void)

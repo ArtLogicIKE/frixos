@@ -79,8 +79,8 @@
  * - p20 = lux_sensitivity (Light sensitivity)
  * - p21 = lux_threshold (Light threshold)
  * - p22 = dim_mode (0=brightness, 1=full, 2=time-of-day)
- * - p55 = dim_start (Time-of-day dimming start hour)
- * - p56 = dim_end (Time-of-day dimming end hour)
+ * - p55 = dim_start (Time-of-day dimming start, minutes from midnight)
+ * - p56 = dim_end (Time-of-day dimming end, minutes from midnight)
  * - p23 = brightness_LED (LED brightness array)
  * - p24 = show_leading_zero (Show leading zero)
  * - p50 = dots_breathe (Disable breathing time dots)
@@ -1832,7 +1832,7 @@ esp_err_t settings_post_handler(httpd_req_t *req)
     if (cJSON_IsNumber(wifi_start))
     {
         int start_value = wifi_start->valueint;
-        if (start_value >= 0 && start_value <= 23)
+        if (start_value >= 0 && start_value <= 1439)
         {
             eeprom_wifi_start = (uint16_t)start_value;
         }
@@ -1846,7 +1846,7 @@ esp_err_t settings_post_handler(httpd_req_t *req)
     if (cJSON_IsNumber(wifi_end))
     {
         int end_value = wifi_end->valueint;
-        if (end_value >= 0 && end_value <= 23)
+        if (end_value >= 0 && end_value <= 1439)
         {
             eeprom_wifi_end = (uint16_t)end_value;
         }
@@ -1912,7 +1912,7 @@ esp_err_t settings_post_handler(httpd_req_t *req)
     if (cJSON_IsNumber(dim_start))
     {
         int start_value = dim_start->valueint;
-        if (start_value >= 0 && start_value <= 23)
+        if (start_value >= 0 && start_value <= 1439)
             eeprom_dim_start = (uint16_t)start_value;
         else
             ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Invalid dim_start value: %d, must be 0-1439", start_value);
@@ -1922,7 +1922,7 @@ esp_err_t settings_post_handler(httpd_req_t *req)
     if (cJSON_IsNumber(dim_end))
     {
         int end_value = dim_end->valueint;
-        if (end_value >= 0 && end_value <= 23)
+        if (end_value >= 0 && end_value <= 1439)
             eeprom_dim_end = (uint16_t)end_value;
         else
             ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Invalid dim_end value: %d, must be 0-1439", end_value);
