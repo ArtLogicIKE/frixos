@@ -324,6 +324,7 @@
         <div class="city-row">
           <button type="button" class="btn sm ghost" id="screenReadFromFileBtn" data-i18n="screen.read_from_file">Load from File</button>
           <button type="button" class="btn sm ghost" id="screenSaveToFileBtn" data-i18n="screen.save_to_file">Save to File</button>
+          <button type="button" class="btn sm ghost" id="screenSaveToDeviceBtn" data-i18n="screen.save_to_device">Save to device</button>
         </div>
         <input type="file" id="screenLayoutFileInput" accept=".layout,application/json" hidden>
       </div>
@@ -491,6 +492,21 @@
     <div class="spinner"></div>
     <h2 data-i18n="restart.waiting_title">Waiting for reboot to be completed</h2>
     <p data-i18n="restart.waiting_hint">This page will reconnect automatically when your device is back online.</p>
+  </div>
+</div>
+<div class="modal" id="layoutSaveModal" role="dialog" aria-modal="true" aria-labelledby="layoutSaveTitle">
+  <div class="box">
+    <h2 id="layoutSaveTitle" data-i18n="screen.save_to_device">Save to device</h2>
+    <p data-i18n="messages.layout_name_prompt">Name for this layout on the device:</p>
+    <div class="field">
+      <input type="text" id="layoutSaveName" maxlength="110" autocomplete="off" spellcheck="false">
+      <div class="err" id="layoutSaveError"></div>
+    </div>
+    <p id="layoutSaveWarn" hidden></p>
+    <div class="btn-row">
+      <button type="button" class="btn ghost" id="layoutSaveCancel" data-i18n="common.cancel">Cancel</button>
+      <button type="button" class="btn" id="layoutSaveConfirm" data-i18n="common.save">Save</button>
+    </div>
   </div>
 </div>
 <div class="modal" id="resetModal">

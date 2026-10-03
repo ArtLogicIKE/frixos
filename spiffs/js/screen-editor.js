@@ -572,7 +572,7 @@ async function refreshScreenLayoutFiles() {
 /* ---------- preset gallery ----------
    One card per .layout file on the device. Clicking a card loads that layout
    into the editor (same path as the Load button); the user then presses Apply. */
-async function renderScreenPresets() {
+async function renderScreenPresets(selectedName) {
     const grid = el('screenPresets');
     if (!grid) return;
     await ensureScreenSpiffsFiles();
@@ -588,6 +588,7 @@ async function renderScreenPresets() {
     names.forEach(name => {
         const card = document.createElement('div');
         card.className = 'preset-card';
+        if (selectedName && name === selectedName) card.classList.add('sel');
         card.setAttribute('role', 'button');
         card.tabIndex = 0;
         const pn = document.createElement('div');
@@ -1676,6 +1677,7 @@ function setupScreenSection() {
     const saveBtn = el('screenSaveBtn');
     const copyBtn = el('screenCopyBtn');
     const saveToFileBtn = el('screenSaveToFileBtn');
+    const saveToDeviceBtn = el('screenSaveToDeviceBtn');
     const readFromFileBtn = el('screenReadFromFileBtn');
     const layoutFileInput = el('screenLayoutFileInput');
 
@@ -1684,6 +1686,30 @@ function setupScreenSection() {
     if (saveBtn) saveBtn.addEventListener('click', saveScreenLayout);
     if (copyBtn) copyBtn.addEventListener('click', copyScreenLayoutToOtherMode);
     if (saveToFileBtn) saveToFileBtn.addEventListener('click', saveScreenLayoutToFile);
+    if (saveToDeviceBtn) saveToDeviceBtn.addEventListener('click', openLayoutSaveModal);
+    const layoutSaveModal = el('layoutSaveModal');
+    const layoutSaveName = el('layoutSaveName');
+    const layoutSaveCancel = el('layoutSaveCancel');
+    const layoutSaveConfirm = el('layoutSaveConfirm');
+    if (layoutSaveCancel) layoutSaveCancel.addEventListener('click', closeLayoutSaveModal);
+    if (layoutSaveConfirm) layoutSaveConfirm.addEventListener('click', confirmLayoutSave);
+    if (layoutSaveModal) layoutSaveModal.addEventListener('click', e => { if (e.target === layoutSaveModal) closeLayoutSaveModal(); });
+    if (layoutSaveName) {
+        layoutSaveName.addEventListener('keydown', e => {
+            if (e.key === 'Enter') { e.preventDefault(); confirmLayoutSave(); }
+        });
+        layoutSaveName.addEventListener('input', () => {
+            if (window.layoutSavePending) window.layoutSavePending.filename = '';
+            const warn = el('layoutSaveWarn');
+            const err = el('layoutSaveError');
+            if (warn) warn.hidden = true;
+            if (err) err.classList.remove('show');
+            layoutSaveName.removeAttribute('aria-invalid');
+        });
+    }
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape' && layoutSaveModal && layoutSaveModal.classList.contains('open')) closeLayoutSaveModal();
+    });
     if (readFromFileBtn) readFromFileBtn.addEventListener('click', () => layoutFileInput && layoutFileInput.click());
     if (layoutFileInput) layoutFileInput.addEventListener('change', onScreenLayoutFileSelected);
 
@@ -2215,6 +2241,145 @@ function saveScreenLayoutToFile() {
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
     showStatus(getMessage('layout_saved_to_file'), 'success');
+}
+
+// Built-in presets ship in the firmware image. A same-named save is allowed,
+// but the next file reconcile puts the shipped copy back.
+const SHIPPED_LAYOUT_NAMES = new Set([
+    'default.layout',
+    'diabetic.layout',
+    'homeassistant.layout',
+    'weather.layout',
+    'hagraph.layout'
+]);
+
+// Single LittleFS basename: no directories, within the firmware name limit.
+function normalizeDeviceLayoutName(raw) {
+    const trimmed = String(raw == null ? '' : raw).trim();
+    if (!trimmed) return '';
+    const file = /\.layout$/i.test(trimmed) ? trimmed : trimmed + '.layout';
+    if (file.length > 110 || /^\.layout$/i.test(file)) return null;
+    if (file.includes('..') || /[\\/]/.test(file) || /[\u0000-\u001f]/.test(file)) return null;
+    return file;
+}
+
+function openLayoutSaveModal() {
+    const layout = prepareScreenLayoutForExport();
+    if (!layout) return;
+    window.layoutSavePending = { layout, filename: '' };
+    const input = el('layoutSaveName');
+    const err = el('layoutSaveError');
+    const warn = el('layoutSaveWarn');
+    if (input) { input.value = ''; input.removeAttribute('aria-invalid'); }
+    if (err) { err.textContent = ''; err.classList.remove('show'); }
+    if (warn) { warn.hidden = true; warn.textContent = ''; }
+    const modal = el('layoutSaveModal');
+    if (modal) modal.classList.add('open');
+    if (input) input.focus();
+}
+
+function closeLayoutSaveModal() {
+    const modal = el('layoutSaveModal');
+    if (modal) modal.classList.remove('open');
+    window.layoutSavePending = null;
+}
+
+async function confirmLayoutSave() {
+    const pending = window.layoutSavePending;
+    if (!pending) return;
+    const input = el('layoutSaveName');
+    const err = el('layoutSaveError');
+    const warn = el('layoutSaveWarn');
+    const filename = normalizeDeviceLayoutName(input && input.value);
+    if (!filename) {
+        if (input) input.setAttribute('aria-invalid', 'true');
+        if (err) { err.textContent = getMessage('layout_name_invalid'); err.classList.add('show'); }
+        if (warn) warn.hidden = true;
+        pending.filename = '';
+        return;
+    }
+    if (pending.filename !== filename) {
+        const confirmBtn = el('layoutSaveConfirm');
+        toggleLoading(confirmBtn, true);
+        try { await ensureScreenSpiffsFiles(true); }
+        finally { toggleLoading(confirmBtn, false); }
+        if (window.layoutSavePending !== pending) return;
+        const exists = (window.screenSpiffsFileList || []).some(f => f.name === filename);
+        if (exists) {
+            pending.filename = filename;
+            const shipped = SHIPPED_LAYOUT_NAMES.has(filename.toLowerCase());
+            const key = shipped ? 'layout_overwrite_shipped' : 'layout_overwrite_confirm';
+            if (warn) {
+                warn.textContent = getMessage(key).replace('{name}', filename);
+                warn.hidden = false;
+            }
+            if (err) err.classList.remove('show');
+            if (input) input.removeAttribute('aria-invalid');
+            return;
+        }
+    }
+    const layout = pending.layout;
+    closeLayoutSaveModal();
+    await uploadScreenLayoutToDevice(layout, filename);
+}
+
+async function uploadScreenLayoutToDevice(layout, filename) {
+    const btn = el('screenSaveToDeviceBtn');
+    const body = JSON.stringify(layout, null, 2);
+    const controller = new AbortController();
+    try {
+        toggleLoading(btn, true);
+        showStatus(getMessage('saving_settings'), 'info');
+        // The handler stores the file, then redraws the clock on the HTTP task
+        // before that reply finishes. A matching file is the success signal.
+        const post = fetch('/api/ota', {
+            method: 'POST',
+            headers: { 'X-Filename': filename, 'Content-Type': 'application/json' },
+            body,
+            signal: controller.signal
+        }).then(async resp => {
+            if (!resp.ok) return false;
+            const data = await Promise.race([
+                resp.json().catch(() => null),
+                new Promise(resolve => setTimeout(() => resolve(null), 3000))
+            ]);
+            return !!(data && data.status === 'ok');
+        }).catch(() => false);
+
+        let landed = false;
+        for (let attempt = 0; attempt < 10 && !landed; attempt++) {
+            if (attempt) await new Promise(r => setTimeout(r, 400));
+            const text = await Promise.race([
+                fetch('/' + encodeURIComponent(filename) + '?t=' + Date.now(), { cache: 'no-store' })
+                    .then(check => check.ok ? check.text() : '')
+                    .catch(() => ''),
+                new Promise(resolve => setTimeout(() => resolve(''), 4000))
+            ]);
+            landed = text === body;
+        }
+        const bodyOk = await Promise.race([
+            post,
+            new Promise(resolve => setTimeout(() => resolve(false), 300))
+        ]);
+        controller.abort();
+        if (landed || bodyOk) {
+            for (let attempt = 0; attempt < 5; attempt++) {
+                await ensureScreenSpiffsFiles(true);
+                if ((window.screenSpiffsFileList || []).some(f => f.name === filename)) break;
+                await new Promise(r => setTimeout(r, 400));
+            }
+            await renderScreenPresets(filename);
+            showStatus(getMessage('layout_saved_to_device'), 'success');
+        } else {
+            showStatus(getMessage('layout_save_device_failed'), 'error');
+        }
+    } catch (error) {
+        console.error('Error saving layout to device:', error);
+        showStatus(getMessage('layout_save_device_failed'), 'error');
+    } finally {
+        controller.abort();
+        toggleLoading(btn, false);
+    }
 }
 
 async function loadSystemScreenLayout(filename) {

@@ -201,6 +201,8 @@ details.menu-dd > .menu-pop{ position:absolute; top:calc(100% + 6px); right:0; z
 .modal h2{ font-family:var(--jost); font-weight:500; font-size:20px; letter-spacing:.03em; color:var(--ink); margin-bottom:10px; }
 .modal p{ font-size:13.5px; color:var(--ink-2); line-height:1.5; margin-bottom:8px; }
 .modal .box .btn-row{ justify-content:center; margin-top:22px; }
+.modal .field{ text-align:left; margin-top:14px; }
+.modal .err{ text-align:left; }
 
 /* ---------- REBOOT OVERLAY ---------- */
 /* Full-screen, non-dismissable cover shown while the device reboots; the page
