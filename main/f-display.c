@@ -23,6 +23,7 @@
 #include "time.h"
 #include "math.h"
 #include <stdlib.h>
+#include <string.h>
 #include "esp_timer.h"
 #include "esp_system.h"
 #include "esp_lcd_st7735.h"
@@ -115,7 +116,7 @@ lv_obj_t *img_digits_sprite = NULL,
          *img_mgdl = NULL,
          *img_mgdl_aux = NULL;
 
-lv_obj_t *label_msg_clip = NULL; // 128px clip window; children scroll inside
+lv_obj_t *label_msg_clip = NULL; // message box; children scroll inside
 lv_obj_t *label_msg = NULL;
 lv_obj_t *label_msg_loop = NULL; // second label for seamless infinite scrolling
 lv_obj_t *label_static[SCREEN_STATIC_TEXT_COUNT] = {NULL};
@@ -169,15 +170,32 @@ static lv_obj_t *label_degree_aux = NULL;
 int label_scroll_pos = 0, label_max_pos = MSG_WIDTH;
 bool label_scroll_swap = false; // which physical label is leftmost in the scroll belt
 
-// Time-based scroll belt state (suggestion #1: position from elapsed wall-clock
-// time; suggestion #2: sampled every fast loop pass, redraw only on pixel change).
-// 10 ms divides the 60 ms/px default (and the 10 ms FreeRTOS tick) so pixel
-// dwells stay even.
+// Frixos belt. Position is elapsed/delay, so a late loop jumps ahead and the
+// long-run speed stays on the scroll delay. 10 ms divides the 60 ms/px default.
 #define SCROLL_LOOP_MS 10
-static int64_t scroll_t0_us = 0;   // time origin of the current message
-static int scroll_seed_px = 0;     // belt offset (px) at scroll_t0_us
-static int scroll_last_ipos = 0;   // last integer offset applied to the labels
-static bool scroll_last_valid = false; // false => force a reposition on the next pass
+#define SCROLL_BELT_GAP 20
+#define SCROLL_CANVAS_MAX_H 24
+static int64_t scroll_t0_us = 0;         // time origin of the current message
+static int scroll_seed_px = 0;           // belt offset (px) at scroll_t0_us
+static int64_t scroll_last_traveled = 0; // pixels already consumed from that origin
+static int scroll_last_ipos = 0;         // label-belt fallback offset, (-period, 0]
+static bool scroll_last_valid = false;   // false until a message has been placed
+static uint8_t *scroll_strip = NULL;     // 1-bit text + gap, rasterized once
+static int scroll_strip_w = 0;
+static int scroll_strip_stride = 0;      // bytes per row
+static int scroll_strip_h = 0;
+static int scroll_col = 0;               // strip column at the left of the window
+static int scroll_view_w = MSG_WIDTH; // on-screen message box, not always the panel width
+static int scroll_view_h = 0;
+static int scroll_canvas_w = 0;
+static int scroll_canvas_h = 0;
+static int scroll_canvas_stride = 0;
+static int scroll_ink_y0 = 0; // first row of this message that has glyph pixels
+static int scroll_ink_y1 = 0;
+static uint8_t scroll_fg_r, scroll_fg_g, scroll_fg_b;
+static uint8_t scroll_bg_r, scroll_bg_g, scroll_bg_b;
+static uint8_t scroll_canvas_buf[MSG_WIDTH * 2 * SCROLL_CANVAS_MAX_H] __attribute__((aligned(4)));
+static lv_obj_t *label_msg_canvas = NULL;
 static uint8_t applied_scroll_engine = 0xFF; // engine last configured on the labels
 static uint8_t applied_scroll_delay = 0;      // delay baked into the LVGL animation
 lv_obj_t *digit_objs[NUM_DIGITS] = {NULL, NULL, NULL, NULL};
@@ -262,6 +280,7 @@ static void update_display_content(time_t now);
 void display_string_substring(const char *text, int32_t x, int32_t y,
                               int32_t start_pixel, int32_t width_pixels,
                               lv_obj_t *label_obj, const lv_font_t *font);
+static uint32_t decode_utf8(const char *text, int text_len, int pos, int *bytes_consumed);
 static inline const screen_widget_t *active_screen_widget(screen_element_id_t id)
 {
   return &eeprom_screen_layout.profile[font_index].widget[id];
@@ -291,15 +310,39 @@ static uint8_t screen_scroll_delay_ms(void)
   return eeprom_screen_layout.scroll_delay > 0 ? eeprom_screen_layout.scroll_delay : eeprom_scroll_delay;
 }
 
+/* Widget width, or the panel from x to the right edge when width is unset. */
+static int message_view_width(int x)
+{
+  const screen_widget_t *w = active_screen_widget(SCREEN_ELEM_MESSAGE);
+  int width = (w != NULL && w->width > 0) ? (int)w->width : LCD_H_RES;
+  if (x < 0)
+    x = 0;
+  if (x >= LCD_H_RES)
+    return 1;
+  if (width > LCD_H_RES - x)
+    width = LCD_H_RES - x;
+  if (width < 1)
+    width = 1;
+  return width;
+}
+
 static void place_message_clip(int x, int y)
 {
   if (label_msg_clip == NULL)
     return;
-  uint8_t h = get_selected_font_height(active_message_font_index());
+  int h = get_selected_font_height(active_message_font_index());
   if (h < 1)
     h = 8;
+  if (y < 0)
+    y = 0;
+  if (y >= LCD_V_RES)
+    y = LCD_V_RES - 1;
+  if (y + h > LCD_V_RES)
+    h = LCD_V_RES - y;
+  scroll_view_w = message_view_width(x);
+  scroll_view_h = h;
   lv_obj_set_pos(label_msg_clip, x, y);
-  lv_obj_set_size(label_msg_clip, MSG_WIDTH, h);
+  lv_obj_set_size(label_msg_clip, scroll_view_w, h);
 }
 
 static void apply_scroll_belt(int ipos, int scroll_period)
@@ -311,13 +354,13 @@ static void apply_scroll_belt(int ipos, int scroll_period)
   const char *msg = last_scroll_msg;
   const int x1 = ipos;
   const int x2 = ipos + scroll_period;
-  const bool vis1 = (x1 < MSG_WIDTH) && (x1 + label_max_pos > 0);
-  const bool vis2 = (x2 < MSG_WIDTH) && (x2 + label_max_pos > 0);
+  const bool vis1 = (x1 < scroll_view_w) && (x1 + label_max_pos > 0);
+  const bool vis2 = (x2 < scroll_view_w) && (x2 + label_max_pos > 0);
 
   if (vis1)
   {
     lv_obj_clear_flag(label_msg, LV_OBJ_FLAG_HIDDEN);
-    display_string_substring(msg, 0, 0, -x1, MSG_WIDTH, label_msg, font);
+    display_string_substring(msg, 0, 0, -x1, scroll_view_w, label_msg, font);
   }
   else
     lv_obj_add_flag(label_msg, LV_OBJ_FLAG_HIDDEN);
@@ -325,58 +368,433 @@ static void apply_scroll_belt(int ipos, int scroll_period)
   if (vis2)
   {
     lv_obj_clear_flag(label_msg_loop, LV_OBJ_FLAG_HIDDEN);
-    display_string_substring(msg, 0, 0, -x2, MSG_WIDTH, label_msg_loop, font);
+    display_string_substring(msg, 0, 0, -x2, scroll_view_w, label_msg_loop, font);
   }
   else
     lv_obj_add_flag(label_msg_loop, LV_OBJ_FLAG_HIDDEN);
 }
 
-/* True when the belt's integer pixel will change this pass. Used to skip other
- * LVGL-locking work so the 1 px blit is the only dirty region that frame. */
-static bool message_scroll_step_due(int *ipos_out, int *period_out)
+static bool frixos_scroll_running(void)
 {
-  if (eeprom_scroll_engine != SCROLL_ENGINE_FRIXOS)
-    return false;
-  if (label_size <= MSG_CENTER_WIDTH)
-    return false;
-  int scroll_period = label_max_pos + 20;
-  if (scroll_period < 1)
-    scroll_period = 1;
-  uint32_t delay_ms = screen_scroll_delay_ms();
-  if (delay_ms < 1)
-    delay_ms = 1;
-  int64_t now_us = esp_timer_get_time();
-  int64_t div = (int64_t)delay_ms * 1000;
-  int64_t traveled = (now_us - scroll_t0_us) / div;
+  return eeprom_scroll_engine == SCROLL_ENGINE_FRIXOS && label_size > scroll_view_w && scroll_last_valid;
+}
+
+static bool frixos_clip_visible(void)
+{
+  return label_msg_clip != NULL && !lv_obj_has_flag(label_msg_clip, LV_OBJ_FLAG_HIDDEN);
+}
+
+static void scroll_timebase_mark(void)
+{
+  scroll_seed_px = scroll_view_w > 0 ? scroll_view_w : MSG_WIDTH;
+  scroll_t0_us = esp_timer_get_time();
+  scroll_last_traveled = 0;
+}
+
+/* Pixels owed since the origin. Does not consume them. */
+static int scroll_clock_position(int *pixels, int *ipos, int64_t *traveled_out)
+{
+  if (!frixos_scroll_running())
+    return 0;
+  int period = label_max_pos + SCROLL_BELT_GAP;
+  if (period < 1)
+    period = 1;
+  uint32_t delay = screen_scroll_delay_ms();
+  if (delay < 1)
+    delay = 1;
+  int64_t traveled = (esp_timer_get_time() - scroll_t0_us) / ((int64_t)delay * 1000);
+  int64_t delta = traveled - scroll_last_traveled;
+  if (delta < 1)
+    return 0;
+  if (delta > 1000)
+  {
+    traveled = scroll_last_traveled + 1000;
+    delta = 1000;
+  }
   int64_t pos = (int64_t)scroll_seed_px - traveled;
-  int ipos = (int)(pos % scroll_period);
-  if (ipos > 0)
-    ipos -= scroll_period;
-  if (ipos_out)
-    *ipos_out = ipos;
-  if (period_out)
-    *period_out = scroll_period;
-  return !scroll_last_valid || ipos != scroll_last_ipos;
+  int p = (int)(pos % period);
+  if (p > 0)
+    p -= period;
+  if (pixels)
+    *pixels = (int)delta;
+  if (ipos)
+    *ipos = p;
+  if (traveled_out)
+    *traveled_out = traveled;
+  return (int)delta;
+}
+
+/* True when the belt's integer pixel will change this pass. */
+static bool message_scroll_step_due(void)
+{
+  return scroll_clock_position(NULL, NULL, NULL) >= 1;
 }
 
 /* True if this pass steps, or the next 10 ms loop would. Keeps the 1 s
  * schedule poll and other LVGL work off frames that paint the belt. */
 static bool message_scroll_busy(bool step_now)
 {
-  if (eeprom_scroll_engine != SCROLL_ENGINE_FRIXOS)
-    return false;
-  if (label_size <= MSG_CENTER_WIDTH)
+  if (!frixos_scroll_running() || !frixos_clip_visible())
     return false;
   if (step_now)
     return true;
-  uint32_t delay_ms = screen_scroll_delay_ms();
-  if (delay_ms < 1)
-    delay_ms = 1;
-  int64_t now_us = esp_timer_get_time();
-  int64_t div = (int64_t)delay_ms * 1000;
-  int64_t traveled = (now_us - scroll_t0_us) / div;
-  int64_t traveled_next = (now_us + (int64_t)SCROLL_LOOP_MS * 1000 - scroll_t0_us) / div;
-  return traveled_next != traveled;
+  uint32_t delay = screen_scroll_delay_ms();
+  if (delay < 1)
+    delay = 1;
+  int64_t div = (int64_t)delay * 1000;
+  int64_t now = esp_timer_get_time();
+  int64_t t0 = (now - scroll_t0_us) / div;
+  int64_t t1 = (now + (int64_t)SCROLL_LOOP_MS * 1000 - scroll_t0_us) / div;
+  return t1 != t0;
+}
+
+static int glyph_ink(const uint8_t *bmp, uint16_t stride, uint16_t box_w, int x, int y)
+{
+  unsigned bit = stride == 0 ? (unsigned)(y * box_w + x) : (unsigned)(y * (int)stride * 8 + x);
+  return (bmp[bit >> 3] >> (7 - (bit & 7))) & 1;
+}
+
+static int frixos_text_width(const char *text, const lv_font_t *font)
+{
+  int width = 0;
+  int len = (int)strlen(text);
+  for (int i = 0; i < len;)
+  {
+    int n = 0, n2 = 0;
+    uint32_t cp = decode_utf8(text, len, i, &n);
+    if (n <= 0)
+      break;
+    uint32_t next = 0;
+    if (i + n < len)
+      next = decode_utf8(text, len, i + n, &n2);
+    lv_font_glyph_dsc_t g;
+    if (lv_font_get_glyph_dsc(font, &g, cp, next))
+      width += g.adv_w;
+    i += n;
+  }
+  return width;
+}
+
+/* Stamp the 1-bpp glyphs into the strip. Rows are MSB-first, matching the fonts. */
+static void frixos_strip_draw(uint8_t *strip, int stride, int strip_h, int text_w,
+                              const char *text, const lv_font_t *font)
+{
+  int pen = 0;
+  int len = (int)strlen(text);
+  const int line_h = (int)font->line_height;
+  const int base = (int)font->base_line;
+  for (int i = 0; i < len;)
+  {
+    int n = 0, n2 = 0;
+    uint32_t cp = decode_utf8(text, len, i, &n);
+    if (n <= 0)
+      break;
+    uint32_t next = 0;
+    if (i + n < len)
+      next = decode_utf8(text, len, i + n, &n2);
+    lv_font_glyph_dsc_t g;
+    if (!lv_font_get_glyph_dsc(font, &g, cp, next))
+    {
+      i += n;
+      continue;
+    }
+    if (g.box_w > 0 && g.box_h > 0 && g.format == LV_FONT_GLYPH_FORMAT_A1 && font->get_glyph_bitmap != NULL)
+    {
+      g.req_raw_bitmap = 1;
+      const uint8_t *bmp = font->get_glyph_bitmap(&g, NULL);
+      if (bmp != NULL)
+      {
+        int y0 = (line_h - base) - (int)g.box_h - (int)g.ofs_y;
+        for (int gy = 0; gy < (int)g.box_h; gy++)
+        {
+          int sy = y0 + gy;
+          if ((unsigned)sy >= (unsigned)strip_h)
+            continue;
+          for (int gx = 0; gx < (int)g.box_w; gx++)
+          {
+            if (!glyph_ink(bmp, g.stride, g.box_w, gx, gy))
+              continue;
+            int sx = pen + (int)g.ofs_x + gx;
+            if ((unsigned)sx >= (unsigned)text_w)
+              continue;
+            strip[sy * stride + (sx >> 3)] |= (uint8_t)(0x80u >> (sx & 7));
+          }
+        }
+      }
+    }
+    pen += g.adv_w;
+    i += n;
+  }
+}
+
+static void frixos_colors_store(const screen_widget_t *w)
+{
+  scroll_fg_r = w->color_r;
+  scroll_fg_g = w->color_g;
+  scroll_fg_b = w->color_b;
+  scroll_bg_r = w->bg_r;
+  scroll_bg_g = w->bg_g;
+  scroll_bg_b = w->bg_b;
+}
+
+static bool frixos_colors_differ(const screen_widget_t *w)
+{
+  return w->color_r != scroll_fg_r || w->color_g != scroll_fg_g || w->color_b != scroll_fg_b ||
+         w->bg_r != scroll_bg_r || w->bg_g != scroll_bg_g || w->bg_b != scroll_bg_b;
+}
+
+static void frixos_put_px(int x, int y, uint8_t r, uint8_t g, uint8_t b)
+{
+  uint16_t packed = (uint16_t)(((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3));
+  uint8_t *p = scroll_canvas_buf + y * scroll_canvas_stride + x * 2;
+  p[0] = (uint8_t)packed;
+  p[1] = (uint8_t)(packed >> 8);
+}
+
+static void frixos_scroll_column(int x, int src)
+{
+  const int stride = scroll_strip_stride;
+  int rows = scroll_strip_h;
+  if (scroll_canvas_h > 0 && rows > scroll_canvas_h)
+    rows = scroll_canvas_h;
+  for (int y = 0; y < rows; y++)
+  {
+    int on = (scroll_strip[y * stride + (src >> 3)] >> (7 - (src & 7))) & 1;
+    if (on)
+      frixos_put_px(x, y, scroll_fg_r, scroll_fg_g, scroll_fg_b);
+    else if (y < LABEL_BG_TOP_TRIM)
+      frixos_put_px(x, y, 0, 0, 0);
+    else
+      frixos_put_px(x, y, scroll_bg_r, scroll_bg_g, scroll_bg_b);
+  }
+}
+
+/* Visible window. Falls back to the canvas once it is bound so a paint cannot
+ * run past the buffer. */
+static int frixos_view_w(void)
+{
+  int w = scroll_view_w > 0 ? scroll_view_w : MSG_WIDTH;
+  if (scroll_canvas_w > 0 && w > scroll_canvas_w)
+    w = scroll_canvas_w;
+  return w;
+}
+
+static bool frixos_scroll_bind(int w, int h)
+{
+  if (label_msg_canvas == NULL || w < 1 || h < 1 || h > SCROLL_CANVAS_MAX_H)
+    return false;
+  int stride_px = (int)lv_draw_buf_width_to_stride(w, LV_COLOR_FORMAT_RGB565);
+  if (stride_px < w * 2 || (size_t)stride_px * (size_t)h > sizeof(scroll_canvas_buf))
+    return false;
+  if (scroll_canvas_w != w || scroll_canvas_h != h)
+  {
+    lv_canvas_set_buffer(label_msg_canvas, scroll_canvas_buf, w, h, LV_COLOR_FORMAT_RGB565);
+    scroll_canvas_w = w;
+    scroll_canvas_h = h;
+  }
+  scroll_canvas_stride = stride_px;
+  lv_obj_set_size(label_msg_canvas, w, h);
+  lv_obj_set_pos(label_msg_canvas, 0, 0);
+  return true;
+}
+
+/* Rows with no ink anywhere in the strip (including the gap) never change
+ * when the window shifts, so they stay out of the per-frame flush. */
+static void frixos_scroll_measure_ink(void)
+{
+  scroll_ink_y0 = 0;
+  scroll_ink_y1 = scroll_strip_h > 0 ? scroll_strip_h - 1 : 0;
+  if (scroll_strip == NULL || scroll_strip_h < 1 || scroll_strip_stride < 1)
+    return;
+  int y0 = -1;
+  int y1 = -1;
+  for (int y = 0; y < scroll_strip_h; y++)
+  {
+    const uint8_t *row = scroll_strip + (size_t)y * (size_t)scroll_strip_stride;
+    for (int b = 0; b < scroll_strip_stride; b++)
+    {
+      if (row[b] == 0)
+        continue;
+      if (y0 < 0)
+        y0 = y;
+      y1 = y;
+      break;
+    }
+  }
+  if (y0 >= 0)
+  {
+    scroll_ink_y0 = y0;
+    scroll_ink_y1 = y1;
+  }
+}
+
+static void frixos_scroll_invalidate_ink(void)
+{
+  if (label_msg_canvas == NULL)
+    return;
+  lv_area_t coords;
+  lv_obj_get_coords(label_msg_canvas, &coords);
+  lv_area_t area = coords;
+  area.y1 = coords.y1 + scroll_ink_y0;
+  area.y2 = coords.y1 + scroll_ink_y1;
+  if (area.y1 < coords.y1)
+    area.y1 = coords.y1;
+  if (area.y2 > coords.y2)
+    area.y2 = coords.y2;
+  if (area.y1 > area.y2)
+    return;
+  lv_obj_invalidate_area(label_msg_canvas, &area);
+}
+
+static void frixos_scroll_paint(void)
+{
+  if (scroll_strip == NULL || scroll_strip_w < 1)
+    return;
+  int view_w = frixos_view_w();
+  for (int x = 0; x < view_w; x++)
+    frixos_scroll_column(x, (scroll_col + x) % scroll_strip_w);
+}
+
+/* Shift the visible window one pixel left and fill the new right column.
+ * Only the ink rows are marked dirty. */
+static void frixos_scroll_shift(void)
+{
+  if (scroll_strip == NULL || scroll_strip_w < 1 || label_msg_canvas == NULL)
+    return;
+  int view_w = frixos_view_w();
+  if (view_w < 1)
+    return;
+  int src = (scroll_col + view_w) % scroll_strip_w;
+  int rows = scroll_strip_h < scroll_canvas_h ? scroll_strip_h : scroll_canvas_h;
+  for (int y = 0; y < rows; y++)
+  {
+    uint8_t *row = scroll_canvas_buf + y * scroll_canvas_stride;
+    memmove(row, row + 2, (size_t)(view_w - 1) * 2);
+  }
+  scroll_col++;
+  if (scroll_col >= scroll_strip_w)
+    scroll_col = 0;
+  frixos_scroll_column(view_w - 1, src);
+  frixos_scroll_invalidate_ink();
+}
+
+static void frixos_scroll_discard(void)
+{
+  free(scroll_strip);
+  scroll_strip = NULL;
+  scroll_strip_w = 0;
+  if (label_msg_canvas != NULL)
+    lv_obj_add_flag(label_msg_canvas, LV_OBJ_FLAG_HIDDEN);
+}
+
+static void frixos_label_reset(void)
+{
+  frixos_scroll_discard();
+  lv_obj_set_style_text_align(label_msg, LV_TEXT_ALIGN_LEFT, 0);
+  lv_obj_set_style_text_align(label_msg_loop, LV_TEXT_ALIGN_LEFT, 0);
+  int period = label_max_pos + SCROLL_BELT_GAP;
+  if (period < 1)
+    period = 1;
+  int ipos = scroll_view_w % period;
+  if (ipos > 0)
+    ipos -= period;
+  scroll_last_ipos = ipos;
+  scroll_last_valid = true;
+  apply_scroll_belt(ipos, period);
+  scroll_timebase_mark();
+}
+
+/* Rasterize once. Returns false when the strip cannot be built; caller keeps the label belt. */
+static bool frixos_scroll_rebuild(const char *text, const lv_font_t *font, const screen_widget_t *w)
+{
+  if (label_msg_canvas == NULL || font == NULL || text == NULL || w == NULL)
+    return false;
+  int line_h = (int)font->line_height;
+  int h = scroll_view_h > 0 && scroll_view_h < line_h ? scroll_view_h : line_h;
+  if (line_h < 1 || line_h > SCROLL_CANVAS_MAX_H || h < 1)
+    return false;
+  int view_w = scroll_view_w > 0 ? scroll_view_w : MSG_WIDTH;
+  int text_w = frixos_text_width(text, font);
+  if (text_w < 1)
+    return false;
+
+  int strip_w = text_w + SCROLL_BELT_GAP;
+  int stride = (strip_w + 7) >> 3;
+  uint8_t *buf = calloc(1, (size_t)stride * (size_t)line_h);
+  if (buf == NULL)
+  {
+    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "scroll strip alloc %u failed", (unsigned)((size_t)stride * (size_t)line_h));
+    frixos_scroll_discard();
+    return false;
+  }
+  frixos_strip_draw(buf, stride, line_h, text_w, text, font);
+
+  free(scroll_strip);
+  scroll_strip = buf;
+  scroll_strip_w = strip_w;
+  scroll_strip_stride = stride;
+  scroll_strip_h = line_h;
+  label_max_pos = text_w;
+  frixos_scroll_measure_ink();
+
+  int ipos = view_w % strip_w;
+  if (ipos > 0)
+    ipos -= strip_w;
+  scroll_col = -ipos;
+  scroll_last_ipos = ipos;
+  scroll_last_valid = true;
+
+  frixos_colors_store(w);
+  if (!frixos_scroll_bind(view_w, h))
+  {
+    frixos_scroll_discard();
+    return false;
+  }
+  frixos_scroll_paint();
+  lv_obj_add_flag(label_msg, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_add_flag(label_msg_loop, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_clear_flag(label_msg_canvas, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_invalidate(label_msg_canvas);
+  scroll_timebase_mark();
+  return true;
+}
+
+static void frixos_scroll_recolor(const screen_widget_t *w)
+{
+  frixos_colors_store(w);
+  frixos_scroll_paint();
+  if (label_msg_canvas != NULL)
+    lv_obj_invalidate(label_msg_canvas);
+}
+
+/* Move to the pixel the clock says is due. One pixel shifts; a late wake paints
+ * the jumped window so the average speed stays on the delay. */
+static void frixos_scroll_advance(void)
+{
+  int pixels = 0;
+  int ipos = 0;
+  int64_t traveled = 0;
+  if (scroll_clock_position(&pixels, &ipos, &traveled) < 1)
+    return;
+  scroll_last_traveled = traveled;
+  scroll_last_ipos = ipos;
+  if (scroll_strip != NULL && scroll_strip_w > 0)
+  {
+    if (pixels == 1)
+      frixos_scroll_shift();
+    else
+    {
+      int col = ipos < 0 ? -ipos : 0;
+      scroll_col = col % scroll_strip_w;
+      frixos_scroll_paint();
+      frixos_scroll_invalidate_ink();
+    }
+    return;
+  }
+  int period = label_max_pos + SCROLL_BELT_GAP;
+  if (period < 1)
+    period = 1;
+  apply_scroll_belt(ipos, period);
 }
 
 static void text_label_draw_trim_bg(lv_event_t *e)
@@ -821,7 +1239,7 @@ static void apply_lvgl_scroll(const char *msg, const lv_font_t *font, int text_w
   lv_obj_clear_flag(label_msg, LV_OBJ_FLAG_HIDDEN);
   lv_obj_set_style_text_align(label_msg, LV_TEXT_ALIGN_LEFT, 0);
   lv_obj_set_pos(label_msg, 0, 0);
-  lv_obj_set_width(label_msg, MSG_WIDTH);
+  lv_obj_set_width(label_msg, scroll_view_w);
 
   int32_t space_w = lv_font_get_glyph_width(font, ' ', ' ');
   if (space_w < 1)
@@ -895,39 +1313,45 @@ void set_scroll_message(const char *msg)
 
   const bool use_frixos = eeprom_scroll_engine != SCROLL_ENGINE_LVGL;
 
-  if (label_size > MSG_CENTER_WIDTH && use_frixos)
-  { // Frixos belt: hand-stepped substring, left aligned
+  if (label_size > scroll_view_w && use_frixos)
+  { // Frixos belt: a 1-bit strip scrolled one presented pixel at a time.
     if (engine_changed)
     {
       lv_label_set_long_mode(label_msg, LV_LABEL_LONG_CLIP);
       lv_label_set_long_mode(label_msg_loop, LV_LABEL_LONG_CLIP);
     }
-    lv_obj_set_style_text_align(label_msg, LV_TEXT_ALIGN_LEFT, 0);
-    lv_obj_set_style_text_align(label_msg_loop, LV_TEXT_ALIGN_LEFT, 0);
     label_max_pos = label_size;
-    if (content_changed)
+    int view_h = scroll_strip_h;
+    if (scroll_view_h > 0 && (view_h < 1 || scroll_view_h < view_h))
+      view_h = scroll_view_h;
+    if (content_changed || scroll_strip == NULL)
     {
-      // New text, font, or engine: reset the time origin and enter from the right edge.
-      const int scroll_period = label_max_pos + 20;
-      scroll_seed_px = MSG_WIDTH;
-      scroll_t0_us = esp_timer_get_time();
-      int ipos = scroll_seed_px % scroll_period;
-      if (ipos > 0) ipos -= scroll_period; // normalize into (-period, 0]
-      scroll_last_ipos = ipos;
-      scroll_last_valid = true;
-      apply_scroll_belt(ipos, scroll_period);
+      if (!frixos_scroll_rebuild(msg, font, w_msg) && content_changed)
+        frixos_label_reset();
     }
-    // else: same content, same font — belt keeps scrolling uninterrupted.
+    else if (scroll_canvas_w != scroll_view_w || scroll_canvas_h != view_h)
+    {
+      frixos_colors_store(w_msg);
+      if (frixos_scroll_bind(scroll_view_w, view_h))
+      {
+        frixos_scroll_paint();
+        lv_obj_invalidate(label_msg_canvas);
+      }
+    }
+    else if (frixos_colors_differ(w_msg))
+      frixos_scroll_recolor(w_msg);
   }
-  else if (label_size > MSG_CENTER_WIDTH)
-  { // LVGL's own circular animation. Leave a running anim alone unless the
-    // text, font, engine, or delay actually changed.
+  else if (label_size > scroll_view_w)
+  { // LVGL's own circular animation, kept as the comparison engine.
+    // Leave a running anim alone unless the text, font, engine, or delay changed.
+    frixos_scroll_discard();
     if (content_changed || delay_changed)
       apply_lvgl_scroll(msg, font, size.x);
   }
   else
   { // centered
-    const int centered_label_width = MSG_CENTER_WIDTH;
+    frixos_scroll_discard();
+    const int centered_label_width = scroll_view_w;
 
     lv_label_set_long_mode(label_msg, LV_LABEL_LONG_CLIP);
     lv_label_set_text(label_msg, msg);
@@ -1001,6 +1425,17 @@ void startup_display(void)
   lv_obj_set_style_bg_opa(label_msg, LV_OPA_TRANSP, 0);
   lv_obj_set_style_bg_opa(label_msg_loop, LV_OPA_TRANSP, 0);
   lv_obj_add_flag(label_msg_loop, LV_OBJ_FLAG_HIDDEN); // hidden until scrolling active
+
+  label_msg_canvas = lv_canvas_create(label_msg_clip);
+  if (label_msg_canvas != NULL)
+  {
+    lv_obj_add_flag(label_msg_canvas, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_clear_flag(label_msg_canvas, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_clear_flag(label_msg_canvas, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_style_border_width(label_msg_canvas, 0, 0);
+    lv_obj_set_style_pad_all(label_msg_canvas, 0, 0);
+    lv_obj_set_pos(label_msg_canvas, 0, 0);
+  }
 
   // Optimize label for smooth scrolling
   // lv_obj_set_style_anim_speed(label_msg, 150, LV_PART_MAIN); // Optimized animation speed for smoothness
@@ -2990,8 +3425,7 @@ void display_task(void *pvParameters)
         set_scroll_message(last_scroll_msg);
     }
 
-    int scroll_ipos = 0, scroll_period = 1;
-    const bool scroll_step = message_scroll_step_due(&scroll_ipos, &scroll_period);
+    const bool scroll_step = message_scroll_step_due();
     const bool scroll_busy = message_scroll_busy(scroll_step);
 
     // Skip other LVGL-locking work on a belt step and on the 10 ms pass just
@@ -3074,10 +3508,8 @@ void display_task(void *pvParameters)
 
     if (scroll_step)
     {
-      scroll_last_ipos = scroll_ipos;
-      scroll_last_valid = true;
       lvgl_port_lock(0);
-      apply_scroll_belt(scroll_ipos, scroll_period);
+      frixos_scroll_advance();
       lvgl_port_unlock();
     }
 
