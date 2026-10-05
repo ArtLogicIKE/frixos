@@ -178,6 +178,8 @@ static int64_t scroll_t0_us = 0;   // time origin of the current message
 static int scroll_seed_px = 0;     // belt offset (px) at scroll_t0_us
 static int scroll_last_ipos = 0;   // last integer offset applied to the labels
 static bool scroll_last_valid = false; // false => force a reposition on the next pass
+static uint8_t applied_scroll_engine = 0xFF; // engine last configured on the labels
+static uint8_t applied_scroll_delay = 0;      // delay baked into the LVGL animation
 lv_obj_t *digit_objs[NUM_DIGITS] = {NULL, NULL, NULL, NULL};
 lv_obj_t *dots[2] = {NULL, NULL};
 lv_obj_t *aux_digit_objs[NUM_DIGITS] = {NULL, NULL, NULL, NULL};
@@ -333,6 +335,8 @@ static void apply_scroll_belt(int ipos, int scroll_period)
  * LVGL-locking work so the 1 px blit is the only dirty region that frame. */
 static bool message_scroll_step_due(int *ipos_out, int *period_out)
 {
+  if (eeprom_scroll_engine != SCROLL_ENGINE_FRIXOS)
+    return false;
   if (label_size <= MSG_CENTER_WIDTH)
     return false;
   int scroll_period = label_max_pos + 20;
@@ -359,6 +363,8 @@ static bool message_scroll_step_due(int *ipos_out, int *period_out)
  * schedule poll and other LVGL work off frames that paint the belt. */
 static bool message_scroll_busy(bool step_now)
 {
+  if (eeprom_scroll_engine != SCROLL_ENGINE_FRIXOS)
+    return false;
   if (label_size <= MSG_CENTER_WIDTH)
     return false;
   if (step_now)
@@ -806,6 +812,32 @@ void show_grid(uint8_t show)
   lv_obj_invalidate(lv_scr_act());
 }
 
+/* LVGL circular scroller. anim_duration is one full pass (text width plus the
+ * three spaces LVGL inserts between copies), so the ms-per-pixel matches the
+ * scroll delay. Caller holds the LVGL lock. Restarts the animation. */
+static void apply_lvgl_scroll(const char *msg, const lv_font_t *font, int text_w)
+{
+  lv_obj_add_flag(label_msg_loop, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_clear_flag(label_msg, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_set_style_text_align(label_msg, LV_TEXT_ALIGN_LEFT, 0);
+  lv_obj_set_pos(label_msg, 0, 0);
+  lv_obj_set_width(label_msg, MSG_WIDTH);
+
+  int32_t space_w = lv_font_get_glyph_width(font, ' ', ' ');
+  if (space_w < 1)
+    space_w = 1;
+  uint32_t distance = (uint32_t)text_w + (uint32_t)space_w * 3;
+  uint32_t anim_time = (uint32_t)screen_scroll_delay_ms() * distance;
+  if (anim_time < MIN_ANIMATION_TIME)
+    anim_time = MIN_ANIMATION_TIME;
+  lv_obj_set_style_anim_duration(label_msg, anim_time, LV_PART_MAIN);
+
+  lv_label_set_long_mode(label_msg, LV_LABEL_LONG_CLIP);
+  lv_label_set_text(label_msg, msg);
+  lv_label_set_long_mode(label_msg, LV_LABEL_LONG_SCROLL_CIRCULAR);
+  label_max_pos = text_w;
+}
+
 // warning - assumes it is running in a port lock/unlock wrapper
 void set_scroll_message(const char *msg)
 {
@@ -836,10 +868,19 @@ void set_scroll_message(const char *msg)
 
   // If the text content AND font are unchanged, preserve the in-progress
   // scroll state so the belt never resets to the right edge mid-cycle.
+  // An engine switch counts as a change so the other scroller takes over.
   bool content_changed = (strcmp(msg, last_scroll_msg) != 0) || (msg_font != last_scroll_font);
+  const bool engine_changed = applied_scroll_engine != eeprom_scroll_engine;
+  const uint8_t delay_now = screen_scroll_delay_ms();
+  const bool delay_changed = applied_scroll_delay != delay_now;
+  if (engine_changed)
+    content_changed = true;
 
-  strncpy(last_scroll_msg, msg, sizeof(last_scroll_msg) - 1);
-  last_scroll_msg[sizeof(last_scroll_msg) - 1] = '\0';
+  if (msg != last_scroll_msg)
+  {
+    strncpy(last_scroll_msg, msg, sizeof(last_scroll_msg) - 1);
+    last_scroll_msg[sizeof(last_scroll_msg) - 1] = '\0';
+  }
   last_scroll_font = msg_font;
 
   lvgl_port_lock(0);
@@ -852,14 +893,21 @@ void set_scroll_message(const char *msg)
   const int msg_y = screen_layout_positions_live ? layout_abs_y(w_msg) : BOOT_MSG_Y;
   place_message_clip(msg_x, msg_y);
 
-  if (label_size > MSG_CENTER_WIDTH)
-  { // scrolling, left aligned
+  const bool use_frixos = eeprom_scroll_engine != SCROLL_ENGINE_LVGL;
+
+  if (label_size > MSG_CENTER_WIDTH && use_frixos)
+  { // Frixos belt: hand-stepped substring, left aligned
+    if (engine_changed)
+    {
+      lv_label_set_long_mode(label_msg, LV_LABEL_LONG_CLIP);
+      lv_label_set_long_mode(label_msg_loop, LV_LABEL_LONG_CLIP);
+    }
     lv_obj_set_style_text_align(label_msg, LV_TEXT_ALIGN_LEFT, 0);
     lv_obj_set_style_text_align(label_msg_loop, LV_TEXT_ALIGN_LEFT, 0);
     label_max_pos = label_size;
     if (content_changed)
     {
-      // New text or font: reset the time origin and enter from the right edge.
+      // New text, font, or engine: reset the time origin and enter from the right edge.
       const int scroll_period = label_max_pos + 20;
       scroll_seed_px = MSG_WIDTH;
       scroll_t0_us = esp_timer_get_time();
@@ -871,10 +919,17 @@ void set_scroll_message(const char *msg)
     }
     // else: same content, same font — belt keeps scrolling uninterrupted.
   }
+  else if (label_size > MSG_CENTER_WIDTH)
+  { // LVGL's own circular animation. Leave a running anim alone unless the
+    // text, font, engine, or delay actually changed.
+    if (content_changed || delay_changed)
+      apply_lvgl_scroll(msg, font, size.x);
+  }
   else
   { // centered
     const int centered_label_width = MSG_CENTER_WIDTH;
 
+    lv_label_set_long_mode(label_msg, LV_LABEL_LONG_CLIP);
     lv_label_set_text(label_msg, msg);
     lv_obj_set_style_text_align(label_msg, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_width(label_msg, centered_label_width);
@@ -884,13 +939,9 @@ void set_scroll_message(const char *msg)
     ESP_LOG_WEB(ESP_LOG_INFO, TAG, "set_scroll_message: centered");
     label_max_pos = 0;
   }
+  applied_scroll_engine = eeprom_scroll_engine;
+  applied_scroll_delay = delay_now;
   lvgl_port_unlock();
-  // Calculate optimal animation time based on text length
-  // Use a minimum time for short text and scale up for longer text
-  // uint32_t anim_time = LV_MAX(MIN_ANIMATION_TIME, eeprom_scroll_delay * size.x);
-  // lv_obj_set_style_anim_time(label_msg, anim_time, LV_PART_MAIN);
-  // lv_obj_update_layout(label_msg);
-  // ESP_LOG_WEB(ESP_LOG_INFO, TAG, "set_scroll_message: anim_time %d, delay %d", anim_time, eeprom_scroll_delay);
 }
 
 // this is reboot only stuff
@@ -2932,6 +2983,11 @@ void display_task(void *pvParameters)
       display_changed();
       update_display_content(now);
       settings_updated = false;
+      // Engine (and any other message setting) applies on the next message
+      // rebuild. Re-feed the current line now so the switch is immediate,
+      // including when the text itself did not change.
+      if (last_scroll_msg[0] != '\0')
+        set_scroll_message(last_scroll_msg);
     }
 
     int scroll_ipos = 0, scroll_period = 1;

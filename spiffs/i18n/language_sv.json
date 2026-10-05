@@ -623,6 +623,8 @@
   },
   "system": {
     "maintenance_title": "Underhåll",
-    "danger_title": "Farozon"
+    "danger_title": "Farozon",
+    "scroll_engine": "Rullande rad",
+    "scroll_engine_desc": "Frixos flyttar texten själv. LVGL använder bibliotekets animation. Byt om raden hackar."
   }
 }

@@ -623,6 +623,8 @@
   },
   "system": {
     "maintenance_title": "Mantenimiento",
-    "danger_title": "Zona de peligro"
+    "danger_title": "Zona de peligro",
+    "scroll_engine": "Línea en movimiento",
+    "scroll_engine_desc": "Frixos mueve el texto por su cuenta. LVGL usa la animación de la biblioteca. Cámbialo si la línea va a tirones."
   }
 }

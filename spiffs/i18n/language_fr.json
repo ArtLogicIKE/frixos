@@ -623,6 +623,8 @@
   },
   "system": {
     "maintenance_title": "Maintenance",
-    "danger_title": "Zone de danger"
+    "danger_title": "Zone de danger",
+    "scroll_engine": "Ligne défilante",
+    "scroll_engine_desc": "Frixos fait défiler le texte lui-même. LVGL utilise l'animation de la bibliothèque. Changez si la ligne saccade."
   }
 }

@@ -53,7 +53,7 @@ The rest of this document writes `curl.exe`. Drop `.exe` on POSIX.
 
 ## 2. Why the screen layout is a binary blob
 
-`/api/settings` is JSON (`p00`…`p63`, plus `p64`–`p66` for Weather Underground and `tz_iana`). That path is small enough for the ESP32 HTTP stack, cJSON, and the shared 4096-byte receive buffer (`HTTP_BUFFER_SIZE`).
+`/api/settings` is JSON (`p00`…`p63`, plus `p64`–`p66` for Weather Underground, `p67` for the scroll engine, and `tz_iana`). That path is small enough for the ESP32 HTTP stack, cJSON, and the shared 4096-byte receive buffer (`HTTP_BUFFER_SIZE`).
 
 The **screen layout is not**. A JSON document for ~28 widgets × 2 profiles, 512-byte scroll strings, eight static text slots, digit labels, and graph config is too large for the device to receive and parse on `/api/screen` (heap, parse buffers, `httpd` recv). Firmware therefore speaks a **packed little-endian blob**.
 
@@ -250,6 +250,7 @@ curl.exe -s -X POST "$HOST/api/settings" -H "Content-Type: application/json" --d
 | `p16` | Scroll message (legacy) | string, max **511**. Tokens e.g. `[temp]` | `{"p16":"Hello [temp]"}` |
 | `p14` | Scroll delay | `30`–`255` ms (`uint8_t`) | `{"p14":60}` |
 | `p38` | Scroll speed | `1`–`255` px/s | `{"p38":10}` |
+| `p67` | Scroll engine | `0` = LVGL animation, `1` = Frixos belt (default). Past the 64-bit settings mask; included in the unfiltered GET and `params=p67` | `{"p67":1}` |
 
 `p16` copies into **both** layout profiles’ `scroll_text` and persists NVS. For per-profile scroll text, or any `text_N`, patch the blob ([section 6](#6-screen-layout-binary-apiscreen)).
 

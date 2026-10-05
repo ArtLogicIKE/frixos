@@ -117,6 +117,9 @@ extern uint8_t  eeprom_dark_theme;
 extern uint8_t  eeprom_language;  // Language index: 0=en, 1=de, 2=fr, 3=it, 4=pt, 5=sv, 6=da, 7=pl
 extern uint8_t  eeprom_scroll_speed;  // Scroll speed in pixels per second
 extern uint8_t  eeprom_scroll_delay;  // Scroll delay in milliseconds (30-200)
+#define SCROLL_ENGINE_LVGL 0
+#define SCROLL_ENGINE_FRIXOS 1
+extern uint8_t  eeprom_scroll_engine; // p67: 0 = LVGL label animation, 1 = Frixos belt
 extern char eeprom_message[SCROLL_MSG_LENGTH];
 extern char eeprom_ha_url[200];      // Home Assistant server URL
 extern char eeprom_ha_token[255];    // Home Assistant long-lived access token

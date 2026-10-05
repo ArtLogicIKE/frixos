@@ -31,7 +31,41 @@ async function loadStatus() {
   if (typeof updateIntegrationDots === 'function') updateIntegrationDots();
 }
 /* The System tab hosts status, files, update and restart. */
-sectionLoaders.status = function () { loadStatus(); loadFiles(); };
+sectionLoaders.status = function () { loadStatus(); loadFiles(); loadScrollEngine(); };
+
+/* Scrolling-line engine. Applies immediately, like the auto-update switch. */
+function applyScrollEngine(engine) {
+  const frixos = Number(engine) !== 0;
+  const lvglBtn = el('scrollEngineLvgl');
+  const frixosBtn = el('scrollEngineFrixos');
+  if (!lvglBtn || !frixosBtn) return;
+  lvglBtn.classList.toggle('active', !frixos);
+  frixosBtn.classList.toggle('active', frixos);
+  lvglBtn.setAttribute('aria-pressed', !frixos ? 'true' : 'false');
+  frixosBtn.setAttribute('aria-pressed', frixos ? 'true' : 'false');
+}
+async function loadScrollEngine() {
+  const res = await apiGet('/api/settings?params=p67');
+  if (!res.data || res.data.p67 == null) return;
+  window.settings.p67 = res.data.p67;
+  applyScrollEngine(res.data.p67);
+}
+document.querySelectorAll('#scrollEngine .seg-btn').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const p67 = parseInt(btn.dataset.engine, 10) === 0 ? 0 : 1;
+    if (Number(window.settings.p67) === p67) return;
+    const previous = window.settings.p67;
+    window.settings.p67 = p67;
+    applyScrollEngine(p67);
+    const res = await apiPostJson('/api/settings', { p67 });
+    if (res.ok && res.data && res.data.status === 'ok') toast(getMessage('settings_saved'), 'ok');
+    else {
+      window.settings.p67 = previous;
+      applyScrollEngine(previous == null ? 1 : previous);
+      toast(getMessage('save_failed'), 'err');
+    }
+  });
+});
 el('refreshStatus').addEventListener('click', () => { loadStatus(); toast(getMessage('status_refreshed'), 'ok'); });
 el('supportCopy').addEventListener('click', async () => {
   try { await navigator.clipboard.writeText(JSON.stringify(window.statusData || {}, null, 2)); toast(getMessage('info_copied_clipboard'), 'ok'); }

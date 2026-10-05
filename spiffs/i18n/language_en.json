@@ -623,6 +623,8 @@
   },
   "system": {
     "maintenance_title": "Maintenance",
-    "danger_title": "Danger zone"
+    "danger_title": "Danger zone",
+    "scroll_engine": "Scrolling line",
+    "scroll_engine_desc": "Frixos steps the text itself. LVGL uses the library animation. Switch if the line stutters."
   }
 }

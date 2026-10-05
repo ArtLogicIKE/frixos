@@ -623,6 +623,8 @@
   },
   "system": {
     "maintenance_title": "Wartung",
-    "danger_title": "Gefahrenzone"
+    "danger_title": "Gefahrenzone",
+    "scroll_engine": "Laufzeile",
+    "scroll_engine_desc": "Frixos bewegt den Text selbst. LVGL nutzt die Bibliotheksanimation. Umschalten, wenn die Zeile ruckelt."
   }
 }

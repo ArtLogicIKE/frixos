@@ -71,6 +71,7 @@
  * - p12 = msg_color (Message color)
  * - p13 = msg_font (Message font)
  * - p14 = scroll_delay (Scroll delay)
+ * - p67 = scroll_engine (0 = LVGL animation, 1 = Frixos belt)
  * - p15 = night_msg_color (Night message color)
  * - p16 = message (Scrolling message)
  * - p17 = lat (Latitude)
@@ -764,11 +765,12 @@ static uint64_t calculate_include_mask(const char *group, const char *params)
     return mask;
 }
 
-/* p64–p66 sit past the uint64 settings mask. Bits: 1=p64, 2=p65, 4=p66. */
+/* p64–p66 and p67 sit past the uint64 settings mask.
+ * Bits: 1=p64, 2=p65, 4=p66, 8=p67 (scroll engine). */
 static uint8_t wu_settings_mask(const char *group, const char *params)
 {
     if ((!group || group[0] == '\0') && (!params || params[0] == '\0'))
-        return 0x7;
+        return 0xF;
 
     uint8_t bits = 0;
     if (group && strcmp(group, "integrations") == 0)
@@ -786,6 +788,8 @@ static uint8_t wu_settings_mask(const char *group, const char *params)
                 bits |= 0x2;
             else if (strncmp(p, "66", 2) == 0 && !isdigit((unsigned char)p[2]))
                 bits |= 0x4;
+            else if (strncmp(p, "67", 2) == 0 && !isdigit((unsigned char)p[2]))
+                bits |= 0x8;
         }
     }
     return bits;
@@ -901,6 +905,7 @@ esp_err_t send_json_settings(httpd_req_t *req)
     if (wu_mask & 0x1) cJSON_AddStringToObject(root, "p64", eeprom_wu_station);
     if (wu_mask & 0x2) cJSON_AddStringToObject(root, "p65", eeprom_wu_key);
     if (wu_mask & 0x4) cJSON_AddNumberToObject(root, "p66", eeprom_wu_refresh_mins);
+    if (wu_mask & 0x8) cJSON_AddNumberToObject(root, "p67", eeprom_scroll_engine);
 
     // Add Dexcom settings
     if (mask & (1ULL << 30)) cJSON_AddNumberToObject(root, "p30", eeprom_dexcom_region);
@@ -1313,6 +1318,10 @@ static bool validate_json_params(cJSON *root, char *err_buf, size_t err_size)
     /* p14 scroll_delay (stored as uint8_t, max 255) */
     if ((item = cJSON_GetObjectItem(root, "p14")) && cJSON_IsNumber(item))
         CHECK_RANGE("scroll_delay", item->valueint, 30, 255);
+
+    /* p67 scroll engine: 0 = LVGL, 1 = Frixos */
+    if ((item = cJSON_GetObjectItem(root, "p67")) && cJSON_IsNumber(item))
+        CHECK_RANGE("scroll_engine", item->valueint, SCROLL_ENGINE_LVGL, SCROLL_ENGINE_FRIXOS);
 
     /* p40 dark_theme, p41 language */
     if ((item = cJSON_GetObjectItem(root, "p40")) && cJSON_IsNumber(item))
@@ -2030,6 +2039,14 @@ esp_err_t settings_post_handler(httpd_req_t *req)
     else
     {
         ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "scroll_delay not found in POST data or not a number");
+    }
+
+    cJSON *scroll_engine = cJSON_GetObjectItem(root, "p67");
+    if (cJSON_IsNumber(scroll_engine))
+    {
+        eeprom_scroll_engine = (uint8_t)scroll_engine->valueint;
+        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Scroll engine: %s",
+                    eeprom_scroll_engine == SCROLL_ENGINE_LVGL ? "LVGL" : "Frixos");
     }
 
     cJSON *dark_theme = cJSON_GetObjectItem(root, "p40");

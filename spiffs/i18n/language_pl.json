@@ -623,6 +623,8 @@
   },
   "system": {
     "maintenance_title": "Konserwacja",
-    "danger_title": "Strefa niebezpieczna"
+    "danger_title": "Strefa niebezpieczna",
+    "scroll_engine": "Przewijany wiersz",
+    "scroll_engine_desc": "Frixos przesuwa tekst samodzielnie. LVGL używa animacji biblioteki. Przełącz, jeśli wiersz zacina się."
   }
 }

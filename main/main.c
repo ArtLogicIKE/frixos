@@ -132,6 +132,7 @@ uint8_t eeprom_dark_theme = 1;      // Default to dark theme (1 = dark, 0 = ligh
 uint8_t eeprom_language = 0;        // Default to English (0=en, 1=de, 2=fr, 3=it, 4=pt, 5=sv, 6=da, 7=pl)
 uint8_t eeprom_scroll_speed = 10;   // Default scroll speed in pixels per second
 uint8_t eeprom_scroll_delay = 60;   // Default scroll delay in milliseconds (30-255)
+uint8_t eeprom_scroll_engine = SCROLL_ENGINE_FRIXOS; // p67: hand-rolled belt, not LVGL's animation
 char eeprom_message[SCROLL_MSG_LENGTH] = "[device]: [greeting] [day], [date] [mon], now [temp] today [high]-[low], hum. [hum], sun [rise]-[set]";
 
 screen_layout_t eeprom_screen_layout = {0};
@@ -175,6 +176,7 @@ static const nvs_setting_t settings_table[] = {
     {"dark_theme", SETTING_TYPE_U8, &eeprom_dark_theme, 0},
     {"scroll_speed", SETTING_TYPE_U8, &eeprom_scroll_speed, 0},
     {"scroll_delay", SETTING_TYPE_U8, &eeprom_scroll_delay, 0},
+    {"scroll_eng", SETTING_TYPE_U8, &eeprom_scroll_engine, 0},
     {"language", SETTING_TYPE_U8, &eeprom_language, 0},
     {"brightness", SETTING_TYPE_BLOB, eeprom_brightness_LED, sizeof(eeprom_brightness_LED)},
     {"lux_sens", SETTING_TYPE_BLOB, &eeprom_lux_sensitivity, sizeof(eeprom_lux_sensitivity)},
@@ -809,6 +811,8 @@ void startup_read_eeprom(void)
       ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Migrated scroll delay %ums -> 60ms", (unsigned)from);
       write_nvs_parameters();
     }
+    if (eeprom_scroll_engine > SCROLL_ENGINE_FRIXOS)
+      eeprom_scroll_engine = SCROLL_ENGINE_FRIXOS;
 
     // Load display schedule from JSON; migrate from legacy params if absent
     if (eeprom_disp_sched[0] != '\0')

@@ -432,6 +432,13 @@
       <details class="adv-box danger-box">
         <summary data-i18n="system.danger_title">Danger zone</summary>
         <div class="adv-body">
+          <div class="subtitle" data-i18n="system.scroll_engine">Scrolling line</div>
+          <p class="muted-p" data-i18n="system.scroll_engine_desc">Frixos steps the text itself. LVGL uses the library animation. Switch if the line stutters.</p>
+          <div class="seg" id="scrollEngine" style="width:fit-content" role="group" data-i18n-aria-label="system.scroll_engine" aria-label="Scrolling line">
+            <button type="button" class="seg-btn" data-engine="0" id="scrollEngineLvgl">LVGL</button>
+            <button type="button" class="seg-btn active" data-engine="1" id="scrollEngineFrixos">Frixos</button>
+          </div>
+
           <div class="subtitle" data-i18n="update.title">Upload firmware / files</div>
           <p class="muted-p" data-i18n="update.upload_desc">Your device installs new firmware automatically. Use this only if support asked you to install a specific build, or to upload a custom font.</p>
           <div class="field"><label data-i18n="common.file">File</label><input type="file" id="fwFile"></div>

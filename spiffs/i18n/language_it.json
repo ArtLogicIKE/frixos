@@ -623,6 +623,8 @@
   },
   "system": {
     "maintenance_title": "Manutenzione",
-    "danger_title": "Zona di pericolo"
+    "danger_title": "Zona di pericolo",
+    "scroll_engine": "Riga scorrevole",
+    "scroll_engine_desc": "Frixos sposta il testo da solo. LVGL usa l'animazione della libreria. Cambia se la riga va a scatti."
   }
 }

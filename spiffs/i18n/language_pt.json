@@ -623,6 +623,8 @@
   },
   "system": {
     "maintenance_title": "Manutenção",
-    "danger_title": "Zona de perigo"
+    "danger_title": "Zona de perigo",
+    "scroll_engine": "Linha rolante",
+    "scroll_engine_desc": "O Frixos move o texto por conta própria. O LVGL usa a animação da biblioteca. Troque se a linha tremer."
   }
 }

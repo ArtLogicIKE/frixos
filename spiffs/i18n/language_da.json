@@ -623,6 +623,8 @@
   },
   "system": {
     "maintenance_title": "Vedligeholdelse",
-    "danger_title": "Farezone"
+    "danger_title": "Farezone",
+    "scroll_engine": "Rullende linje",
+    "scroll_engine_desc": "Frixos flytter teksten selv. LVGL bruger bibliotekets animation. Skift hvis linjen hakker."
   }
 }
