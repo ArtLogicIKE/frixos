@@ -24,6 +24,7 @@ void display_digit(int position, int digit);
 void display_task(void *pvParameters);
 void replace_placeholders(const char *input, char* output, size_t output_size);
 void set_scroll_message(const char *message);
+void scroll_stall_report(char *buf, size_t n);
 void prepare_tokens(void);
 const lv_font_t* get_selected_font(uint8_t font_index);
 uint8_t get_selected_font_height(uint8_t font_index);

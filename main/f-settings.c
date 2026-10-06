@@ -2702,6 +2702,9 @@ esp_err_t status_api_handler(httpd_req_t *req)
     cJSON_AddNumberToObject(root, "last_weather_update", (double)last_weather_update);
     cJSON_AddNumberToObject(root, "last_time_update", (double)last_time_update);
     cJSON_AddNumberToObject(root, "uptime", (double)(esp_timer_get_time() / 1000000ULL));
+    char scroll_stall[384];
+    scroll_stall_report(scroll_stall, sizeof(scroll_stall));
+    cJSON_AddStringToObject(root, "scroll_stall", scroll_stall);
 
     // Add sensor and location data
     // Add sensor data

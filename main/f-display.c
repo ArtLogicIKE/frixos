@@ -22,6 +22,7 @@
 
 #include "time.h"
 #include "math.h"
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "esp_timer.h"
@@ -277,6 +278,8 @@ static void apply_screen_layout_z_order(const screen_layout_profile_t *layout);
 static uint8_t screen_scroll_delay_ms(void);
 static void handle_alternate_mode_switching(time_t now, uint32_t loop_counter, bool *should_update_display);
 static void update_display_content(time_t now);
+static void scroll_service(void);
+static void stall_note(const char *name, int64_t us);
 void display_string_substring(const char *text, int32_t x, int32_t y,
                               int32_t start_pixel, int32_t width_pixels,
                               lv_obj_t *label_obj, const lv_font_t *font);
@@ -448,16 +451,75 @@ static bool message_scroll_busy(bool step_now)
   return t1 != t0;
 }
 
+/* Longest run of each display-loop section, so a boot redraw cannot hide a
+ * later stall. Read from /api/status. Names are string literals. */
+#define STALL_KEEP 16
+static struct
+{
+  const char *n;
+  int32_t ms;
+  int32_t ntimes;
+} stall_ev[STALL_KEEP];
+static bool stall_live = false;
+
+static void stall_note(const char *name, int64_t us)
+{
+  if (!stall_live || us < 20000 || name == NULL)
+    return;
+  int32_t ms = (int32_t)(us / 1000);
+  for (int i = 0; i < STALL_KEEP; i++)
+  {
+    if (stall_ev[i].n == name)
+    {
+      stall_ev[i].ntimes++;
+      if (ms > stall_ev[i].ms)
+        stall_ev[i].ms = ms;
+      return;
+    }
+    if (stall_ev[i].n == NULL)
+    {
+      stall_ev[i].n = name;
+      stall_ev[i].ms = ms;
+      stall_ev[i].ntimes = 1;
+      return;
+    }
+  }
+}
+
+void scroll_stall_report(char *buf, size_t n)
+{
+  if (buf == NULL || n == 0)
+    return;
+  buf[0] = '\0';
+  size_t used = 0;
+  for (int i = 0; i < STALL_KEEP; i++)
+  {
+    if (stall_ev[i].n == NULL)
+      break;
+    int u = snprintf(buf + used, n - used, "%s%s:%ld/%ld",
+                     used == 0 ? "" : " ",
+                     stall_ev[i].n,
+                     (long)stall_ev[i].ms,
+                     (long)stall_ev[i].ntimes);
+    if (u < 0 || used + (size_t)u >= n)
+      return;
+    used += (size_t)u;
+  }
+  if (used == 0)
+    snprintf(buf, n, "-");
+}
+
 static int glyph_ink(const uint8_t *bmp, uint16_t stride, uint16_t box_w, int x, int y)
 {
   unsigned bit = stride == 0 ? (unsigned)(y * box_w + x) : (unsigned)(y * (int)stride * 8 + x);
   return (bmp[bit >> 3] >> (7 - (bit & 7))) & 1;
 }
 
-static int frixos_text_width(const char *text, const lv_font_t *font)
+static int frixos_text_width(const char *text, const lv_font_t *font, bool pump)
 {
   int width = 0;
   int len = (int)strlen(text);
+  int glyphs = 0;
   for (int i = 0; i < len;)
   {
     int n = 0, n2 = 0;
@@ -471,15 +533,18 @@ static int frixos_text_width(const char *text, const lv_font_t *font)
     if (lv_font_get_glyph_dsc(font, &g, cp, next))
       width += g.adv_w;
     i += n;
+    if (pump && (++glyphs & 7) == 0)
+      scroll_service();
   }
   return width;
 }
 
 /* Stamp the 1-bpp glyphs into the strip. Rows are MSB-first, matching the fonts. */
 static void frixos_strip_draw(uint8_t *strip, int stride, int strip_h, int text_w,
-                              const char *text, const lv_font_t *font)
+                              const char *text, const lv_font_t *font, bool pump)
 {
   int pen = 0;
+  int glyphs = 0;
   int len = (int)strlen(text);
   const int line_h = (int)font->line_height;
   const int base = (int)font->base_line;
@@ -524,6 +589,9 @@ static void frixos_strip_draw(uint8_t *strip, int stride, int strip_h, int text_
     }
     pen += g.adv_w;
     i += n;
+    /* The belt keeps moving on the old strip while this one is rasterized. */
+    if (pump && (++glyphs & 3) == 0)
+      scroll_service();
   }
 }
 
@@ -704,17 +772,18 @@ static void frixos_label_reset(void)
   scroll_timebase_mark();
 }
 
-/* Rasterize once. Returns false when the strip cannot be built; caller keeps the label belt. */
-static bool frixos_scroll_rebuild(const char *text, const lv_font_t *font, const screen_widget_t *w)
+/* Rasterize into a private buffer. pump lets the installed belt step while this
+ * runs, so the caller must not already hold the LVGL lock. */
+static bool frixos_strip_build(const char *text, const lv_font_t *font, bool pump,
+                               uint8_t **out_buf, int *out_w, int *out_stride,
+                               int *out_h, int *out_text_w)
 {
-  if (label_msg_canvas == NULL || font == NULL || text == NULL || w == NULL)
+  if (font == NULL || text == NULL || out_buf == NULL)
     return false;
   int line_h = (int)font->line_height;
-  int h = scroll_view_h > 0 && scroll_view_h < line_h ? scroll_view_h : line_h;
-  if (line_h < 1 || line_h > SCROLL_CANVAS_MAX_H || h < 1)
+  if (line_h < 1 || line_h > SCROLL_CANVAS_MAX_H)
     return false;
-  int view_w = scroll_view_w > 0 ? scroll_view_w : MSG_WIDTH;
-  int text_w = frixos_text_width(text, font);
+  int text_w = frixos_text_width(text, font, pump);
   if (text_w < 1)
     return false;
 
@@ -724,10 +793,38 @@ static bool frixos_scroll_rebuild(const char *text, const lv_font_t *font, const
   if (buf == NULL)
   {
     ESP_LOG_WEB(ESP_LOG_WARN, TAG, "scroll strip alloc %u failed", (unsigned)((size_t)stride * (size_t)line_h));
-    frixos_scroll_discard();
     return false;
   }
-  frixos_strip_draw(buf, stride, line_h, text_w, text, font);
+  frixos_strip_draw(buf, stride, line_h, text_w, text, font, pump);
+  *out_buf = buf;
+  if (out_w)
+    *out_w = strip_w;
+  if (out_stride)
+    *out_stride = stride;
+  if (out_h)
+    *out_h = line_h;
+  if (out_text_w)
+    *out_text_w = text_w;
+  return true;
+}
+
+/* Install a strip built by frixos_strip_build. Takes ownership of buf.
+ * Caller holds the LVGL lock. Returns false when the canvas cannot be bound;
+ * the label belt is the fallback. */
+static bool frixos_scroll_commit(uint8_t *buf, int strip_w, int stride, int line_h, int text_w,
+                                 const screen_widget_t *w)
+{
+  if (buf == NULL || w == NULL || label_msg_canvas == NULL)
+  {
+    free(buf);
+    return false;
+  }
+  int h = scroll_view_h > 0 && scroll_view_h < line_h ? scroll_view_h : line_h;
+  if (h < 1 || strip_w < 1)
+  {
+    free(buf);
+    return false;
+  }
 
   free(scroll_strip);
   scroll_strip = buf;
@@ -737,6 +834,7 @@ static bool frixos_scroll_rebuild(const char *text, const lv_font_t *font, const
   label_max_pos = text_w;
   frixos_scroll_measure_ink();
 
+  int view_w = scroll_view_w > 0 ? scroll_view_w : MSG_WIDTH;
   int ipos = view_w % strip_w;
   if (ipos > 0)
     ipos -= strip_w;
@@ -795,6 +893,22 @@ static void frixos_scroll_advance(void)
   if (period < 1)
     period = 1;
   apply_scroll_belt(ipos, period);
+}
+
+/* Paint one owed pixel if the clock says so. Safe to call when nothing is due.
+ * Must not be called while this task already holds the LVGL lock: the unlock
+ * below has to be the last one, or the renderer cannot flush the new column. */
+static void scroll_service(void)
+{
+  if (!message_scroll_step_due())
+    return;
+  int64_t t0 = esp_timer_get_time();
+  lvgl_port_lock(0);
+  int64_t locked = esp_timer_get_time();
+  stall_note("scroll_lock", locked - t0);
+  frixos_scroll_advance();
+  stall_note("scroll_draw", esp_timer_get_time() - locked);
+  lvgl_port_unlock();
 }
 
 static void text_label_draw_trim_bg(lv_event_t *e)
@@ -892,18 +1006,31 @@ static void apply_static_text_widget(lv_obj_t *label, const screen_widget_t *w, 
 static void update_static_text_labels(void)
 {
   const screen_layout_profile_t *layout = &eeprom_screen_layout.profile[font_index];
+  static char rendered[SCREEN_STATIC_TEXT_COUNT][SCREEN_STATIC_TEXT_LENGTH];
 
+  for (int i = 0; i < SCREEN_STATIC_TEXT_COUNT; i++)
+  {
+    rendered[i][0] = '\0';
+    if (label_static[i] == NULL)
+      continue;
+    int64_t t0 = esp_timer_get_time();
+    replace_placeholders(layout->static_text[i], rendered[i], sizeof(rendered[i]));
+    stall_note("static_txt", esp_timer_get_time() - t0);
+    scroll_service();
+  }
+
+  int64_t t0 = esp_timer_get_time();
+  lvgl_port_lock(0);
   for (int i = 0; i < SCREEN_STATIC_TEXT_COUNT; i++)
   {
     if (label_static[i] == NULL)
       continue;
-
     const screen_widget_t *w = &layout->widget[SCREEN_ELEM_TEXT_1 + i];
-    char rendered[SCREEN_STATIC_TEXT_LENGTH];
-    replace_placeholders(layout->static_text[i], rendered, sizeof(rendered));
-    apply_static_text_widget(label_static[i], w, rendered);
+    apply_static_text_widget(label_static[i], w, rendered[i]);
     show_object(label_static[i], w->enabled != 0 && time_valid);
   }
+  lvgl_port_unlock();
+  stall_note("static_lv", esp_timer_get_time() - t0);
 }
 
 int check_file(char *filename); // defined later; used by update_icon_srcs
@@ -942,35 +1069,47 @@ static void update_digit_label_widget(lv_obj_t *label,
                                       screen_element_id_t pair_elem,
                                       const char *configured_text)
 {
-  if (label == NULL || w->enabled == 0 || !time_valid)
+  char rendered[SCREEN_STATIC_TEXT_LENGTH];
+  const char *display_text = configured_text;
+  bool show = label != NULL && w->enabled != 0 && time_valid;
+
+  if (show)
+  {
+    const screen_layout_profile_t *layout = &eeprom_screen_layout.profile[font_index];
+    const bool show_time = layout_show_time_digits(layout, runner, pair_elem);
+    const bool show_glucose = layout_show_glucose_on_digits(layout, runner, pair_elem);
+    const bool show_weather = layout_show_weather_on_digits(layout, runner, pair_elem);
+    const bool show_ha = layout_show_ha_on_digits(layout, runner, pair_elem);
+    const bool slot_named = (show_time || show_glucose || show_weather || show_ha)
+                            && runner->count > 0
+                            && runner->schedule[runner->current_idx].name[0] != '\0';
+
+    if (slot_named)
+      display_text = runner->schedule[runner->current_idx].name;
+    else
+    {
+      int64_t t0 = esp_timer_get_time();
+      replace_placeholders(configured_text, rendered, sizeof(rendered));
+      stall_note("digit_txt", esp_timer_get_time() - t0);
+      display_text = rendered;
+    }
+  }
+
+  int64_t t0 = esp_timer_get_time();
+  lvgl_port_lock(0);
+  if (!show)
   {
     if (label)
       show_object(label, false);
-    return;
   }
-
-  const screen_layout_profile_t *layout = &eeprom_screen_layout.profile[font_index];
-  const bool show_time = layout_show_time_digits(layout, runner, pair_elem);
-  const bool show_glucose = layout_show_glucose_on_digits(layout, runner, pair_elem);
-  const bool show_weather = layout_show_weather_on_digits(layout, runner, pair_elem);
-  const bool show_ha = layout_show_ha_on_digits(layout, runner, pair_elem);
-  const bool slot_named = (show_time || show_glucose || show_weather || show_ha)
-                          && runner->count > 0
-                          && runner->schedule[runner->current_idx].name[0] != '\0';
-
-  char rendered[SCREEN_STATIC_TEXT_LENGTH];
-  const char *display_text = configured_text;
-
-  if (slot_named)
-    display_text = runner->schedule[runner->current_idx].name;
   else
   {
-    replace_placeholders(configured_text, rendered, sizeof(rendered));
-    display_text = rendered;
+    apply_static_text_widget(label, w, display_text);
+    show_object(label, true);
   }
-
-  apply_static_text_widget(label, w, display_text);
-  show_object(label, true);
+  lvgl_port_unlock();
+  stall_note("digit_lv", esp_timer_get_time() - t0);
+  scroll_service();
 }
 
 static void update_digit_label_widgets(void)
@@ -1301,17 +1440,31 @@ void set_scroll_message(const char *msg)
   }
   last_scroll_font = msg_font;
 
+  const screen_widget_t *w_msg = active_screen_widget(SCREEN_ELEM_MESSAGE);
+  const int msg_x = screen_layout_positions_live ? layout_abs_x(w_msg) : BOOT_MSG_X;
+  const int msg_y = screen_layout_positions_live ? layout_abs_y(w_msg) : BOOT_MSG_Y;
+  const bool use_frixos = eeprom_scroll_engine != SCROLL_ENGINE_LVGL;
+  int preview_w = message_view_width(msg_x);
+
+  uint8_t *new_strip = NULL;
+  int new_w = 0, new_stride = 0, new_h = 0, new_text_w = 0;
+  bool have_strip = false;
+  if (use_frixos && size.x > preview_w && (content_changed || scroll_strip == NULL))
+  {
+    int64_t t_strip = esp_timer_get_time();
+    have_strip = frixos_strip_build(msg, font, true, &new_strip, &new_w, &new_stride, &new_h, &new_text_w);
+    stall_note("strip", esp_timer_get_time() - t_strip);
+  }
+
+  int64_t t_wait = esp_timer_get_time();
   lvgl_port_lock(0);
+  stall_note("msg_wait", esp_timer_get_time() - t_wait);
+  int64_t t_lv = esp_timer_get_time();
   lv_obj_set_style_text_font(label_msg, font, 0);
   lv_obj_set_style_text_font(label_msg_loop, font, 0);
   label_size = size.x;
-  const screen_widget_t *w_msg = active_screen_widget(SCREEN_ELEM_MESSAGE);
   apply_message_widget_styles(w_msg);
-  const int msg_x = screen_layout_positions_live ? layout_abs_x(w_msg) : BOOT_MSG_X;
-  const int msg_y = screen_layout_positions_live ? layout_abs_y(w_msg) : BOOT_MSG_Y;
   place_message_clip(msg_x, msg_y);
-
-  const bool use_frixos = eeprom_scroll_engine != SCROLL_ENGINE_LVGL;
 
   if (label_size > scroll_view_w && use_frixos)
   { // Frixos belt: a 1-bit strip scrolled one presented pixel at a time.
@@ -1324,11 +1477,14 @@ void set_scroll_message(const char *msg)
     int view_h = scroll_strip_h;
     if (scroll_view_h > 0 && (view_h < 1 || scroll_view_h < view_h))
       view_h = scroll_view_h;
-    if (content_changed || scroll_strip == NULL)
+    if (have_strip)
     {
-      if (!frixos_scroll_rebuild(msg, font, w_msg) && content_changed)
+      if (!frixos_scroll_commit(new_strip, new_w, new_stride, new_h, new_text_w, w_msg) && content_changed)
         frixos_label_reset();
+      new_strip = NULL;
     }
+    else if (content_changed || scroll_strip == NULL)
+      frixos_label_reset();
     else if (scroll_canvas_w != scroll_view_w || scroll_canvas_h != view_h)
     {
       frixos_colors_store(w_msg);
@@ -1343,6 +1499,8 @@ void set_scroll_message(const char *msg)
   }
   else if (label_size > scroll_view_w)
   { // LVGL's own circular animation, kept as the comparison engine.
+    free(new_strip);
+    new_strip = NULL;
     // Leave a running anim alone unless the text, font, engine, or delay changed.
     frixos_scroll_discard();
     if (content_changed || delay_changed)
@@ -1350,6 +1508,8 @@ void set_scroll_message(const char *msg)
   }
   else
   { // centered
+    free(new_strip);
+    new_strip = NULL;
     frixos_scroll_discard();
     const int centered_label_width = scroll_view_w;
 
@@ -1366,6 +1526,7 @@ void set_scroll_message(const char *msg)
   applied_scroll_engine = eeprom_scroll_engine;
   applied_scroll_delay = delay_now;
   lvgl_port_unlock();
+  stall_note("msg_lv", esp_timer_get_time() - t_lv);
 }
 
 // this is reboot only stuff
@@ -2230,8 +2391,12 @@ static void apply_screen_layout_positions(void)
     const screen_widget_t *w_icon = &layout->widget[SCREEN_ELEM_ICON_1 + i];
     lv_obj_align(img_icon[i], LV_ALIGN_TOP_LEFT, layout_abs_x(w_icon), layout_abs_y(w_icon));
   }
+  lvgl_port_unlock();
+
   update_static_text_labels();
   update_digit_label_widgets();
+
+  lvgl_port_lock(0);
   apply_screen_layout_z_order(layout);
   lvgl_port_unlock();
 }
@@ -2817,12 +2982,13 @@ void display_changed(void)
 
   update_icon_srcs(); // (re)point icon images at S:/icon<N>.jpg before visibility
   apply_widget_visibility(layout);
+  lvgl_port_unlock(); // Unlock LVGL
+
   if (!screen_layout_positions_live)
   {
     update_static_text_labels();
     update_digit_label_widgets();
   }
-  lvgl_port_unlock(); // Unlock LVGL
 
   apply_screen_layout_positions();
 
@@ -2924,8 +3090,8 @@ void show_qr_code(void)
   lvgl_port_lock(0);
   lv_image_set_src(img_logo, "S:/wifi-qr.jpg");
   lv_obj_align(img_logo, LV_ALIGN_TOP_LEFT, 37, 32);
-  set_scroll_message(" Scan QR code to connect to your Frixos ");
   lvgl_port_unlock();
+  set_scroll_message(" Scan QR code to connect to your Frixos ");
 }
 
 // Watchdog mechanism for display task hang detection
@@ -2993,7 +3159,9 @@ static void handle_als_and_brightness(uint32_t loop_counter)
   {
     // read ALS sensor every 5 seconds (time-based, independent of loop period)
     als_last_read_us = esp_timer_get_time();
+    int64_t t_als = esp_timer_get_time();
     lux = ltr303_get_frixos_lux();
+    stall_note("als", esp_timer_get_time() - t_als);
 
     if (lux > eeprom_lux_threshold + eeprom_lux_sensitivity)
       font_index = 0;
@@ -3093,32 +3261,36 @@ static void handle_integration_and_messages(void)
     {
       char ip_message[64];
       snprintf(ip_message, sizeof(ip_message), "%s ", boot_ip_address);
-      lvgl_port_lock(0);
       set_scroll_message(ip_message);
       ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Displaying IP address: %s for %d seconds", ip_message, IP_DISPLAY_DURATION_SEC);
-      lvgl_port_unlock();
       ip_message_set = true;
       ip_display_start_time = esp_timer_get_time();
     }
     else if (!show_ip_on_boot)
     {
       const screen_layout_profile_t *layout = &eeprom_screen_layout.profile[font_index];
-      lvgl_port_lock(0);
       // Only render the scroll message when it's enabled (or during the boot
       // splash, !time_valid). When disabled, hide both the message and its
       // seamless-scroll copy so set_scroll_message can't re-show the belt. (#190)
+      // Placeholder expansion stays outside the LVGL lock; set_scroll_message
+      // and the static labels take it only while they touch objects.
       if (layout->widget[SCREEN_ELEM_MESSAGE].enabled || !time_valid)
       {
+        int64_t t_txt = esp_timer_get_time();
         replace_placeholders(layout->scroll_text, msg_scrolling, sizeof(msg_scrolling));
+        stall_note("scroll_txt", esp_timer_get_time() - t_txt);
+        scroll_service();
         set_scroll_message(msg_scrolling);
       }
       else
       {
+        lvgl_port_lock(0);
         show_object(label_msg_clip, false);
         show_object(label_msg_loop, false);
+        lvgl_port_unlock();
       }
+      scroll_service();
       update_static_text_labels();
-      lvgl_port_unlock();
       // One-shot restore after an update ended: without this the
       // "(!in_progress && updating_message)" refresh gate stays armed and
       // re-runs this block every tick.
@@ -3354,13 +3526,14 @@ static void update_display_content(time_t now)
                            digit_objs, dots, img_mgdl, label_degree, &show_ampm);
   update_one_digit_display(layout, &aux_runner, SCREEN_ELEM_TIME_AUX,
                            aux_digit_objs, aux_dots, img_mgdl_aux, label_degree_aux, NULL);
-  update_digit_label_widgets();
   show_object(img_ampm, layout_show_time_digits(layout, &primary_runner, SCREEN_ELEM_TIME) && eeprom_12hour);
 
   lv_image_set_offset_x(img_weather, -weather_icon_index * 32);
   lv_image_set_offset_x(img_moon, -moon_icon_index * 14);
   lv_image_set_offset_x(img_ampm, show_ampm ? -10 : 0);
   lvgl_port_unlock();
+
+  update_digit_label_widgets();
 
   last_minute = timeinfo.tm_min;
 
@@ -3371,9 +3544,9 @@ static void update_display_content(time_t now)
     lvgl_port_lock(0);
     if (img_logo) lv_obj_add_flag(img_logo, LV_OBJ_FLAG_HIDDEN);
     apply_widget_visibility(layout);
+    lvgl_port_unlock();
     update_static_text_labels();
     update_digit_label_widgets();
-    lvgl_port_unlock();
   }
   lastrun = now;
 }
@@ -3411,18 +3584,25 @@ void display_task(void *pvParameters)
     }
 
     time(&now);
+    if (time_valid)
+      stall_live = true;
 
     if (settings_updated)
     {
       ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Settings updated");
+      int64_t t0 = esp_timer_get_time();
       display_changed();
+      stall_note("settings", esp_timer_get_time() - t0);
+      scroll_service();
       update_display_content(now);
+      scroll_service();
       settings_updated = false;
       // Engine (and any other message setting) applies on the next message
       // rebuild. Re-feed the current line now so the switch is immediate,
       // including when the text itself did not change.
       if (last_scroll_msg[0] != '\0')
         set_scroll_message(last_scroll_msg);
+      scroll_service();
     }
 
     const bool scroll_step = message_scroll_step_due();
@@ -3430,25 +3610,53 @@ void display_task(void *pvParameters)
 
     // Skip other LVGL-locking work on a belt step and on the 10 ms pass just
     // before one, so the 1 s schedule poll cannot share a frame with a blit.
+    // Between the calls that do run, paint any pixel the clock says is due so
+    // one slow section cannot pile up into a multi-pixel jump.
     if (!scroll_busy)
     {
+      int64_t t0 = esp_timer_get_time();
       handle_screen_layout_on_wifi();
+      stall_note("layout", esp_timer_get_time() - t0);
+      scroll_service();
+
+      t0 = esp_timer_get_time();
       handle_wifi_status_icon();
+      stall_note("wifi", esp_timer_get_time() - t0);
+      scroll_service();
+
+      t0 = esp_timer_get_time();
       handle_integration_and_messages();
+      stall_note("integr", esp_timer_get_time() - t0);
+      scroll_service();
+
+      t0 = esp_timer_get_time();
       handle_als_and_brightness(loop_counter);
+      stall_note("bright", esp_timer_get_time() - t0);
+      scroll_service();
+
+      t0 = esp_timer_get_time();
       update_graph(); // self-guards: only redraws when a new sample arrived
+      stall_note("graph", esp_timer_get_time() - t0);
+      scroll_service();
 
       bool should_update_display = false;
+      t0 = esp_timer_get_time();
       handle_alternate_mode_switching(now, loop_counter, &should_update_display);
+      stall_note("alt", esp_timer_get_time() - t0);
+      scroll_service();
 
       if (should_update_display)
       {
+        t0 = esp_timer_get_time();
         update_display_content(now);
+        stall_note("digits", esp_timer_get_time() - t0);
+        scroll_service();
       }
 
       // Handle fade updates
       if (fade_update_needed)
       {
+        int64_t t_fade = esp_timer_get_time();
         fade_update_needed = false;
         // Calculate current opacity
         float t = (float)fade_step / FADE_STEPS;
@@ -3487,6 +3695,8 @@ void display_task(void *pvParameters)
             last_disabled = false;
           }
         }
+        stall_note("fade", esp_timer_get_time() - t_fade);
+        scroll_service();
       }
     }
 
@@ -3506,12 +3716,7 @@ void display_task(void *pvParameters)
       }
     }
 
-    if (scroll_step)
-    {
-      lvgl_port_lock(0);
-      frixos_scroll_advance();
-      lvgl_port_unlock();
-    }
+    scroll_service();
 
     // NOTE: Do NOT call lv_task_handler() here! The esp_lvgl_port creates its own
     // task that runs lv_timer_handler. Calling it from display_task causes two tasks
