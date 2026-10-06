@@ -326,8 +326,10 @@ static bool fetch_ha_entity(integration_token_t *token)
         // Keep the per-attempt budget short so a stalled HA can't tie up the radio
         // and CPU for ages. We retry on the next 60s integration cycle anyway.
         .timeout_ms = 5000,
-        .buffer_size = HTTP_BUFFER_SIZE,    // Use HTTP_BUFFER_SIZE
-        .buffer_size_tx = HTTP_BUFFER_SIZE, // Use HTTP_BUFFER_SIZE
+        // Match download_file() in f-ota.c. 4096/4096 RX/TX made
+        // esp_http_client_init fail when free heap was low.
+        .buffer_size = 2048,
+        .buffer_size_tx = 512,
         .transport_type = HTTP_TRANSPORT_OVER_SSL,
         .crt_bundle_attach = custom_crt_bundle_attach,
         .tls_version = ESP_TLS_VER_TLS_1_2,
@@ -623,8 +625,8 @@ static void graph_backfill_from_ha(const char *entity, const char *path, uint16_
         .url = url,
         .event_handler = graph_hist_event_handler,
         .timeout_ms = 8000,
-        .buffer_size = HTTP_BUFFER_SIZE,
-        .buffer_size_tx = HTTP_BUFFER_SIZE,
+        .buffer_size = 2048,
+        .buffer_size_tx = 512,
         .transport_type = HTTP_TRANSPORT_OVER_SSL,
         .crt_bundle_attach = custom_crt_bundle_attach,
         .tls_version = ESP_TLS_VER_TLS_1_2,
