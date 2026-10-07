@@ -286,7 +286,87 @@ static esp_err_t ha_http_event_handler(esp_http_client_event_t *evt)
     return ESP_OK;
 }
 
-// Function to fetch a single HA entity value
+// One client for the whole HA token loop. Same idea as dexcom_client: do not
+// init/cleanup per token. Connection: keep-alive (not close) so tokens that
+// share eeprom_ha_url reuse the TLS session. Discarded at the end of the cycle
+// so the TLS block is free before stocks, CGM, or weather.
+//
+// A single multi-entity body does not fit the 4 KB shared buffer. Each
+// /api/states document includes attributes; one climate or media player is
+// often already past 1 KB, and a dozen tokens overflow. Streaming every state
+// in the HA instance would not finish inside the 5 s client timeout this
+// backoff is built around. Each token stays one GET, scanned with
+// get_value_from_JSON_string — not a cJSON parse of a multi-entity blob.
+static esp_http_client_handle_t ha_client = NULL;
+/** True while this task holds the SSL semaphore for ha_client. */
+static bool ha_ssl_held = false;
+
+static void ha_client_discard(void)
+{
+    if (ha_client)
+    {
+        esp_http_client_cleanup(ha_client);
+        ha_client = NULL;
+    }
+    if (ha_ssl_held)
+    {
+        release_ssl_semaphore();
+        ha_ssl_held = false;
+    }
+}
+
+static bool ha_client_ensure(void)
+{
+    if (ha_client)
+        return true;
+
+    if (!ha_ssl_held)
+    {
+        if (!acquire_ssl_semaphore("fetch_ha_entity"))
+        {
+            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "SSL lock failed (HA fetch)");
+            return false;
+        }
+        ha_ssl_held = true;
+    }
+
+    // Base URL only; each token replaces the path via esp_http_client_set_url.
+    // Same host and port does not close the socket (IDF closes on host/port change).
+    esp_http_client_config_t config = {
+        .url = eeprom_ha_url,
+        .event_handler = ha_http_event_handler,
+        // Keep the per-attempt budget short so a stalled HA can't tie up the radio
+        // and CPU for ages. We retry on the next 60s integration cycle anyway.
+        .timeout_ms = 5000,
+        // Match download_file() in f-ota.c. 4096/4096 RX/TX made
+        // esp_http_client_init fail when free heap was low.
+        .buffer_size = 2048,
+        .buffer_size_tx = 512,
+        .transport_type = HTTP_TRANSPORT_OVER_SSL,
+        .crt_bundle_attach = custom_crt_bundle_attach,
+        .tls_version = ESP_TLS_VER_TLS_1_2,
+        .method = HTTP_METHOD_GET,
+    };
+
+    ha_client = esp_http_client_init(&config);
+    if (ha_client == NULL)
+    {
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to initialize HTTP client");
+        vTaskDelay(pdMS_TO_TICKS(100)); // Add a small delay before retry
+        ha_client = esp_http_client_init(&config);
+        if (ha_client == NULL)
+        {
+            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "HTTP client init failed (after cleanup)");
+            ha_client_discard();
+            return false;
+        }
+    }
+
+    return true;
+}
+
+// Function to fetch a single HA entity value on the cycle's shared client.
+// Does not close ha_client. The token loop calls ha_client_discard() when done.
 static bool fetch_ha_entity(integration_token_t *token)
 {
     if (!token || !token->entity || !token->entity[0])
@@ -301,10 +381,8 @@ static bool fetch_ha_entity(integration_token_t *token)
         return false;
     }
 
-    // Acquire SSL connection semaphore before making SSL connection
-    if (!acquire_ssl_semaphore("fetch_ha_entity"))
+    if (!ha_client_ensure())
     {
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "SSL lock failed (HA fetch)");
         return false;
     }
 
@@ -313,168 +391,120 @@ static bool fetch_ha_entity(integration_token_t *token)
     if (ha_response_buffer == NULL)
     {
         ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "HA response buffer failed");
-        release_ssl_semaphore();
         return false;
     }
 
     char urlstr[URL_BUFFER_SIZE];
     snprintf(urlstr, URL_BUFFER_SIZE, "%s/api/states/%s", eeprom_ha_url, token->entity);
 
-    esp_http_client_config_t config = {
-        .url = urlstr,
-        .event_handler = ha_http_event_handler,
-        // Keep the per-attempt budget short so a stalled HA can't tie up the radio
-        // and CPU for ages. We retry on the next 60s integration cycle anyway.
-        .timeout_ms = 5000,
-        // Match download_file() in f-ota.c. 4096/4096 RX/TX made
-        // esp_http_client_init fail when free heap was low.
-        .buffer_size = 2048,
-        .buffer_size_tx = 512,
-        .transport_type = HTTP_TRANSPORT_OVER_SSL,
-        .crt_bundle_attach = custom_crt_bundle_attach,
-        .tls_version = ESP_TLS_VER_TLS_1_2,
-    };
-
-    esp_http_client_handle_t client = esp_http_client_init(&config);
-    if (client == NULL)
-    {
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to initialize HTTP client");
-        vTaskDelay(pdMS_TO_TICKS(100)); // Add a small delay before retry
-        client = esp_http_client_init(&config);
-        if (client == NULL)
-        {
-            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "HTTP client init failed (after cleanup)");
-            release_shared_buffer(ha_response_buffer);
-            ha_response_buffer = NULL;
-            release_ssl_semaphore();
-            return false;
-        }
-    }
-
-    // Format Authorization header with Bearer token
-    char auth_header[AUTH_BUFFER_SIZE];
-    snprintf(auth_header, AUTH_BUFFER_SIZE, "Bearer %.240s", eeprom_ha_token);
-    esp_http_client_set_header(client, "Authorization", auth_header);
-    esp_http_client_set_header(client, "Content-Type", "application/json");
-    esp_http_client_set_header(client, "Connection", "close");
-
     // Single attempt per token per cycle. The integration task wakes again
     // every int_update_secs (60s); piling on multiple SSL handshakes against
     // a sick HA inside one cycle hurts the radio/CPU more than it helps.
-    int max_retries = 1;
-    int retry_count = 0;
     bool success = false;
-    int backoff_ms = 500;
 
     ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Fetching HA entity %s for path %s", token->entity, token->path);
 
-    while (retry_count < max_retries && !success)
+    // Drop the previous token's body so a short or empty response cannot
+    // reuse it. set_url on a host change deletes Authorization, so set headers
+    // after the URL.
+    ha_response_len = 0;
+    ha_response_buffer[0] = '\0';
+    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "HA HTTP %s", urlstr);
+
+    if (esp_http_client_set_url(ha_client, urlstr) != ESP_OK)
     {
-        ha_response_len = 0; // Reset response buffer
-        ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "HA HTTP %s (%d/%d)", urlstr, retry_count + 1, max_retries);
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "HA URL failed");
+        release_shared_buffer(ha_response_buffer);
+        ha_response_buffer = NULL;
+        return false;
+    }
 
-        esp_err_t err = esp_http_client_perform(client);
-        if (err == ESP_OK)
+    char auth_header[AUTH_BUFFER_SIZE];
+    snprintf(auth_header, AUTH_BUFFER_SIZE, "Bearer %.240s", eeprom_ha_token);
+    esp_http_client_set_method(ha_client, HTTP_METHOD_GET);
+    esp_http_client_set_header(ha_client, "Authorization", auth_header);
+    esp_http_client_set_header(ha_client, "Content-Type", "application/json");
+    // keep-alive: Connection: close would drop TLS after this GET.
+    esp_http_client_set_header(ha_client, "Connection", "keep-alive");
+
+    esp_err_t err = esp_http_client_perform(ha_client);
+    if (err == ESP_OK)
+    {
+        int status_code = esp_http_client_get_status_code(ha_client);
+        if (status_code == 200)
         {
-            int status_code = esp_http_client_get_status_code(client);
-            if (status_code == 200)
+            // Parse JSON response
+            ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "HA response: %s", ha_response_buffer);
+
+            char value_buffer[64];
+            char *value = get_value_from_JSON_string(ha_response_buffer, token->path, value_buffer, sizeof(value_buffer), NULL);
+
+            if (strcmp(value, "-") != 0)
             {
-                // Parse JSON response
-                ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "HA response: %s", ha_response_buffer);
-
-                char value_buffer[64];
-                char *value = get_value_from_JSON_string(ha_response_buffer, token->path, value_buffer, sizeof(value_buffer), NULL);
-
-                if (strcmp(value, "-") != 0)
+                // Remove quotes from beginning/end if present
+                char *start = value;
+                size_t len = strlen(value);
+                ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "HA value [%s] len %d", value, len);
+                if (len > 0 && (value[0] == '"' || value[0] == '\''))
                 {
-                    // Remove quotes from beginning/end if present
-                    char *start = value;
-                    size_t len = strlen(value);
-                    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "HA value [%s] len %d", value, len);
-                    if (len > 0 && (value[0] == '"' || value[0] == '\''))
-                    {
-                        start++;
-                        len--;
-                    }
-                    if (len > 0 && (start[len - 1] == '"' || start[len - 1] == '\''))
-                    {
-                        start[len - 1] = '\0'; // len-1 is already \0, len-2 should be "
-                        len--;
-                    }
-                    // Ensure we have a valid length after quote removal
-                    if (len > 0)
-                    {
-                        size_t copy_len = min(len, sizeof(token->value) - 1);
-                        strncpy(token->value, start, copy_len);
-                        token->value[copy_len] = '\0';
-                    }
-                    else
-                    {
-                        strcpy(token->value, "-");
-                    }
-                    success = true;
-                    ha_http_connect_backoff_until = 0;
-                    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "HA %s %s=%s",
-                                token->entity, token->path, token->value);
+                    start++;
+                    len--;
+                }
+                if (len > 0 && (start[len - 1] == '"' || start[len - 1] == '\''))
+                {
+                    start[len - 1] = '\0'; // len-1 is already \0, len-2 should be "
+                    len--;
+                }
+                // Ensure we have a valid length after quote removal
+                if (len > 0)
+                {
+                    size_t copy_len = min(len, sizeof(token->value) - 1);
+                    strncpy(token->value, start, copy_len);
+                    token->value[copy_len] = '\0';
                 }
                 else
                 {
-                    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "HA invalid value path %s", token->path);
+                    strcpy(token->value, "-");
                 }
+                success = true;
+                ha_http_connect_backoff_until = 0;
+                ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "HA %s %s=%s",
+                            token->entity, token->path, token->value);
             }
             else
             {
-                ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "HA status %d (%d/%d)",
-                            status_code, retry_count + 1, max_retries);
+                ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "HA invalid value path %s", token->path);
             }
         }
         else
         {
-            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "HA request failed: %s (attempt %d/%d)",
-                        esp_err_to_name(err), retry_count + 1, max_retries);
-
-            // Any transport-level failure: don't keep hammering. Most likely HA is
-            // down or the link is bad — and retrying repeatedly inside one cycle
-            // is exactly what made the device unreachable to ping. Skip the rest
-            // of this cycle and back off for at least 30s.
-            time_t now = time(NULL);
-            ha_http_connect_backoff_until = now + 30;
-            ha_abort_remaining_tokens = true;
-            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "HA transport error (%s); backing off 30s",
-                        esp_err_to_name(err));
-            break;
-        }
-
-        if (!success && retry_count < max_retries - 1)
-        {
-            // Reset transport state between retries so next perform() starts fresh.
-            esp_http_client_close(client);
-            retry_count++;
-            ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Retry in %d ms", backoff_ms);
-            vTaskDelay(pdMS_TO_TICKS(backoff_ms));
-            // backoff_ms *= 2; // Exponential backoff cancelled; don't like it
-        }
-        else
-        {
-            break;
+            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "HA status %d", status_code);
         }
     }
-
-    esp_http_client_cleanup(client);
-
-    // Force garbage collection after each request
-    if (heap_caps_get_free_size(MALLOC_CAP_8BIT) < 10000)
+    else
     {
-        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Low mem before cleanup: %d", heap_caps_get_free_size(MALLOC_CAP_8BIT));
-        vTaskDelay(pdMS_TO_TICKS(100)); // Give time for cleanup
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "HA request failed: %s", esp_err_to_name(err));
+
+        // Any transport-level failure: don't keep hammering. Most likely HA is
+        // down or the link is bad — and retrying repeatedly inside one cycle
+        // is exactly what made the device unreachable to ping. Skip the rest
+        // of this cycle and back off for at least 30s. The socket is dead, so
+        // drop the shared client before the loop's inter-token delay.
+        time_t now = time(NULL);
+        ha_http_connect_backoff_until = now + 30;
+        ha_abort_remaining_tokens = true;
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "HA transport error (%s); backing off 30s",
+                    esp_err_to_name(err));
+        release_shared_buffer(ha_response_buffer);
+        ha_response_buffer = NULL;
+        ha_client_discard();
+        return false;
     }
 
-    // Release the shared buffer before returning
+    // Release the shared buffer before returning. Leave ha_client open.
     release_shared_buffer(ha_response_buffer);
     ha_response_buffer = NULL;
 
-    // Always release SSL semaphore before returning
-    release_ssl_semaphore();
     return success;
 }
 
@@ -860,9 +890,14 @@ static void integration_update_task(void *pvParameters)
                                     }
 
                                     // Yield between tokens so httpd / lwIP / WiFi tasks on PRO_CPU
-                                    // get plenty of CPU and radio time before the next handshake.
+                                    // get CPU and radio time. The HA client stays open across this
+                                    // gap (keep-alive); it is not a new handshake.
                                     vTaskDelay(pdMS_TO_TICKS(250));
                                 }
+                                // End of the HA cycle: close the shared client before stocks/CGM
+                                // so only one TLS context is live. Idempotent if a transport
+                                // error already discarded it.
+                                ha_client_discard();
                                 if (!ha_mutex_failed && !update_ok[INTEGRATION_HA])
                                     ESP_LOG_WEB(ESP_LOG_INFO, TAG, "HA update failed");
                                 // Small delay to allow memory cleanup before next integration
