@@ -172,8 +172,17 @@ int label_scroll_pos = 0, label_max_pos = MSG_WIDTH;
 bool label_scroll_swap = false; // which physical label is leftmost in the scroll belt
 
 // Frixos belt. Position is elapsed/delay, so a late loop jumps ahead and the
-// long-run speed stays on the scroll delay. 10 ms divides the 60 ms/px default.
+// long-run speed stays on the scroll delay. SCROLL_LOOP_MS is one FreeRTOS
+// tick: the schedule poll stays off a frame that will paint inside that tick.
+// When no pixel is due the loop sleeps until the next pixel, capped at
+// DISPLAY_IDLE_SLEEP_MS (inside the 30–50 ms window). 40 ms is a whole number
+// of 10 ms ticks, and it is above the fastest scroll setting (30 ms/px) so a
+// wait that ends on the pixel still paints every step.
 #define SCROLL_LOOP_MS 10
+#define DISPLAY_IDLE_SLEEP_MS 40
+// Clock, brightness, and the message poll share this loop. Near the fastest
+// scroll every wake is a pixel and those frames skip the other sections.
+#define DISPLAY_HOUSEKEEPING_MAX_MS 100
 #define SCROLL_BELT_GAP 20
 #define SCROLL_CANVAS_MAX_H 24
 static int64_t scroll_t0_us = 0;         // time origin of the current message
@@ -433,7 +442,44 @@ static bool message_scroll_step_due(void)
   return scroll_clock_position(NULL, NULL, NULL) >= 1;
 }
 
-/* True if this pass steps, or the next 10 ms loop would. Keeps the 1 s
+/* Milliseconds until the next belt pixel, already capped at the idle sleep.
+ * 0 means a pixel is already owed. The belt is not running: idle cap. */
+static uint32_t scroll_ms_until_next_pixel(void)
+{
+  if (!frixos_scroll_running() || !frixos_clip_visible())
+    return DISPLAY_IDLE_SLEEP_MS;
+
+  uint32_t delay = screen_scroll_delay_ms();
+  if (delay < 1)
+    delay = 1;
+  int64_t step_us = (int64_t)delay * 1000;
+  int64_t now = esp_timer_get_time();
+  int64_t due = scroll_t0_us + (scroll_last_traveled + 1) * step_us;
+  if (due <= now)
+    return 0;
+  int64_t remain_ms = (due - now + 999) / 1000;
+  if (remain_ms >= DISPLAY_IDLE_SLEEP_MS)
+    return DISPLAY_IDLE_SLEEP_MS;
+  if (remain_ms < 1)
+    return 0;
+  return (uint32_t)remain_ms;
+}
+
+/* Sleep used at the bottom of display_task. A pixel that is already due
+ * comes back on the next tick so the belt can paint it. Otherwise sleep
+ * until the next pixel or DISPLAY_IDLE_SLEEP_MS, and never less than one
+ * tick: a shorter delay is a yield, and the loop would spin on this core. */
+static uint32_t display_loop_sleep_ms(void)
+{
+  uint32_t ms = message_scroll_step_due() ? 0 : scroll_ms_until_next_pixel();
+  if (ms < portTICK_PERIOD_MS)
+    ms = portTICK_PERIOD_MS;
+  if (ms > DISPLAY_IDLE_SLEEP_MS)
+    ms = DISPLAY_IDLE_SLEEP_MS;
+  return ms;
+}
+
+/* True if this pass steps, or the next tick would. Keeps the 1 s
  * schedule poll and other LVGL work off frames that paint the belt. */
 static bool message_scroll_busy(bool step_now)
 {
@@ -1253,17 +1299,103 @@ err:
   return ret;
 }
 
+/* 5 ms tick, used only while an LVGL animation is actually running.
+ * The port's own tick stays at CONFIG_LV_DEF_REFR_PERIOD. esp_lvgl_port
+ * keeps that period in a private timer, so the fast tick is a separate
+ * esp_timer that replaces it for the animation and is stopped when the
+ * animation stops. The belt does not start an LVGL animation. */
+#define LVGL_ANIM_TICK_MS 5
+static esp_timer_handle_t lvgl_anim_tick = NULL;
+static bool lvgl_anim_tick_on = false;
+
+static void lvgl_anim_tick_cb(void *arg)
+{
+  (void)arg;
+  lv_tick_inc(LVGL_ANIM_TICK_MS);
+}
+
+/* The port tick only advances time. The animation refresher is what steps
+ * the label scroller, and it is created at LV_DEF_REFR_PERIOD. Match it to
+ * the tick that is actually running. */
+static void lvgl_set_anim_period(uint32_t period_ms)
+{
+  lv_timer_t *tmr = lv_anim_get_timer();
+  if (tmr != NULL)
+    lv_timer_set_period(tmr, period_ms);
+}
+
+/* Caller holds lvgl_port_lock. */
+static void lvgl_sync_anim_tick(void)
+{
+  const bool want = eeprom_scroll_engine == SCROLL_ENGINE_LVGL && lv_anim_count_running() > 0;
+  if (want == lvgl_anim_tick_on)
+    return;
+
+  if (want)
+  {
+    /* lvgl_port_stop disables LVGL timers before it stops the tick.
+     * Turn them back on before installing the 5 ms tick. On any failure
+     * the 50 ms port tick is resumed so the panel does not lose time. */
+    if (lvgl_port_stop() != ESP_OK)
+    {
+      /* stop() disables LVGL timers before esp_timer_stop. Put them back
+       * and make sure the 50 ms tick is running. */
+      lv_timer_enable(true);
+      lvgl_port_resume();
+      return;
+    }
+    lv_timer_enable(true);
+    if (lvgl_anim_tick == NULL)
+    {
+      const esp_timer_create_args_t args = {
+          .callback = &lvgl_anim_tick_cb,
+          .name = "lvgl_anim_tick",
+      };
+      if (esp_timer_create(&args, &lvgl_anim_tick) != ESP_OK)
+      {
+        lvgl_port_resume();
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "LVGL anim tick create failed");
+        return;
+      }
+    }
+    if (esp_timer_start_periodic(lvgl_anim_tick, (uint64_t)LVGL_ANIM_TICK_MS * 1000) != ESP_OK)
+    {
+      lvgl_port_resume();
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "LVGL anim tick start failed");
+      return;
+    }
+    lvgl_anim_tick_on = true;
+    lvgl_set_anim_period(LVGL_ANIM_TICK_MS);
+    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "LVGL tick %d ms (animation)", LVGL_ANIM_TICK_MS);
+    return;
+  }
+
+  if (lvgl_anim_tick != NULL)
+    esp_timer_stop(lvgl_anim_tick);
+  if (lvgl_port_resume() != ESP_OK)
+  {
+    /* 50 ms tick did not come back. Keep the 5 ms tick so time still moves. */
+    if (lvgl_anim_tick == NULL ||
+        esp_timer_start_periodic(lvgl_anim_tick, (uint64_t)LVGL_ANIM_TICK_MS * 1000) != ESP_OK)
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "LVGL tick resume failed");
+    return;
+  }
+  lvgl_anim_tick_on = false;
+  lvgl_set_anim_period(CONFIG_LV_DEF_REFR_PERIOD);
+  ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "LVGL tick %d ms", CONFIG_LV_DEF_REFR_PERIOD);
+}
+
 esp_err_t startup_lvgl(void)
 {
   ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "LVGL startup");
 
   /* Initialize LVGL port - this will create the LVGL task and call lv_init() internally */
   const lvgl_port_cfg_t lvgl_cfg = {
-      .task_priority = 8,       /* LVGL task priority - increased from 1 */
+      .task_priority = 5,       /* Flush ahead of display_task (4). Was 8, above every TLS task on each wake. */
       .task_stack = 8192+2048,       /* LVGL task stack size SUPER LARGE STACK */
       .task_affinity = 1,       /* LVGL task pinned to core (core 1 for our display tasks, -1 would be no affinity) */
       .task_max_sleep_ms = 100, /* 100ms */
-      .timer_period_ms = 5      /* Reduced timer period for smoother animations */
+      .timer_period_ms = CONFIG_LV_DEF_REFR_PERIOD /* 50. 5 ms only while an LVGL animation runs */
   };
   ESP_RETURN_ON_ERROR(lvgl_port_init(&lvgl_cfg), TAG, "LVGL port initialization failed");
 
@@ -1525,6 +1657,7 @@ void set_scroll_message(const char *msg)
   }
   applied_scroll_engine = eeprom_scroll_engine;
   applied_scroll_delay = delay_now;
+  lvgl_sync_anim_tick();
   lvgl_port_unlock();
   stall_note("msg_lv", esp_timer_get_time() - t_lv);
 }
@@ -3569,9 +3702,9 @@ void display_task(void *pvParameters)
   // will verify that the counter is still advancing.
   esp_timer_start_periodic(watchdog_timer, 30000000);
 
-  TickType_t lastrun_tick = xTaskGetTickCount();
   time_t now;
   static uint32_t loop_counter = 0;
+  static int64_t display_housekeeping_us = 0;
 
   while (1)
   {
@@ -3607,12 +3740,18 @@ void display_task(void *pvParameters)
 
     const bool scroll_step = message_scroll_step_due();
     const bool scroll_busy = message_scroll_busy(scroll_step);
+    const int64_t housekeeping_now = esp_timer_get_time();
+    const bool housekeeping_due = display_housekeeping_us == 0 ||
+                                   (housekeeping_now - display_housekeeping_us) >=
+                                       (int64_t)DISPLAY_HOUSEKEEPING_MAX_MS * 1000;
 
-    // Skip other LVGL-locking work on a belt step and on the 10 ms pass just
+    // Skip other LVGL-locking work on a belt step and on the tick just
     // before one, so the 1 s schedule poll cannot share a frame with a blit.
-    // Between the calls that do run, paint any pixel the clock says is due so
-    // one slow section cannot pile up into a multi-pixel jump.
-    if (!scroll_busy)
+    // The longer idle sleep makes every wake a pixel at the fastest delay, so
+    // those sections still run at DISPLAY_HOUSEKEEPING_MAX_MS. Between the
+    // calls that do run, paint any pixel the clock says is due so one slow
+    // section cannot pile up into a multi-pixel jump.
+    if (!scroll_busy || housekeeping_due)
     {
       int64_t t0 = esp_timer_get_time();
       handle_screen_layout_on_wifi();
@@ -3698,6 +3837,7 @@ void display_task(void *pvParameters)
         stall_note("fade", esp_timer_get_time() - t_fade);
         scroll_service();
       }
+      display_housekeeping_us = esp_timer_get_time();
     }
 
     // Check if IP display timer has expired
@@ -3728,10 +3868,11 @@ void display_task(void *pvParameters)
     // which were executing every ~65ms in the high-frequency display loop.
     display_task_heartbeat++;
 
-    // Fixed, fast loop period (decoupled from scroll speed). Scroll speed is now
-    // expressed purely as time in the belt math above, so the loop runs at a
-    // steady high rate and only the per-pixel duration changes with the setting.
-    xTaskDelayUntil(&lastrun_tick, pdMS_TO_TICKS(SCROLL_LOOP_MS));
+    // No pixel due: sleep until the next one, or DISPLAY_IDLE_SLEEP_MS.
+    // A pixel already due sleeps one tick. Interval is from now, so this is
+    // vTaskDelay rather than a fixed DelayUntil cadence. Catch-up in
+    // frixos_scroll_advance paints a wake that lands a tick late.
+    vTaskDelay(pdMS_TO_TICKS(display_loop_sleep_ms()));
   } // end of while (1) loop
 
   ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Display task exit (unexpected)");
