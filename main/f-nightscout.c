@@ -121,8 +121,8 @@ bool init_nightscout_client(void)
         .tls_version = ESP_TLS_VER_TLS_1_2,
         .user_agent = "Frixos HTTP Client",
         .event_handler = nightscout_http_event_handler,
-        .buffer_size = HTTP_BUFFER_SIZE,
-        .buffer_size_tx = HTTP_BUFFER_SIZE,
+        .buffer_size = 2048,
+        .buffer_size_tx = 512,
     };
 
     nightscout_client = esp_http_client_init(&config);

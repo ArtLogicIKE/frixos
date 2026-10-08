@@ -1250,8 +1250,8 @@ bool wifi_get_openweather(void)
         .url = weather_url,
         .event_handler = http_event_handler,
         .timeout_ms = 5000,
-        .buffer_size = HTTP_BUFFER_SIZE,
-        .buffer_size_tx = HTTP_BUFFER_SIZE,
+        .buffer_size = 2048,
+        .buffer_size_tx = 512,
     };
 
     esp_http_client_handle_t client = esp_http_client_init(&config);
@@ -1321,9 +1321,8 @@ bool wifi_get_openweather(void)
     forecast_low = 100.0;
     forecast_temp_count = 0;
 
-    // Use a larger buffer for forecast data
-    config.buffer_size = HTTP_BUFFER_SIZE;
-    config.buffer_size_tx = HTTP_BUFFER_SIZE;
+    config.buffer_size = 2048;
+    config.buffer_size_tx = 512;
     client = esp_http_client_init(&config);
     err = esp_http_client_perform(client);
 
