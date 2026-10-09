@@ -167,12 +167,14 @@ static time_t ha_http_connect_backoff_until = 0;
 /** Set when a HA entity hit connect error; skip remaining entities this cycle. */
 static bool ha_abort_remaining_tokens = false;
 
-// Semaphore for SSL connections - ESP32 can only handle one SSL connection at a time
+// One TLS session at a time, device-wide. Recursive so nested helpers can re-take it.
 static SemaphoreHandle_t ssl_connection_semaphore = NULL;
 #define SSL_SEMAPHORE_TIMEOUT_MS (30 * 1000)    // 30 seconds timeout
+// mbedtls allocates the input record buffer (IN_CONTENT_LEN 16384 + overhead) in one block.
+#define TLS_MIN_FREE_BLOCK (17 * 1024)
 static const char *ssl_semaphore_holder = NULL; // Track which function currently holds the semaphore
+static int ssl_semaphore_depth = 0;             // Only touched by the holder
 
-// Helper function to acquire SSL connection semaphore
 bool acquire_ssl_semaphore(const char *function_name)
 {
     if (ssl_connection_semaphore == NULL)
@@ -181,36 +183,55 @@ bool acquire_ssl_semaphore(const char *function_name)
         return false;
     }
 
-    TickType_t timeout_ticks = pdMS_TO_TICKS(SSL_SEMAPHORE_TIMEOUT_MS);
-    if (xSemaphoreTake(ssl_connection_semaphore, timeout_ticks) == pdTRUE)
-    {
-        ssl_semaphore_holder = function_name;
-        ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "SSL lock %s", function_name ? function_name : "?");
-        return true;
-    }
-    else
+    if (xSemaphoreTakeRecursive(ssl_connection_semaphore, pdMS_TO_TICKS(SSL_SEMAPHORE_TIMEOUT_MS)) != pdTRUE)
     {
         ESP_LOG_WEB(ESP_LOG_WARN, TAG, "SSL lock timeout %ds (held by %s)",
                     SSL_SEMAPHORE_TIMEOUT_MS / 1000, ssl_semaphore_holder ? ssl_semaphore_holder : "unknown");
         return false;
     }
+
+    if (ssl_semaphore_depth == 0)
+    {
+        size_t largest = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+        if (largest < TLS_MIN_FREE_BLOCK)
+        {
+            xSemaphoreGiveRecursive(ssl_connection_semaphore);
+            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "SSL skip %s: largest block %u < %u",
+                        function_name ? function_name : "?", (unsigned)largest, (unsigned)TLS_MIN_FREE_BLOCK);
+            return false;
+        }
+        ssl_semaphore_holder = function_name;
+    }
+    ssl_semaphore_depth++;
+    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "SSL lock %s", function_name ? function_name : "?");
+    return true;
 }
 
-// Helper function to release SSL connection semaphore
 void release_ssl_semaphore(void)
 {
-    if (ssl_connection_semaphore != NULL)
+    if (ssl_connection_semaphore == NULL ||
+        xSemaphoreGetMutexHolder(ssl_connection_semaphore) != xTaskGetCurrentTaskHandle())
     {
-        const char *holder = ssl_semaphore_holder;
-        ssl_semaphore_holder = NULL;
-        xSemaphoreGive(ssl_connection_semaphore);
-        ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "SSL semaphore released by %s", holder ? holder : "unknown");
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "SSL release by non-holder");
+        return;
     }
+
+    const char *holder = ssl_semaphore_holder;
+    if (--ssl_semaphore_depth == 0)
+        ssl_semaphore_holder = NULL;
+    xSemaphoreGiveRecursive(ssl_connection_semaphore);
+    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "SSL semaphore released by %s", holder ? holder : "unknown");
 }
 
-// Custom certificate validation callback to set optional validation
+// Called for every TLS handshake in the firmware, so it is the place to catch unlocked ones.
 esp_err_t custom_crt_bundle_attach(void *conf)
 {
+    if (ssl_connection_semaphore != NULL &&
+        xSemaphoreGetMutexHolder(ssl_connection_semaphore) != xTaskGetCurrentTaskHandle())
+    {
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "TLS handshake without SSL lock (task %s)", pcTaskGetName(NULL));
+    }
+
     mbedtls_ssl_config *ssl_conf = (mbedtls_ssl_config *)conf;
     mbedtls_ssl_conf_authmode(ssl_conf, MBEDTLS_SSL_VERIFY_NONE); // No certificate verification
 
@@ -1015,11 +1036,19 @@ static void integration_update_task(void *pvParameters)
                 {
                     if (time(NULL) - integration_last_update[INTEGRATION_FREESTYLE] >= (eeprom_glucose_refresh * 60))
                     {
-                        if (!freestyle_client_initialized)
-                            init_freestyle_client();
+                        if (xSemaphoreTake(http_mutex, pdMS_TO_TICKS(5000)) != pdTRUE)
+                        {
+                            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "http_mutex timeout (Freestyle)");
+                        }
+                        else
+                        {
+                            if (!freestyle_client_initialized)
+                                init_freestyle_client();
 
-                        if (fetch_freestyle_glucose())
-                            update_ok[INTEGRATION_FREESTYLE] = true;
+                            if (fetch_freestyle_glucose())
+                                update_ok[INTEGRATION_FREESTYLE] = true;
+                            xSemaphoreGive(http_mutex);
+                        }
                     }
                 }
 
@@ -1476,15 +1505,12 @@ void schedule_parse_integrations(void)
 
 void startup_integrations(void)
 {
-    // Create SSL connection semaphore (binary semaphore - only one SSL connection at a time)
-    ssl_connection_semaphore = xSemaphoreCreateBinary();
+    ssl_connection_semaphore = xSemaphoreCreateRecursiveMutex();
     if (ssl_connection_semaphore == NULL)
     {
         ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "SSL semaphore create failed");
         return;
     }
-    // Give the semaphore initially so first connection can acquire it
-    xSemaphoreGive(ssl_connection_semaphore);
     ESP_LOG_WEB(ESP_LOG_INFO, TAG, "SSL semaphore ready");
 
     // parse for any active integrations

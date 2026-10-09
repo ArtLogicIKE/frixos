@@ -740,6 +740,8 @@ static void ota_self_heal(void)
         if (err == ESP_ERR_NOT_FOUND)
             fs_was_fresh = true;
         remove(MANIFEST_PATH); // no-op when already missing
+        ota_update_in_progress = true;
+        ota_updating_message = false;
         xSemaphoreTake(http_mutex, portMAX_DELAY);
         // A few spaced attempts: a fresh filesystem has no web UI (or fonts)
         // until files arrive, and the first try lands in the boot congestion
@@ -765,6 +767,7 @@ static void ota_self_heal(void)
             ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Self-heal: manifest fetch failed (%s), will retry",
                         esp_err_to_name(err));
             f_ota_report_status(UPDATE_ERROR_DOWNLOAD, "Self-heal: manifest re-fetch failed");
+            ota_update_in_progress = false;
             manifest_set_ota_in_progress(false);
             return;
         }
@@ -1210,28 +1213,26 @@ void f_ota_check_update(void)
     // /latest first: a newer image reboots and heals itself, so repairing
     // this version's files would be discarded. The GET is cheap; self-heal
     // (and the firmware download) are not, so we never do both this pass.
-    int new_version = 0;
-    bool have_latest = false;
     if (!eeprom_update_firmware)
     {
         last_check_us = now_us;
         ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Firmware updates are disabled");
+        return;
     }
-    else
+
+    int new_version = 0;
+    bool have_latest = ota_query_latest(&new_version);
+    if (have_latest && new_version > fwversion)
     {
-        have_latest = ota_query_latest(&new_version);
-        if (have_latest && new_version > fwversion)
+        if (manifest_get_self_heal_pending() ||
+            manifest_get_applied_generation() == 0)
         {
-            if (manifest_get_self_heal_pending() ||
-                manifest_get_applied_generation() == 0)
-            {
-                ESP_LOG_WEB(ESP_LOG_INFO, TAG,
-                            "Update %d available, skipping self-heal", new_version);
-            }
-            ota_reinstall_in_progress = false;
-            f_ota_do_update(new_version);
-            return;
+            ESP_LOG_WEB(ESP_LOG_INFO, TAG,
+                        "Update %d available, skipping self-heal", new_version);
         }
+        ota_reinstall_in_progress = false;
+        f_ota_do_update(new_version);
+        return;
     }
 
     if (have_latest && new_version <= fwversion)
