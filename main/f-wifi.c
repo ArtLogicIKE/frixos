@@ -594,6 +594,13 @@ void location_timer_callback(void *arg)
 // matching timer based on success/failure.
 static void wifi_task_do_weather(void)
 {
+    if (ota_update_in_progress)
+    {
+        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Weather deferred: OTA in progress");
+        ESP_ERROR_CHECK(esp_timer_start_once(weather_timer, WEATHER_RETRY_DELAY_MS * 1000));
+        return;
+    }
+
     bool ok = wifi_get_metno_weather();
 
     // we might as well calculate the moon phase too
@@ -1137,9 +1144,15 @@ bool wifi_lookup_iana_from_coords(double lat, double lon, char *out, size_t out_
         .transport_type = HTTP_TRANSPORT_OVER_SSL,
     };
 
+    if (!acquire_ssl_semaphore("wifi_lookup_iana_from_coords"))
+        return false;
+
     esp_http_client_handle_t client = esp_http_client_init(&config);
     if (client == NULL)
+    {
+        release_ssl_semaphore();
         return false;
+    }
 
     esp_err_t err = esp_http_client_perform(client);
     bool found = false;
@@ -1159,6 +1172,7 @@ bool wifi_lookup_iana_from_coords(double lat, double lon, char *out, size_t out_
         }
     }
     esp_http_client_cleanup(client);
+    release_ssl_semaphore();
     return found;
 }
 

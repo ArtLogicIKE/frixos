@@ -4020,7 +4020,30 @@ static esp_err_t timezone_lookup_handler(httpd_req_t *req)
 
 static esp_err_t timezone_lookup_wrapper(httpd_req_t *req)
 {
-    return http_mutex_wrapper(req, timezone_lookup_handler);
+    // lat/lon hits timeapi.io over TLS. Take that lock before http_mutex so a
+    // lookup cannot block on SSL while HA, already holding SSL, waits for http_mutex.
+    char location[64] = "";
+    char lat_buf[24] = "";
+    char lon_buf[24] = "";
+    bool needs_tls = !get_request_query_param(req, "location", location, sizeof(location)) &&
+                     get_request_query_param(req, "lat", lat_buf, sizeof(lat_buf)) &&
+                     get_request_query_param(req, "lon", lon_buf, sizeof(lon_buf));
+
+    if (needs_tls && !acquire_ssl_semaphore("timezone_lookup"))
+    {
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "SSL lock unavailable (timezone lookup)");
+        httpd_resp_set_status(req, "503 Service Unavailable");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_send(req,
+                        "{\"status\":\"error\",\"message\":\"TLS busy; try again in a few seconds.\"}",
+                        HTTPD_RESP_USE_STRLEN);
+        return ESP_FAIL;
+    }
+
+    esp_err_t err = http_mutex_wrapper(req, timezone_lookup_handler);
+    if (needs_tls)
+        release_ssl_semaphore();
+    return err;
 }
 
 // Status handler wrapper with validation
