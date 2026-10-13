@@ -887,6 +887,18 @@ static void integration_update_task(void *pvParameters)
                                     if (ha_abort_remaining_tokens)
                                         break;
 
+                                    // SSL before http_mutex. The HA client stays open across
+                                    // tokens, so later iterations already hold the SSL lock.
+                                    if (!ha_ssl_held)
+                                    {
+                                        if (!acquire_ssl_semaphore("fetch_ha_entity"))
+                                        {
+                                            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "SSL lock failed (HA fetch)");
+                                            break;
+                                        }
+                                        ha_ssl_held = true;
+                                    }
+
                                     if (xSemaphoreTake(http_mutex, pdMS_TO_TICKS(5000)) != pdTRUE)
                                     {
                                         ESP_LOG_WEB(ESP_LOG_WARN, TAG, "http_mutex timeout (HA token %d)", i);
@@ -949,8 +961,15 @@ static void integration_update_task(void *pvParameters)
                             bool stock_mutex_failed = false;
                             for (int i = 0; i < integration_active_tokens_count[INTEGRATION_STOCK]; i++)
                             {
+                                if (!acquire_ssl_semaphore("fetch_stock_quote"))
+                                {
+                                    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "SSL lock failed (Stock token %d)", i);
+                                    stock_mutex_failed = true;
+                                    break;
+                                }
                                 if (xSemaphoreTake(http_mutex, pdMS_TO_TICKS(5000)) != pdTRUE)
                                 {
+                                    release_ssl_semaphore();
                                     ESP_LOG_WEB(ESP_LOG_WARN, TAG, "http_mutex timeout (Stock token %d)", i);
                                     stock_mutex_failed = true;
                                     break;
@@ -958,6 +977,7 @@ static void integration_update_task(void *pvParameters)
 
                                 bool ok = fetch_stock_quote(&integration_active_tokens[INTEGRATION_STOCK][i]);
                                 xSemaphoreGive(http_mutex);
+                                release_ssl_semaphore();
 
                                 if (ok)
                                 {
@@ -995,14 +1015,20 @@ static void integration_update_task(void *pvParameters)
                         {
                             ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Skipping WU update - low heap: %u", (unsigned)wu_heap);
                         }
+                        else if (!acquire_ssl_semaphore("fetch_wu_observation"))
+                        {
+                            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "SSL lock failed (WU)");
+                        }
                         else if (xSemaphoreTake(http_mutex, pdMS_TO_TICKS(5000)) != pdTRUE)
                         {
+                            release_ssl_semaphore();
                             ESP_LOG_WEB(ESP_LOG_WARN, TAG, "http_mutex timeout (WU)");
                         }
                         else
                         {
                             bool ok = fetch_wu_observation();
                             xSemaphoreGive(http_mutex);
+                            release_ssl_semaphore();
                             if (ok)
                                 update_ok[INTEGRATION_WU] = true;
                             else
@@ -1036,19 +1062,11 @@ static void integration_update_task(void *pvParameters)
                 {
                     if (time(NULL) - integration_last_update[INTEGRATION_FREESTYLE] >= (eeprom_glucose_refresh * 60))
                     {
-                        if (xSemaphoreTake(http_mutex, pdMS_TO_TICKS(5000)) != pdTRUE)
-                        {
-                            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "http_mutex timeout (Freestyle)");
-                        }
-                        else
-                        {
-                            if (!freestyle_client_initialized)
-                                init_freestyle_client();
+                        if (!freestyle_client_initialized)
+                            init_freestyle_client();
 
-                            if (fetch_freestyle_glucose())
-                                update_ok[INTEGRATION_FREESTYLE] = true;
-                            xSemaphoreGive(http_mutex);
-                        }
+                        if (fetch_freestyle_glucose())
+                            update_ok[INTEGRATION_FREESTYLE] = true;
                     }
                 }
 
