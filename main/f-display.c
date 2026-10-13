@@ -156,6 +156,16 @@ static lv_obj_t *label_degree_aux = NULL;
 #define GLUCOSE_WIDGET_UNIT_GAP_AFTER_DIGIT2 3
 /** Trim leading space for standalone mmol/L glucose (pixels). */
 #define GLUCOSE_WIDGET_MMOL_LEADING_TRIM_PX 2
+/** Right edge of the time digits, relative to the time widget x. */
+#define TIME_SLOT_RIGHT_PX 78
+/** Width of the glucose unit sprite (img_mgdl, 12x24). */
+#define GLUCOSE_UNIT_W_PX 12
+/** Gap between the glucose value and its unit inside the time slot. */
+#define GLUCOSE_UNIT_GAP_PX 1
+/** Unit x offset relative to the time widget, so the unit ends at TIME_SLOT_RIGHT_PX. */
+#define GLUCOSE_UNIT_X_PX (TIME_SLOT_RIGHT_PX - GLUCOSE_UNIT_W_PX)
+/** Right edge (exclusive) of the glucose value, relative to the time widget x. */
+#define GLUCOSE_VALUE_RIGHT_PX (GLUCOSE_UNIT_X_PX - GLUCOSE_UNIT_GAP_PX)
 
 #define NUM_DIGITS 4                   // the 4 time digits
 #define label_msg_ofs_y (25 + 25 + 14) // y offset for the message label
@@ -2205,10 +2215,14 @@ static void align_time_style_digits(lv_obj_t *objs[NUM_DIGITS], lv_obj_t *dot_ob
 static void align_glucose_mgdl_digits(lv_obj_t *objs[NUM_DIGITS], lv_obj_t *dot_objs[2],
                                       int ox, int y, const digit_display_t *dd)
 {
-  lv_obj_align(objs[0], LV_ALIGN_TOP_LEFT, ox + 0, y);
-  lv_obj_align(objs[1], LV_ALIGN_TOP_LEFT, ox + 1 * 18 + 6, y);
-  lv_obj_align(objs[2], LV_ALIGN_TOP_LEFT, ox + 2 * 18 + 6, y);
-  lv_obj_align(objs[3], LV_ALIGN_TOP_LEFT, ox + 3 * 18 + 6, y);
+  const int r = ox + GLUCOSE_VALUE_RIGHT_PX;
+  const int x3 = r - DIGIT_WIDTH;
+  const int x2 = x3 - DIGIT_WIDTH;
+  const int x1 = x2 - DIGIT_WIDTH;
+  lv_obj_align(objs[0], LV_ALIGN_TOP_LEFT, x1 - DIGIT_WIDTH - 6, y);
+  lv_obj_align(objs[1], LV_ALIGN_TOP_LEFT, x1, y);
+  lv_obj_align(objs[2], LV_ALIGN_TOP_LEFT, x2, y);
+  lv_obj_align(objs[3], LV_ALIGN_TOP_LEFT, x3, y);
   show_object(dot_objs[0], false);
   show_object(dot_objs[1], false);
 }
@@ -2221,11 +2235,11 @@ static void align_glucose_mmol_digits(lv_obj_t *objs[NUM_DIGITS], lv_obj_t *dot_
     dot_w = MMOL_DOT_WIDTH_FALLBACK_PX;
 
   const int g = MMOL_DECIMAL_SIDE_GAP_PX;
-  const int shift = g + dot_w;
-  const int x0 = ox + 0 - shift;
-  const int x1 = ox + 1 * 18 + 6 - shift;
-  const int x2 = ox + 2 * 18 + 6 - shift;
-  const int x3 = x2 + DIGIT_WIDTH + g + dot_w + g;
+  const int r = ox + GLUCOSE_VALUE_RIGHT_PX;
+  const int x3 = r - DIGIT_WIDTH;
+  const int x2 = x3 - DIGIT_WIDTH - 2 * g - dot_w;
+  const int x1 = x2 - DIGIT_WIDTH;
+  const int x0 = x1 - DIGIT_WIDTH - 6;
 
   lv_obj_align(objs[0], LV_ALIGN_TOP_LEFT, x0, y);
   lv_obj_align(objs[1], LV_ALIGN_TOP_LEFT, x1, y);
@@ -2501,8 +2515,8 @@ static void apply_screen_layout_positions(void)
   lv_obj_align(img_glucose, LV_ALIGN_TOP_LEFT, layout_abs_x(w_glucose_level), layout_abs_y(w_glucose_level));
   lv_obj_align(img_wifi, LV_ALIGN_TOP_LEFT, layout_abs_x(w_wifi), layout_abs_y(w_wifi));
   lv_obj_align(img_glucose_trend, LV_ALIGN_TOP_LEFT, layout_abs_x(w_glucose_trend), layout_abs_y(w_glucose_trend));
-  lv_obj_align(img_mgdl, LV_ALIGN_TOP_LEFT, layout_abs_x(w_time) + 79, layout_abs_y(w_time) + 5);
-  lv_obj_align(img_mgdl_aux, LV_ALIGN_TOP_LEFT, layout_abs_x(w_time_aux) + 79, layout_abs_y(w_time_aux) + 5);
+  lv_obj_align(img_mgdl, LV_ALIGN_TOP_LEFT, layout_abs_x(w_time) + GLUCOSE_UNIT_X_PX, layout_abs_y(w_time) + 5);
+  lv_obj_align(img_mgdl_aux, LV_ALIGN_TOP_LEFT, layout_abs_x(w_time_aux) + GLUCOSE_UNIT_X_PX, layout_abs_y(w_time_aux) + 5);
 
   for (int i = 0; i < 4; i++)
     lv_obj_align(digit_objs[i], LV_ALIGN_TOP_LEFT, layout_abs_x(w_time) + i * 18 + (i > 1 ? 6 : 0), layout_abs_y(w_time));
