@@ -676,7 +676,9 @@ bool init_freestyle_client(void)
         .timeout_ms = 10000,
         .is_async = false,
         .buffer_size = 2048,
-        .buffer_size_tx = 512,
+        // TX must hold one header. "authorization: Bearer " plus
+        // eeprom_libre_token[512] is ~540 bytes, so 512 drops the Bearer line.
+        .buffer_size_tx = 2048,
         .crt_bundle_attach = custom_crt_bundle_attach,
         .transport_type = HTTP_TRANSPORT_OVER_SSL,
         .tls_version = ESP_TLS_VER_TLS_1_2,        

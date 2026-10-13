@@ -30,8 +30,6 @@
 #include "esp_lcd_st7735.h"
 #include <unistd.h>
 #include "lvgl.h"
-#include "draw/lv_image_decoder.h"
-#include "draw/lv_draw_buf.h"
 
 /* Bitmap fonts have unused rows above glyphs inside line_height; trim bg only, not text.
  * Keep in sync with SCREEN_LABEL_BG_TOP_TRIM in spiffs/index.js. */
@@ -181,18 +179,12 @@ static lv_obj_t *label_degree_aux = NULL;
 int label_scroll_pos = 0, label_max_pos = MSG_WIDTH;
 bool label_scroll_swap = false; // which physical label is leftmost in the scroll belt
 
-// Frixos belt. Position is elapsed/delay, so a late loop jumps ahead and the
-// long-run speed stays on the scroll delay. SCROLL_LOOP_MS is one FreeRTOS
-// tick: the schedule poll stays off a frame that will paint inside that tick.
-// When no pixel is due the loop sleeps until the next pixel, capped at
-// DISPLAY_IDLE_SLEEP_MS (inside the 30–50 ms window). 40 ms is a whole number
-// of 10 ms ticks, and it is above the fastest scroll setting (30 ms/px) so a
-// wait that ends on the pixel still paints every step.
+// Frixos belt. Each wake moves one pixel, then the next pixel is due one
+// scroll delay after that paint. A late loop holds the line instead of
+// skipping ahead, so the on-screen gap stays the delay. 10 ms is one FreeRTOS
+// tick and divides the 60 ms/px default; the schedule poll stays off a frame
+// that will paint inside that tick.
 #define SCROLL_LOOP_MS 10
-#define DISPLAY_IDLE_SLEEP_MS 40
-// Clock, brightness, and the message poll share this loop. Near the fastest
-// scroll every wake is a pixel and those frames skip the other sections.
-#define DISPLAY_HOUSEKEEPING_MAX_MS 100
 #define SCROLL_BELT_GAP 20
 #define SCROLL_CANVAS_MAX_H 24
 static int64_t scroll_t0_us = 0;         // time origin of the current message
@@ -450,43 +442,6 @@ static int scroll_clock_position(int *pixels, int *ipos, int64_t *traveled_out)
 static bool message_scroll_step_due(void)
 {
   return scroll_clock_position(NULL, NULL, NULL) >= 1;
-}
-
-/* Milliseconds until the next belt pixel, already capped at the idle sleep.
- * 0 means a pixel is already owed. The belt is not running: idle cap. */
-static uint32_t scroll_ms_until_next_pixel(void)
-{
-  if (!frixos_scroll_running() || !frixos_clip_visible())
-    return DISPLAY_IDLE_SLEEP_MS;
-
-  uint32_t delay = screen_scroll_delay_ms();
-  if (delay < 1)
-    delay = 1;
-  int64_t step_us = (int64_t)delay * 1000;
-  int64_t now = esp_timer_get_time();
-  int64_t due = scroll_t0_us + (scroll_last_traveled + 1) * step_us;
-  if (due <= now)
-    return 0;
-  int64_t remain_ms = (due - now + 999) / 1000;
-  if (remain_ms >= DISPLAY_IDLE_SLEEP_MS)
-    return DISPLAY_IDLE_SLEEP_MS;
-  if (remain_ms < 1)
-    return 0;
-  return (uint32_t)remain_ms;
-}
-
-/* Sleep used at the bottom of display_task. A pixel that is already due
- * comes back on the next tick so the belt can paint it. Otherwise sleep
- * until the next pixel or DISPLAY_IDLE_SLEEP_MS, and never less than one
- * tick: a shorter delay is a yield, and the loop would spin on this core. */
-static uint32_t display_loop_sleep_ms(void)
-{
-  uint32_t ms = message_scroll_step_due() ? 0 : scroll_ms_until_next_pixel();
-  if (ms < portTICK_PERIOD_MS)
-    ms = portTICK_PERIOD_MS;
-  if (ms > DISPLAY_IDLE_SLEEP_MS)
-    ms = DISPLAY_IDLE_SLEEP_MS;
-  return ms;
 }
 
 /* True if this pass steps, or the next tick would. Keeps the 1 s
@@ -921,39 +876,43 @@ static void frixos_scroll_recolor(const screen_widget_t *w)
     lv_obj_invalidate(label_msg_canvas);
 }
 
-/* Move to the pixel the clock says is due. One pixel shifts; a late wake paints
- * the jumped window so the average speed stays on the delay. */
-static void frixos_scroll_advance(void)
+/* One pixel is on screen. The next one is due `delay` after this paint, so a
+ * late wake does not owe a second pixel. */
+static void scroll_deadline_from_paint(int ipos, int64_t now)
 {
-  int pixels = 0;
-  int ipos = 0;
-  int64_t traveled = 0;
-  if (scroll_clock_position(&pixels, &ipos, &traveled) < 1)
-    return;
-  scroll_last_traveled = traveled;
+  scroll_seed_px = ipos;
   scroll_last_ipos = ipos;
-  if (scroll_strip != NULL && scroll_strip_w > 0)
-  {
-    if (pixels == 1)
-      frixos_scroll_shift();
-    else
-    {
-      int col = ipos < 0 ? -ipos : 0;
-      scroll_col = col % scroll_strip_w;
-      frixos_scroll_paint();
-      frixos_scroll_invalidate_ink();
-    }
-    return;
-  }
+  scroll_t0_us = now;
+  scroll_last_traveled = 0;
+}
+
+/* Move exactly one pixel when the delay has elapsed. Returns true when a
+ * column changed and the caller should flush it. */
+static bool frixos_scroll_advance(void)
+{
+  if (scroll_clock_position(NULL, NULL, NULL) < 1)
+    return false;
+
   int period = label_max_pos + SCROLL_BELT_GAP;
   if (period < 1)
     period = 1;
-  apply_scroll_belt(ipos, period);
+  int ipos = scroll_last_ipos - 1;
+  if (ipos <= -period)
+    ipos += period;
+
+  int64_t now = esp_timer_get_time();
+  if (scroll_strip != NULL && scroll_strip_w > 0)
+    frixos_scroll_shift();
+  else
+    apply_scroll_belt(ipos, period);
+  scroll_deadline_from_paint(ipos, now);
+  return true;
 }
 
-/* Paint one owed pixel if the clock says so. Safe to call when nothing is due.
- * Must not be called while this task already holds the LVGL lock: the unlock
- * below has to be the last one, or the renderer cannot flush the new column. */
+/* Paint one owed pixel if the delay has elapsed, and flush that column before
+ * releasing the lock. The LVGL task's own refresh is 50 ms and would otherwise
+ * combine two steps into one panel update. Safe to call when nothing is due.
+ * Must not be called while this task already holds the LVGL lock. */
 static void scroll_service(void)
 {
   if (!message_scroll_step_due())
@@ -962,7 +921,8 @@ static void scroll_service(void)
   lvgl_port_lock(0);
   int64_t locked = esp_timer_get_time();
   stall_note("scroll_lock", locked - t0);
-  frixos_scroll_advance();
+  if (frixos_scroll_advance())
+    lv_refr_now(lv_display_get_default());
   stall_note("scroll_draw", esp_timer_get_time() - locked);
   lvgl_port_unlock();
 }
@@ -3716,9 +3676,9 @@ void display_task(void *pvParameters)
   // will verify that the counter is still advancing.
   esp_timer_start_periodic(watchdog_timer, 30000000);
 
+  TickType_t lastrun_tick = xTaskGetTickCount();
   time_t now;
   static uint32_t loop_counter = 0;
-  static int64_t display_housekeeping_us = 0;
 
   while (1)
   {
@@ -3754,18 +3714,12 @@ void display_task(void *pvParameters)
 
     const bool scroll_step = message_scroll_step_due();
     const bool scroll_busy = message_scroll_busy(scroll_step);
-    const int64_t housekeeping_now = esp_timer_get_time();
-    const bool housekeeping_due = display_housekeeping_us == 0 ||
-                                   (housekeeping_now - display_housekeeping_us) >=
-                                       (int64_t)DISPLAY_HOUSEKEEPING_MAX_MS * 1000;
 
-    // Skip other LVGL-locking work on a belt step and on the tick just
+    // Skip other LVGL-locking work on a belt step and on the 10 ms pass just
     // before one, so the 1 s schedule poll cannot share a frame with a blit.
-    // The longer idle sleep makes every wake a pixel at the fastest delay, so
-    // those sections still run at DISPLAY_HOUSEKEEPING_MAX_MS. Between the
-    // calls that do run, paint any pixel the clock says is due so one slow
-    // section cannot pile up into a multi-pixel jump.
-    if (!scroll_busy || housekeeping_due)
+    // Between the calls that do run, paint one owed pixel. A slow section
+    // holds the belt for that step; it does not skip ahead.
+    if (!scroll_busy)
     {
       int64_t t0 = esp_timer_get_time();
       handle_screen_layout_on_wifi();
@@ -3851,7 +3805,6 @@ void display_task(void *pvParameters)
         stall_note("fade", esp_timer_get_time() - t_fade);
         scroll_service();
       }
-      display_housekeeping_us = esp_timer_get_time();
     }
 
     // Check if IP display timer has expired
@@ -3882,11 +3835,9 @@ void display_task(void *pvParameters)
     // which were executing every ~65ms in the high-frequency display loop.
     display_task_heartbeat++;
 
-    // No pixel due: sleep until the next one, or DISPLAY_IDLE_SLEEP_MS.
-    // A pixel already due sleeps one tick. Interval is from now, so this is
-    // vTaskDelay rather than a fixed DelayUntil cadence. Catch-up in
-    // frixos_scroll_advance paints a wake that lands a tick late.
-    vTaskDelay(pdMS_TO_TICKS(display_loop_sleep_ms()));
+    // Fixed 10 ms period, decoupled from scroll speed. Speed is the belt
+    // clock above, so only the per-pixel duration changes with the setting.
+    xTaskDelayUntil(&lastrun_tick, pdMS_TO_TICKS(SCROLL_LOOP_MS));
   } // end of while (1) loop
 
   ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Display task exit (unexpected)");

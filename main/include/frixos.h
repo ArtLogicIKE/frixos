@@ -54,7 +54,6 @@ Main task stack size
 #include "ltr303.h"
 
 #include "lvgl.h"
-#include "font/lv_font.h"
 
 // Generic App Stuff
 extern const char app[];

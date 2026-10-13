@@ -4,7 +4,7 @@
         {
             "label": "ESP-IDF: Build",
             "type": "shell",
-            "command": "cmd.exe /c \"call C:\\Espressif\\frameworks\\esp-idf-v6.0.1\\export.bat && set ESP_IDF_VERSION=6.0.1 && set _IDF.PY_COMPLETE= && cd /d ${workspaceFolder} && idf.py build\"",
+            "command": "cmd.exe /c \"call C:\\Espressif\\frameworks\\esp-idf-v6.1\\export.bat && set ESP_IDF_VERSION=6.1 && set _IDF.PY_COMPLETE= && cd /d ${workspaceFolder} && idf.py build\"",
             "options": {
                 "shell": {
                     "executable": "cmd.exe",

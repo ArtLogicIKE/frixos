@@ -35,7 +35,7 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/main/config.h.in
                ${CMAKE_CURRENT_SOURCE_DIR}/main/include/config.h @ONLY)
 
 if(NOT DEFINED ENV{IDF_PATH} OR NOT EXISTS "$ENV{IDF_PATH}/tools/cmake/project.cmake")
-    set(_idf_fallback "C:/Espressif/frameworks/esp-idf-v6.0.1")
+    set(_idf_fallback "C:/Espressif/frameworks/esp-idf-v6.1")
     if(EXISTS "${_idf_fallback}/tools/cmake/project.cmake")
         set(ENV{IDF_PATH} "${_idf_fallback}")
         message(STATUS "IDF_PATH unset; using ${_idf_fallback}")

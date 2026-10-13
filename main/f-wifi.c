@@ -777,10 +777,38 @@ static void process_forecast_chunk(const char *chunk, int len) {
 // Forward declaration — defined in the met.no section below.
 static int metno_process_buffer(char *buf, int buf_used, bool final);
 
+// HTTP_EVENT_ERROR carries the esp-tls error handle. Those lines are ESP_LOGE
+// on the HTTP_CLIENT / esp-tls tags, so they reach the serial console and not
+// the web log. Copy the codes here, while the handle is still valid.
+static void log_http_tls_error(esp_http_client_event_t *evt)
+{
+    if (evt->data == NULL)
+        return;
+
+    int mbedtls_code = 0;
+    esp_err_t tls_err = esp_tls_get_and_clear_last_error((esp_tls_error_handle_t)evt->data, &mbedtls_code, NULL);
+    int sock_err = 0;
+    esp_tls_get_and_clear_error_type((esp_tls_error_handle_t)evt->data, ESP_TLS_ERR_TYPE_SYSTEM, &sock_err);
+    if (tls_err == ESP_ERR_INVALID_STATE)
+        return;
+    if (tls_err == ESP_OK && mbedtls_code == 0 && sock_err == 0)
+        return;
+
+    unsigned mbedtls_hex = (unsigned)(mbedtls_code < 0 ? -mbedtls_code : mbedtls_code);
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG,
+                "TLS %s (0x%x) mbedtls=-0x%04x errno=%d free=%u largest=%u",
+                esp_err_to_name(tls_err), (unsigned)tls_err, mbedtls_hex, sock_err,
+                (unsigned)heap_caps_get_free_size(MALLOC_CAP_8BIT),
+                (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+}
+
 esp_err_t http_event_handler(esp_http_client_event_t *evt)
 {
     switch (evt->event_id)
     {
+    case HTTP_EVENT_ERROR:
+        log_http_tls_error(evt);
+        break;
     case HTTP_EVENT_ON_HEADER:
         if (is_metno_request && evt->header_key && evt->header_value &&
             strcasecmp(evt->header_key, "Last-Modified") == 0)
@@ -800,7 +828,6 @@ esp_err_t http_event_handler(esp_http_client_event_t *evt)
         if (wifi_http_buffer != NULL)
             wifi_http_buffer[0] = '\0';
         break;
-    case HTTP_EVENT_ERROR:
     case HTTP_EVENT_DISCONNECTED:
     case HTTP_EVENT_HEADERS_SENT:
     case HTTP_EVENT_ON_HEADERS_COMPLETE:

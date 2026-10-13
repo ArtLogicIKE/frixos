@@ -4,7 +4,7 @@
 
 **[Frixos Store → buyfrixos.com](https://buyfrixos.com)**
 
-Frixos is an open-source firmware for the Frixos daylight projection clock—a WiFi-enabled device that projects time, weather, and biometric data onto any surface. Built on **ESP-IDF 6.0.1** for ESP32, it features a web-based provisioning portal, multilingual settings UI, and integrations with popular smart home and health platforms.
+Frixos is an open-source firmware for the Frixos daylight projection clock—a WiFi-enabled device that projects time, weather, and biometric data onto any surface. Built on **ESP-IDF 6.1** for ESP32, it features a web-based provisioning portal, multilingual settings UI, and integrations with popular smart home and health platforms.
 
 ---
 
@@ -195,10 +195,10 @@ cd frixos
 cp env.example .env
 # Edit .env: add WEATHER_API_KEY; optionally add ARTLOGIC_SSID/ARTLOGIC_PASSWORD
 
-# Set ESP-IDF 6.0.1 environment (install via Espressif installer or EIM)
+# Set ESP-IDF 6.1 environment (install via Espressif installer or EIM)
 . $IDF_PATH/export.sh   # Linux/macOS
 # or
-%IDF_PATH%\export.bat   # Windows (e.g. c:\Espressif\frameworks\esp-idf-v6.0.1\export.bat)
+%IDF_PATH%\export.bat   # Windows (e.g. c:\Espressif\frameworks\esp-idf-v6.1\export.bat)
 
 # Configure (optional)
 idf.py menuconfig
