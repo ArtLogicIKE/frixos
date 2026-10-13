@@ -30,6 +30,8 @@
 #include "esp_lcd_st7735.h"
 #include <unistd.h>
 #include "lvgl.h"
+// Exported by LVGL but only declared in its private headers.
+void lv_image_header_cache_drop(const void *src);
 
 /* Bitmap fonts have unused rows above glyphs inside line_height; trim bg only, not text.
  * Keep in sync with SCREEN_LABEL_BG_TOP_TRIM in spiffs/index.js. */
@@ -1466,9 +1468,11 @@ void show_grid(uint8_t show)
 {
   // eeprom_show_grid is the source of truth read by the draw callback; just make
   // sure the overlay callback is installed, then invalidate so the toggle shows.
-  (void)show;
+  static int shown = -1;
   create_grid(lv_scr_act());
-  lv_obj_invalidate(lv_scr_act());
+  if (shown != (int)show)
+    lv_obj_invalidate(lv_scr_act());
+  shown = show;
 }
 
 /* LVGL circular scroller. anim_duration is one full pass (text width plus the
@@ -2156,7 +2160,8 @@ static void set_digit_sprite(lv_obj_t *objs[NUM_DIGITS], int position, int digit
 {
   if (digit < -1 || digit > 9)
     return;
-  lv_image_set_offset_x(objs[position], -digit * DIGIT_WIDTH);
+  if (lv_image_get_offset_x(objs[position]) != -digit * DIGIT_WIDTH)
+    lv_image_set_offset_x(objs[position], -digit * DIGIT_WIDTH);
 }
 
 static void align_time_style_digits(lv_obj_t *objs[NUM_DIGITS], lv_obj_t *dot_objs[2],
@@ -2441,13 +2446,28 @@ static void apply_screen_layout_z_order(const screen_layout_profile_t *layout)
     }
   }
 
+  static lv_obj_t *wanted[SCREEN_ELEM_COUNT * 12];
+  int n = 0;
   for (int i = 0; i < SCREEN_ELEM_COUNT; i++)
   {
     lv_obj_t *objs[12];
     int count = 0;
     screen_layout_collect_elem_objects((screen_element_id_t)order[i], objs, &count);
     for (int j = 0; j < count; j++)
-      lv_obj_move_foreground(objs[j]);
+      wanted[n++] = objs[j];
+  }
+
+  // Each move invalidates the whole screen, so skip them when the stacking
+  // is already right (the usual case on a font or settings refresh).
+  lv_obj_t *scr = lv_scr_act();
+  const int32_t first = (int32_t)lv_obj_get_child_count(scr) - n;
+  bool in_order = first >= 0;
+  for (int k = 0; in_order && k < n; k++)
+    in_order = lv_obj_get_child(scr, first + k) == wanted[k];
+  if (!in_order)
+  {
+    for (int k = 0; k < n; k++)
+      lv_obj_move_foreground(wanted[k]);
   }
 
   raise_grid_foreground();
@@ -2997,6 +3017,7 @@ void display_changed(void)
   aux_runner.showing_ha = false;
 
   lvgl_port_lock(0);
+  lv_image_header_cache_drop(NULL); // files may have been uploaded or renamed under the same name
   st7735_set_rotation_and_mirror(eeprom_rotation, eeprom_mirroring);
   lv_obj_set_style_bg_color(scr, lv_color_hex(0x000000), 0);
   lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
@@ -3131,7 +3152,8 @@ void display_digit(int position, int digit)
   if (digit < -1 || digit > 9)
     return;
 
-  lv_image_set_offset_x(digit_objs[position], -digit * DIGIT_WIDTH);
+  if (lv_image_get_offset_x(digit_objs[position]) != -digit * DIGIT_WIDTH)
+    lv_image_set_offset_x(digit_objs[position], -digit * DIGIT_WIDTH);
   // ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Displayed digit %d at position %d (x=%d)", digit, position, digit * DIGIT_WIDTH);
 }
 
