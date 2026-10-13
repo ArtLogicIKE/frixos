@@ -3,6 +3,7 @@
 #include <time.h>
 #include "mbedtls/md.h"
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "esp_http_client.h"
 #include "esp_crt_bundle.h"
 #include "esp_tls.h"
@@ -16,6 +17,10 @@
 
 static const char *TAG = "f-freestyle";
 #define LIBRE_CLIENT_VERSION "4.20.0"
+#define LIBRE_LOGIN_COOLDOWN_US (300LL * 1000000LL) // matches the 300 s account lockout
+
+// Login is paused until this esp_timer time after an API-level rejection
+static int64_t libre_login_block_until_us = 0;
 
 // Guard to prevent recursive calls to login_freestyle
 static bool login_freestyle_in_progress = false;
@@ -470,6 +475,97 @@ static void process_glucose_chunk(const char *chunk, int len)
     }
 }
 
+// String-scan lookup (no cJSON): value after the first "key":, or NULL.
+static const char *freestyle_json_value(const char *buf, const char *key)
+{
+    char pattern[32];
+    snprintf(pattern, sizeof(pattern), "\"%s\"", key);
+    const char *field = strstr(buf, pattern);
+    if (!field)
+        return NULL;
+    const char *colon = strchr(field + strlen(pattern), ':');
+    if (!colon)
+        return NULL;
+    colon++;
+    while (*colon == ' ' || *colon == '\t')
+        colon++;
+    return colon;
+}
+
+static int freestyle_json_int(const char *buf, const char *key, int def)
+{
+    const char *value = freestyle_json_value(buf, key);
+    return value ? (int)strtol(value, NULL, 10) : def;
+}
+
+static bool freestyle_json_string(const char *buf, const char *key, char *out, size_t out_size)
+{
+    const char *value = freestyle_json_value(buf, key);
+    if (!value || *value != '"')
+        return false;
+    value++;
+    const char *end = strchr(value, '"');
+    size_t len = end ? (size_t)(end - value) : 0;
+    if (len == 0 || len >= out_size)
+        return false;
+    memcpy(out, value, len);
+    out[len] = '\0';
+    return true;
+}
+
+// Region codes are 2-3 lowercase letters (e.g. "eu", "us"); anything else is rejected.
+static bool freestyle_region_valid(const char *region)
+{
+    size_t len = strlen(region);
+    if (len < 2 || len > 3)
+        return false;
+    for (size_t i = 0; i < len; i++)
+        if (region[i] < 'a' || region[i] > 'z')
+            return false;
+    return true;
+}
+
+// Sets authorization and account-id; required on every call, including the graph request.
+static void freestyle_set_auth_headers(void)
+{
+    char auth_header[512 + 7 + 1]; // "Bearer " (7) + token (512) + NUL
+    snprintf(auth_header, sizeof(auth_header), "Bearer %s", eeprom_libre_token);
+    esp_http_client_set_header(freestyle_client, "authorization", auth_header);
+    char id_hash[65];
+    generateSHA256((const unsigned char *)libre_account_id, id_hash);
+    esp_http_client_set_header(freestyle_client, "account-id", id_hash);
+}
+
+// Logs an API-level login rejection (body status) and pauses login to avoid lockout.
+static void freestyle_login_rejected(const char *buf, int api_status)
+{
+    if (api_status == 2)
+    {
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Freestyle login rejected: bad credentials (status 2)");
+    }
+    else if (api_status == 4)
+    {
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Freestyle login: accept terms in the LibreLinkUp app (status 4)");
+    }
+    else if (api_status == 429 || freestyle_json_int(buf, "code", -1) == 60)
+    {
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Freestyle login: account locked (status %d)", api_status);
+    }
+    else if (api_status == 920)
+    {
+        char min_version[16];
+        if (freestyle_json_string(buf, "minimumVersion", min_version, sizeof(min_version)))
+            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Freestyle login: app version %s too old, need %s", LIBRE_CLIENT_VERSION, min_version);
+        else
+            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Freestyle login: app version too old (status 920)");
+    }
+    else
+    {
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Freestyle login: API status %d", api_status);
+    }
+    libre_login_block_until_us = esp_timer_get_time() + LIBRE_LOGIN_COOLDOWN_US;
+}
+
 // Function to handle redirects or determine base URL based on region
 static const char *get_freestyle_base_url()
 {
@@ -505,7 +601,7 @@ static esp_err_t freestyle_http_event_handler(esp_http_client_event_t *evt)
     switch (evt->event_id)
     {
     case HTTP_EVENT_ERROR:
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Freestyle HTTP error");
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Freestyle HTTP error (errno %d)", esp_http_client_get_errno(evt->client));
         freestyle_response_len = 0;
         if (is_glucose_chunk_mode)
         {
@@ -619,7 +715,7 @@ void cleanup_freestyle_client(void)
     freestyle_client_initialized = false;
 }
 
-bool login_freestyle(void)
+static bool login_request(bool *redirected)
 {  
     
     // Guard against recursive calls
@@ -706,6 +802,29 @@ bool login_freestyle(void)
         if (status_code == 200 && freestyle_response_len > 0)
         {
 
+            int api_status = freestyle_json_int(freestyle_response_buffer, "status", -1);
+            const char *redirect_value = freestyle_json_value(freestyle_response_buffer, "redirect");
+            if (api_status == 0 && redirect_value && strncmp(redirect_value, "true", 4) == 0)
+            {
+                char region[8];
+                if (freestyle_json_string(freestyle_response_buffer, "region", region, sizeof(region)) &&
+                    freestyle_region_valid(region))
+                {
+                    snprintf(eeprom_libre_region_url, sizeof(eeprom_libre_region_url), "https://api-%s.libreview.io", region);
+                    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Freestyle redirected to region %s", region);
+                    freestyle_reset_connection();
+                    *redirected = true;
+                }
+                else
+                {
+                    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Freestyle redirect: invalid region");
+                }
+            }
+            else if (api_status != 0)
+            {
+                freestyle_login_rejected(freestyle_response_buffer, api_status);
+            }
+
             // Extract token and account ID directly from JSON string without full parsing
             // Look for "authTicket" then find "token" within it
             char *auth_ticket = strstr(freestyle_response_buffer, "\"authTicket\"");
@@ -769,13 +888,14 @@ bool login_freestyle(void)
                 }
             }
 
-            if (eeprom_libre_token[0] != '\0' && libre_account_id[0] != '\0')
+            if (api_status == 0 && !*redirected && eeprom_libre_token[0] != '\0' && libre_account_id[0] != '\0')
             {
                 success = true;
            }
             else
             {
-                ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Freestyle login: no token/account ID");
+                if (api_status == 0 && !*redirected)
+                    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Freestyle login: no token/account ID");
             }
         }
         else
@@ -785,7 +905,7 @@ bool login_freestyle(void)
     }
     else
     {
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Freestyle login HTTP %s", esp_err_to_name(http_err));
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Freestyle login HTTP %s (errno %d)", esp_err_to_name(http_err), esp_http_client_get_errno(freestyle_client));
         
         // If SSL handshake failed, the client might be in a bad state - recreate it
         // Check for connection failures (ESP_FAIL is returned for SSL handshake failures)
@@ -813,6 +933,26 @@ bool login_freestyle(void)
     // Clear the in-progress flag
     login_freestyle_in_progress = false;
     return success;
+}
+
+bool login_freestyle(void)
+{
+    if (esp_timer_get_time() < libre_login_block_until_us)
+    {
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Freestyle login paused after API rejection");
+        return false;
+    }
+
+    // Start from the configured region; a redirect sets it for this session only
+    eeprom_libre_region_url[0] = '\0';
+    bool redirected = false;
+    if (login_request(&redirected))
+        return true;
+    if (!redirected)
+        return false;
+
+    redirected = false;
+    return login_request(&redirected);
 }
 
 static bool fetch_patient_id(void)
@@ -856,7 +996,10 @@ static bool fetch_patient_id(void)
     
 
     bool success = false;
-    if (esp_http_client_perform(freestyle_client) == ESP_OK)
+    esp_err_t patient_err = esp_http_client_perform(freestyle_client);
+    if (patient_err != ESP_OK)
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Freestyle connections HTTP %s (errno %d)", esp_err_to_name(patient_err), esp_http_client_get_errno(freestyle_client));
+    if (patient_err == ESP_OK)
     {
         int status_code = esp_http_client_get_status_code(freestyle_client);
         if (status_code == 200 && freestyle_response_len > 0)
@@ -937,6 +1080,7 @@ bool fetch_freestyle_glucose(void)
 
         // Update URL and method for this request
         esp_http_client_set_url(freestyle_client, graph_url);
+        freestyle_set_auth_headers();
         esp_http_client_set_method(freestyle_client, HTTP_METHOD_GET);
 
         if (!acquire_ssl_semaphore("fetch_freestyle_glucose"))
@@ -1009,9 +1153,9 @@ bool fetch_freestyle_glucose(void)
                     }
                 }
             }
-            else if (status_code == 401)
+            else if (status_code == 401 || status_code == 400)
             {
-                ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Freestyle unauthorized, retry login");
+                ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Freestyle graph HTTP %d, clearing session and re-login", status_code);
                 eeprom_libre_token[0] = '\0';
                 eeprom_libre_patient_id[0] = '\0';
             }
@@ -1023,7 +1167,7 @@ bool fetch_freestyle_glucose(void)
         }
         else
         {
-            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Freestyle fetch failed");
+            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Freestyle fetch failed: %s (errno %d)", esp_err_to_name(http_err), esp_http_client_get_errno(freestyle_client));
             freestyle_reset_connection();
             eeprom_libre_token[0] = '\0';
             eeprom_libre_patient_id[0] = '\0';
