@@ -1197,7 +1197,7 @@ static bool validate_json_params(cJSON *root, char *err_buf, size_t err_size)
     if ((item = cJSON_GetObjectItem(root, "p47")) && cJSON_IsNumber(item))
         CHECK_RANGE("wifi_end", item->valueint, 0, 1439);
 
-    /* p23 brightness_LED array - exactly 2 elements [day, night], each 1-100 */
+    /* p23 brightness_LED array - exactly 2 elements [day, night], each 0-100 */
     if ((item = cJSON_GetObjectItem(root, "p23")) && cJSON_IsArray(item))
     {
         int arr_size = cJSON_GetArraySize(item);
@@ -1212,7 +1212,7 @@ static bool validate_json_params(cJSON *root, char *err_buf, size_t err_size)
             if (cJSON_IsNumber(elem))
             {
                 int val = (int)(elem->valuedouble + 0.5); /* works for both int and float JSON numbers */
-                CHECK_RANGE("brightness_LED", val, 1, 100);
+                CHECK_RANGE("brightness_LED", val, 0, 100);
             }
         }
     }

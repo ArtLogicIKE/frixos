@@ -262,7 +262,7 @@ curl.exe -s -X POST "$HOST/api/settings" -H "Content-Type: application/json" --d
 
 | Key | Meaning | Type / range | Example body |
 |-----|---------|--------------|--------------|
-| `p23` | LED brightness **array** `[day, night]` | JSON array of 1–2 numbers, each **1–100** | `{"p23":[80,40]}` |
+| `p23` | LED brightness **array** `[day, night]` | JSON array of 1–2 numbers, each **0–100** | `{"p23":[80,40]}` |
 | `p20` | Lux sensitivity | float `0`–`50` | `{"p20":8.0}` |
 | `p21` | Lux threshold (day/night switch) | float `0`–`500` | `{"p21":20.0}` |
 | `p22` | Dim mode | `0`=brightness, `1`=full, `2`=time-of-day | `{"p22":0}` |
