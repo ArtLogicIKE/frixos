@@ -14,7 +14,7 @@ File system on top of posix API
 Set an upper cased letter on which the drive will accessible (e.g. 65 for 'A') -- 83 (S)
 Set the working directory "/spiffs"
 
-ESP Timer Stack Size -> 8192, otherwise OTA Update Timer will not work
+ESP Timer Stack Size -> 4096 (callbacks only notify tasks; POH save writes a small file)
 
 
 Enable Bluetooth
