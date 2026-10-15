@@ -1036,6 +1036,10 @@ bool fetch_freestyle_glucose(void)
 
         if (success)
             return true;
+
+        // A transfer cut mid-stream leaves only the oldest graphData points; a
+        // graph backfill seeded from that would keep a gap until the ring rolls over.
+        cgm_history_begin();
     }
 
     ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Freestyle fetch failed (retry)");
