@@ -1137,9 +1137,15 @@ bool wifi_lookup_iana_from_coords(double lat, double lon, char *out, size_t out_
         .transport_type = HTTP_TRANSPORT_OVER_SSL,
     };
 
+    if (!acquire_ssl_semaphore("wifi_lookup_iana_from_coords"))
+        return false;
+
     esp_http_client_handle_t client = esp_http_client_init(&config);
     if (client == NULL)
+    {
+        release_ssl_semaphore();
         return false;
+    }
 
     esp_err_t err = esp_http_client_perform(client);
     bool found = false;
@@ -1159,6 +1165,7 @@ bool wifi_lookup_iana_from_coords(double lat, double lon, char *out, size_t out_
         }
     }
     esp_http_client_cleanup(client);
+    release_ssl_semaphore();
     return found;
 }
 
