@@ -1,5 +1,6 @@
 managed_components/
 build/
+build-check/
 sdkconfig
 sdkconfig.old
 main/include/config.h
