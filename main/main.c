@@ -1363,6 +1363,7 @@ void app_main(void)
   }
   startup_led_pwm();
   ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Startup complete");
+  ssl_startup_gate_open();
 
   // Start 120s success timer: clear boot fail count on successful run
   esp_timer_handle_t success_timer = NULL;

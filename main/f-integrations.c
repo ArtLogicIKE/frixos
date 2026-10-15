@@ -12,6 +12,7 @@
 #include "esp_heap_caps.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/event_groups.h"
 #include "esp_wifi.h"
 #include "esp_netif.h"
 #include "esp_tls.h"     // Added for TLS types
@@ -172,6 +173,21 @@ static SemaphoreHandle_t ssl_connection_semaphore = NULL;
 #define SSL_SEMAPHORE_TIMEOUT_MS (30 * 1000)    // 30 seconds timeout
 static const char *ssl_semaphore_holder = NULL; // Track which function currently holds the semaphore
 
+// Boot gate: a TLS session (36-49 KB) started while httpd/mDNS/LVGL are still
+// allocating starved the WiFi driver and aborted the boot.
+static EventGroupHandle_t ssl_startup_gate = NULL;
+#define SSL_STARTUP_GATE_BIT BIT0
+#define SSL_STARTUP_GATE_MAX_WAIT_MS (60 * 1000)
+
+void ssl_startup_gate_open(void)
+{
+    if (ssl_startup_gate != NULL)
+    {
+        xEventGroupSetBits(ssl_startup_gate, SSL_STARTUP_GATE_BIT);
+        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "TLS startup gate open");
+    }
+}
+
 // Helper function to acquire SSL connection semaphore
 bool acquire_ssl_semaphore(const char *function_name)
 {
@@ -179,6 +195,16 @@ bool acquire_ssl_semaphore(const char *function_name)
     {
         ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "SSL semaphore not initialized");
         return false;
+    }
+
+    // Proceed anyway after the max wait so a stalled boot never blocks TLS forever.
+    if (ssl_startup_gate != NULL &&
+        !(xEventGroupWaitBits(ssl_startup_gate, SSL_STARTUP_GATE_BIT, pdFALSE, pdTRUE,
+                              pdMS_TO_TICKS(SSL_STARTUP_GATE_MAX_WAIT_MS)) & SSL_STARTUP_GATE_BIT))
+    {
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "TLS startup gate still closed after %ds, proceeding (%s)",
+                    SSL_STARTUP_GATE_MAX_WAIT_MS / 1000, function_name ? function_name : "?");
+        xEventGroupSetBits(ssl_startup_gate, SSL_STARTUP_GATE_BIT);
     }
 
     TickType_t timeout_ticks = pdMS_TO_TICKS(SSL_SEMAPHORE_TIMEOUT_MS);
@@ -1485,6 +1511,7 @@ void startup_integrations(void)
     }
     // Give the semaphore initially so first connection can acquire it
     xSemaphoreGive(ssl_connection_semaphore);
+    ssl_startup_gate = xEventGroupCreate();
     ESP_LOG_WEB(ESP_LOG_INFO, TAG, "SSL semaphore ready");
 
     // parse for any active integrations
