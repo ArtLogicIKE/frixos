@@ -1039,13 +1039,34 @@ static void integration_update_task(void *pvParameters)
                 // Freestyle Libre integration, always update if active 
                 if (integration_active[INTEGRATION_FREESTYLE])
                 {
-                    if (time(NULL) - integration_last_update[INTEGRATION_FREESTYLE] >= (eeprom_glucose_refresh * 60))
+                    static uint8_t freestyle_failures = 0;
+                    static time_t freestyle_retry_after = 0;
+                    time_t now_fs = time(NULL);
+                    if (now_fs - integration_last_update[INTEGRATION_FREESTYLE] >= (eeprom_glucose_refresh * 60) &&
+                        now_fs >= freestyle_retry_after)
                     {
                         if (!freestyle_client_initialized)
                             init_freestyle_client();
 
                         if (fetch_freestyle_glucose())
+                        {
                             update_ok[INTEGRATION_FREESTYLE] = true;
+                            freestyle_failures = 0;
+                            freestyle_retry_after = 0;
+                        }
+                        else
+                        {
+                            // 30 s, 60 s, 120 s ... capped at the refresh interval
+                            if (freestyle_failures < 6)
+                                freestyle_failures++;
+                            time_t backoff = (time_t)30 << (freestyle_failures - 1);
+                            time_t cap = (time_t)eeprom_glucose_refresh * 60;
+                            if (cap > 0 && backoff > cap)
+                                backoff = cap;
+                            freestyle_retry_after = now_fs + backoff;
+                            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Freestyle failed %u time(s), next try in %lds",
+                                        freestyle_failures, (long)backoff);
+                        }
                     }
                 }
 
