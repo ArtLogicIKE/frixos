@@ -497,6 +497,8 @@ esp_err_t generic_file_handler(httpd_req_t *req)
     file = fopen(filepath, "r");
     if (file != NULL)
     {
+        // We read in 1 KB chunks already; the stdio buffer only cost heap per request.
+        setvbuf(file, NULL, _IONBF, 0);
         ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "File found at: %s", filepath);
         ret = ESP_OK;
     }
@@ -545,6 +547,14 @@ esp_err_t generic_file_handler(httpd_req_t *req)
     else if (strstr(filename, ".png"))
     {
         httpd_resp_set_type(req, "image/png");
+    }
+
+    // UI code/translations only change with an OTA asset update; user-editable
+    // files (layouts, fonts, images) are deliberately left uncached.
+    if (strstr(filename, ".css") || strstr(filename, ".js") || strstr(filename, ".ico") ||
+        strncmp(filename, "i18n/", 5) == 0)
+    {
+        httpd_resp_set_hdr(req, "Cache-Control", "max-age=600");
     }
 
     // Read and send file in chunks
