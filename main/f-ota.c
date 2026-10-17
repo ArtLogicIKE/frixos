@@ -4,6 +4,7 @@
 #include "f-wifi.h"
 #include "f-membuffer.h"
 #include "f-integrations.h"
+#include "config.h"
 
 #include "esp_chip_info.h"
 #include "esp_flash.h"
@@ -1195,6 +1196,12 @@ void f_ota_check_update(void)
 {
     ESP_LOGI_STACK(TAG, "OTA Check Update");
 
+#if FRIXOS_DISABLE_AUTO_OTA
+    // Dev build flashed with idf.py: never replace it with a published release.
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Automatic OTA disabled in this build (DISABLE_AUTO_OTA=1)");
+    return;
+#endif
+
     if (!wifi_connected)
     {
         ESP_LOG_WEB(ESP_LOG_INFO, TAG, "WiFi not connected, skipping OTA check");
@@ -1244,7 +1251,9 @@ void f_ota_check_update(void)
 
     ota_self_heal_if_needed();
 
-    if (have_latest && new_version <= fwversion)
+    struct stat manifest_st;
+    const bool have_stored_manifest = stat(MANIFEST_PATH, &manifest_st) == 0;
+    if (have_latest && new_version <= fwversion && have_stored_manifest)
     {
         // Every QUIET_REFRESH_EVERY_CHECKS idle checks (or right away while no
         // release has ever been applied), pick up web-file-only publishes.

@@ -1160,14 +1160,28 @@ void startup_spiffs()
     else
       ESP_LOG_WEB(ESP_LOG_INFO, TAG, "LittleFS mounted ok: total: %d used: %d", total, used);
 
-    // Empty or freshly-formatted filesystem (no stored manifest): flag
-    // self-heal so the OTA task re-downloads the full verified file set as
-    // soon as WiFi is up, instead of waiting for the next update check.
+    // A locally flashed LittleFS image has the UI files but no signed release
+    // manifest. Preserve that bundle; only self-heal when the filesystem is
+    // actually missing essential UI assets.
     struct stat st;
     if (stat(MANIFEST_PATH, &st) != 0)
     {
-      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "No stored manifest (fresh filesystem) - scheduling self-heal");
-      manifest_set_self_heal_pending(true);
+      const bool bundled_ui_present =
+          stat("/spiffs/index.html", &st) == 0 &&
+          stat("/spiffs/js/core.js", &st) == 0 &&
+          stat("/spiffs/js/screen-editor.js", &st) == 0 &&
+          stat("/spiffs/css/screen-editor.css", &st) == 0 &&
+          stat("/spiffs/i18n/language_en.json", &st) == 0;
+      if (bundled_ui_present)
+      {
+        ESP_LOG_WEB(ESP_LOG_INFO, TAG,
+                    "No stored manifest, but bundled UI is present - preserving local filesystem");
+      }
+      else
+      {
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "No stored manifest and UI assets missing - scheduling self-heal");
+        manifest_set_self_heal_pending(true);
+      }
     }
   }
 
