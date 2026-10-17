@@ -14,13 +14,11 @@ from .const import (
     PARAM_NIGHT_FONT,
     PARAM_COLOR_FILTER,
     PARAM_NIGHT_COLOR_FILTER,
-    PARAM_MSG_FONT,
     PARAM_DEXCOM_REGION,
     PARAM_LANGUAGE,
     FONT_OPTIONS,
     COLOR_FILTER_OPTIONS,
     ROTATION_OPTIONS,
-    MSG_FONT_OPTIONS,
     DEXCOM_REGION_OPTIONS,
     LANGUAGE_OPTIONS,
 )
@@ -63,13 +61,6 @@ SELECT_DESCRIPTIONS: tuple[SelectEntityDescription, ...] = (
         entity_category=EntityCategory.CONFIG,
     ),
     SelectEntityDescription(
-        key=PARAM_MSG_FONT,
-        name="Message Font Size",
-        icon="mdi:format-size",
-        options=list(MSG_FONT_OPTIONS.values()),
-        entity_category=EntityCategory.CONFIG,
-    ),
-    SelectEntityDescription(
         key=PARAM_DEXCOM_REGION,
         name="Dexcom Region",
         icon="mdi:map-marker",
@@ -101,7 +92,6 @@ async def async_setup_entry(
         PARAM_NIGHT_FONT: None,  # String value, no mapping
         PARAM_COLOR_FILTER: COLOR_FILTER_OPTIONS,
         PARAM_NIGHT_COLOR_FILTER: COLOR_FILTER_OPTIONS,
-        PARAM_MSG_FONT: MSG_FONT_OPTIONS,
         PARAM_DEXCOM_REGION: DEXCOM_REGION_OPTIONS,
         PARAM_LANGUAGE: LANGUAGE_OPTIONS,
     }

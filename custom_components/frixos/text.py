@@ -29,7 +29,7 @@ TEXT_MAX_LENGTHS = {
 TEXT_DESCRIPTIONS: tuple[TextEntityDescription, ...] = (
     TextEntityDescription(
         key=PARAM_MESSAGE,
-        name="Scrolling Message",
+        name="Scrolling Widget Text",
         icon="mdi:message-text",
         entity_category=EntityCategory.CONFIG,
     ),

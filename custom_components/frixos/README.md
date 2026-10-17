@@ -53,13 +53,12 @@ This custom integration allows you to control and monitor your Frixos device dir
 - Night Font (same options)
 - Day Color Filter (None, Red, Green, Blue, B&W)
 - Night Color Filter (same options)
-- Message Font Size (8pt, 10pt, 12pt)
 - Dexcom Region (Disabled, US, Japan, Rest of World)
 - Language (English, Deutsch, Français, etc.)
 
 ### Text Inputs
 - Hostname
-- Scrolling Message (supports tokens like [HA:entity:path], [temp], etc.)
+- Scrolling Widget Text (supports tokens like [HA:entity:path], [temp], etc.)
 - Latitude
 - Longitude
 - Timezone (POSIX format, e.g., "EET-2EEST,M3.5.0/3,M10.5.0/4")
@@ -181,9 +180,9 @@ automation:
           value: 30
 ```
 
-### Scrolling Message Tokens
+### Scrolling Widget Tokens
 
-When setting the scrolling message, you can use tokens that the device will replace:
+When setting the text on a scroll-enabled text widget, you can use tokens that the device will replace:
 
 - `[device]` - Device name
 - `[greeting]` - Time-based greeting

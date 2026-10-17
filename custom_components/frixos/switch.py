@@ -37,7 +37,7 @@ SWITCH_DESCRIPTIONS: tuple[SwitchEntityDescription, ...] = (
     ),
     SwitchEntityDescription(
         key=PARAM_QUIET_SCROLL,
-        name="Show Scrolling Message",
+        name="Show Scrolling Text Widget",
         icon="mdi:message-scroll",
         entity_category=EntityCategory.CONFIG,
     ),
