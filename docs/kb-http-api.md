@@ -17,7 +17,7 @@ Source of truth is firmware (`main/f-settings.c`, `main/include/frixos.h`, `main
 5. [Parameter reference](#5-parameter-reference)
 6. [Screen layout binary (`/api/screen`)](#6-screen-layout-binary-apiscreen)
 7. [Apply flow](#7-apply-flow)
-8. [Python: patch scroll text and `text_N`](#8-python-patch-scroll-text-and-text_n)
+8. [Python: patch scroll text and a text widget](#8-python-patch-scroll-text-and-the-first-text-widget)
 9. [Other HTTP APIs](#9-other-http-apis)
 10. [Reboot, apply, and gotchas](#10-reboot-apply-and-gotchas)
 
@@ -53,9 +53,9 @@ The rest of this document writes `curl.exe`. Drop `.exe` on POSIX.
 
 ## 2. Why the screen layout is a binary blob
 
-`/api/settings` is JSON (`p00`…`p63`, plus `p64`–`p66` for Weather Underground, `p67` for the scroll engine, and `tz_iana`). That path is small enough for the ESP32 HTTP stack, cJSON, and the shared 4096-byte receive buffer (`HTTP_BUFFER_SIZE`).
+`/api/settings` is JSON (`p00`…`p66` and `tz_iana`). That path is small enough for the ESP32 HTTP stack, cJSON, and the shared 4096-byte receive buffer (`HTTP_BUFFER_SIZE`).
 
-The **screen layout is not**. A JSON document for ~28 widgets × 2 profiles, 512-byte scroll strings, eight static text slots, digit labels, and graph config is too large for the device to receive and parse on `/api/screen` (heap, parse buffers, `httpd` recv). Firmware therefore speaks a **packed little-endian blob**.
+The **screen layout is not**. A JSON document for ~15 widgets and 8 text widgets × 2 profiles, 512-byte scroll strings, text widgets, and graph config is too large for the device to receive and parse on `/api/screen` (heap, parse buffers, `httpd` recv). Firmware therefore speaks a **packed little-endian blob**.
 
 JSON exists **only in the browser**. `spiffs/js/screen-editor.js` decodes the blob to an editor object and encodes it back. Firmware encode/decode is `main/f-screen-layout-bin.c`. Comment in `f-settings.c`:
 
@@ -71,7 +71,7 @@ application/vnd.frixos.screen-layout+1
 
 POST also accepts `application/octet-stream`. Do **not** POST JSON to `/api/screen`.
 
-The eight static text fields (`text_1`…`text_8`) live **only** in this blob. They are not `/api/settings` keys.
+The text of the text widgets lives **only** in this blob. It is not an `/api/settings` key.
 
 ---
 
@@ -81,8 +81,8 @@ The eight static text fields (`text_1`…`text_8`) live **only** in this blob. T
 |--------|------|------|--------|
 | GET | `/api/settings` | — | JSON. Optional `?group=` / `?params=` |
 | POST | `/api/settings` | JSON | Partial update. `Content-Type: application/json` |
-| GET | `/api/screen` | — | **3912-byte** binary blob |
-| POST | `/api/screen` | binary, exact 3912 bytes | Persists and applies layout |
+| GET | `/api/screen` | — | **5634-byte** binary blob |
+| POST | `/api/screen` | binary, exactly 5634 bytes (or 1654 bytes: layout without the text widgets) | Persists and applies layout |
 | GET | `/api/status` | — | Device status JSON. `?logs=1` adds logs |
 | GET | `/api/locate` | — | IP geolocation (`lat`, `lon`, `city`, `iana`, `posix`) |
 | GET | `/api/timezone` | — | `?location=Europe/Athens` or `?lat=&lon=` |
@@ -122,7 +122,7 @@ Named groups (OR’d with `params` if both are set):
 | `theme` | `p40`, `p41` |
 | `settings` | `p00`, `p03`, `p09`, `p16`, `p34`–`p37`, `p39`, `p60`–`p63` |
 | `advanced` | `p01`–`p24`, `p42`, `p43`, `p46`, `p47`, `p50`, `p55`, `p56` |
-| `integrations` | `p25`–`p33`, `p44`, `p45`, `p48`, `p49`, `p51`–`p54`, `p57`–`p59`, `p64`–`p66` |
+| `integrations` | `p25`–`p33`, `p44`, `p45`, `p51`–`p54`, `p64`–`p66` |
 
 ```powershell
 curl.exe -s "$HOST/api/settings?group=integrations"
@@ -150,7 +150,7 @@ curl -s -X POST "$HOST/api/settings" \
   --data-binary '{"p16":"Hello from HTTP"}'
 ```
 
-`p16` max **511** characters (`SCROLL_MSG_LENGTH` 512 including NUL). It writes `eeprom_message` and calls `screen_layout_apply_legacy_message()`, which copies the string into **both** day and night profile `scroll_text`. That is the legacy JSON path for the scrolling message. Static `text_1`…`text_8` cannot be set this way.
+`p16` max **511** characters (`SCROLL_MSG_LENGTH` 512 including NUL). It writes `eeprom_message` and calls `screen_layout_apply_legacy_message()`, which copies the string into **both** day and night profile `scroll_text`. That is the legacy JSON path for the scrolling message. The text widgets have no JSON path.
 
 ---
 
@@ -219,9 +219,9 @@ curl.exe -s -X POST "$HOST/api/settings" -H "Content-Type: application/json" --d
 curl.exe -s -X POST "$HOST/api/settings" -H "Content-Type: application/json" --data-binary '{"p03":3,"p09":0}'
 ```
 
-### Fonts / color filter / message chrome (JSON)
+### Fonts / color filter (JSON)
 
-These also exist in the **screen blob header** (fonts, color filters) or **message widget**. POST `/api/screen` overwrites fonts, aux fonts, and color filters from the blob. POST `/api/settings` can still set the JSON keys below.
+Fonts and color filters also exist in the **screen blob header**. POST `/api/screen` overwrites fonts, aux fonts, and color filters from the blob. POST `/api/settings` can still set the JSON keys below. Text-widget color and font size are configured on the widget in the screen editor, not through legacy message settings.
 
 | Key | Meaning | Type / range | Example body |
 |-----|---------|--------------|--------------|
@@ -229,10 +229,7 @@ These also exist in the **screen blob header** (fonts, color filters) or **messa
 | `p05` | Night digit font | same | `{"p05":"light"}` |
 | `p10` | Day color filter | `0`–`4`: none, red, green, blue, B&W | `{"p10":0}` |
 | `p11` | Night color filter | `0`–`4` | `{"p11":4}` |
-| `p12` | Day message color | `#RRGGBB` | `{"p12":"#ffffff"}` |
-| `p15` | Night message color | `#RRGGBB` | `{"p15":"#ffffff"}` |
-| `p13` | Message font size | `0`=8pt … `4`=16pt | `{"p13":0}` |
-| `p06` | Show scrolling message | `0`/`1` (mirrors message widget enabled) | `{"p06":1}` |
+| `p06` | Show scrolling widget | `0`/`1` (compatibility mirror of the scroll-enabled text widget) | `{"p06":1}` |
 | `p07` | Show weather icon | `0`/`1` (mirrors weather widget enabled) | `{"p07":1}` |
 
 Valid font names: `bold`, `light`, `lcd`, `nixie`, `robrito`, `ficasso`, `lichten`, `kablame`, `kablamo`, `kaboom`, `kabboom`, `user1`, `user2`.
@@ -243,16 +240,14 @@ Valid font names: `bold`, `light`, `lcd`, `nixie`, `robrito`, `ficasso`, `lichte
 curl.exe -s -X POST "$HOST/api/settings" -H "Content-Type: application/json" --data-binary '{"p04":"bold","p05":"light","p10":0,"p11":0}'
 ```
 
-### Scrolling message (legacy JSON)
+### Scrolling text (compatibility JSON)
 
 | Key | Meaning | Type / range | Example body |
 |-----|---------|--------------|--------------|
-| `p16` | Scroll message (legacy) | string, max **511**. Tokens e.g. `[temp]` | `{"p16":"Hello [temp]"}` |
+| `p16` | Scroll text | string, max **511**. Tokens e.g. `[temp]` | `{"p16":"Hello [temp]"}` |
 | `p14` | Scroll delay | `30`–`255` ms (`uint8_t`) | `{"p14":60}` |
-| `p38` | Scroll speed | `1`–`255` px/s | `{"p38":10}` |
-| `p67` | Scroll engine | `0` = LVGL animation, `1` = Frixos belt (default). Past the 64-bit settings mask; included in the unfiltered GET and `params=p67` | `{"p67":1}` |
 
-`p16` copies into **both** layout profiles’ `scroll_text` and persists NVS. For per-profile scroll text, or any `text_N`, patch the blob ([section 6](#6-screen-layout-binary-apiscreen)).
+`p16` is retained for compatibility: it copies into **both** layout profiles’ `scroll_text` and persists NVS. Scrolling is enabled and styled on an ordinary text widget in the screen layout. For per-profile text or widget configuration, patch the blob ([section 6](#6-screen-layout-binary-apiscreen)).
 
 ```powershell
 curl.exe -s -X POST "$HOST/api/settings" -H "Content-Type: application/json" --data-binary '{"p16":"UI test message [temp]","p14":60}'
@@ -337,35 +332,11 @@ Shared credentials: `p31`/`p32`/`p33` (username, password, refresh). Dexcom regi
 curl.exe -s -X POST "$HOST/api/settings" -H "Content-Type: application/json" --data-binary '{"p30":0,"p44":0,"p33":5,"p53":0}'
 ```
 
-### Digit display schedule
+### Text widget rotation
 
-Legacy durations (`p48`/`p49`/`p57`) remain for migration; the live rotator is JSON in `p58` (main digits) and `p59` (aux digits). Each is a **JSON string** (not a nested array) stored in a 512-byte buffer (`strlen < 512`).
+The old digit-display schedule (`p48`, `p49`, `p57`, `p58`, `p59`) is gone. A text widget carries up to **3** contents that it shows in turn, each with its own duration in seconds (`1`–`3600`). A content that has nothing to show right now (a value token without data renders as `-`) is skipped. They are part of the `/api/screen` blob ([section 6](#6-screen-layout-binary-apiscreen)).
 
-Slot object:
-
-| Field | Meaning |
-|-------|---------|
-| `t` | `0`=time, `1`=CGM, `2`=weather temp, `3`=HA entity |
-| `d` | duration seconds, `1`–`3600` |
-| `e` | HA entity id (required if `t`=3), max 63 |
-| `l` | short unit label, max 7 |
-| `n` | optional digit-label name, max 25 |
-
-Max **8** slots. Outer JSON key value is a **string**:
-
-```powershell
-curl.exe -s -X POST "$HOST/api/settings" -H "Content-Type: application/json" --data-binary '{"p58":"[{\"t\":0,\"d\":30},{\"t\":2,\"d\":10}]"}'
-curl.exe -s -X POST "$HOST/api/settings" -H "Content-Type: application/json" --data-binary '{"p59":"[{\"t\":0,\"d\":20}]"}'
-curl.exe -s -X POST "$HOST/api/settings" -H "Content-Type: application/json" --data-binary '{"p48":30,"p49":10,"p57":10}'
-```
-
-| Key | Meaning | Type / range |
-|-----|---------|--------------|
-| `p48` | Legacy time-slot seconds | `0`–`120` |
-| `p49` | Legacy CGM-slot seconds | `0`–`120` |
-| `p57` | Legacy weather-slot seconds | `0`–`120` |
-| `p58` | Main digit schedule JSON **string** | max 511 chars |
-| `p59` | Aux digit schedule JSON **string** | max 511 chars |
+A layout written by an older firmware (layout version 10) is converted at the first boot of the new firmware: the schedule that was kept in NVS becomes the contents of the clock widget, and the stored schedule keys are erased.
 
 ---
 
@@ -373,28 +344,31 @@ curl.exe -s -X POST "$HOST/api/settings" -H "Content-Type: application/json" --d
 
 ### Sizes (current firmware — do not use `tools/set_graph.py`)
 
-`tools/set_graph.py` still has **stale** constants (`WIRE=3704`, `PROFILE=1820`) from before eight icon slots. Use these, matching `screen-editor.js` and `_Static_assert` in `f-screen-layout-bin.c`:
+`tools/set_graph.py` still has **stale** constants. Use these, matching `screen-editor.js` and the `_Static_assert` lines in `f-screen-layout-bin.c`:
 
 | Constant | Value |
 |----------|-------|
 | Magic | `"FSXL"` little-endian `0x4653584C` |
 | Format | `1` |
-| Layout version | `10` (`FRIXOS_SCREEN_LAYOUT_VERSION`) |
+| Layout version | `11` (`FRIXOS_SCREEN_LAYOUT_VERSION`) |
 | Header | **64** bytes |
-| Widget | 13 bytes × **28** widgets = 364 |
+| Widget | 13 bytes × **15** widgets = 195 |
 | `scroll_text` | 512 |
-| `static_text[8]` | 8 × 96 = 768 |
-| `digit_label` + `digit_label_aux` | 2 × 96 = 192 |
 | Graph cfg | **88** bytes |
-| Profile | **1924** bytes |
+| Profile | **795** bytes |
 | Profiles | 2 (day = 0, night = 1) |
-| Wire | `64 + 1924*2` = **3912** bytes (`FRIXOS_SCREEN_LAYOUT_WIRE_SIZE`) |
+| Base wire | `64 + 795*2` = **1654** bytes (`FRIXOS_SCREEN_LAYOUT_WIRE_SIZE`) |
+| Text widget section | 8 + 2 × 8 × 216 + 516 = **3980** bytes, appended after the base wire |
+| Widget meta (end of the text widget section) | **516** bytes: `uint16 instanced[2]` (bit *i* = slot exists: text 0–7, icons 8–15) + `char name[2][16][16]` |
+| Full wire | **5634** bytes (`FRIXOS_SCREEN_LAYOUT_FULL_WIRE_SIZE`) |
 
-POST **must** be exactly 3912 bytes. Wrong `Content-Type` → `{"status":"error","error":"bad_content_type",…}`. Wrong length → `invalid_length` with `got` / `expected`. Bad magic/format/version → `bad_wire`. Success → `{"status":"ok"}`.
+The widget meta is editor data (which text/icon slots exist, enabled or not, and their names). The display never reads it. Ext version 3 carries it; version 2 (text widgets only, 5118 bytes) is still read from layout files and by the editor, and every enabled widget then counts as existing.
+
+GET returns the full 5634 bytes. POST accepts 5634 bytes, or the 1654-byte base wire (the text widgets are then left as they are). Wrong `Content-Type` → `{"status":"error","error":"bad_content_type",…}`. Wrong length → `invalid_length` with `got` / `expected`. Bad magic/format/version → `bad_wire`. Success → `{"status":"ok"}`.
 
 ```powershell
 curl.exe -s -o layout.bin "$HOST/api/screen"
-# check size: should be 3912
+# check size: should be 5634
 curl.exe -s -X POST "$HOST/api/screen" `
   -H "Content-Type: application/vnd.frixos.screen-layout+1" `
   --data-binary "@layout.bin"
@@ -425,48 +399,30 @@ curl -s -X POST "$HOST/api/screen" \
 | 60 | 2 | width (`128`) |
 | 62 | 2 | height (`128`) |
 
-Day profile starts at byte **64**. Night profile at **1988** (`64+1924`).
+Day profile starts at byte **64**. Night profile at **859** (`64+795`). The text widget section starts at **1654**.
 
 ### Offsets within a profile
 
 | Offset | Size | Field |
 |--------|------|--------|
-| 0 | 364 | `widget[28]` |
-| 364 | 512 | `scroll_text` |
-| 876 | 96 | `static_text[0]` = **text_1** |
-| 972 | 96 | text_2 |
-| 1068 | 96 | text_3 |
-| 1164 | 96 | text_4 |
-| 1260 | 96 | text_5 |
-| 1356 | 96 | text_6 |
-| 1452 | 96 | text_7 |
-| 1548 | 96 | text_8 |
-| 1644 | 96 | digit_label |
-| 1740 | 96 | digit_label_aux |
-| 1836 | 88 | graph cfg |
+| 0 | 195 | `widget[15]` |
+| 195 | 512 | `scroll_text` |
+| 707 | 88 | graph cfg |
 
-`text_N` at `876 + (N-1)*96`. Strings are fixed-length **NUL-terminated**; unused bytes should be `0`.
-
-Absolute file offsets:
-
-| Field | Day | Night |
-|-------|-----|-------|
-| `scroll_text` | 428 | 2352 |
-| `text_1` | 940 | 2864 |
-| `text_8` | 1612 | 3536 |
+Strings are fixed-length **NUL-terminated**; unused bytes should be `0`. Absolute file offsets of `scroll_text`: day **259**, night **1054**.
 
 ### Widget bytes (13)
 
 Index order (`screen_element_id_t`):
 
-`glucose_level`, `glucose_trend`, `wifi_off`, `weather`, `moon`, `time`, `message`, `text_1`…`text_8`, `ampm`, `time_aux`, `digit_label`, `digit_label_aux`, `graph`, `icon_1`…`icon_8`.
+`glucose_level`, `glucose_trend`, `wifi_off`, `weather`, `moon`, `message`, `graph`, `icon_1`…`icon_8`.
 
 | +0 | +1 | +2 | +3 | +4 | +5 | +6 | +7–9 | +10–12 |
 |----|----|----|----|----|----|----|------|--------|
 | enabled | x | y | z | font | width | align | RGB fg | RGB bg |
 
 - `x`,`y`: 0–127. `z`: 0–4 (higher on top).
-- `font` (text): 0–4 = 8–16pt; firmware also allows 5 = 5pt tiny.
+- `font` (message only): 0–4 = 8–16pt; firmware also allows 5 = 5pt tiny.
 - `align`: `0` left, `1` center, `2` right.
 - Graph line color = widget fg; graph background = widget bg.
 - Icon slots map to SPIFFS `icon1.jpg`…`icon8.jpg`.
@@ -492,34 +448,58 @@ Index order (`screen_element_id_t`):
 
 Flags: `0x01` autoscale, `0x02` Y axis, `0x04` band, `0x08` backfill (compat), `0x10` value readout, `0x20` boolean, `0x40` thick line, `0x80` X axis.
 
+### Text widgets (section after the base wire)
+
+Header (8 bytes): magic `0x54585346` (`"FSXT"` little-endian), version `2`, widget count `8`, `u16` size of one widget (`216`). Then `8` widgets for the day profile and `8` for the night profile, each `text_widget_cfg_t`:
+
+| Offset | Size | Field |
+|--------|------|--------|
+| 0 | 1 | enabled |
+| 1–3 | 3 | x, y, z (z `0`–`4`) |
+| 4 | 1 | width in pixels, `0` = up to the right edge |
+| 5 | 1 | align: `0` left, `1` center, `2` right |
+| 6 | 1 | family: `0` sans, `1` bold, `2` profile digit theme, `3` aux digit theme, `4`+ = digit theme by index (bold, light, lcd, …) |
+| 7 | 1 | size in pixels, `8`–`36` |
+| 8 | 1 | flags: `0x01` show units, `0x02` tabular digits, `0x04` transparent background |
+| 9 | 1 | content count, `1`–`3` |
+| 10–12 | 3 | RGB text colour |
+| 13–15 | 3 | RGB background colour |
+| 16 | 6 | `u16` duration in seconds of each content |
+| 22 | 2 | reserved |
+| 24 | 192 | `char text[3][64]` |
+
+A text is a template: `"[temp]"`, `"Now [temp] [high]"`, `"[CGM:reading]"`. Besides the integration tokens it understands `[clock]` (time, honours the 12 h setting and the leading zero setting), `[ampm12]` (`AM`/`PM` in 12 h mode, empty in 24 h mode) and `[colon]` (an animated colon, only meaningful with a digit theme). Default layout: widget 1 = `[clock]` in the profile digit theme at size 36, widget 2 = `[ampm12]`.
+
 ---
 
 ## 7. Apply flow
 
 There is no separate “apply” endpoint. **POST `/api/screen` is apply.**
 
-1. `GET /api/screen` → 3912-byte `layout.bin` (current live layout, encoded from `eeprom_screen_layout` + fonts/filters).
-2. Patch fixed-length NUL-terminated strings and/or widget bytes. Keep length **3912**. Do not change magic/format unless you know the decoder (`format` must stay `1`; `layout_version` must be `≤ 10`).
+1. `GET /api/screen` → 5634-byte `layout.bin` (current live layout, encoded from `eeprom_screen_layout` + fonts/filters).
+2. Patch fixed-length NUL-terminated strings and/or widget bytes. Keep length **5634**. Do not change magic/format unless you know the decoder (`format` must stay `1`; `layout_version` must be `≤ 12`; version 11 message widgets are migrated, see above).
 3. `POST /api/screen` with `Content-Type: application/vnd.frixos.screen-layout+1` and `--data-binary @layout.bin`.
-4. Firmware: decode → copy to `eeprom_screen_layout` → `screen_layout_sync_legacy_eeprom` (mirrors day `scroll_text` into `p16` / `eeprom_message`, message colors/font, `p06`/`p07` from widgets) → `write_nvs_parameters` → `schedule_parse_integrations`. Display uses `eeprom_screen_layout`. Response `{"status":"ok"}`. **No reboot.**
+4. Firmware: decode → copy to `eeprom_screen_layout` → `screen_layout_sync_legacy_eeprom` (mirrors day `scroll_text` into `p16` / `eeprom_message` and `p06`/`p07` from widgets) → `write_nvs_parameters` → `schedule_parse_integrations`. Display uses `eeprom_screen_layout`. Response `{"status":"ok"}`. **No reboot.**
 
 Recommended workflow: always GET, patch, POST (do not synthesize a blob from scratch unless you copy a known-good GET).
 
-`p16` via `/api/settings` is the inverse for the scroll string only: it writes NVS message and copies into **both** profiles’ `scroll_text`, then schedules integration parse. It does not move widgets or static texts.
+`p16` via `/api/settings` is the inverse for the scroll string only: it writes NVS message and copies into **both** profiles’ `scroll_text`, then schedules integration parse. It does not move widgets or text widgets.
 
 ---
 
-## 8. Python: patch scroll text and `text_N`
+## 8. Python: patch scroll text and the first text widget
 
 ```python
 #!/usr/bin/env python3
-"""GET /api/screen, patch day+night scroll_text and text_1, POST back."""
+"""GET /api/screen, patch day+night scroll_text and the text of text widget 1, POST back."""
 from urllib.request import Request, urlopen
 
 HOST = "http://frixos.local"  # or http://192.168.2.129
-WIRE, HEADER, PROFILE = 3912, 64, 1924
-SCROLL_OFF, SCROLL_LEN = 364, 512
-STATIC0_OFF, STATIC_LEN = 876, 96
+WIRE, HEADER, PROFILE = 5634, 64, 795
+BASE_WIRE = HEADER + PROFILE * 2          # 1654: the text widget section follows
+SCROLL_OFF, SCROLL_LEN = 195, 512
+EXT_HEADER, TW_SIZE, TW_COUNT = 8, 216, 8
+TW_TEXT_OFF, TW_TEXT_LEN = 24, 64
 MIME = "application/vnd.frixos.screen-layout+1"
 
 def put_cstr(buf: bytearray, off: int, maxlen: int, text: str) -> None:
@@ -533,11 +513,13 @@ if len(blob) != WIRE:
     raise SystemExit(f"unexpected wire size {len(blob)}, expected {WIRE}")
 
 scroll = "Hello from HTTP [temp]"
-text_1 = "Kitchen"
+text_1 = "Kitchen [temp]"
 for profile in (0, 1):  # day, night
     base = HEADER + PROFILE * profile
     put_cstr(blob, base + SCROLL_OFF, SCROLL_LEN, scroll)
-    put_cstr(blob, base + STATIC0_OFF + 0 * STATIC_LEN, STATIC_LEN, text_1)
+    # first content of text widget 1 of this profile
+    tw = BASE_WIRE + EXT_HEADER + TW_SIZE * TW_COUNT * profile
+    put_cstr(blob, tw + TW_TEXT_OFF, TW_TEXT_LEN, text_1)
 
 req = Request(
     HOST + "/api/screen",
@@ -549,7 +531,7 @@ with urlopen(req) as resp:
     print(resp.read().decode())
 ```
 
-`text_N` uses `STATIC0_OFF + (N-1)*STATIC_LEN`. Digit labels are at profile offsets `1644` and `1740`.
+Text widget `N` (1-based) of a profile is at `BASE_WIRE + EXT_HEADER + TW_SIZE * (TW_COUNT * profile + N - 1)`.
 
 ---
 
@@ -616,14 +598,12 @@ Names are relative to `/spiffs`, max 110 chars, no `..` or leading `/`.
 
 **Layout POST** persists and is what the display uses. No reboot.
 
-**Do not POST JSON to `/api/screen`.** Use the 3912-byte blob.
+**Do not POST JSON to `/api/screen`.** Use the 5634-byte blob.
 
-**`p16` vs `text_1`…`text_8`:** scroll message has a JSON path; static texts do not.
+**`p16` vs text widgets:** scroll message has a JSON path; text widgets do not.
 
 **HA `const.py`** does not list `p44`–`p63` or `tz_iana`. Firmware wins.
 
 **`p23`** is `[day, night]`, not a scalar.
-
-**`p58`/`p59`** are strings containing JSON, max 511 characters.
 
 **Windows:** `curl.exe`, not `curl`. For binary POST always `--data-binary` (never `--data`, which can strip NULs / convert newlines).

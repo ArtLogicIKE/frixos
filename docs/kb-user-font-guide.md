@@ -50,12 +50,12 @@ The easiest way to create a custom font is to start with an existing one. **Bold
 
 1. Connect to your Frixos device’s web interface.
 2. Open the **Font Samples** section to see preview images.
-3. The built-in Bold font is stored as `bold-font.jpg` on the device. You can also use the sample image from the web UI (e.g. `bold.jpg`) as a reference—the font sprite uses the same layout.
+3. The built-in Bold font is stored at `themes/bold/font.jpg` on the device. You can also use the sample image from the web UI (e.g. `themes/bold/preview.jpg`) as a reference—the font sprite uses the same layout.
 
 ### Step 2: Create Your Modified Version
 
 1. **Copy the Bold font file**  
-   Use `bold-font.jpg` as your starting point. If you don’t have direct access to the file, create a new 180×36 image and use the Bold sample as a visual reference.
+   Use `themes/bold/font.jpg` as your starting point. If you don’t have direct access to the file, create a new 180×36 image and use the Bold sample as a visual reference.
 
 2. **Edit in an image editor** (e.g. GIMP, Photoshop, Photopea):
    - Open the 180×36 image.
@@ -123,17 +123,17 @@ Frixos uses a **theme system**: when you select a font (e.g. Bold, User1, Nixie)
 
 ### Theme File Naming
 
-Files follow the pattern: `{theme}-{element}.jpg` (or `.bmp`).
+Theme assets are stored in `themes/<theme>/`, with the element name as the filename. For example, User1 assets are stored as `themes/user1/font.jpg`, `themes/user1/weather.jpg`, and `themes/user1/moon.jpg`.
 
 For **User1**, examples:
-- `user1-font.jpg` – time digits
-- `user1-weather.jpg` – weather icons
-- `user1-moon.jpg` – moon phases
-- `user1-dot.jpg` – time separator dots
-- `user1-ampm.jpg` – AM/PM indicator
-- `user1-glucose.jpg` – glucose icon (CGM)
-- `user1-trend.jpg` – glucose trend arrows
-- `user1-units.jpg` – mg/dL / mmol/L label
+- `themes/user1/font.jpg` – time digits
+- `themes/user1/weather.jpg` – weather icons
+- `themes/user1/moon.jpg` – moon phases
+- `themes/user1/dot.jpg` – time separator dots
+- `themes/user1/ampm.jpg` – AM/PM indicator
+- `themes/user1/glucose.jpg` – glucose icon (CGM)
+- `themes/user1/trend.jpg` – glucose trend arrows
+- `themes/user1/units.jpg` – mg/dL / mmol/L label
 - `user1-wifi-off.jpg` – WiFi disabled icon
 
 Replace `user1` with `user2` for the second user font slot.
@@ -142,19 +142,19 @@ Replace `user1` with `user2` for the second user font slot.
 
 | Element | File | Width | Height | Frames | Total Width | Notes |
 |--------|------|-------|--------|--------|-------------|-------|
-| **Font** | `*-font.jpg` | 18 | 36 | 10 | 180 | Digits 0–9 |
-| **Weather** | `*-weather.jpg` | 32 | 22 | 8 | 256 | OpenWeatherMap icons |
-| **Moon** | `*-moon.jpg` | 14 | 14 | 8 | 112 | Moon phases 0–7 |
-| **Dot** | `*-dot.jpg` | varies | varies | 1 | — | Time separator |
-| **AM/PM** | `*-ampm.jpg` | 10 | 20 | 2 | 20 | AM, PM |
-| **Glucose** | `*-glucose.jpg` | 14 | 20 | 4 | 56 | Red, green, yellow, gray |
-| **Trend** | `*-trend.jpg` | 12 | 14 | 5 | 60 | Trend arrows |
-| **Units** | `*-units.jpg` | 12 | 24 | 2 | 24 | mg/dL, mmol/L |
-| **WiFi-off** | `*-wifi-off.jpg` | 20 | 20 | 1 | 20 | WiFi disabled icon |
+| **Font** | `themes/<theme>/font.jpg` | 18 | 36 | 10 | 180 | Digits 0–9 |
+| **Weather** | `themes/<theme>/weather.jpg` | 32 | 22 | 8 | 256 | OpenWeatherMap icons |
+| **Moon** | `themes/<theme>/moon.jpg` | 14 | 14 | 8 | 112 | Moon phases 0–7 |
+| **Dot** | `themes/<theme>/dot.jpg` | varies | varies | 1 | — | Time separator |
+| **AM/PM** | `themes/<theme>/ampm.jpg` | 10 | 20 | 2 | 20 | AM, PM |
+| **Glucose** | `themes/<theme>/glucose.jpg` | 14 | 20 | 4 | 56 | Red, green, yellow, gray |
+| **Trend** | `themes/<theme>/trend.jpg` | 12 | 14 | 5 | 60 | Trend arrows |
+| **Units** | `themes/<theme>/units.jpg` | 12 | 24 | 2 | 24 | mg/dL, mmol/L |
+| **WiFi-off** | `themes/<theme>/wifi-off.jpg` | 20 | 20 | 1 | 20 | WiFi disabled icon |
 
 ### Fallback Behavior
 
-If a theme-specific file is missing (e.g. `user1-weather.jpg`), the device falls back to `default-weather.jpg`. So you only need to create the assets you want to customize.
+If a theme-specific file is missing (e.g. `themes/user1/weather.jpg`), the device falls back to `themes/default/weather.jpg`. So you only need to create the assets you want to customize.
 
 ### Sample: Custom Weather Icons
 
@@ -221,7 +221,7 @@ Create a 112×14 px image with 8 moon icons in order.
 
 ### Important Notes
 
-- The upload uses the **original filename**. Rename your file to `user1-font.jpg` or `user2-font.jpg` before uploading if needed.
+- For recognized theme asset names, the web UI stores the uploaded file under `themes/<theme>/<element>.<extension>`. Rename your file to `user1-font.jpg` or `user2-font.jpg` before uploading if needed.
 - Non‑binary files (e.g. `.bin` firmware) are handled differently; font and theme files are uploaded as regular files to SPIFFS.
 - After upload, the display refreshes automatically. If you’ve selected User1 or User2 as the active font, you should see your custom digits immediately.
 
@@ -265,12 +265,12 @@ User1 and User2 use the files `user1-font.jpg` and `user2-font.jpg` (and any oth
 
 ## Quick Reference
 
-| Task | File to upload | Where to set |
-|------|----------------|--------------|
-| Custom digits for User1 | `user1-font.jpg` | Advanced → Day/Night font → User1 |
-| Custom digits for User2 | `user2-font.jpg` | Advanced → Day/Night font → User2 |
-| Custom weather icons | `user1-weather.jpg` or `user2-weather.jpg` | Auto-used when User1/User2 is selected |
-| Custom moon phases | `user1-moon.jpg` or `user2-moon.jpg` | Auto-used when User1/User2 is selected |
+| Task | File to upload | Stored as |
+|------|----------------|-----------|
+| Custom digits for User1 | `user1-font.jpg` | `themes/user1/font.jpg` |
+| Custom digits for User2 | `user2-font.jpg` | `themes/user2/font.jpg` |
+| Custom weather icons | `user1-weather.jpg` or `user2-weather.jpg` | `themes/user1/weather.jpg` or `themes/user2/weather.jpg` |
+| Custom moon phases | `user1-moon.jpg` or `user2-moon.jpg` | `themes/user1/moon.jpg` or `themes/user2/moon.jpg` |
 
 ---
 
