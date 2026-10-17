@@ -19,6 +19,8 @@
 #include "f-dexcom.h"
 #include "f-graph.h"
 #include "f-wu.h"
+#include "f-text-widget.h"
+#include "f-fonts.h"
 
 #include "time.h"
 #include "math.h"
@@ -105,22 +107,16 @@ static const char *month_names[9][12] = {
 char msg_scrolling[SCROLL_MSG_LENGTH]; // scrolling message text
 double lux = 0;
 // Include the generated sprite sheet image
-lv_obj_t *img_digits_sprite = NULL,
-         *img_digits_sprite_aux = NULL,
-         *img_weather = NULL,
+lv_obj_t *img_weather = NULL,
          *img_moon = NULL,
-         *img_ampm = NULL,
          *img_logo = NULL,
          *img_glucose = NULL,
          *img_glucose_trend = NULL,
-         *img_wifi = NULL,
-         *img_mgdl = NULL,
-         *img_mgdl_aux = NULL;
+         *img_wifi = NULL;
 
 lv_obj_t *label_msg_clip = NULL; // message box; children scroll inside
 lv_obj_t *label_msg = NULL;
 lv_obj_t *label_msg_loop = NULL; // second label for seamless infinite scrolling
-lv_obj_t *label_static[SCREEN_STATIC_TEXT_COUNT] = {NULL};
 
 // User JPG icons: one lv_image per slot, pointed at S:/icon<N>.jpg. Static images
 // kept in flash and decoded on draw (LV cache is 0), so no bitmap is held in RAM.
@@ -138,25 +134,7 @@ static uint8_t *graph_canvas_buf = NULL;
 // Set by display_changed() so the next update_graph() redraws immediately on a
 // config edit instead of waiting for the next sample.
 static bool graph_force_redraw = false;
-lv_obj_t *label_digit = NULL;
-lv_obj_t *label_digit_aux = NULL;
-static lv_obj_t *label_degree = NULL;
-static lv_obj_t *label_degree_aux = NULL;
 
-// Define digit width & height (adjust based on actual sprite sheet)
-#define DIGIT_WIDTH 18          // Width of each digit in the sprite sheet
-#define DIGIT_HEIGHT 36         // Height of each digit
-#define SPRITE_SHEET_COLUMNS 10 // Number of digits in the sprite sheet
-/** Free pixels between decimal dot and adjacent digit glyphs (mmol/L glucose display). */
-#define MMOL_DECIMAL_SIDE_GAP_PX 1
-/** If LVGL has not laid out the dot image yet, assume this width (typical theme dot). */
-#define MMOL_DOT_WIDTH_FALLBACK_PX 4
-/** Gap between the right edge of digit slot 2 and the glucose unit label (standalone widget). */
-#define GLUCOSE_WIDGET_UNIT_GAP_AFTER_DIGIT2 3
-/** Trim leading space for standalone mmol/L glucose (pixels). */
-#define GLUCOSE_WIDGET_MMOL_LEADING_TRIM_PX 2
-
-#define NUM_DIGITS 4                   // the 4 time digits
 #define label_msg_ofs_y (25 + 25 + 14) // y offset for the message label
 #define MSG_WIDTH 128                  // width of the message area
 #define MSG_EXTRA_WIDTH 0            // extra width for the message area, useful for scolling but bad for centering
@@ -165,7 +143,6 @@ static lv_obj_t *label_degree_aux = NULL;
 #define FADE_INTERVAL 200       // Time between steps in ms
 #define MAX_TOKEN_COUNT 100     // Maximum number of tokens to prevent memory issues
 #define MAX_FONT_INDEX 5        // Maximum font index (0=8pt .. 4=16pt, 5=5pt tiny)
-#define MIN_ANIMATION_TIME 1000 // Minimum animation time in milliseconds
 
 int label_scroll_pos = 0, label_max_pos = MSG_WIDTH;
 bool label_scroll_swap = false; // which physical label is leftmost in the scroll belt
@@ -205,12 +182,12 @@ static uint8_t scroll_fg_r, scroll_fg_g, scroll_fg_b;
 static uint8_t scroll_bg_r, scroll_bg_g, scroll_bg_b;
 static uint8_t scroll_canvas_buf[MSG_WIDTH * 2 * SCROLL_CANVAS_MAX_H] __attribute__((aligned(4)));
 static lv_obj_t *label_msg_canvas = NULL;
-static uint8_t applied_scroll_engine = 0xFF; // engine last configured on the labels
 static uint8_t applied_scroll_delay = 0;      // delay baked into the LVGL animation
-lv_obj_t *digit_objs[NUM_DIGITS] = {NULL, NULL, NULL, NULL};
-lv_obj_t *dots[2] = {NULL, NULL};
-lv_obj_t *aux_digit_objs[NUM_DIGITS] = {NULL, NULL, NULL, NULL};
-lv_obj_t *aux_dots[2] = {NULL, NULL};
+static const text_widget_cfg_t *active_scroll_widget = NULL;
+static const lv_font_t *active_scroll_font = NULL;
+static bool scroll_widget_configured = false;
+static bool system_banner_active = false;
+static int64_t system_banner_deadline_us = 0;
 
 /* LCD IO and panel */
 static esp_lcd_panel_io_handle_t lcd_io = NULL;
@@ -223,35 +200,6 @@ int last_minute = -1;      // Store the last updated minute
 time_t ota_start_time = 0; // Track when OTA update started
 time_t now;
 struct tm timeinfo;
-
-typedef struct
-{
-  const display_slot_t *schedule;
-  int count;
-  int current_idx;
-  time_t slot_start;
-  bool alternate_active;
-  bool showing_glucose;
-  bool showing_weather;
-  bool showing_ha;
-} schedule_runner_t;
-
-static schedule_runner_t primary_runner;
-static schedule_runner_t aux_runner;
-
-static void sync_schedule_runners(void);
-static bool layout_show_weather_on_digits(const screen_layout_profile_t *layout,
-                                          const schedule_runner_t *runner,
-                                          screen_element_id_t elem);
-static bool layout_show_ha_on_digits(const screen_layout_profile_t *layout,
-                                     const schedule_runner_t *runner,
-                                     screen_element_id_t elem);
-static bool layout_show_time_digits(const screen_layout_profile_t *layout,
-                                    const schedule_runner_t *runner,
-                                    screen_element_id_t elem);
-static bool layout_show_glucose_on_digits(const screen_layout_profile_t *layout,
-                                          const schedule_runner_t *runner,
-                                          screen_element_id_t elem);
 
 // fader stuff
 static int fade_step = 0;
@@ -280,7 +228,6 @@ static void handle_als_and_brightness(uint32_t loop_counter);
 static void handle_wifi_status_icon(void);
 static void handle_screen_layout_on_wifi(void);
 static void handle_integration_and_messages(void);
-static void update_static_text_labels(void);
 static void apply_screen_layout_positions(void);
 static void apply_screen_layout_z_order(const screen_layout_profile_t *layout);
 static uint8_t screen_scroll_delay_ms(void);
@@ -325,7 +272,8 @@ static uint8_t screen_scroll_delay_ms(void)
 static int message_view_width(int x)
 {
   const screen_widget_t *w = active_screen_widget(SCREEN_ELEM_MESSAGE);
-  int width = (w != NULL && w->width > 0) ? (int)w->width : LCD_H_RES;
+  int width = active_scroll_widget ? (active_scroll_widget->width ? active_scroll_widget->width : LCD_H_RES - x)
+                                   : (w != NULL && w->width > 0 ? (int)w->width : LCD_H_RES);
   if (x < 0)
     x = 0;
   if (x >= LCD_H_RES)
@@ -341,7 +289,7 @@ static void place_message_clip(int x, int y)
 {
   if (label_msg_clip == NULL)
     return;
-  int h = get_selected_font_height(active_message_font_index());
+  int h = active_scroll_font ? active_scroll_font->line_height : get_selected_font_height(active_message_font_index());
   if (h < 1)
     h = 8;
   if (y < 0)
@@ -361,7 +309,7 @@ static void apply_scroll_belt(int ipos, int scroll_period)
   if (label_msg_clip != NULL && lv_obj_has_flag(label_msg_clip, LV_OBJ_FLAG_HIDDEN))
     return;
 
-  const lv_font_t *font = get_selected_font(active_message_font_index());
+  const lv_font_t *font = active_scroll_font ? active_scroll_font : get_selected_font(active_message_font_index());
   const char *msg = last_scroll_msg;
   const int x1 = ipos;
   const int x2 = ipos + scroll_period;
@@ -387,7 +335,7 @@ static void apply_scroll_belt(int ipos, int scroll_period)
 
 static bool frixos_scroll_running(void)
 {
-  return eeprom_scroll_engine == SCROLL_ENGINE_FRIXOS && label_size > scroll_view_w && scroll_last_valid;
+  return label_size > scroll_view_w && scroll_last_valid;
 }
 
 static bool frixos_clip_visible(void)
@@ -554,10 +502,15 @@ void scroll_stall_report(char *buf, size_t n)
     snprintf(buf, n, "-");
 }
 
-static int glyph_ink(const uint8_t *bmp, uint16_t stride, uint16_t box_w, int x, int y)
+/* Ink when the coverage of a bpp-bit pixel reaches half (anti-aliased fonts are thresholded to 1 bit). */
+static int glyph_ink(const uint8_t *bmp, uint16_t stride, uint16_t box_w, int x, int y, int bpp)
 {
-  unsigned bit = stride == 0 ? (unsigned)(y * box_w + x) : (unsigned)(y * (int)stride * 8 + x);
-  return (bmp[bit >> 3] >> (7 - (bit & 7))) & 1;
+  unsigned row_bits = stride == 0 ? (unsigned)box_w * bpp : (unsigned)stride * 8;
+  unsigned bit = (unsigned)y * row_bits + (unsigned)x * bpp;
+  if (bpp == 8)
+    return bmp[bit >> 3] >= 128;
+  unsigned value = (bmp[bit >> 3] >> (8 - bpp - (bit & 7))) & ((1u << bpp) - 1);
+  return value >= (1u << (bpp - 1));
 }
 
 static int frixos_text_width(const char *text, const lv_font_t *font, bool pump)
@@ -608,7 +561,9 @@ static void frixos_strip_draw(uint8_t *strip, int stride, int strip_h, int text_
       i += n;
       continue;
     }
-    if (g.box_w > 0 && g.box_h > 0 && g.format == LV_FONT_GLYPH_FORMAT_A1 && font->get_glyph_bitmap != NULL)
+    const bool bpp_ok = g.format == LV_FONT_GLYPH_FORMAT_A1 || g.format == LV_FONT_GLYPH_FORMAT_A2 ||
+                        g.format == LV_FONT_GLYPH_FORMAT_A4 || g.format == LV_FONT_GLYPH_FORMAT_A8;
+    if (g.box_w > 0 && g.box_h > 0 && bpp_ok && font->get_glyph_bitmap != NULL)
     {
       g.req_raw_bitmap = 1;
       const uint8_t *bmp = font->get_glyph_bitmap(&g, NULL);
@@ -622,7 +577,7 @@ static void frixos_strip_draw(uint8_t *strip, int stride, int strip_h, int text_
             continue;
           for (int gx = 0; gx < (int)g.box_w; gx++)
           {
-            if (!glyph_ink(bmp, g.stride, g.box_w, gx, gy))
+            if (!glyph_ink(bmp, g.stride, g.box_w, gx, gy, (int)g.format))
               continue;
             int sx = pen + (int)g.ofs_x + gx;
             if ((unsigned)sx >= (unsigned)text_w)
@@ -945,6 +900,16 @@ static void frixos_scroll_advance(void)
  * below has to be the last one, or the renderer cannot flush the new column. */
 static void scroll_service(void)
 {
+  if (system_banner_active && time_valid && esp_timer_get_time() >= system_banner_deadline_us)
+  {
+    lvgl_port_lock(0);
+    system_banner_active = false;
+    frixos_scroll_discard();
+    if (label_msg_clip)
+      lv_obj_add_flag(label_msg_clip, LV_OBJ_FLAG_HIDDEN);
+    lvgl_port_unlock();
+    return;
+  }
   if (!message_scroll_step_due())
     return;
   int64_t t0 = esp_timer_get_time();
@@ -978,7 +943,7 @@ static void text_label_draw_trim_bg(lv_event_t *e)
   lv_draw_rect(layer, &draw_dsc, &bg_coords);
 }
 
-static lv_obj_t *trim_bg_labels[SCREEN_STATIC_TEXT_COUNT + 4];
+static lv_obj_t *trim_bg_labels[2];
 static int trim_bg_labels_count = 0;
 
 static bool label_has_trim_bg_draw(lv_obj_t *label)
@@ -1005,7 +970,7 @@ static void apply_text_widget_background(lv_obj_t *label, const screen_widget_t 
   if (font_idx > MAX_FONT_INDEX)
     font_idx = 0;
   lv_obj_set_style_pad_all(label, 0, LV_PART_MAIN);
-  lv_obj_set_height(label, get_selected_font_height(font_idx));
+  lv_obj_set_height(label, active_scroll_font ? active_scroll_font->line_height : get_selected_font_height(font_idx));
   lv_obj_set_style_bg_color(label, lv_color_make(w->bg_r, w->bg_g, w->bg_b), LV_PART_MAIN);
   /* Default widget bg is suppressed; trimmed bg is drawn in text_label_draw_trim_bg. */
   lv_obj_set_style_bg_opa(label, LV_OPA_TRANSP, LV_PART_MAIN);
@@ -1022,60 +987,6 @@ static void apply_message_widget_styles(const screen_widget_t *w)
     apply_text_widget_background(label_msg_clip, w, active_message_font_index());
   if (label_msg_loop != NULL)
     lv_obj_set_style_text_color(label_msg_loop, msg_color, 0);
-}
-
-static void apply_static_text_widget(lv_obj_t *label, const screen_widget_t *w, const char *text)
-{
-  const uint8_t font_idx = w->font <= MAX_FONT_INDEX ? w->font : 0;
-  lv_obj_set_style_text_font(label, get_selected_font(font_idx), 0);
-  lv_obj_set_style_text_color(label, lv_color_make(w->color_r, w->color_g, w->color_b), 0);
-  apply_text_widget_background(label, w, font_idx);
-
-  int label_w = w->width > 0 ? w->width : (LCD_H_RES - layout_abs_x(w));
-  if (label_w < 1)
-    label_w = 1;
-  lv_obj_set_width(label, label_w);
-  lv_label_set_long_mode(label, LV_LABEL_LONG_CLIP);
-
-  lv_text_align_t align = LV_TEXT_ALIGN_LEFT;
-  if (w->align == SCREEN_MSG_ALIGN_CENTER)
-    align = LV_TEXT_ALIGN_CENTER;
-  else if (w->align == SCREEN_MSG_ALIGN_RIGHT)
-    align = LV_TEXT_ALIGN_RIGHT;
-  lv_obj_set_style_text_align(label, align, 0);
-  if (screen_layout_positions_live)
-    lv_obj_set_pos(label, layout_abs_x(w), layout_abs_y(w));
-  lv_label_set_text(label, text);
-}
-
-static void update_static_text_labels(void)
-{
-  const screen_layout_profile_t *layout = &eeprom_screen_layout.profile[font_index];
-  static char rendered[SCREEN_STATIC_TEXT_COUNT][SCREEN_STATIC_TEXT_LENGTH];
-
-  for (int i = 0; i < SCREEN_STATIC_TEXT_COUNT; i++)
-  {
-    rendered[i][0] = '\0';
-    if (label_static[i] == NULL)
-      continue;
-    int64_t t0 = esp_timer_get_time();
-    replace_placeholders(layout->static_text[i], rendered[i], sizeof(rendered[i]));
-    stall_note("static_txt", esp_timer_get_time() - t0);
-    scroll_service();
-  }
-
-  int64_t t0 = esp_timer_get_time();
-  lvgl_port_lock(0);
-  for (int i = 0; i < SCREEN_STATIC_TEXT_COUNT; i++)
-  {
-    if (label_static[i] == NULL)
-      continue;
-    const screen_widget_t *w = &layout->widget[SCREEN_ELEM_TEXT_1 + i];
-    apply_static_text_widget(label_static[i], w, rendered[i]);
-    show_object(label_static[i], w->enabled != 0 && time_valid);
-  }
-  lvgl_port_unlock();
-  stall_note("static_lv", esp_timer_get_time() - t0);
 }
 
 int check_file(char *filename); // defined later; used by update_icon_srcs
@@ -1108,71 +1019,6 @@ static void update_icon_srcs(void)
   }
 }
 
-static void update_digit_label_widget(lv_obj_t *label,
-                                      const screen_widget_t *w,
-                                      const schedule_runner_t *runner,
-                                      screen_element_id_t pair_elem,
-                                      const char *configured_text)
-{
-  char rendered[SCREEN_STATIC_TEXT_LENGTH];
-  const char *display_text = configured_text;
-  bool show = label != NULL && w->enabled != 0 && time_valid;
-
-  if (show)
-  {
-    const screen_layout_profile_t *layout = &eeprom_screen_layout.profile[font_index];
-    const bool show_time = layout_show_time_digits(layout, runner, pair_elem);
-    const bool show_glucose = layout_show_glucose_on_digits(layout, runner, pair_elem);
-    const bool show_weather = layout_show_weather_on_digits(layout, runner, pair_elem);
-    const bool show_ha = layout_show_ha_on_digits(layout, runner, pair_elem);
-    const bool slot_named = (show_time || show_glucose || show_weather || show_ha)
-                            && runner->count > 0
-                            && runner->schedule[runner->current_idx].name[0] != '\0';
-
-    if (slot_named)
-      display_text = runner->schedule[runner->current_idx].name;
-    else
-    {
-      int64_t t0 = esp_timer_get_time();
-      replace_placeholders(configured_text, rendered, sizeof(rendered));
-      stall_note("digit_txt", esp_timer_get_time() - t0);
-      display_text = rendered;
-    }
-  }
-
-  int64_t t0 = esp_timer_get_time();
-  lvgl_port_lock(0);
-  if (!show)
-  {
-    if (label)
-      show_object(label, false);
-  }
-  else
-  {
-    apply_static_text_widget(label, w, display_text);
-    show_object(label, true);
-  }
-  lvgl_port_unlock();
-  stall_note("digit_lv", esp_timer_get_time() - t0);
-  scroll_service();
-}
-
-static void update_digit_label_widgets(void)
-{
-  const screen_layout_profile_t *layout = &eeprom_screen_layout.profile[font_index];
-
-  sync_schedule_runners();
-  update_digit_label_widget(label_digit,
-                            &layout->widget[SCREEN_ELEM_DIGIT_LABEL],
-                            &primary_runner,
-                            SCREEN_ELEM_TIME,
-                            layout->digit_label_text);
-  update_digit_label_widget(label_digit_aux,
-                            &layout->widget[SCREEN_ELEM_DIGIT_LABEL_AUX],
-                            &aux_runner,
-                            SCREEN_ELEM_TIME_AUX,
-                            layout->digit_label_aux_text);
-}
 void update_weather_msg(void);
 void display_string_substring(const char *text, int32_t x, int32_t y,
                               int32_t start_pixel, int32_t width_pixels,
@@ -1298,92 +1144,6 @@ err:
   return ret;
 }
 
-/* 5 ms tick, used only while an LVGL animation is actually running.
- * The port's own tick stays at CONFIG_LV_DEF_REFR_PERIOD. esp_lvgl_port
- * keeps that period in a private timer, so the fast tick is a separate
- * esp_timer that replaces it for the animation and is stopped when the
- * animation stops. The belt does not start an LVGL animation. */
-#define LVGL_ANIM_TICK_MS 5
-static esp_timer_handle_t lvgl_anim_tick = NULL;
-static bool lvgl_anim_tick_on = false;
-
-static void lvgl_anim_tick_cb(void *arg)
-{
-  (void)arg;
-  lv_tick_inc(LVGL_ANIM_TICK_MS);
-}
-
-/* The port tick only advances time. The animation refresher is what steps
- * the label scroller, and it is created at LV_DEF_REFR_PERIOD. Match it to
- * the tick that is actually running. */
-static void lvgl_set_anim_period(uint32_t period_ms)
-{
-  lv_timer_t *tmr = lv_anim_get_timer();
-  if (tmr != NULL)
-    lv_timer_set_period(tmr, period_ms);
-}
-
-/* Caller holds lvgl_port_lock. */
-static void lvgl_sync_anim_tick(void)
-{
-  const bool want = eeprom_scroll_engine == SCROLL_ENGINE_LVGL && lv_anim_count_running() > 0;
-  if (want == lvgl_anim_tick_on)
-    return;
-
-  if (want)
-  {
-    /* lvgl_port_stop disables LVGL timers before it stops the tick.
-     * Turn them back on before installing the 5 ms tick. On any failure
-     * the 50 ms port tick is resumed so the panel does not lose time. */
-    if (lvgl_port_stop() != ESP_OK)
-    {
-      /* stop() disables LVGL timers before esp_timer_stop. Put them back
-       * and make sure the 50 ms tick is running. */
-      lv_timer_enable(true);
-      lvgl_port_resume();
-      return;
-    }
-    lv_timer_enable(true);
-    if (lvgl_anim_tick == NULL)
-    {
-      const esp_timer_create_args_t args = {
-          .callback = &lvgl_anim_tick_cb,
-          .name = "lvgl_anim_tick",
-      };
-      if (esp_timer_create(&args, &lvgl_anim_tick) != ESP_OK)
-      {
-        lvgl_port_resume();
-        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "LVGL anim tick create failed");
-        return;
-      }
-    }
-    if (esp_timer_start_periodic(lvgl_anim_tick, (uint64_t)LVGL_ANIM_TICK_MS * 1000) != ESP_OK)
-    {
-      lvgl_port_resume();
-      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "LVGL anim tick start failed");
-      return;
-    }
-    lvgl_anim_tick_on = true;
-    lvgl_set_anim_period(LVGL_ANIM_TICK_MS);
-    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "LVGL tick %d ms (animation)", LVGL_ANIM_TICK_MS);
-    return;
-  }
-
-  if (lvgl_anim_tick != NULL)
-    esp_timer_stop(lvgl_anim_tick);
-  if (lvgl_port_resume() != ESP_OK)
-  {
-    /* 50 ms tick did not come back. Keep the 5 ms tick so time still moves. */
-    if (lvgl_anim_tick == NULL ||
-        esp_timer_start_periodic(lvgl_anim_tick, (uint64_t)LVGL_ANIM_TICK_MS * 1000) != ESP_OK)
-      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "LVGL tick resume failed");
-    return;
-  }
-  lvgl_anim_tick_on = false;
-  lvgl_set_anim_period(CONFIG_LV_DEF_REFR_PERIOD);
-  ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "LVGL tick %d ms", CONFIG_LV_DEF_REFR_PERIOD);
-}
-
 esp_err_t startup_lvgl(void)
 {
   ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "LVGL startup");
@@ -1500,90 +1260,59 @@ void show_grid(uint8_t show)
   lv_obj_invalidate(lv_scr_act());
 }
 
-/* LVGL circular scroller. anim_duration is one full pass (text width plus the
- * three spaces LVGL inserts between copies), so the ms-per-pixel matches the
- * scroll delay. Caller holds the LVGL lock. Restarts the animation. */
-static void apply_lvgl_scroll(const char *msg, const lv_font_t *font, int text_w)
+static void set_scroll_message_config(const char *msg, const text_widget_cfg_t *widget)
 {
-  lv_obj_add_flag(label_msg_loop, LV_OBJ_FLAG_HIDDEN);
-  lv_obj_clear_flag(label_msg, LV_OBJ_FLAG_HIDDEN);
-  lv_obj_set_style_text_align(label_msg, LV_TEXT_ALIGN_LEFT, 0);
-  lv_obj_set_pos(label_msg, 0, 0);
-  lv_obj_set_width(label_msg, scroll_view_w);
-
-  int32_t space_w = lv_font_get_glyph_width(font, ' ', ' ');
-  if (space_w < 1)
-    space_w = 1;
-  uint32_t distance = (uint32_t)text_w + (uint32_t)space_w * 3;
-  uint32_t anim_time = (uint32_t)screen_scroll_delay_ms() * distance;
-  if (anim_time < MIN_ANIMATION_TIME)
-    anim_time = MIN_ANIMATION_TIME;
-  lv_obj_set_style_anim_duration(label_msg, anim_time, LV_PART_MAIN);
-
-  lv_label_set_long_mode(label_msg, LV_LABEL_LONG_CLIP);
-  lv_label_set_text(label_msg, msg);
-  lv_label_set_long_mode(label_msg, LV_LABEL_LONG_SCROLL_CIRCULAR);
-  label_max_pos = text_w;
-}
-
-// warning - assumes it is running in a port lock/unlock wrapper
-void set_scroll_message(const char *msg)
-{
-  // Add null pointer check
-  if (msg == NULL || label_msg == NULL)
+  if (!msg || !label_msg)
   {
-    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "set_scroll_message: null pointer");
+    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "scroll renderer not ready");
     return;
   }
-  uint8_t msg_font = active_message_font_index();
-  // Validate font index bounds
-  if (msg_font > MAX_FONT_INDEX)
-  {
-    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "set_scroll_message: invalid font %d, using default", msg_font);
-    msg_font = 0;
-  }
-  // Get the selected font and validate it
-  const lv_font_t *font = get_selected_font(msg_font);
-  if (font == NULL)
-  {
-    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "set_scroll_message: invalid font, using default");
-    font = &frixos_8; // Use default font
-  }
 
-  // Measure new text width
+  active_scroll_widget = widget;
+  active_scroll_font = widget ? font_registry_get(widget->family, widget->size)
+                              : get_selected_font(active_message_font_index());
+  if (!active_scroll_font)
+    active_scroll_font = &frixos_8;
+  scroll_widget_configured = widget != NULL;
+  system_banner_active = widget == NULL;
+  system_banner_deadline_us = widget ? 0 : esp_timer_get_time() + (int64_t)IP_DISPLAY_DURATION_SEC * 1000000;
+
+  const uint8_t font_key = widget ? (uint8_t)(widget->family * 40 + widget->size)
+                                  : active_message_font_index();
   lv_point_t size;
-  lv_text_get_size(&size, msg, font, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
-
-  // If the text content AND font are unchanged, preserve the in-progress
-  // scroll state so the belt never resets to the right edge mid-cycle.
-  // An engine switch counts as a change so the other scroller takes over.
-  bool content_changed = (strcmp(msg, last_scroll_msg) != 0) || (msg_font != last_scroll_font);
-  const bool engine_changed = applied_scroll_engine != eeprom_scroll_engine;
+  lv_text_get_size(&size, msg, active_scroll_font, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+  bool content_changed = strcmp(msg, last_scroll_msg) != 0 || font_key != last_scroll_font;
   const uint8_t delay_now = screen_scroll_delay_ms();
   const bool delay_changed = applied_scroll_delay != delay_now;
-  if (engine_changed)
-    content_changed = true;
+  content_changed |= delay_changed;
+  strlcpy(last_scroll_msg, msg, sizeof(last_scroll_msg));
+  last_scroll_font = font_key;
 
-  if (msg != last_scroll_msg)
-  {
-    strncpy(last_scroll_msg, msg, sizeof(last_scroll_msg) - 1);
-    last_scroll_msg[sizeof(last_scroll_msg) - 1] = '\0';
-  }
-  last_scroll_font = msg_font;
-
-  const screen_widget_t *w_msg = active_screen_widget(SCREEN_ELEM_MESSAGE);
-  const int msg_x = screen_layout_positions_live ? layout_abs_x(w_msg) : BOOT_MSG_X;
-  const int msg_y = screen_layout_positions_live ? layout_abs_y(w_msg) : BOOT_MSG_Y;
-  const bool use_frixos = eeprom_scroll_engine != SCROLL_ENGINE_LVGL;
-  int preview_w = message_view_width(msg_x);
-
+  screen_widget_t style = {
+      .enabled = 1,
+      .x = widget ? widget->x : BOOT_MSG_X,
+      .y = widget ? widget->y : BOOT_MSG_Y,
+      .z = widget ? widget->z : 0,
+      .width = widget ? widget->width : 0,
+      .align = widget ? widget->align : SCREEN_MSG_ALIGN_CENTER,
+      .color_r = widget && (widget->flags & TW_FLAG_COLOR_OVERRIDE) ? widget->color_r : 255,
+      .color_g = widget && (widget->flags & TW_FLAG_COLOR_OVERRIDE) ? widget->color_g : 255,
+      .color_b = widget && (widget->flags & TW_FLAG_COLOR_OVERRIDE) ? widget->color_b : 255,
+      .bg_r = widget ? widget->bg_r : 0,
+      .bg_g = widget ? widget->bg_g : 0,
+      .bg_b = widget ? widget->bg_b : 0,
+  };
+  const int msg_x = style.x;
+  const int msg_y = style.y;
+  const int preview_w = message_view_width(msg_x);
   uint8_t *new_strip = NULL;
   int new_w = 0, new_stride = 0, new_h = 0, new_text_w = 0;
   bool have_strip = false;
-  if (use_frixos && size.x > preview_w && (content_changed || scroll_strip == NULL))
+  if (size.x > preview_w && (content_changed || scroll_strip == NULL))
   {
     int64_t t_strip = esp_timer_get_time();
-    have_strip = frixos_strip_build(msg, font, true, &new_strip, &new_w, &new_stride, &new_h, &new_text_w);
+    have_strip = frixos_strip_build(msg, active_scroll_font, true, &new_strip, &new_w, &new_stride,
+                                    &new_h, &new_text_w);
     stall_note("strip", esp_timer_get_time() - t_strip);
   }
 
@@ -1591,26 +1320,22 @@ void set_scroll_message(const char *msg)
   lvgl_port_lock(0);
   stall_note("msg_wait", esp_timer_get_time() - t_wait);
   int64_t t_lv = esp_timer_get_time();
-  lv_obj_set_style_text_font(label_msg, font, 0);
-  lv_obj_set_style_text_font(label_msg_loop, font, 0);
+  lv_obj_clear_flag(label_msg_clip, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_set_style_text_font(label_msg, active_scroll_font, 0);
+  lv_obj_set_style_text_font(label_msg_loop, active_scroll_font, 0);
   label_size = size.x;
-  apply_message_widget_styles(w_msg);
+  apply_message_widget_styles(&style);
   place_message_clip(msg_x, msg_y);
 
-  if (label_size > scroll_view_w && use_frixos)
-  { // Frixos belt: a 1-bit strip scrolled one presented pixel at a time.
-    if (engine_changed)
-    {
-      lv_label_set_long_mode(label_msg, LV_LABEL_LONG_CLIP);
-      lv_label_set_long_mode(label_msg_loop, LV_LABEL_LONG_CLIP);
-    }
+  if (label_size > scroll_view_w)
+  {
     label_max_pos = label_size;
     int view_h = scroll_strip_h;
     if (scroll_view_h > 0 && (view_h < 1 || scroll_view_h < view_h))
       view_h = scroll_view_h;
     if (have_strip)
     {
-      if (!frixos_scroll_commit(new_strip, new_w, new_stride, new_h, new_text_w, w_msg) && content_changed)
+      if (!frixos_scroll_commit(new_strip, new_w, new_stride, new_h, new_text_w, &style) && content_changed)
         frixos_label_reset();
       new_strip = NULL;
     }
@@ -1618,47 +1343,77 @@ void set_scroll_message(const char *msg)
       frixos_label_reset();
     else if (scroll_canvas_w != scroll_view_w || scroll_canvas_h != view_h)
     {
-      frixos_colors_store(w_msg);
+      frixos_colors_store(&style);
       if (frixos_scroll_bind(scroll_view_w, view_h))
       {
         frixos_scroll_paint();
         lv_obj_invalidate(label_msg_canvas);
       }
     }
-    else if (frixos_colors_differ(w_msg))
-      frixos_scroll_recolor(w_msg);
-  }
-  else if (label_size > scroll_view_w)
-  { // LVGL's own circular animation, kept as the comparison engine.
-    free(new_strip);
-    new_strip = NULL;
-    // Leave a running anim alone unless the text, font, engine, or delay changed.
-    frixos_scroll_discard();
-    if (content_changed || delay_changed)
-      apply_lvgl_scroll(msg, font, size.x);
+    else if (frixos_colors_differ(&style))
+      frixos_scroll_recolor(&style);
   }
   else
-  { // centered
+  {
     free(new_strip);
-    new_strip = NULL;
     frixos_scroll_discard();
-    const int centered_label_width = scroll_view_w;
-
     lv_label_set_long_mode(label_msg, LV_LABEL_LONG_CLIP);
     lv_label_set_text(label_msg, msg);
-    lv_obj_set_style_text_align(label_msg, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_width(label_msg, centered_label_width);
+    lv_text_align_t align = LV_TEXT_ALIGN_CENTER;
+    if (widget && widget->align == SCREEN_MSG_ALIGN_LEFT)
+      align = LV_TEXT_ALIGN_LEFT;
+    else if (widget && widget->align == SCREEN_MSG_ALIGN_RIGHT)
+      align = LV_TEXT_ALIGN_RIGHT;
+    lv_obj_set_style_text_align(label_msg, align, 0);
+    lv_obj_set_width(label_msg, scroll_view_w);
     lv_obj_set_pos(label_msg, 0, 0);
     lv_obj_clear_flag(label_msg, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(label_msg_loop, LV_OBJ_FLAG_HIDDEN);
-    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "set_scroll_message: centered");
     label_max_pos = 0;
   }
-  applied_scroll_engine = eeprom_scroll_engine;
   applied_scroll_delay = delay_now;
-  lvgl_sync_anim_tick();
   lvgl_port_unlock();
   stall_note("msg_lv", esp_timer_get_time() - t_lv);
+}
+
+void set_scroll_widget_message(const char *msg, const text_widget_cfg_t *widget, bool visible)
+{
+  if (!visible || !widget)
+  {
+    if (system_banner_active)
+      return;
+    scroll_widget_configured = false;
+    system_banner_active = false;
+    active_scroll_widget = NULL;
+    active_scroll_font = NULL;
+    if (label_msg_clip)
+    {
+      lvgl_port_lock(0);
+      frixos_scroll_discard();
+      lv_obj_add_flag(label_msg_clip, LV_OBJ_FLAG_HIDDEN);
+      lvgl_port_unlock();
+    }
+    return;
+  }
+  set_scroll_message_config(msg ? msg : "", widget);
+}
+
+void set_scroll_message(const char *msg)
+{
+  const text_widget_cfg_t *widget = NULL;
+  if (font_index < FRIXOS_SCREEN_LAYOUT_PROFILES)
+  {
+    for (int i = 0; i < TEXT_WIDGET_COUNT; i++)
+    {
+      const text_widget_cfg_t *candidate = &eeprom_text_widgets.widget[font_index][i];
+      if (candidate->enabled && (candidate->flags & TW_FLAG_SCROLL))
+      {
+        widget = candidate;
+        break;
+      }
+    }
+  }
+  set_scroll_message_config(msg ? msg : "", widget);
 }
 
 // this is reboot only stuff
@@ -1736,24 +1491,6 @@ void startup_display(void)
 
   set_scroll_message("Starting...");
 
-  for (int i = 0; i < SCREEN_STATIC_TEXT_COUNT; i++)
-  {
-    label_static[i] = lv_label_create(lv_scr_act());
-    lv_label_set_long_mode(label_static[i], LV_LABEL_LONG_CLIP);
-    lv_obj_add_flag(label_static[i], LV_OBJ_FLAG_HIDDEN);
-    lv_obj_set_style_bg_opa(label_static[i], LV_OPA_COVER, LV_PART_MAIN);
-  }
-
-  label_digit = lv_label_create(lv_scr_act());
-  lv_label_set_long_mode(label_digit, LV_LABEL_LONG_CLIP);
-  lv_obj_add_flag(label_digit, LV_OBJ_FLAG_HIDDEN);
-  lv_obj_set_style_bg_opa(label_digit, LV_OPA_COVER, LV_PART_MAIN);
-  label_digit_aux = lv_label_create(lv_scr_act());
-  lv_label_set_long_mode(label_digit_aux, LV_LABEL_LONG_CLIP);
-  lv_obj_add_flag(label_digit_aux, LV_OBJ_FLAG_HIDDEN);
-  lv_obj_set_style_bg_opa(label_digit_aux, LV_OPA_COVER, LV_PART_MAIN);
-
-  img_digits_sprite = lv_image_create(lv_scr_act());
   img_weather = lv_image_create(lv_scr_act());
   img_moon = lv_image_create(lv_scr_act());
   img_glucose = lv_image_create(lv_scr_act());
@@ -1765,33 +1502,6 @@ void startup_display(void)
   // element is enabled (update_graph), so devices without a graph pay nothing.
   graph_canvas = lv_canvas_create(lv_scr_act());
   lv_obj_add_flag(graph_canvas, LV_OBJ_FLAG_HIDDEN);
-  img_mgdl = lv_image_create(lv_scr_act());
-  img_mgdl_aux = lv_image_create(lv_scr_act());
-  img_ampm = lv_image_create(lv_scr_act()); // AMPM indicator
-  label_degree = lv_label_create(lv_scr_act());
-  lv_label_set_text(label_degree, "\xc2\xb0");
-  lv_obj_set_style_text_color(label_degree, lv_color_hex(0xFFFFFF), 0);
-  lv_obj_set_style_text_font(label_degree, &frixos_11, 0);
-  lv_obj_add_flag(label_degree, LV_OBJ_FLAG_HIDDEN);
-  label_degree_aux = lv_label_create(lv_scr_act());
-  lv_label_set_text(label_degree_aux, "\xc2\xb0");
-  lv_obj_set_style_text_color(label_degree_aux, lv_color_hex(0xFFFFFF), 0);
-  lv_obj_set_style_text_font(label_degree_aux, &frixos_11, 0);
-  lv_obj_add_flag(label_degree_aux, LV_OBJ_FLAG_HIDDEN);
-  for (int i = 0; i < 4; i++)
-  {
-    digit_objs[i] = lv_image_create(lv_scr_act());
-    lv_obj_add_flag(digit_objs[i], LV_OBJ_FLAG_HIDDEN);
-    aux_digit_objs[i] = lv_image_create(lv_scr_act());
-    lv_obj_add_flag(aux_digit_objs[i], LV_OBJ_FLAG_HIDDEN);
-  }
-  for (int i = 0; i < 2; i++)
-  {
-    dots[i] = lv_image_create(lv_scr_act());
-    lv_obj_add_flag(dots[i], LV_OBJ_FLAG_HIDDEN);
-    aux_dots[i] = lv_image_create(lv_scr_act());
-    lv_obj_add_flag(aux_dots[i], LV_OBJ_FLAG_HIDDEN);
-  }
   for (int i = 0; i < SCREEN_ICON_COUNT; i++)
   {
     img_icon[i] = lv_image_create(lv_scr_act());
@@ -1800,23 +1510,14 @@ void startup_display(void)
   }
 
   // hide objects
-  lv_obj_add_flag(img_digits_sprite, LV_OBJ_FLAG_HIDDEN);
-  img_digits_sprite_aux = lv_image_create(lv_scr_act());
-  lv_obj_add_flag(img_digits_sprite_aux, LV_OBJ_FLAG_HIDDEN);
-  lv_obj_add_flag(img_moon, LV_OBJ_FLAG_HIDDEN);          // Hide
-  lv_obj_add_flag(img_ampm, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_add_flag(img_moon, LV_OBJ_FLAG_HIDDEN);
   lv_obj_add_flag(img_weather, LV_OBJ_FLAG_HIDDEN);
   lv_obj_add_flag(img_glucose, LV_OBJ_FLAG_HIDDEN);
   lv_obj_add_flag(img_glucose_trend, LV_OBJ_FLAG_HIDDEN);
   lv_obj_add_flag(img_wifi, LV_OBJ_FLAG_HIDDEN);
-  lv_obj_add_flag(img_mgdl, LV_OBJ_FLAG_HIDDEN);
-  lv_obj_add_flag(img_mgdl_aux, LV_OBJ_FLAG_HIDDEN);
 
   register_label_trim_bg_draw(label_msg_clip);
-  for (int i = 0; i < SCREEN_STATIC_TEXT_COUNT; i++)
-    register_label_trim_bg_draw(label_static[i]);
-  register_label_trim_bg_draw(label_digit);
-  register_label_trim_bg_draw(label_digit_aux);
+  text_widgets_init();
 
   lvgl_port_unlock(); // Unlock LVGL
 
@@ -1839,44 +1540,44 @@ int check_file(char *filename)
   }
 }
 
-void find_file(char *filename, char len, char *theme, char *item)
+void find_file(char *filename, size_t len, char *theme, char *item)
 {
-
-  // look for BMP files first, then JPG
-  // Try theme-specific file first
-  snprintf(filename, len, "/spiffs/%s-%s.bmp", theme, item);
-  if (check_file(filename))
+  static const char *const extensions[] = {"bmp", "jpg"};
+  for (size_t i = 0; i < sizeof(extensions) / sizeof(extensions[0]); i++)
   {
-    // Theme-specific file exists, return without /spiffs/
-    snprintf(filename, len, "S:/%s-%s.bmp", theme, item);
-    return;
+    const char *ext = extensions[i];
+    snprintf(filename, len, "/spiffs/themes/%s/%s.%s", theme, item, ext);
+    if (check_file(filename))
+    {
+      snprintf(filename, len, "S:/themes/%s/%s.%s", theme, item, ext);
+      return;
+    }
+
+    // Keep support for user assets saved before themes were directory-based.
+    snprintf(filename, len, "/spiffs/%s-%s.%s", theme, item, ext);
+    if (check_file(filename))
+    {
+      snprintf(filename, len, "S:/%s-%s.%s", theme, item, ext);
+      return;
+    }
   }
 
-  // Try default file
-  snprintf(filename, len, "/spiffs/default-%s.bmp", item);
-  if (check_file(filename))
+  for (size_t i = 0; i < sizeof(extensions) / sizeof(extensions[0]); i++)
   {
-    // Default file exists, return without /spiffs/
-    snprintf(filename, len, "S:/default-%s.bmp", item);
-    return;
-  }
+    const char *ext = extensions[i];
+    snprintf(filename, len, "/spiffs/themes/default/%s.%s", item, ext);
+    if (check_file(filename))
+    {
+      snprintf(filename, len, "S:/themes/default/%s.%s", item, ext);
+      return;
+    }
 
-  // Try theme-specific file first
-  snprintf(filename, len, "/spiffs/%s-%s.jpg", theme, item);
-  if (check_file(filename))
-  {
-    // Theme-specific file exists, return without /spiffs/
-    snprintf(filename, len, "S:/%s-%s.jpg", theme, item);
-    return;
-  }
-
-  // Try default file
-  snprintf(filename, len, "/spiffs/default-%s.jpg", item);
-  if (check_file(filename))
-  {
-    // Default file exists, return without /spiffs/
-    snprintf(filename, len, "S:/default-%s.jpg", item);
-    return;
+    snprintf(filename, len, "/spiffs/default-%s.%s", item, ext);
+    if (check_file(filename))
+    {
+      snprintf(filename, len, "S:/default-%s.%s", item, ext);
+      return;
+    }
   }
 
   // Fallback to logo
@@ -1944,384 +1645,6 @@ static bool is_glucose_fresh()
   return is_fresh;
 }
 
-/* Return cached HA value string for the given entity, or NULL if not available. */
-static const char *get_ha_slot_value(const char *entity)
-{
-  if (!entity || entity[0] == '\0') return NULL;
-  for (int i = 0; i < integration_active_tokens_count[INTEGRATION_HA]; i++)
-  {
-    integration_token_t *tok = &integration_active_tokens[INTEGRATION_HA][i];
-    if (tok->entity && strcmp(tok->entity, entity) == 0)
-      return (strcmp(tok->value, "-") != 0 && tok->value[0] != '\0') ? tok->value : NULL;
-  }
-  return NULL;
-}
-
-/* Return true if the given slot currently has data available to display. */
-static bool slot_is_available(const display_slot_t *s)
-{
-  switch (s->type)
-  {
-    case SLOT_TYPE_TIME:         return true;
-    case SLOT_TYPE_CGM:          return is_glucose_on() && is_glucose_fresh();
-    case SLOT_TYPE_WEATHER_TEMP: return last_weather_update > 0;
-    case SLOT_TYPE_HA:           return get_ha_slot_value(s->entity) != NULL;
-    default:                     return false;
-  }
-}
-
-static bool layout_widget_enabled(const screen_layout_profile_t *layout, screen_element_id_t elem)
-{
-  return layout->widget[elem].enabled != 0;
-}
-
-static bool layout_show_weather_on_digits(const screen_layout_profile_t *layout,
-                                          const schedule_runner_t *runner,
-                                          screen_element_id_t elem)
-{
-  return layout_widget_enabled(layout, elem) && time_valid && runner->alternate_active &&
-         runner->showing_weather && last_weather_update > 0;
-}
-
-static bool layout_show_ha_on_digits(const screen_layout_profile_t *layout,
-                                     const schedule_runner_t *runner,
-                                     screen_element_id_t elem)
-{
-  if (!layout_widget_enabled(layout, elem) || !time_valid || !runner->alternate_active || !runner->showing_ha)
-    return false;
-  if (runner->count == 0)
-    return false;
-  return get_ha_slot_value(runner->schedule[runner->current_idx].entity) != NULL;
-}
-
-static bool layout_show_time_digits(const screen_layout_profile_t *layout,
-                                    const schedule_runner_t *runner,
-                                    screen_element_id_t elem)
-{
-  if (!layout_widget_enabled(layout, elem) || !time_valid)
-    return false;
-  if (runner->alternate_active && (runner->showing_weather || runner->showing_ha || runner->showing_glucose))
-    return false;
-  return true;
-}
-
-static bool layout_show_glucose_on_digits(const screen_layout_profile_t *layout,
-                                          const schedule_runner_t *runner,
-                                          screen_element_id_t elem)
-{
-  return layout_widget_enabled(layout, elem) && time_valid && runner->alternate_active &&
-         runner->showing_glucose && is_glucose_on() && is_glucose_fresh() &&
-         glucose_data.current_gl_mgdl > 0;
-}
-
-typedef struct
-{
-  int digit[4];
-  bool show_dots;
-  bool is_mmol;
-} digit_display_t;
-
-static void fill_glucose_digits(digit_display_t *out, bool time_slot)
-{
-  out->show_dots = false;
-  out->is_mmol = false;
-  for (int i = 0; i < 4; i++)
-    out->digit[i] = -1;
-
-  if (!is_glucose_on() || glucose_data.current_gl_mgdl <= 0)
-    return;
-
-  if (eeprom_glucose_unit == 1)
-  {
-    float glucose_mmol = glucose_data.current_gl_mgdl / 18.0182f;
-    if (glucose_mmol > 22.0f)
-      glucose_mmol = 22.0f;
-    if (glucose_mmol < 0.0f)
-      glucose_mmol = 0.0f;
-    int whole_part = (int)glucose_mmol;
-    int decimal_part = (int)((glucose_mmol - whole_part) * 10.0f + 0.5f);
-    if (decimal_part >= 10)
-    {
-      whole_part++;
-      decimal_part = 0;
-    }
-    if (time_slot)
-    {
-      out->digit[0] = -1;
-      if (whole_part >= 10)
-      {
-        out->digit[1] = whole_part / 10;
-        out->digit[2] = whole_part % 10;
-        out->digit[3] = decimal_part;
-      }
-      else
-      {
-        out->digit[1] = -1;
-        out->digit[2] = whole_part;
-        out->digit[3] = decimal_part;
-      }
-    }
-    else if (whole_part >= 10)
-    {
-      out->digit[0] = whole_part / 10;
-      out->digit[1] = whole_part % 10;
-      out->digit[2] = decimal_part;
-    }
-    else
-    {
-      out->digit[1] = whole_part;
-      out->digit[2] = decimal_part;
-    }
-    out->show_dots = true;
-    out->is_mmol = true;
-  }
-  else
-  {
-    int glucose_value = (int)glucose_data.current_gl_mgdl;
-    if (glucose_value > 999)
-      glucose_value = 999;
-    if (glucose_value < 0)
-      glucose_value = 0;
-    if (time_slot)
-    {
-      out->digit[0] = -1;
-      if (glucose_value >= 100)
-      {
-        out->digit[1] = glucose_value / 100;
-        out->digit[2] = (glucose_value / 10) % 10;
-        out->digit[3] = glucose_value % 10;
-      }
-      else
-      {
-        out->digit[1] = -1;
-        out->digit[2] = glucose_value / 10;
-        out->digit[3] = glucose_value % 10;
-      }
-    }
-    else if (glucose_value >= 100)
-    {
-      out->digit[0] = glucose_value / 100;
-      out->digit[1] = (glucose_value / 10) % 10;
-      out->digit[2] = glucose_value % 10;
-    }
-    else
-    {
-      out->digit[1] = glucose_value / 10;
-      out->digit[2] = glucose_value % 10;
-    }
-  }
-}
-
-static void fill_time_digits(digit_display_t *out, struct tm *ti)
-{
-  out->show_dots = true;
-  out->is_mmol = false;
-  bool is_pm = false;
-  struct tm local = *ti;
-
-  if (eeprom_12hour)
-  {
-    if (local.tm_hour == 0)
-      local.tm_hour = 12;
-    else if (local.tm_hour > 12)
-    {
-      local.tm_hour -= 12;
-      is_pm = true;
-    }
-  }
-
-  out->digit[0] = local.tm_hour / 10;
-  out->digit[1] = local.tm_hour % 10;
-  out->digit[2] = local.tm_min / 10;
-  out->digit[3] = local.tm_min % 10;
-  if (!eeprom_show_leading_zero && out->digit[0] == 0)
-    out->digit[0] = -1;
-  (void)is_pm;
-}
-
-/* Fill a digit_display_t with an integer value (0..999), right-aligned into digit[1..3],
- * leaving digit[0] blank. Used for weather temperature and HA entity readouts. */
-static void fill_integer_digits(digit_display_t *out, int value)
-{
-  out->show_dots = false;
-  out->is_mmol = false;
-  for (int i = 0; i < 4; i++)
-    out->digit[i] = -1;
-
-  if (value < 0) value = 0;
-  if (value > 999) value = 999;
-
-  if (value >= 100)
-  {
-    out->digit[1] = value / 100;
-    out->digit[2] = (value / 10) % 10;
-    out->digit[3] = value % 10;
-  }
-  else if (value >= 10)
-  {
-    out->digit[2] = value / 10;
-    out->digit[3] = value % 10;
-  }
-  else
-  {
-    out->digit[3] = value;
-  }
-}
-
-static void fill_weather_digits(digit_display_t *out)
-{
-  double display_temp = eeprom_fahrenheit ? ((weather_temp * 9.0 / 5.0) + 32.0) : weather_temp;
-  int temp_val = (int)round(display_temp < 0 ? -display_temp : display_temp);
-  fill_integer_digits(out, temp_val);
-}
-
-static void fill_ha_digits(digit_display_t *out, const char *ha_val)
-{
-  int ha_int = ha_val ? (int)round(fabs(atof(ha_val))) : 0;
-  fill_integer_digits(out, ha_int);
-}
-
-static void set_digit_sprite(lv_obj_t *objs[NUM_DIGITS], int position, int digit)
-{
-  if (digit < -1 || digit > 9)
-    return;
-  lv_image_set_offset_x(objs[position], -digit * DIGIT_WIDTH);
-}
-
-static void align_time_style_digits(lv_obj_t *objs[NUM_DIGITS], lv_obj_t *dot_objs[2],
-                                    int ox, int y, const digit_display_t *dd, bool show_dots)
-{
-  lv_obj_align(objs[0], LV_ALIGN_TOP_LEFT, ox + 0, y);
-  lv_obj_align(objs[1], LV_ALIGN_TOP_LEFT, ox + 1 * 18, y);
-  lv_obj_align(objs[2], LV_ALIGN_TOP_LEFT, ox + 2 * 18 + 6, y);
-  lv_obj_align(objs[3], LV_ALIGN_TOP_LEFT, ox + 3 * 18 + 6, y);
-  show_object(dot_objs[0], show_dots);
-  show_object(dot_objs[1], show_dots);
-  lv_obj_align(dot_objs[0], LV_ALIGN_TOP_LEFT, ox + 2 * 18 + 1, y + 10);
-  lv_obj_align(dot_objs[1], LV_ALIGN_TOP_LEFT, ox + 2 * 18 + 1, y + 26);
-}
-
-static void align_glucose_mgdl_digits(lv_obj_t *objs[NUM_DIGITS], lv_obj_t *dot_objs[2],
-                                      int ox, int y, const digit_display_t *dd)
-{
-  lv_obj_align(objs[0], LV_ALIGN_TOP_LEFT, ox + 0, y);
-  lv_obj_align(objs[1], LV_ALIGN_TOP_LEFT, ox + 1 * 18 + 6, y);
-  lv_obj_align(objs[2], LV_ALIGN_TOP_LEFT, ox + 2 * 18 + 6, y);
-  lv_obj_align(objs[3], LV_ALIGN_TOP_LEFT, ox + 3 * 18 + 6, y);
-  show_object(dot_objs[0], false);
-  show_object(dot_objs[1], false);
-}
-
-static void align_glucose_mmol_digits(lv_obj_t *objs[NUM_DIGITS], lv_obj_t *dot_objs[2],
-                                      int ox, int y, const digit_display_t *dd)
-{
-  int dot_w = lv_obj_get_width(dot_objs[0]);
-  if (dot_w <= 0)
-    dot_w = MMOL_DOT_WIDTH_FALLBACK_PX;
-
-  const int g = MMOL_DECIMAL_SIDE_GAP_PX;
-  const int shift = g + dot_w;
-  const int x0 = ox + 0 - shift;
-  const int x1 = ox + 1 * 18 + 6 - shift;
-  const int x2 = ox + 2 * 18 + 6 - shift;
-  const int x3 = x2 + DIGIT_WIDTH + g + dot_w + g;
-
-  lv_obj_align(objs[0], LV_ALIGN_TOP_LEFT, x0, y);
-  lv_obj_align(objs[1], LV_ALIGN_TOP_LEFT, x1, y);
-  lv_obj_align(objs[2], LV_ALIGN_TOP_LEFT, x2, y);
-  lv_obj_align(objs[3], LV_ALIGN_TOP_LEFT, x3, y);
-  show_object(dot_objs[0], true);
-  show_object(dot_objs[1], false);
-  lv_obj_align(dot_objs[0], LV_ALIGN_TOP_LEFT, x2 + DIGIT_WIDTH + g, y + 30);
-}
-
-static void align_glucose_digits(lv_obj_t *objs[NUM_DIGITS], lv_obj_t *dot_objs[2],
-                                 int ox, int y, const digit_display_t *dd)
-{
-  if (dd->is_mmol)
-    align_glucose_mmol_digits(objs, dot_objs, ox, y, dd);
-  else
-    align_glucose_mgdl_digits(objs, dot_objs, ox, y, dd);
-}
-
-/* Lay out the significant digits of a weather/HA value left-to-right starting at ox,
- * followed by an optional unit label (degree symbol or HA unit). Anchored to the time
- * widget so it follows the user's layout. */
-static void align_value_with_label_digits(lv_obj_t *objs[NUM_DIGITS], lv_obj_t *dot_objs[2],
-                                          int ox, int y, const digit_display_t *dd,
-                                          const char *unit, lv_obj_t *unit_label)
-{
-  int n_sig = (dd->digit[1] >= 0) ? 3 : (dd->digit[2] >= 0) ? 2 : 1;
-  int first = NUM_DIGITS - n_sig; /* index of first significant digit */
-
-  for (int i = 0; i < NUM_DIGITS; i++)
-  {
-    int rel = i - first;
-    int x = ox + (rel > 0 ? rel : 0) * DIGIT_WIDTH;
-    lv_obj_align(objs[i], LV_ALIGN_TOP_LEFT, x, y);
-  }
-
-  show_object(dot_objs[0], false);
-  show_object(dot_objs[1], false);
-
-  if (unit_label)
-  {
-    if (unit && unit[0] != '\0')
-    {
-      lv_label_set_text(unit_label, unit);
-      lv_obj_align(unit_label, LV_ALIGN_TOP_LEFT, ox + n_sig * DIGIT_WIDTH + 1, y);
-      show_object(unit_label, true);
-    }
-    else
-    {
-      show_object(unit_label, false);
-    }
-  }
-}
-
-static void render_digit_group(lv_obj_t *objs[NUM_DIGITS], const digit_display_t *dd)
-{
-  for (int i = 0; i < 4; i++)
-    set_digit_sprite(objs, i, dd->digit[i]);
-}
-
-static void update_cgm_dots_visibility(lv_obj_t *dot_objs[2], bool show_slot, const digit_display_t *dd)
-{
-  // Only adjust the dots when showing glucose: dot[0] becomes the mmol decimal
-  // point, dot[1] is unused. For time (or weather/HA) leave them exactly as the
-  // caller set them, otherwise the time colon gets hidden and isn't restored
-  // when switching back from glucose.
-  if (!show_slot)
-    return;
-  const bool is_mmol = (dd && dd->is_mmol) || eeprom_glucose_unit == 1;
-  show_object(dot_objs[1], false);
-  show_object(dot_objs[0], is_mmol);
-}
-
-static void apply_digit_display_visibility(lv_obj_t *digits[NUM_DIGITS], lv_obj_t *dot_objs[2],
-                                           lv_obj_t *mgdl_img, lv_obj_t *unit_label,
-                                           const screen_layout_profile_t *layout,
-                                           const schedule_runner_t *runner,
-                                           screen_element_id_t elem)
-{
-  const bool show_time = layout_show_time_digits(layout, runner, elem);
-  const bool show_glucose = layout_show_glucose_on_digits(layout, runner, elem);
-  const bool show_weather = layout_show_weather_on_digits(layout, runner, elem);
-  const bool show_ha = layout_show_ha_on_digits(layout, runner, elem);
-  const bool show_slot_digits = show_time || show_glucose || show_weather || show_ha;
-
-  for (int i = 0; i < 4; i++)
-    show_object(digits[i], show_slot_digits);
-  show_object(dot_objs[0], show_time || show_glucose);
-  show_object(dot_objs[1], show_time || show_glucose);
-  update_cgm_dots_visibility(dot_objs, show_glucose, NULL);
-  show_object(mgdl_img, show_glucose);
-  bool degree_visible = show_weather ||
-                        (show_ha && runner->count > 0 &&
-                         runner->schedule[runner->current_idx].label[0] != '\0');
-  show_object(unit_label, degree_visible);
-}
-
 static void apply_widget_visibility(const screen_layout_profile_t *layout)
 {
   // Boot splash: until the clock is synced, keep only the frixos logo and the
@@ -2336,18 +1659,11 @@ static void apply_widget_visibility(const screen_layout_profile_t *layout)
 
   const screen_widget_t *w_weather = &layout->widget[SCREEN_ELEM_WEATHER];
   const screen_widget_t *w_moon = &layout->widget[SCREEN_ELEM_MOON];
-  const screen_widget_t *w_msg = &layout->widget[SCREEN_ELEM_MESSAGE];
-
-  const bool show_time_digits = layout_show_time_digits(layout, &primary_runner, SCREEN_ELEM_TIME);
-
-  apply_digit_display_visibility(digit_objs, dots, img_mgdl, label_degree, layout, &primary_runner, SCREEN_ELEM_TIME);
-  apply_digit_display_visibility(aux_digit_objs, aux_dots, img_mgdl_aux, label_degree_aux,
-                                 layout, &aux_runner, SCREEN_ELEM_TIME_AUX);
-  show_object(img_ampm, show_time_digits && eeprom_12hour);
-
   show_object(img_weather, w_weather->enabled && weather_valid && time_valid);
   show_object(img_moon, w_moon->enabled && time_valid);
-  const bool msg_visible = w_msg->enabled || !time_valid;
+  const bool banner_visible = system_banner_active &&
+                              (!time_valid || esp_timer_get_time() < system_banner_deadline_us);
+  const bool msg_visible = !time_valid || scroll_widget_configured || banner_visible;
   show_object(label_msg_clip, msg_visible);
   if (!msg_visible)
     show_object(label_msg_loop, false); // hide the seamless-scroll copy too (#190)
@@ -2377,6 +1693,9 @@ static uint8_t screen_widget_layer(const screen_widget_t *w)
 {
   if (!w)
     return 0;
+  if (active_scroll_widget && font_index < FRIXOS_SCREEN_LAYOUT_PROFILES &&
+      w == &eeprom_screen_layout.profile[font_index].widget[SCREEN_ELEM_MESSAGE])
+    return active_scroll_widget->z <= SCREEN_LAYER_MAX ? active_scroll_widget->z : SCREEN_LAYER_MAX;
   return w->z <= SCREEN_LAYER_MAX ? w->z : SCREEN_LAYER_MAX;
 }
 
@@ -2405,41 +1724,14 @@ static void screen_layout_collect_elem_objects(screen_element_id_t id, lv_obj_t 
   case SCREEN_ELEM_MOON:
     screen_layout_push_obj(img_moon, objs, count, 12);
     break;
-  case SCREEN_ELEM_TIME:
-    for (int i = 0; i < NUM_DIGITS; i++)
-      screen_layout_push_obj(digit_objs[i], objs, count, 12);
-    screen_layout_push_obj(dots[0], objs, count, 12);
-    screen_layout_push_obj(dots[1], objs, count, 12);
-    screen_layout_push_obj(img_mgdl, objs, count, 12);
-    screen_layout_push_obj(label_degree, objs, count, 12);
-    break;
-  case SCREEN_ELEM_TIME_AUX:
-    for (int i = 0; i < NUM_DIGITS; i++)
-      screen_layout_push_obj(aux_digit_objs[i], objs, count, 12);
-    screen_layout_push_obj(aux_dots[0], objs, count, 12);
-    screen_layout_push_obj(aux_dots[1], objs, count, 12);
-    screen_layout_push_obj(img_mgdl_aux, objs, count, 12);
-    screen_layout_push_obj(label_degree_aux, objs, count, 12);
-    break;
-  case SCREEN_ELEM_AMPM:
-    screen_layout_push_obj(img_ampm, objs, count, 12);
-    break;
   case SCREEN_ELEM_MESSAGE:
     screen_layout_push_obj(label_msg_clip, objs, count, 12);
-    break;
-  case SCREEN_ELEM_DIGIT_LABEL:
-    screen_layout_push_obj(label_digit, objs, count, 12);
-    break;
-  case SCREEN_ELEM_DIGIT_LABEL_AUX:
-    screen_layout_push_obj(label_digit_aux, objs, count, 12);
     break;
   case SCREEN_ELEM_GRAPH:
     screen_layout_push_obj(graph_canvas, objs, count, 12);
     break;
   default:
-    if (screen_elem_is_static_text(id))
-      screen_layout_push_obj(label_static[screen_static_text_index(id)], objs, count, 12);
-    else if (screen_elem_is_icon(id))
+    if (screen_elem_is_icon(id))
       screen_layout_push_obj(img_icon[screen_icon_index(id)], objs, count, 12);
     break;
   }
@@ -2466,13 +1758,20 @@ static void apply_screen_layout_z_order(const screen_layout_profile_t *layout)
     }
   }
 
-  for (int i = 0; i < SCREEN_ELEM_COUNT; i++)
+  // Raise layer by layer so the text widgets interleave with the fixed elements.
+  for (uint8_t layer = 0; layer <= SCREEN_LAYER_MAX; layer++)
   {
-    lv_obj_t *objs[12];
-    int count = 0;
-    screen_layout_collect_elem_objects((screen_element_id_t)order[i], objs, &count);
-    for (int j = 0; j < count; j++)
-      lv_obj_move_foreground(objs[j]);
+    for (int i = 0; i < SCREEN_ELEM_COUNT; i++)
+    {
+      if (screen_widget_layer(&layout->widget[order[i]]) != layer)
+        continue;
+      lv_obj_t *objs[12];
+      int count = 0;
+      screen_layout_collect_elem_objects((screen_element_id_t)order[i], objs, &count);
+      for (int j = 0; j < count; j++)
+        lv_obj_move_foreground(objs[j]);
+    }
+    text_widgets_raise_layer(font_index, layer);
   }
 
   raise_grid_foreground();
@@ -2489,10 +1788,6 @@ static void apply_screen_layout_positions(void)
   const screen_widget_t *w_glucose_level = &layout->widget[SCREEN_ELEM_GLUCOSE_LEVEL];
   const screen_widget_t *w_wifi = &layout->widget[SCREEN_ELEM_WIFI_OFF];
   const screen_widget_t *w_glucose_trend = &layout->widget[SCREEN_ELEM_GLUCOSE_TREND];
-  const screen_widget_t *w_time = &layout->widget[SCREEN_ELEM_TIME];
-  const screen_widget_t *w_time_aux = &layout->widget[SCREEN_ELEM_TIME_AUX];
-  const screen_widget_t *w_ampm = &layout->widget[SCREEN_ELEM_AMPM];
-  const screen_widget_t *w_msg = &layout->widget[SCREEN_ELEM_MESSAGE];
 
   lvgl_port_lock(0);
   lv_obj_align(img_weather, LV_ALIGN_TOP_LEFT, layout_abs_x(w_weather), layout_abs_y(w_weather));
@@ -2500,19 +1795,6 @@ static void apply_screen_layout_positions(void)
   lv_obj_align(img_glucose, LV_ALIGN_TOP_LEFT, layout_abs_x(w_glucose_level), layout_abs_y(w_glucose_level));
   lv_obj_align(img_wifi, LV_ALIGN_TOP_LEFT, layout_abs_x(w_wifi), layout_abs_y(w_wifi));
   lv_obj_align(img_glucose_trend, LV_ALIGN_TOP_LEFT, layout_abs_x(w_glucose_trend), layout_abs_y(w_glucose_trend));
-  lv_obj_align(img_mgdl, LV_ALIGN_TOP_LEFT, layout_abs_x(w_time) + 79, layout_abs_y(w_time) + 5);
-  lv_obj_align(img_mgdl_aux, LV_ALIGN_TOP_LEFT, layout_abs_x(w_time_aux) + 79, layout_abs_y(w_time_aux) + 5);
-
-  for (int i = 0; i < 4; i++)
-    lv_obj_align(digit_objs[i], LV_ALIGN_TOP_LEFT, layout_abs_x(w_time) + i * 18 + (i > 1 ? 6 : 0), layout_abs_y(w_time));
-  for (int i = 0; i < 4; i++)
-    lv_obj_align(aux_digit_objs[i], LV_ALIGN_TOP_LEFT, layout_abs_x(w_time_aux) + i * 18 + (i > 1 ? 6 : 0), layout_abs_y(w_time_aux));
-  lv_obj_align(img_ampm, LV_ALIGN_TOP_LEFT, layout_abs_x(w_ampm), layout_abs_y(w_ampm));
-  lv_obj_align(dots[0], LV_ALIGN_TOP_LEFT, layout_abs_x(w_time) + 2 * 18 + 1, layout_abs_y(w_time) + 10);
-  lv_obj_align(dots[1], LV_ALIGN_TOP_LEFT, layout_abs_x(w_time) + 2 * 18 + 1, layout_abs_y(w_time) + 26);
-  lv_obj_align(aux_dots[0], LV_ALIGN_TOP_LEFT, layout_abs_x(w_time_aux) + 2 * 18 + 1, layout_abs_y(w_time_aux) + 10);
-  lv_obj_align(aux_dots[1], LV_ALIGN_TOP_LEFT, layout_abs_x(w_time_aux) + 2 * 18 + 1, layout_abs_y(w_time_aux) + 26);
-  place_message_clip(layout_abs_x(w_msg), layout_abs_y(w_msg));
   if (graph_canvas)
   {
     const screen_widget_t *w_graph = &layout->widget[SCREEN_ELEM_GRAPH];
@@ -2523,10 +1805,10 @@ static void apply_screen_layout_positions(void)
     const screen_widget_t *w_icon = &layout->widget[SCREEN_ELEM_ICON_1 + i];
     lv_obj_align(img_icon[i], LV_ALIGN_TOP_LEFT, layout_abs_x(w_icon), layout_abs_y(w_icon));
   }
+  text_widgets_apply(font_index, time_valid);
   lvgl_port_unlock();
 
-  update_static_text_labels();
-  update_digit_label_widgets();
+  text_widgets_refresh(font_index, time_valid);
 
   lvgl_port_lock(0);
   apply_screen_layout_z_order(layout);
@@ -2999,6 +2281,15 @@ static void handle_screen_layout_on_wifi(void)
   display_changed();
 }
 
+static char *weather_theme_for_profile(uint8_t profile)
+{
+  static char themes[12][12] = {
+      "bold", "light", "lcd", "nixie", "robrito", "ficasso",
+      "lichten", "kablame", "kablamo", "kaboom", "user1", "user2"};
+  const uint8_t selected = eeprom_weather_theme[profile];
+  return selected > 0 && selected <= 12 ? themes[selected - 1] : eeprom_font[profile];
+}
+
 // this is the initialization needed when stuff about the display has changed
 void display_changed(void)
 {
@@ -3006,38 +2297,20 @@ void display_changed(void)
   char buf[128];
   /* Task lock */
 
-  sync_schedule_runners();
-  primary_runner.slot_start = 0;
-  primary_runner.current_idx = 0;
-  primary_runner.showing_glucose = false;
-  primary_runner.showing_weather = false;
-  primary_runner.showing_ha = false;
-  aux_runner.slot_start = 0;
-  aux_runner.current_idx = 0;
-  aux_runner.showing_glucose = false;
-  aux_runner.showing_weather = false;
-  aux_runner.showing_ha = false;
-
   lvgl_port_lock(0);
   st7735_set_rotation_and_mirror(eeprom_rotation, eeprom_mirroring);
   lv_obj_set_style_bg_color(scr, lv_color_hex(0x000000), 0);
   lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
 
   show_grid(eeprom_show_grid);
-  find_file(buf, sizeof(buf), eeprom_font[font_index], "font");
-  lv_image_set_src(img_digits_sprite, buf);
-  lv_obj_align(img_digits_sprite, LV_ALIGN_TOP_LEFT, 0, 0);
-  find_file(buf, sizeof(buf), eeprom_aux_font[font_index], "font");
-  lv_image_set_src(img_digits_sprite_aux, buf);
-  lv_obj_align(img_digits_sprite_aux, LV_ALIGN_TOP_LEFT, 0, 0);
   lvgl_port_unlock();
 
   ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Display change: lx %.1f idx %i flt %i fnt %s",
-              lux, font_index, eeprom_color_filter[font_index], buf);
+              lux, font_index, eeprom_color_filter[font_index], eeprom_font[font_index]);
 
   lvgl_port_lock(0);
 
-  find_file(buf, sizeof(buf), eeprom_font[font_index], "weather");
+  find_file(buf, sizeof(buf), weather_theme_for_profile(font_index), "weather");
   lv_image_set_src(img_weather, buf);
   lv_image_set_inner_align(img_weather, LV_ALIGN_TOP_LEFT);
   lv_obj_set_size(img_weather, 32, 22);
@@ -3065,48 +2338,9 @@ void display_changed(void)
   lv_image_set_inner_align(img_glucose_trend, LV_ALIGN_TOP_LEFT);
   lv_obj_set_size(img_glucose_trend, 12, 14);
 
-  // Load mgdl image
-  find_file(buf, sizeof(buf), eeprom_font[font_index], "units");
-  lv_image_set_src(img_mgdl, buf);
-  lv_image_set_inner_align(img_mgdl, LV_ALIGN_TOP_LEFT);
-  lv_obj_set_size(img_mgdl, 12, 24);
-  lv_image_set_src(img_mgdl_aux, buf);
-  lv_image_set_inner_align(img_mgdl_aux, LV_ALIGN_TOP_LEFT);
-  lv_obj_set_size(img_mgdl_aux, 12, 24);
-
-  find_file(buf, sizeof(buf), eeprom_font[font_index], "ampm");
-  lv_image_set_src(img_ampm, buf);
-  lv_image_set_inner_align(img_ampm, LV_ALIGN_TOP_LEFT);
-  lv_obj_set_size(img_ampm, 10, 20);
-
   lvgl_port_unlock(); // Unlock LVGL
 
   lvgl_port_lock(0);
-  // now setup the 4 visible digits
-  for (int i = 0; i < 4; i++)
-  {
-    lv_image_set_src(digit_objs[i], lv_image_get_src(img_digits_sprite));
-    lv_image_set_inner_align(digit_objs[i], LV_ALIGN_TOP_LEFT);
-    lv_obj_set_size(digit_objs[i], DIGIT_WIDTH, DIGIT_HEIGHT);
-    lv_image_set_src(aux_digit_objs[i], lv_image_get_src(img_digits_sprite_aux));
-    lv_image_set_inner_align(aux_digit_objs[i], LV_ALIGN_TOP_LEFT);
-    lv_obj_set_size(aux_digit_objs[i], DIGIT_WIDTH, DIGIT_HEIGHT);
-  }
-
-  find_file(buf, sizeof(buf), eeprom_font[font_index], "dot");
-  char aux_dot_buf[128];
-  find_file(aux_dot_buf, sizeof(aux_dot_buf), eeprom_aux_font[font_index], "dot");
-  for (int i = 0; i < 2; i++)
-  {
-    lv_image_set_src(dots[i], buf);
-    lv_image_set_src(aux_dots[i], aux_dot_buf);
-  }
-
-  const screen_widget_t *w_msg = &layout->widget[SCREEN_ELEM_MESSAGE];
-  lv_obj_set_style_text_font(label_msg, get_selected_font(active_message_font_index()), 0);
-  lv_obj_set_style_text_font(label_msg_loop, get_selected_font(active_message_font_index()), 0);
-  apply_message_widget_styles(w_msg);
-  // Invalidate character width cache when font changes
   invalidate_char_width_cache();
 
   update_icon_srcs(); // (re)point icon images at S:/icon<N>.jpg before visibility
@@ -3114,10 +2348,7 @@ void display_changed(void)
   lvgl_port_unlock(); // Unlock LVGL
 
   if (!screen_layout_positions_live)
-  {
-    update_static_text_labels();
-    update_digit_label_widgets();
-  }
+    text_widgets_refresh(font_index, time_valid);
 
   apply_screen_layout_positions();
 
@@ -3131,8 +2362,8 @@ void display_changed(void)
 
   ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Display changed");
 
-  // Font or layout changed; remeasure message width for scroll vs centered mode.
-  if (last_scroll_msg[0] != '\0')
+  // Reapply only a temporary system banner; profile text is refreshed from scroll_text above.
+  if (system_banner_active && last_scroll_msg[0] != '\0')
   {
     set_scroll_message(last_scroll_msg);
   }
@@ -3145,16 +2376,6 @@ void display_changed(void)
   }
   graph_force_redraw = true; // a layout/config edit just landed -> redraw now
   update_graph();
-}
-
-// allow -1 to display nothing
-void display_digit(int position, int digit)
-{
-  if (digit < -1 || digit > 9)
-    return;
-
-  lv_image_set_offset_x(digit_objs[position], -digit * DIGIT_WIDTH);
-  // ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Displayed digit %d at position %d (x=%d)", digit, position, digit * DIGIT_WIDTH);
 }
 
 float ease_in_quad(float t)
@@ -3398,12 +2619,9 @@ static void handle_integration_and_messages(void)
     else if (!show_ip_on_boot)
     {
       const screen_layout_profile_t *layout = &eeprom_screen_layout.profile[font_index];
-      // Only render the scroll message when it's enabled (or during the boot
-      // splash, !time_valid). When disabled, hide both the message and its
-      // seamless-scroll copy so set_scroll_message can't re-show the belt. (#190)
-      // Placeholder expansion stays outside the LVGL lock; set_scroll_message
-      // and the static labels take it only while they touch objects.
-      if (layout->widget[SCREEN_ELEM_MESSAGE].enabled || !time_valid)
+      // Boot splash only: once the clock is valid the scroll text belongs to the scroll
+      // text widget, which text_widgets_refresh() below drives.
+      if (!time_valid)
       {
         int64_t t_txt = esp_timer_get_time();
         replace_placeholders(layout->scroll_text, msg_scrolling, sizeof(msg_scrolling));
@@ -3411,15 +2629,8 @@ static void handle_integration_and_messages(void)
         scroll_service();
         set_scroll_message(msg_scrolling);
       }
-      else
-      {
-        lvgl_port_lock(0);
-        show_object(label_msg_clip, false);
-        show_object(label_msg_loop, false);
-        lvgl_port_unlock();
-      }
       scroll_service();
-      update_static_text_labels();
+      text_widgets_refresh(font_index, time_valid);
       // One-shot restore after an update ended: without this the
       // "(!in_progress && updating_message)" refresh gate stays armed and
       // re-runs this block every tick.
@@ -3443,68 +2654,6 @@ static void handle_integration_and_messages(void)
   }
 }
 
-static void sync_schedule_runners(void)
-{
-  primary_runner.schedule = display_schedule;
-  primary_runner.count = display_schedule_count;
-  aux_runner.schedule = display_schedule_aux;
-  aux_runner.count = display_schedule_aux_count;
-}
-
-static void advance_schedule_runner(schedule_runner_t *runner, time_t now, bool *mode_changed)
-{
-  runner->alternate_active = (runner->count > 1);
-
-  if (!time_valid || runner->count == 0)
-  {
-    if (runner->showing_glucose || runner->showing_weather || runner->showing_ha)
-      *mode_changed = true;
-    runner->showing_glucose = false;
-    runner->showing_weather = false;
-    runner->showing_ha = false;
-    runner->current_idx = 0;
-    runner->slot_start = 0;
-    return;
-  }
-
-  if (runner->slot_start == 0)
-  {
-    runner->current_idx = 0;
-    runner->slot_start = now;
-    *mode_changed = true;
-  }
-  else if (runner->count > 1)
-  {
-    const display_slot_t *cur = &runner->schedule[runner->current_idx];
-    if ((now - runner->slot_start) >= cur->duration)
-    {
-      int next = (runner->current_idx + 1) % runner->count;
-      int tries = runner->count;
-      while (tries-- > 0)
-      {
-        if (slot_is_available(&runner->schedule[next]))
-        {
-          runner->current_idx = next;
-          runner->slot_start = now;
-          *mode_changed = true;
-          break;
-        }
-        next = (next + 1) % runner->count;
-      }
-    }
-  }
-
-  slot_type_t st = runner->schedule[runner->current_idx].type;
-  bool new_glucose = (st == SLOT_TYPE_CGM);
-  bool new_weather = (st == SLOT_TYPE_WEATHER_TEMP);
-  bool new_ha = (st == SLOT_TYPE_HA);
-  if (new_glucose != runner->showing_glucose || new_weather != runner->showing_weather || new_ha != runner->showing_ha)
-    *mode_changed = true;
-  runner->showing_glucose = new_glucose;
-  runner->showing_weather = new_weather;
-  runner->showing_ha = new_ha;
-}
-
 static void handle_alternate_mode_switching(time_t now, uint32_t loop_counter, bool *should_update_display)
 {
   (void)loop_counter; // cadence is now time-based, independent of loop rate
@@ -3512,121 +2661,13 @@ static void handle_alternate_mode_switching(time_t now, uint32_t loop_counter, b
   int64_t alt_now_us = esp_timer_get_time();
   if ((alt_now_us - alt_last_us) < 1000000) return; // ~1s cadence
   alt_last_us = alt_now_us;
+  text_widgets_rotate_tick(font_index, time_valid);
 
-  static bool last_primary_glucose = false;
-  static bool last_primary_weather = false;
-  static bool last_primary_ha = false;
   static time_t last_minute_slot = 0;
   time_t current_minute_slot = now / 60;
   bool minute_changed = (current_minute_slot != last_minute_slot);
-  bool mode_changed = false;
-
-  sync_schedule_runners();
-  advance_schedule_runner(&primary_runner, now, &mode_changed);
-  advance_schedule_runner(&aux_runner, now, &mode_changed);
-
-  if (mode_changed
-      || primary_runner.showing_glucose != last_primary_glucose
-      || primary_runner.showing_weather != last_primary_weather
-      || primary_runner.showing_ha != last_primary_ha)
-  {
-    *should_update_display = true;
-    last_primary_glucose = primary_runner.showing_glucose;
-    last_primary_weather = primary_runner.showing_weather;
-    last_primary_ha = primary_runner.showing_ha;
-
-    if (mode_changed)
-      update_weather_msg();
-  }
-  else if (!primary_runner.showing_glucose && !primary_runner.showing_weather && !primary_runner.showing_ha)
-  {
-    *should_update_display = ((minute_changed || (time_just_validated == 1) || weather_has_updated) && time_valid && (now - lastrun > 3));
-    last_minute_slot = current_minute_slot;
-  }
-}
-
-static void update_one_digit_display(const screen_layout_profile_t *layout,
-                                     const schedule_runner_t *runner,
-                                     screen_element_id_t elem,
-                                     lv_obj_t *digits[NUM_DIGITS],
-                                     lv_obj_t *dot_objs[2],
-                                     lv_obj_t *mgdl_img,
-                                     lv_obj_t *unit_label,
-                                     bool *show_ampm_out)
-{
-  const bool show_time = layout_show_time_digits(layout, runner, elem);
-  const bool show_glucose = layout_show_glucose_on_digits(layout, runner, elem);
-  const bool show_weather = layout_show_weather_on_digits(layout, runner, elem);
-  const bool show_ha = layout_show_ha_on_digits(layout, runner, elem);
-  const bool show_slot_digits = show_time || show_glucose || show_weather || show_ha;
-
-  digit_display_t digits_data = {0};
-  digit_display_t value_digits = {0};
-  const char *value_unit = "";
-
-  if (show_glucose)
-    fill_glucose_digits(&digits_data, true);
-  else if (show_weather)
-  {
-    fill_weather_digits(&value_digits);
-    value_unit = "\xc2\xb0";
-    digits_data = value_digits;
-  }
-  else if (show_ha)
-  {
-    const char *ha_val = get_ha_slot_value(runner->schedule[runner->current_idx].entity);
-    fill_ha_digits(&value_digits, ha_val);
-    value_unit = runner->schedule[runner->current_idx].label;
-    digits_data = value_digits;
-  }
-  else if (show_time)
-  {
-    struct tm local = timeinfo;
-    bool is_pm = false;
-    if (eeprom_12hour)
-    {
-      if (local.tm_hour == 0)
-        local.tm_hour = 12;
-      else if (local.tm_hour > 12)
-      {
-        local.tm_hour -= 12;
-        is_pm = true;
-      }
-    }
-    fill_time_digits(&digits_data, &local);
-    if (show_ampm_out && elem == SCREEN_ELEM_TIME)
-      *show_ampm_out = eeprom_12hour && is_pm;
-  }
-
-  if (show_glucose)
-    render_digit_group(digits, &digits_data);
-  else if (show_weather || show_ha)
-    render_digit_group(digits, &value_digits);
-  else if (show_time)
-    render_digit_group(digits, &digits_data);
-
-  if (screen_layout_positions_live)
-  {
-    const screen_widget_t *w = &layout->widget[elem];
-    const int ox = layout_abs_x(w);
-    const int y_digits = layout_abs_y(w);
-
-    if (show_glucose)
-      align_glucose_digits(digits, dot_objs, ox, y_digits, &digits_data);
-    else if (show_weather || show_ha)
-      align_value_with_label_digits(digits, dot_objs, ox, y_digits, &value_digits, value_unit, unit_label);
-    else if (show_time)
-      align_time_style_digits(digits, dot_objs, ox, y_digits, &digits_data, true);
-  }
-
-  for (int i = 0; i < 4; i++)
-    show_object(digits[i], show_slot_digits);
-  show_object(dot_objs[0], show_time || show_glucose);
-  show_object(dot_objs[1], show_time || show_glucose);
-  update_cgm_dots_visibility(dot_objs, show_glucose, show_glucose ? &digits_data : NULL);
-  show_object(mgdl_img, show_glucose);
-  lv_image_set_offset_x(mgdl_img, -eeprom_glucose_unit * 12);
-  show_object(unit_label, show_weather || (show_ha && value_unit[0] != '\0'));
+  *should_update_display = ((minute_changed || (time_just_validated == 1) || weather_has_updated) && time_valid && (now - lastrun > 3));
+  last_minute_slot = current_minute_slot;
 }
 
 static void update_display_content(time_t now)
@@ -3640,7 +2681,6 @@ static void update_display_content(time_t now)
   //   ESP_LOGI_STACK(TAG, buf);
   // }
 
-  sync_schedule_runners();
   const screen_layout_profile_t *layout = &eeprom_screen_layout.profile[font_index];
   if (weather_has_updated || (timeinfo.tm_min == 1))
   {
@@ -3648,21 +2688,12 @@ static void update_display_content(time_t now)
     weather_has_updated = false;
   }
 
-  bool show_ampm = false;
-
   lvgl_port_lock(0);
-  update_one_digit_display(layout, &primary_runner, SCREEN_ELEM_TIME,
-                           digit_objs, dots, img_mgdl, label_degree, &show_ampm);
-  update_one_digit_display(layout, &aux_runner, SCREEN_ELEM_TIME_AUX,
-                           aux_digit_objs, aux_dots, img_mgdl_aux, label_degree_aux, NULL);
-  show_object(img_ampm, layout_show_time_digits(layout, &primary_runner, SCREEN_ELEM_TIME) && eeprom_12hour);
-
   lv_image_set_offset_x(img_weather, -weather_icon_index * 32);
   lv_image_set_offset_x(img_moon, -moon_icon_index * 14);
-  lv_image_set_offset_x(img_ampm, show_ampm ? -10 : 0);
   lvgl_port_unlock();
 
-  update_digit_label_widgets();
+  text_widgets_refresh(font_index, time_valid);
 
   last_minute = timeinfo.tm_min;
 
@@ -3674,8 +2705,7 @@ static void update_display_content(time_t now)
     if (img_logo) lv_obj_add_flag(img_logo, LV_OBJ_FLAG_HIDDEN);
     apply_widget_visibility(layout);
     lvgl_port_unlock();
-    update_static_text_labels();
-    update_digit_label_widgets();
+    text_widgets_refresh(font_index, time_valid);
   }
   lastrun = now;
 }
@@ -3726,10 +2756,8 @@ void display_task(void *pvParameters)
       update_display_content(now);
       scroll_service();
       settings_updated = false;
-      // Engine (and any other message setting) applies on the next message
-      // rebuild. Re-feed the current line now so the switch is immediate,
-      // including when the text itself did not change.
-      if (last_scroll_msg[0] != '\0')
+      // Re-feed only a temporary banner; the scroll widget is rebuilt by text_widgets_refresh().
+      if (system_banner_active && last_scroll_msg[0] != '\0')
         set_scroll_message(last_scroll_msg);
       scroll_service();
     }
@@ -3798,38 +2826,8 @@ void display_task(void *pvParameters)
         float opacity_factor = ease_in_out_quad(t);
         int opacity = (int)(opacity_factor * 255);
 
-        // Bolt Optimization: Guard against redundant LVGL style updates and port locks.
-        // Breathing is often disabled, yet the fade timer continues to trigger every 200ms.
-        static int last_op = -1;
-        static bool last_disabled = false;
-        bool currently_disabled = (eeprom_dots_breathe == 1 || primary_runner.showing_glucose);
-
-        if (currently_disabled)
-        {
-          if (!last_disabled)
-          {
-            // Breathing newly disabled - show dots at full brightness once
-            lvgl_port_lock(0);
-            lv_obj_set_style_opa(dots[0], 255, LV_PART_MAIN);
-            lv_obj_set_style_opa(dots[1], 255, LV_PART_MAIN);
-            lvgl_port_unlock();
-            last_disabled = true;
-            last_op = 255;
-          }
-        }
-        else
-        {
-          // Breathing enabled - update only if opacity changed or if we were previously disabled
-          if (opacity != last_op || last_disabled)
-          {
-            lvgl_port_lock(0);
-            lv_obj_set_style_opa(dots[0], opacity, LV_PART_MAIN);
-            lv_obj_set_style_opa(dots[1], 255 - opacity, LV_PART_MAIN);
-            lvgl_port_unlock();
-            last_op = opacity;
-            last_disabled = false;
-          }
-        }
+        if (eeprom_dots_breathe == 0)
+          text_widgets_colon_tick((uint8_t)opacity);
         stall_note("fade", esp_timer_get_time() - t_fade);
         scroll_service();
       }

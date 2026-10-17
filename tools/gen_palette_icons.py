@@ -82,8 +82,8 @@ def _thicken_white_on_black(img: Image.Image, passes: int = 4) -> Image.Image:
 
 
 def draw_glucose_level(size: int = 128) -> Image.Image:
-    """Green in-range drop with checkmark from default-glucose.jpg (2nd icon)."""
-    src = Image.open(SPIFFS / "default-glucose.jpg").convert("RGB")
+    """Green in-range drop with checkmark from the default theme's glucose image."""
+    src = Image.open(SPIFFS / "themes" / "default" / "glucose.jpg").convert("RGB")
     icon_w = src.width // 4
     icon = src.crop((icon_w, 0, icon_w * 2, src.height))
     canvas = Image.new("RGB", (size, size), BLACK)
@@ -91,8 +91,8 @@ def draw_glucose_level(size: int = 128) -> Image.Image:
 
 
 def draw_glucose_trend(size: int = 128) -> Image.Image:
-    """Horizontal trend arrow from default-trend.jpg (3rd icon), thickened."""
-    src = Image.open(SPIFFS / "default-trend.jpg").convert("RGB")
+    """Horizontal trend arrow from the default theme's trend image, thickened."""
+    src = Image.open(SPIFFS / "themes" / "default" / "trend.jpg").convert("RGB")
     icon_w = src.width // 5
     icon = src.crop((icon_w * 2, 0, icon_w * 3, src.height))
     upscale = 12
@@ -148,7 +148,7 @@ def digit_bounds(img: Image.Image) -> tuple[int, int, int, int]:
 
 
 def draw_bold_digit_label(scale: int = 2, line_thickness: int = 18) -> Image.Image:
-    src = Image.open(SPIFFS / "bold.jpg").convert("RGB")
+    src = Image.open(SPIFFS / "themes" / "bold" / "preview.jpg").convert("RGB")
     w, h = src.size
     gap = scale
     extra_bottom = gap + line_thickness + scale
@@ -169,7 +169,7 @@ def main() -> None:
     save(draw_glucose_level(), "palette-glucose.png")
     save(draw_glucose_trend(), "palette-trend.png")
     save(draw_message_palette(), "palette-message.png")
-    save(draw_bold_digit_label(), "bold-digit-label.jpg")
+    save(draw_bold_digit_label(), "themes/bold/digit-label.jpg")
 
 
 if __name__ == "__main__":

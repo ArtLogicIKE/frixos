@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Generate default-settings.jpg for the layout palette (32x32, Frixos copper style)."""
+"""Generate themes/default/settings.jpg for the layout palette (32x32, Frixos copper style)."""
 
 from pathlib import Path
 
 from PIL import Image
 
-OUT = Path(__file__).resolve().parent.parent / "spiffs" / "default-settings.jpg"
+OUT = Path(__file__).resolve().parent.parent / "spiffs" / "themes" / "default" / "settings.jpg"
 
 BG = (38, 38, 40)
 COPPER = (196, 102, 58)

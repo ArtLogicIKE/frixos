@@ -10,6 +10,7 @@
 #include "frixos.h"
 #include "f-display.h"
 #include "f-screen-layout-bin.h"
+#include "f-layout-migrate.h"
 #include "f-pwm.h"
 #include "f-wifi.h"
 #include "f-ota.h"
@@ -52,7 +53,6 @@
  * - p36 = fahrenheit (Temperature unit)
  * - p37 = hour12 (12-hour format)
  * - p39 = update_firmware (Auto firmware update)
- * - p38 = scroll_speed (Scroll speed)
  * - p40 = dark_theme (Dark theme)
  * - p41 = language (Language index: 0=en, 1=de, 2=fr, 3=it, 4=pt, 5=sv, 6=da)
  *
@@ -68,11 +68,7 @@
  * - p09 = mirroring (Mirror display)
  * - p10 = color_filter (Day color filter)
  * - p11 = night_color_filter (Night color filter)
- * - p12 = msg_color (Message color)
- * - p13 = msg_font (Message font)
  * - p14 = scroll_delay (Scroll delay)
- * - p67 = scroll_engine (0 = LVGL animation, 1 = Frixos belt)
- * - p15 = night_msg_color (Night message color)
  * - p16 = message (Scrolling message)
  * - p17 = lat (Latitude)
  * - p18 = lon (Longitude)
@@ -102,11 +98,6 @@
  * - p32 = eeprom_glucose_password (Shared glucose password)
  * - p33 = eeprom_glucose_refresh (Shared glucose refresh interval)
  * - p45 = glucose_validity_duration (Glucose data validity duration in minutes)
- * - p48 = eeprom_sec_time (Alternate time display duration in seconds)
- * - p49 = eeprom_sec_cgm (Alternate CGM display duration in seconds)
- * - p57 = eeprom_sec_weather (Alternate weather temperature display duration in seconds)
- * - p58 = eeprom_disp_sched (Display schedule JSON)
- * - p59 = eeprom_disp_sched_aux (Aux digit display schedule JSON)
  * - p44 = eeprom_libre_region (Libre region)
  * - p54 = eeprom_ns_url (Nightscout URL, max 100 chars)
  *
@@ -121,137 +112,6 @@
 static const char *TAG = "f-settings";
 
 #define SCREEN_LAYOUT_MIME "application/vnd.frixos.screen-layout+1"
-
-/* ---- Display schedule helpers ---- */
-
-static void parse_display_schedule_into(display_slot_t *out_slots, int *out_count,
-                                        const char *json, const char *log_label)
-{
-    *out_count = 0;
-    if (!json || json[0] == '\0') return;
-
-    cJSON *arr = cJSON_Parse(json);
-    if (!arr || !cJSON_IsArray(arr)) { cJSON_Delete(arr); return; }
-
-    int count = cJSON_GetArraySize(arr);
-    if (count > MAX_DISPLAY_SLOTS) count = MAX_DISPLAY_SLOTS;
-
-    for (int i = 0; i < count; i++)
-    {
-        cJSON *slot = cJSON_GetArrayItem(arr, i);
-        if (!slot) continue;
-        cJSON *t = cJSON_GetObjectItem(slot, "t");
-        cJSON *d = cJSON_GetObjectItem(slot, "d");
-        if (!cJSON_IsNumber(t) || !cJSON_IsNumber(d)) continue;
-
-        int type = t->valueint;
-        if (type < SLOT_TYPE_TIME || type > SLOT_TYPE_HA) continue;
-        int dur = d->valueint;
-        if (dur <= 0 || dur > 3600) continue;
-
-        display_slot_t *s = &out_slots[*out_count];
-        s->type      = (slot_type_t)type;
-        s->duration  = (uint16_t)dur;
-        s->entity[0] = '\0';
-        s->label[0]  = '\0';
-        s->name[0]   = '\0';
-
-        if (type == SLOT_TYPE_HA)
-        {
-            cJSON *e = cJSON_GetObjectItem(slot, "e");
-            if (cJSON_IsString(e) && e->valuestring[0] != '\0')
-            {
-                strncpy(s->entity, e->valuestring, SLOT_ENTITY_LEN - 1);
-                s->entity[SLOT_ENTITY_LEN - 1] = '\0';
-            }
-            else continue; /* HA slot with no entity is useless */
-        }
-
-        cJSON *l = cJSON_GetObjectItem(slot, "l");
-        if (cJSON_IsString(l) && l->valuestring[0] != '\0')
-        {
-            strncpy(s->label, l->valuestring, sizeof(s->label) - 1);
-            s->label[sizeof(s->label) - 1] = '\0';
-        }
-        cJSON *n = cJSON_GetObjectItem(slot, "n");
-        if (cJSON_IsString(n) && n->valuestring[0] != '\0')
-        {
-            strncpy(s->name, n->valuestring, sizeof(s->name) - 1);
-            s->name[sizeof(s->name) - 1] = '\0';
-        }
-        (*out_count)++;
-    }
-    cJSON_Delete(arr);
-    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "%s: %d slots", log_label, *out_count);
-}
-
-void parse_display_schedule(const char *json)
-{
-    parse_display_schedule_into(display_schedule, &display_schedule_count, json, "Display schedule");
-}
-
-void parse_display_schedule_aux(const char *json)
-{
-    parse_display_schedule_into(display_schedule_aux, &display_schedule_aux_count, json, "Aux display schedule");
-}
-
-void migrate_schedule_from_legacy(void)
-{
-    display_schedule_count = 0;
-
-    /* Always start with a time slot; use sec_time if set, else default 30s */
-    display_schedule[display_schedule_count].type     = SLOT_TYPE_TIME;
-    display_schedule[display_schedule_count].duration = eeprom_sec_time > 0 ? eeprom_sec_time : 30;
-    display_schedule[display_schedule_count].entity[0] = '\0';
-    display_schedule[display_schedule_count].label[0]  = '\0';
-    display_schedule[display_schedule_count].name[0]   = '\0';
-    display_schedule_count++;
-
-    if (eeprom_sec_cgm > 0)
-    {
-        display_schedule[display_schedule_count].type     = SLOT_TYPE_CGM;
-        display_schedule[display_schedule_count].duration = eeprom_sec_cgm;
-        display_schedule[display_schedule_count].entity[0] = '\0';
-        display_schedule[display_schedule_count].label[0]  = '\0';
-        display_schedule[display_schedule_count].name[0]   = '\0';
-        display_schedule_count++;
-    }
-    if (eeprom_sec_weather > 0)
-    {
-        display_schedule[display_schedule_count].type     = SLOT_TYPE_WEATHER_TEMP;
-        display_schedule[display_schedule_count].duration = eeprom_sec_weather;
-        display_schedule[display_schedule_count].entity[0] = '\0';
-        display_schedule[display_schedule_count].label[0]  = '\0';
-        display_schedule[display_schedule_count].name[0]   = '\0';
-        display_schedule_count++;
-    }
-
-    /* Serialise into eeprom_disp_sched so it persists on next boot */
-    cJSON *arr = cJSON_CreateArray();
-    for (int i = 0; i < display_schedule_count; i++)
-    {
-        cJSON *slot = cJSON_CreateObject();
-        cJSON_AddNumberToObject(slot, "t", display_schedule[i].type);
-        cJSON_AddNumberToObject(slot, "d", display_schedule[i].duration);
-        if (display_schedule[i].type == SLOT_TYPE_HA)
-            cJSON_AddStringToObject(slot, "e", display_schedule[i].entity);
-        if (display_schedule[i].label[0] != '\0')
-            cJSON_AddStringToObject(slot, "l", display_schedule[i].label);
-        if (display_schedule[i].name[0] != '\0')
-            cJSON_AddStringToObject(slot, "n", display_schedule[i].name);
-        cJSON_AddItemToArray(arr, slot);
-    }
-    char *out = cJSON_PrintUnformatted(arr);
-    cJSON_Delete(arr);
-    if (out)
-    {
-        strncpy(eeprom_disp_sched, out, sizeof(eeprom_disp_sched) - 1);
-        eeprom_disp_sched[sizeof(eeprom_disp_sched) - 1] = '\0';
-        free(out);
-        write_nvs_parameters();
-    }
-    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Migrated legacy schedule: %d slots", display_schedule_count);
-}
 
 // HTTP server handle
 static httpd_handle_t server = NULL;
@@ -548,11 +408,15 @@ esp_err_t generic_file_handler(httpd_req_t *req)
     {
         httpd_resp_set_type(req, "image/png");
     }
+    else if (strstr(filename, ".woff"))
+    {
+        httpd_resp_set_type(req, "font/woff");
+    }
 
     // UI code/translations only change with an OTA asset update; user-editable
     // files (layouts, fonts, images) are deliberately left uncached.
     if (strstr(filename, ".css") || strstr(filename, ".js") || strstr(filename, ".ico") ||
-        strncmp(filename, "i18n/", 5) == 0)
+        strstr(filename, ".woff") || strncmp(filename, "i18n/", 5) == 0)
     {
         httpd_resp_set_hdr(req, "Cache-Control", "max-age=600");
     }
@@ -744,7 +608,7 @@ static uint64_t calculate_include_mask(const char *group, const char *params)
         }
             else if (strcmp(group, "integrations") == 0)
         {
-            // p25-p33, p44, p45, p48, p49, p51-p54, p57-p59
+            // p25-p33, p44, p45, p51-p54
             // p64-p66 (Weather Underground) are outside this mask; wu_settings_mask adds them.
             for (int i = 25; i <= 33; i++) mask |= (1ULL << i);
             mask |= (1ULL << 44) | (1ULL << 45) | (1ULL << 48) |
@@ -775,12 +639,11 @@ static uint64_t calculate_include_mask(const char *group, const char *params)
     return mask;
 }
 
-/* p64–p66 and p67 sit past the uint64 settings mask.
- * Bits: 1=p64, 2=p65, 4=p66, 8=p67 (scroll engine). */
+/* p64–p66 sit past the uint64 settings mask. Bits: 1=p64, 2=p65, 4=p66. */
 static uint8_t wu_settings_mask(const char *group, const char *params)
 {
     if ((!group || group[0] == '\0') && (!params || params[0] == '\0'))
-        return 0xF;
+        return 0x7;
 
     uint8_t bits = 0;
     if (group && strcmp(group, "integrations") == 0)
@@ -798,8 +661,6 @@ static uint8_t wu_settings_mask(const char *group, const char *params)
                 bits |= 0x2;
             else if (strncmp(p, "66", 2) == 0 && !isdigit((unsigned char)p[2]))
                 bits |= 0x4;
-            else if (strncmp(p, "67", 2) == 0 && !isdigit((unsigned char)p[2]))
-                bits |= 0x8;
         }
     }
     return bits;
@@ -874,29 +735,11 @@ esp_err_t send_json_settings(httpd_req_t *req)
         ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Sending night_color_filter in JSON response: %u", eeprom_color_filter[1]);
     }
 
-    if (mask & (1ULL << 12))
-    {
-        char day_color_hex[8];
-        snprintf(day_color_hex, sizeof(day_color_hex), "#%02x%02x%02x",
-                 eeprom_msg_red[0], eeprom_msg_green[0], eeprom_msg_blue[0]);
-        cJSON_AddStringToObject(root, "p12", day_color_hex);
-    }
-
-    if (mask & (1ULL << 15))
-    {
-        char night_color_hex[8];
-        snprintf(night_color_hex, sizeof(night_color_hex), "#%02x%02x%02x",
-                 eeprom_msg_red[1], eeprom_msg_green[1], eeprom_msg_blue[1]);
-        cJSON_AddStringToObject(root, "p15", night_color_hex);
-    }
-
-    if (mask & (1ULL << 13)) cJSON_AddNumberToObject(root, "p13", eeprom_msg_font);
     if (mask & (1ULL << 1)) cJSON_AddNumberToObject(root, "p01", eeprom_ofs_x);
     if (mask & (1ULL << 2)) cJSON_AddNumberToObject(root, "p02", eeprom_ofs_y);
     if (mask & (1ULL << 3)) cJSON_AddNumberToObject(root, "p03", eeprom_rotation);
     if (mask & (1ULL << 9)) cJSON_AddNumberToObject(root, "p09", eeprom_mirroring);
     if (mask & (1ULL << 8)) cJSON_AddNumberToObject(root, "p08", eeprom_show_grid);
-    if (mask & (1ULL << 38)) cJSON_AddNumberToObject(root, "p38", eeprom_scroll_speed);
     if (mask & (1ULL << 14)) cJSON_AddNumberToObject(root, "p14", eeprom_scroll_delay);
     if (mask & (1ULL << 39)) cJSON_AddNumberToObject(root, "p39", eeprom_update_firmware);
     if (mask & (1ULL << 40)) cJSON_AddNumberToObject(root, "p40", eeprom_dark_theme);
@@ -915,7 +758,6 @@ esp_err_t send_json_settings(httpd_req_t *req)
     if (wu_mask & 0x1) cJSON_AddStringToObject(root, "p64", eeprom_wu_station);
     if (wu_mask & 0x2) cJSON_AddStringToObject(root, "p65", eeprom_wu_key);
     if (wu_mask & 0x4) cJSON_AddNumberToObject(root, "p66", eeprom_wu_refresh_mins);
-    if (wu_mask & 0x8) cJSON_AddNumberToObject(root, "p67", eeprom_scroll_engine);
 
     // Add Dexcom settings
     if (mask & (1ULL << 30)) cJSON_AddNumberToObject(root, "p30", eeprom_dexcom_region);
@@ -923,11 +765,6 @@ esp_err_t send_json_settings(httpd_req_t *req)
     if (mask & (1ULL << 32)) cJSON_AddStringToObject(root, "p32", eeprom_glucose_password);
     if (mask & (1ULL << 33)) cJSON_AddNumberToObject(root, "p33", eeprom_glucose_refresh);
     if (mask & (1ULL << 45)) cJSON_AddNumberToObject(root, "p45", glucose_validity_duration);
-    if (mask & (1ULL << 48)) cJSON_AddNumberToObject(root, "p48", eeprom_sec_time);
-    if (mask & (1ULL << 49)) cJSON_AddNumberToObject(root, "p49", eeprom_sec_cgm);
-    if (mask & (1ULL << 57)) cJSON_AddNumberToObject(root, "p57", eeprom_sec_weather);
-    if (mask & (1ULL << 58)) cJSON_AddStringToObject(root, "p58", eeprom_disp_sched);
-    if (mask & (1ULL << 59)) cJSON_AddStringToObject(root, "p59", eeprom_disp_sched_aux);
 
     // Add Libre settings (region only - other fields are internal and set by API responses)
     if (mask & (1ULL << 44)) cJSON_AddNumberToObject(root, "p44", eeprom_libre_region);
@@ -1279,32 +1116,6 @@ static bool validate_json_params(cJSON *root, char *err_buf, size_t err_size)
     if ((item = cJSON_GetObjectItem(root, "p11")) && cJSON_IsNumber(item))
         CHECK_RANGE("night_color_filter", item->valueint, 0, 4);
 
-    /* p12 msg_color, p15 night_msg_color - hex #RRGGBB */
-    if ((item = cJSON_GetObjectItem(root, "p12")) && cJSON_IsString(item))
-    {
-        sval = item->valuestring;
-        if (strlen(sval) != 0 && (strlen(sval) != 7 || sval[0] != '#' ||
-            !isxdigit((unsigned char)sval[1]) || !isxdigit((unsigned char)sval[2]) ||
-            !isxdigit((unsigned char)sval[3]) || !isxdigit((unsigned char)sval[4]) ||
-            !isxdigit((unsigned char)sval[5]) || !isxdigit((unsigned char)sval[6])))
-        {
-            snprintf(err_buf, err_size, "Invalid msg_color: must be #RRGGBB hex format");
-            return false;
-        }
-    }
-    if ((item = cJSON_GetObjectItem(root, "p15")) && cJSON_IsString(item))
-    {
-        sval = item->valuestring;
-        if (strlen(sval) != 0 && (strlen(sval) != 7 || sval[0] != '#' ||
-            !isxdigit((unsigned char)sval[1]) || !isxdigit((unsigned char)sval[2]) ||
-            !isxdigit((unsigned char)sval[3]) || !isxdigit((unsigned char)sval[4]) ||
-            !isxdigit((unsigned char)sval[5]) || !isxdigit((unsigned char)sval[6])))
-        {
-            snprintf(err_buf, err_size, "Invalid night_msg_color: must be #RRGGBB hex format");
-            return false;
-        }
-    }
-
     /* p01 ofs_x, p02 ofs_y */
     if ((item = cJSON_GetObjectItem(root, "p01")) && cJSON_IsNumber(item))
         CHECK_RANGE("ofs_x", item->valueint, 0, 160);
@@ -1321,17 +1132,9 @@ static bool validate_json_params(cJSON *root, char *err_buf, size_t err_size)
     if ((item = cJSON_GetObjectItem(root, "p08")) && cJSON_IsNumber(item))
         CHECK_RANGE("show_grid", item->valueint, 0, 1);
 
-    /* p38 scroll_speed */
-    if ((item = cJSON_GetObjectItem(root, "p38")) && cJSON_IsNumber(item))
-        CHECK_RANGE("scroll_speed", item->valueint, 1, 255);
-
     /* p14 scroll_delay (stored as uint8_t, max 255) */
     if ((item = cJSON_GetObjectItem(root, "p14")) && cJSON_IsNumber(item))
         CHECK_RANGE("scroll_delay", item->valueint, 30, 255);
-
-    /* p67 scroll engine: 0 = LVGL, 1 = Frixos */
-    if ((item = cJSON_GetObjectItem(root, "p67")) && cJSON_IsNumber(item))
-        CHECK_RANGE("scroll_engine", item->valueint, SCROLL_ENGINE_LVGL, SCROLL_ENGINE_FRIXOS);
 
     /* p40 dark_theme, p41 language */
     if ((item = cJSON_GetObjectItem(root, "p40")) && cJSON_IsNumber(item))
@@ -1346,10 +1149,6 @@ static bool validate_json_params(cJSON *root, char *err_buf, size_t err_size)
     /* p43 max_power */
     if ((item = cJSON_GetObjectItem(root, "p43")) && cJSON_IsNumber(item))
         CHECK_RANGE("max_power", item->valueint, 1, 1023);
-
-    /* p13 msg_font */
-    if ((item = cJSON_GetObjectItem(root, "p13")) && cJSON_IsNumber(item))
-        CHECK_RANGE("msg_font", item->valueint, 0, 4);
 
     /* p25 ha_url, p26 ha_token */
     if ((item = cJSON_GetObjectItem(root, "p25")) && cJSON_IsString(item))
@@ -1410,14 +1209,6 @@ static bool validate_json_params(cJSON *root, char *err_buf, size_t err_size)
     if ((item = cJSON_GetObjectItem(root, "p45")) && cJSON_IsNumber(item))
         CHECK_RANGE("glucose_validity_duration", item->valueint, 10, 360);
 
-    /* p48 sec_time, p49 sec_cgm, p57 sec_weather */
-    if ((item = cJSON_GetObjectItem(root, "p48")) && cJSON_IsNumber(item))
-        CHECK_RANGE("sec_time", item->valueint, 0, 120);
-    if ((item = cJSON_GetObjectItem(root, "p49")) && cJSON_IsNumber(item))
-        CHECK_RANGE("sec_cgm", item->valueint, 0, 120);
-    if ((item = cJSON_GetObjectItem(root, "p57")) && cJSON_IsNumber(item))
-        CHECK_RANGE("sec_weather", item->valueint, 0, 120);
-
     /* p44 libre_region */
     if ((item = cJSON_GetObjectItem(root, "p44")) && cJSON_IsNumber(item))
         CHECK_RANGE("libre_region", item->valueint, 0, 7);
@@ -1468,8 +1259,19 @@ esp_err_t screen_get_handler(httpd_req_t *req)
     }
 
     httpd_resp_set_type(req, SCREEN_LAYOUT_MIME);
-    esp_err_t ret = httpd_resp_send(req, wire_buf, written);
+    // Base wire fills the shared buffer; the ext section is streamed as a second chunk.
+    esp_err_t ret = httpd_resp_send_chunk(req, wire_buf, written);
     release_shared_buffer(wire_buf);
+    if (ret == ESP_OK)
+    {
+        screen_layout_ext_header_t ext;
+        screen_layout_ext_header(&ext);
+        ret = httpd_resp_send_chunk(req, (const char *)&ext, sizeof(ext));
+    }
+    if (ret == ESP_OK)
+        ret = httpd_resp_send_chunk(req, (const char *)&eeprom_text_widgets, sizeof(eeprom_text_widgets));
+    if (ret == ESP_OK)
+        ret = httpd_resp_send_chunk(req, NULL, 0);
     return ret;
 }
 
@@ -1485,6 +1287,7 @@ static bool screen_post_content_type_ok(httpd_req_t *req)
 esp_err_t screen_post_handler(httpd_req_t *req)
 {
     const int expected = (int)FRIXOS_SCREEN_LAYOUT_WIRE_SIZE;
+    const int expected_full = (int)FRIXOS_SCREEN_LAYOUT_FULL_WIRE_SIZE;
     ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Screen POST content_len=%d expected=%d", req->content_len, expected);
 
     if (!screen_post_content_type_ok(req))
@@ -1500,12 +1303,12 @@ esp_err_t screen_post_handler(httpd_req_t *req)
     int remaining = req->content_len;
     if (remaining <= 0)
         remaining = expected;
-    else if (remaining != expected)
+    else if (remaining != expected && remaining != expected_full)
     {
         char resp[96];
         snprintf(resp, sizeof(resp),
                  "{\"status\":\"error\",\"error\":\"invalid_length\",\"got\":%d,\"expected\":%d}",
-                 req->content_len, expected);
+                 req->content_len, expected_full);
         ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Screen POST bad length %d (expected %d)", req->content_len, expected);
         httpd_resp_set_status(req, "400 Bad Request");
         httpd_resp_set_type(req, "application/json");
@@ -1522,15 +1325,30 @@ esp_err_t screen_post_handler(httpd_req_t *req)
         return ESP_OK;
     }
 
+    // The full payload does not fit one 4 KB pool buffer: the optional ext section
+    // is staged in a second one.
+    const bool has_ext = remaining == expected_full;
+    char *ext_buf = has_ext ? get_shared_buffer(FRIXOS_SCREEN_LAYOUT_EXT_SIZE, "screen_ext") : NULL;
+    if (has_ext && ext_buf == NULL)
+    {
+        release_shared_buffer(wire_buf);
+        httpd_resp_set_status(req, "500 Internal Server Error");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_send(req, "{\"status\":\"error\",\"error\":\"no_memory\"}", HTTPD_RESP_USE_STRLEN);
+        return ESP_OK;
+    }
     int received = 0;
     while (remaining > 0)
     {
-        int ret = httpd_req_recv(req, wire_buf + received, remaining);
+        char *dst = received < expected ? wire_buf + received : ext_buf + (received - expected);
+        int chunk = received < expected ? min(remaining, expected - received) : remaining;
+        int ret = httpd_req_recv(req, dst, chunk);
         if (ret <= 0)
         {
             if (ret == HTTPD_SOCK_ERR_TIMEOUT)
                 continue;
             release_shared_buffer(wire_buf);
+            release_shared_buffer(ext_buf);
             httpd_resp_set_status(req, "400 Bad Request");
             httpd_resp_set_type(req, "application/json");
             httpd_resp_send(req, "{\"status\":\"error\",\"error\":\"recv\"}", HTTPD_RESP_USE_STRLEN);
@@ -1543,14 +1361,20 @@ esp_err_t screen_post_handler(httpd_req_t *req)
     ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Screen POST %d bytes, free heap %u",
                 received, (unsigned)esp_get_free_heap_size());
 
+    const uint8_t wire_version = (uint8_t)wire_buf[5];
     screen_layout_t new_layout;
     esp_err_t decode_err = screen_layout_wire_decode(
-        (const uint8_t *)wire_buf, received, &new_layout,
+        (const uint8_t *)wire_buf, expected, &new_layout,
         eeprom_font[0], eeprom_font[1], eeprom_aux_font[0], eeprom_aux_font[1],
         &eeprom_color_filter[0], &eeprom_color_filter[1]);
     release_shared_buffer(wire_buf);
+    // Older clients send only the base wire: their text widgets are left untouched.
+    screen_layout_ext_wire_t *ext = (screen_layout_ext_wire_t *)ext_buf;
+    if (decode_err == ESP_OK && has_ext)
+        decode_err = screen_layout_ext_decode(ext);
     if (decode_err != ESP_OK)
     {
+        release_shared_buffer(ext_buf);
         httpd_resp_set_status(req, "400 Bad Request");
         httpd_resp_set_type(req, "application/json");
         httpd_resp_send(req, "{\"status\":\"error\",\"error\":\"bad_wire\"}", HTTPD_RESP_USE_STRLEN);
@@ -1558,6 +1382,14 @@ esp_err_t screen_post_handler(httpd_req_t *req)
     }
 
     eeprom_screen_layout = new_layout;
+    if (has_ext)
+    {
+        memcpy(&eeprom_text_widgets, &ext->widgets, sizeof(eeprom_text_widgets));
+        text_widgets_instance_from_layout(&eeprom_text_widgets, &eeprom_screen_layout);
+    }
+    if (wire_version == 11)
+        screen_layout_migrate_v11(&eeprom_screen_layout, &eeprom_text_widgets);
+    release_shared_buffer(ext_buf);
     screen_layout_sync_legacy_eeprom(&eeprom_screen_layout);
     settings_updated = true;
 
@@ -1960,6 +1792,7 @@ esp_err_t settings_post_handler(httpd_req_t *req)
     if (cJSON_IsNumber(quiet_scroll))
     {
         eeprom_quiet_scroll = (uint8_t)quiet_scroll->valueint;
+        screen_layout_set_scroll_enabled(eeprom_quiet_scroll != 0);
     }
 
     cJSON *quiet_weather = cJSON_GetObjectItem(root, "p07");
@@ -1973,27 +1806,6 @@ esp_err_t settings_post_handler(httpd_req_t *req)
     if (cJSON_IsNumber(color_filter))
     {
         eeprom_color_filter[0] = (uint8_t)color_filter->valueint;
-    }
-
-    // Process message color setting
-    cJSON *msg_color = cJSON_GetObjectItem(root, "p12");
-    if (cJSON_IsString(msg_color))
-    {
-        const char *color_str = msg_color->valuestring;
-        if (strlen(color_str) == 7 && color_str[0] == '#')
-        {
-            // Convert hex color to RGB
-            char hex[3] = {0};
-            hex[0] = color_str[1];
-            hex[1] = color_str[2];
-            eeprom_msg_red[0] = (uint8_t)strtol(hex, NULL, 16);
-            hex[0] = color_str[3];
-            hex[1] = color_str[4];
-            eeprom_msg_green[0] = (uint8_t)strtol(hex, NULL, 16);
-            hex[0] = color_str[5];
-            hex[1] = color_str[6];
-            eeprom_msg_blue[0] = (uint8_t)strtol(hex, NULL, 16);
-        }
     }
 
     // Process display position settings
@@ -2027,12 +1839,6 @@ esp_err_t settings_post_handler(httpd_req_t *req)
         eeprom_show_grid = (uint8_t)show_grid->valueint;
     }
 
-    cJSON *scroll_speed = cJSON_GetObjectItem(root, "p38");
-    if (cJSON_IsNumber(scroll_speed))
-    {
-        eeprom_scroll_speed = (uint8_t)scroll_speed->valueint;
-    }
-
     cJSON *scroll_delay = cJSON_GetObjectItem(root, "p14");
     if (cJSON_IsNumber(scroll_delay))
     {
@@ -2044,19 +1850,12 @@ esp_err_t settings_post_handler(httpd_req_t *req)
         if (delay_value > 255)
             delay_value = 255;
         eeprom_scroll_delay = (uint8_t)delay_value;
+        eeprom_screen_layout.scroll_delay = eeprom_scroll_delay;
         ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Set eeprom_scroll_delay to: %u", eeprom_scroll_delay);
     }
     else
     {
         ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "scroll_delay not found in POST data or not a number");
-    }
-
-    cJSON *scroll_engine = cJSON_GetObjectItem(root, "p67");
-    if (cJSON_IsNumber(scroll_engine))
-    {
-        eeprom_scroll_engine = (uint8_t)scroll_engine->valueint;
-        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Scroll engine: %s",
-                    eeprom_scroll_engine == SCROLL_ENGINE_LVGL ? "LVGL" : "Frixos");
     }
 
     cJSON *dark_theme = cJSON_GetObjectItem(root, "p40");
@@ -2121,37 +1920,6 @@ esp_err_t settings_post_handler(httpd_req_t *req)
     else
     {
         ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "night_color_filter not found in POST data or not a number");
-    }
-
-    // Process night message color
-    cJSON *night_msg_color = cJSON_GetObjectItem(root, "p15");
-    if (cJSON_IsString(night_msg_color))
-    {
-        const char *color_str = night_msg_color->valuestring;
-        if (strlen(color_str) == 7 && color_str[0] == '#')
-        {
-            char hex[3] = {0};
-            hex[0] = color_str[1];
-            hex[1] = color_str[2];
-            eeprom_msg_red[1] = (uint8_t)strtol(hex, NULL, 16);
-            hex[0] = color_str[3];
-            hex[1] = color_str[4];
-            eeprom_msg_green[1] = (uint8_t)strtol(hex, NULL, 16);
-            hex[0] = color_str[5];
-            hex[1] = color_str[6];
-            eeprom_msg_blue[1] = (uint8_t)strtol(hex, NULL, 16);
-        }
-    }
-
-    // Process message font size
-    cJSON *msg_font = cJSON_GetObjectItem(root, "p13");
-    if (cJSON_IsNumber(msg_font))
-    {
-        int font_value = (int)msg_font->valueint;
-        if (font_value >= 0 && font_value <= 4)
-        {
-            eeprom_msg_font = (uint8_t)font_value;
-        }
     }
 
     // Track if any integration-related settings changed (needed to re-parse integrations)
@@ -2278,31 +2046,6 @@ esp_err_t settings_post_handler(httpd_req_t *req)
             glucose_validity_duration = (uint16_t)validity_duration;
         }
     }
-    if (cJSON_HasObjectItem(root, "p48"))
-    {
-        int sec_time = cJSON_GetObjectItem(root, "p48")->valueint;
-        if (sec_time >= 0 && sec_time <= 120)
-        {
-            eeprom_sec_time = (uint8_t)sec_time;
-        }
-    }
-    if (cJSON_HasObjectItem(root, "p49"))
-    {
-        int sec_cgm = cJSON_GetObjectItem(root, "p49")->valueint;
-        if (sec_cgm >= 0 && sec_cgm <= 120)
-        {
-            eeprom_sec_cgm = (uint8_t)sec_cgm;
-        }
-    }
-    if (cJSON_HasObjectItem(root, "p57"))
-    {
-        int sec_weather = cJSON_GetObjectItem(root, "p57")->valueint;
-        if (sec_weather >= 0 && sec_weather <= 120)
-        {
-            eeprom_sec_weather = (uint8_t)sec_weather;
-        }
-    }
-
     // Libre settings (region only - credentials use shared glucose variables via p31, p32, p33)
     // Other Libre fields (patient_id, token, account_id, region_url) are internal and set by API responses, not via web interface
     if (cJSON_HasObjectItem(root, "p44"))
@@ -2369,36 +2112,6 @@ esp_err_t settings_post_handler(httpd_req_t *req)
         else
         {
             ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Invalid glucose_unit value: %d, must be 0 or 1", unit_value);
-        }
-    }
-
-    // p58: display schedule JSON
-    if (cJSON_HasObjectItem(root, "p58"))
-    {
-        cJSON *p58 = cJSON_GetObjectItem(root, "p58");
-        const char *sched_json = cJSON_IsString(p58) ? p58->valuestring : NULL;
-        if (sched_json && strlen(sched_json) < sizeof(eeprom_disp_sched))
-        {
-            strncpy(eeprom_disp_sched, sched_json, sizeof(eeprom_disp_sched) - 1);
-            eeprom_disp_sched[sizeof(eeprom_disp_sched) - 1] = '\0';
-            parse_display_schedule(eeprom_disp_sched);
-            // Re-register any new HA entities from the schedule via the consolidated
-            // parse_integrations() call below.
-            integration_settings_changed = true;
-        }
-    }
-
-    // p59: aux digit display schedule JSON
-    if (cJSON_HasObjectItem(root, "p59"))
-    {
-        cJSON *p59 = cJSON_GetObjectItem(root, "p59");
-        const char *sched_json = cJSON_IsString(p59) ? p59->valuestring : NULL;
-        if (sched_json && strlen(sched_json) < sizeof(eeprom_disp_sched_aux))
-        {
-            strncpy(eeprom_disp_sched_aux, sched_json, sizeof(eeprom_disp_sched_aux) - 1);
-            eeprom_disp_sched_aux[sizeof(eeprom_disp_sched_aux) - 1] = '\0';
-            parse_display_schedule_aux(eeprom_disp_sched_aux);
-            integration_settings_changed = true;
         }
     }
 
@@ -3029,6 +2742,25 @@ typedef struct
     int content_len;
 } upload_ctx_t;
 
+static bool is_valid_spiffs_filename(const char *filename);
+
+static void upload_ensure_parent_dirs(const char *path)
+{
+    char buf[256];
+    if (!path || strlen(path) >= sizeof(buf))
+    {
+        return;
+    }
+    strlcpy(buf, path, sizeof(buf));
+    char *separator = strchr(buf + 1, '/');
+    while (separator && (separator = strchr(separator + 1, '/')) != NULL)
+    {
+        *separator = '\0';
+        mkdir(buf, 0775);
+        *separator = '/';
+    }
+}
+
 static esp_err_t upload_open_destination(upload_ctx_t *ctx, const uint8_t *first_payload, size_t first_payload_len)
 {
     if (*ctx->upload_destination_open)
@@ -3064,7 +2796,13 @@ static esp_err_t upload_open_destination(upload_ctx_t *ctx, const uint8_t *first
     }
     else
     {
+        if (!is_valid_spiffs_filename(ctx->filename))
+        {
+            httpd_resp_send_err(ctx->req, HTTPD_400_BAD_REQUEST, "Invalid filename");
+            return ESP_FAIL;
+        }
         snprintf(ctx->filepath, ctx->filepath_size, "/spiffs/%s", ctx->filename);
+        upload_ensure_parent_dirs(ctx->filepath);
         *ctx->file = fopen(ctx->filepath, "wb");
         if (!*ctx->file)
         {

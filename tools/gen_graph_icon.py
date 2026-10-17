@@ -3,7 +3,7 @@
 
 Produces:
   spiffs/palette-graph.png  - palette tile (matches palette-message.png style)
-  spiffs/default-graph.jpg  - on-canvas placeholder (graph aspect ~ 90x40)
+    spiffs/themes/default/graph.jpg  - on-canvas placeholder (graph aspect ~ 90x40)
 
 The geometry mirrors what the firmware actually draws (f-display.c) for the
 default 80x36 widget with both axes on: a 17px label gutter left of the Y
@@ -91,8 +91,9 @@ def main():
     print("Wrote", SPIFFS / "palette-graph.png")
 
     canvas = draw_graph(180, 80)  # 2x of 90x40
-    canvas.save(SPIFFS / "default-graph.jpg", "JPEG", quality=92)
-    print("Wrote", SPIFFS / "default-graph.jpg")
+    target = SPIFFS / "themes" / "default" / "graph.jpg"
+    canvas.save(target, "JPEG", quality=92)
+    print("Wrote", target)
 
 
 if __name__ == "__main__":

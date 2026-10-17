@@ -6,6 +6,7 @@
 #include "esp_log.h"
 #include "f-integrations.h"
 #include "frixos.h"
+#include "f-text-widget.h"
 #include "esp_timer.h"
 #include "esp_http_client.h"
 #include "esp_system.h"
@@ -1294,56 +1295,6 @@ void parse_HA_entities(const char *input)
                 integration_active_tokens_count[INTEGRATION_HA]);
 }
 
-/* Append any display-schedule HA entities that aren't already in the token list. */
-void add_display_schedule_ha_entities(void)
-{
-    for (int sched = 0; sched < 2; sched++)
-    {
-        const display_slot_t *slots = sched == 0 ? display_schedule : display_schedule_aux;
-        const int slot_count = sched == 0 ? display_schedule_count : display_schedule_aux_count;
-
-    for (int i = 0; i < slot_count; i++)
-    {
-        if (slots[i].type != SLOT_TYPE_HA) continue;
-        const char *entity = slots[i].entity;
-        if (entity[0] == '\0') continue;
-
-        /* Check if already present */
-        bool found = false;
-        for (int j = 0; j < integration_active_tokens_count[INTEGRATION_HA]; j++)
-        {
-            if (integration_active_tokens[INTEGRATION_HA][j].entity &&
-                strcmp(integration_active_tokens[INTEGRATION_HA][j].entity, entity) == 0)
-            {
-                found = true;
-                break;
-            }
-        }
-        if (found) continue;
-
-        /* Grow the token array by one */
-        int old_count = integration_active_tokens_count[INTEGRATION_HA];
-        integration_token_t *new_arr = realloc(
-            integration_active_tokens[INTEGRATION_HA],
-            (old_count + 1) * sizeof(integration_token_t));
-        if (!new_arr)
-        {
-            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "add_display_schedule_ha_entities: realloc failed");
-            continue;
-        }
-        integration_active_tokens[INTEGRATION_HA] = new_arr;
-        memset(&new_arr[old_count], 0, sizeof(integration_token_t));
-        if (!init_integration_token(&new_arr[old_count], entity, entity, "state"))
-        {
-            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "add_display_schedule_ha_entities: init failed for %s", entity);
-            continue;
-        }
-        integration_active_tokens_count[INTEGRATION_HA]++;
-        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Registered display-schedule HA entity: %s", entity);
-    }
-    }
-}
-
 void build_integration_message_corpus(char *out, size_t out_size)
 {
     if (!out || out_size == 0)
@@ -1364,18 +1315,6 @@ void build_integration_message_corpus(char *out, size_t out_size)
             out[used] = '\0';
         }
 
-        for (int i = 0; i < SCREEN_STATIC_TEXT_COUNT; i++)
-        {
-            const size_t text_len = strnlen(p->static_text[i], SCREEN_STATIC_TEXT_LENGTH);
-            if (text_len > 0 && used + text_len + 2 < out_size)
-            {
-                memcpy(out + used, p->static_text[i], text_len);
-                used += text_len;
-                out[used++] = '\n';
-                out[used] = '\0';
-            }
-        }
-
         // Include the graph widget's token so its HA/stock entity is registered
         // for fetching (it isn't part of any message/text).
         const size_t gtok_len = strnlen(p->graph.token, GRAPH_TOKEN_LEN);
@@ -1386,6 +1325,24 @@ void build_integration_message_corpus(char *out, size_t out_size)
             out[used++] = '\n';
             out[used] = '\0';
         }
+
+        for (int i = 0; i < TEXT_WIDGET_COUNT; i++)
+        {
+            const text_widget_cfg_t *tw = &eeprom_text_widgets.widget[profile][i];
+            if (!tw->enabled)
+                continue;
+            for (int s = 0; s < tw->slot_count && s < TEXT_WIDGET_SLOTS; s++)
+            {
+                const size_t tw_len = strnlen(tw->text[s], TEXT_WIDGET_TEXT_LEN);
+                if (tw_len > 0 && used + tw_len + 2 < out_size)
+                {
+                    memcpy(out + used, tw->text[s], tw_len);
+                    used += tw_len;
+                    out[used++] = '\n';
+                    out[used] = '\0';
+                }
+            }
+        }
     }
 
     if (used == 0 && eeprom_message[0] != '\0')
@@ -1395,10 +1352,8 @@ void build_integration_message_corpus(char *out, size_t out_size)
     }
 }
 
-#define INTEGRATION_MESSAGE_CORPUS_SIZE \
-    (SCROLL_MSG_LENGTH * FRIXOS_SCREEN_LAYOUT_PROFILES + \
-     SCREEN_STATIC_TEXT_COUNT * SCREEN_STATIC_TEXT_LENGTH * FRIXOS_SCREEN_LAYOUT_PROFILES + \
-     GRAPH_TOKEN_LEN * FRIXOS_SCREEN_LAYOUT_PROFILES + 32)
+// One shared pool buffer; the corpus is truncated if the texts do not all fit.
+#define INTEGRATION_MESSAGE_CORPUS_SIZE HTTP_BUFFER_SIZE
 
 void parse_integrations(void)
 {
@@ -1446,7 +1401,6 @@ void parse_integrations(void)
     if (integration_active[INTEGRATION_HA])
     {
         parse_HA_entities(message_corpus);
-        add_display_schedule_ha_entities();
     }
 
     if (integration_active[INTEGRATION_STOCK])

@@ -106,7 +106,8 @@ char eeprom_lon[12] = "", my_lon[12] = "";                         // "16.123456
 char eeprom_timezone[TZ_LENGTH] = "", my_timezone[TZ_LENGTH] = ""; // EET-2EEST,M3.5.0/3,M10.5.0/4";
 char eeprom_iana_tz[64] = "";                                      // human-readable IANA tz, e.g. "Europe/Athens"
 char eeprom_font[2][12] = {"bold", "light"};                       // [0] = day font, [1] = night font
-char eeprom_aux_font[2][12] = {"bold", "bold"};                    // [0] = day aux digit font, [1] = night aux
+char eeprom_aux_font[2][12] = {"bold", "light"};                    // [0] = day aux digit font, [1] = night aux
+uint8_t eeprom_weather_theme[2] = {0, 0};                            // 0 follows eeprom_font; 1..12 selects a weather theme
 float eeprom_lux_sensitivity = 6.0;
 float eeprom_lux_threshold = 16.0;
 uint8_t eeprom_brightness_LED[2] = {100, 30}; // in pct
@@ -118,10 +119,6 @@ uint8_t eeprom_quiet_weather = 1;
 uint8_t eeprom_show_leading_zero = 0;     // Show leading zero for single digit hour
 uint8_t eeprom_dots_breathe = 0;          // Disable breathing effect for time dots (0=show, 1=don't show)
 uint8_t eeprom_color_filter[2] = {0, 0};  // [0] = day, [1] = night
-uint8_t eeprom_msg_red[2] = {255, 255};   // Default to white color for both day and night
-uint8_t eeprom_msg_green[2] = {255, 255}; // Default to white color for both day and night
-uint8_t eeprom_msg_blue[2] = {255, 255};  // Default to white color for both day and night
-uint8_t eeprom_msg_font = 0;              // Default to 8pt (0=8pt, 1=10pt, 2=12pt, 3=14pt, 4=16pt)
 uint8_t eeprom_ofs_x = 22;
 uint8_t eeprom_ofs_y = 22;
 uint8_t eeprom_rotation = 3;        // 0 = 0°, 1 = 90°, 2 = 180°, 3 = 270°
@@ -130,9 +127,7 @@ uint8_t eeprom_show_grid = 0;       // 0 = no grid, 1 = show grid
 uint8_t eeprom_update_firmware = 1; // yes, auto update firmware
 uint8_t eeprom_dark_theme = 1;      // Default to dark theme (1 = dark, 0 = light)
 uint8_t eeprom_language = 0;        // Default to English (0=en, 1=de, 2=fr, 3=it, 4=pt, 5=sv, 6=da, 7=pl)
-uint8_t eeprom_scroll_speed = 10;   // Default scroll speed in pixels per second
 uint8_t eeprom_scroll_delay = 60;   // Default scroll delay in milliseconds (30-255)
-uint8_t eeprom_scroll_engine = SCROLL_ENGINE_FRIXOS; // p67: hand-rolled belt, not LVGL's animation
 char eeprom_message[SCROLL_MSG_LENGTH] = "[device]: [greeting] [day], [date] [mon], now [temp] today [high]-[low], hum. [hum], sun [rise]-[set]";
 
 screen_layout_t eeprom_screen_layout = {0};
@@ -159,14 +154,7 @@ static const nvs_setting_t settings_table[] = {
     {"lead_zero", SETTING_TYPE_U8, &eeprom_show_leading_zero, 0},
     {"dots_breathe", SETTING_TYPE_U8, &eeprom_dots_breathe, 0},
     {"color_filter", SETTING_TYPE_U8, &eeprom_color_filter[0], 0},
-    {"msg_red", SETTING_TYPE_U8, &eeprom_msg_red[0], 0},
-    {"msg_green", SETTING_TYPE_U8, &eeprom_msg_green[0], 0},
-    {"msg_blue", SETTING_TYPE_U8, &eeprom_msg_blue[0], 0},
     {"night_filter", SETTING_TYPE_U8, &eeprom_color_filter[1], 0},
-    {"night_msg_red", SETTING_TYPE_U8, &eeprom_msg_red[1], 0},
-    {"night_msg_green", SETTING_TYPE_U8, &eeprom_msg_green[1], 0},
-    {"night_msg_blue", SETTING_TYPE_U8, &eeprom_msg_blue[1], 0},
-    {"msg_font", SETTING_TYPE_U8, &eeprom_msg_font, 0},
     {"offset_x", SETTING_TYPE_U8, &eeprom_ofs_x, 0},
     {"offset_y", SETTING_TYPE_U8, &eeprom_ofs_y, 0},
     {"rotation", SETTING_TYPE_U8, &eeprom_rotation, 0},
@@ -174,9 +162,7 @@ static const nvs_setting_t settings_table[] = {
     {"show_grid", SETTING_TYPE_U8, &eeprom_show_grid, 0},
     {"update_firm", SETTING_TYPE_U8, &eeprom_update_firmware, 0},
     {"dark_theme", SETTING_TYPE_U8, &eeprom_dark_theme, 0},
-    {"scroll_speed", SETTING_TYPE_U8, &eeprom_scroll_speed, 0},
     {"scroll_delay", SETTING_TYPE_U8, &eeprom_scroll_delay, 0},
-    {"scroll_eng", SETTING_TYPE_U8, &eeprom_scroll_engine, 0},
     {"language", SETTING_TYPE_U8, &eeprom_language, 0},
     {"brightness", SETTING_TYPE_BLOB, eeprom_brightness_LED, sizeof(eeprom_brightness_LED)},
     {"lux_sens", SETTING_TYPE_BLOB, &eeprom_lux_sensitivity, sizeof(eeprom_lux_sensitivity)},
@@ -199,11 +185,6 @@ static const nvs_setting_t settings_table[] = {
     {"cgm_password", SETTING_TYPE_STR, eeprom_glucose_password, sizeof(eeprom_glucose_password)},
     {"cgm_refresh", SETTING_TYPE_U8, &eeprom_glucose_refresh, 0},
     {"cgm_validity", SETTING_TYPE_U16, &glucose_validity_duration, 0},
-    {"sec_time", SETTING_TYPE_U8, &eeprom_sec_time, 0},
-    {"sec_cgm", SETTING_TYPE_U8, &eeprom_sec_cgm, 0},
-    {"sec_weather", SETTING_TYPE_U8, &eeprom_sec_weather, 0},
-    {"disp_sched", SETTING_TYPE_STR, eeprom_disp_sched, sizeof(eeprom_disp_sched)},
-    {"disp_sched_aux", SETTING_TYPE_STR, eeprom_disp_sched_aux, sizeof(eeprom_disp_sched_aux)},
     {"cgm_unit", SETTING_TYPE_U8, &eeprom_glucose_unit, 0},
     {"pwm_frequency", SETTING_TYPE_U32, &eeprom_pwm_frequency, 0},
     {"max_power", SETTING_TYPE_U16, &eeprom_max_power, 0},
@@ -310,17 +291,6 @@ char eeprom_glucose_username[64] = {0};
 char eeprom_glucose_password[64] = {0};
 uint8_t eeprom_glucose_refresh = 5;      // Default to 5 minutes
 uint16_t glucose_validity_duration = 60; // Default to 60 minutes
-uint8_t eeprom_sec_time = 25;            // Alternate time display duration (0-120 seconds) — legacy, used for migration
-uint8_t eeprom_sec_cgm = 5;              // Alternate CGM display duration (0-120 seconds) — legacy, used for migration
-uint8_t eeprom_sec_weather = 0;          // Alternate weather temperature display duration — legacy, used for migration
-char eeprom_disp_sched[512] = {0};       // Display schedule JSON (p58)
-char eeprom_disp_sched_aux[512] = {0};   // Aux digit display schedule JSON (p59)
-
-/* Display schedule parsed from eeprom_disp_sched */
-display_slot_t display_schedule[MAX_DISPLAY_SLOTS];
-int            display_schedule_count = 0;
-display_slot_t display_schedule_aux[MAX_DISPLAY_SLOTS];
-int            display_schedule_aux_count = 0;
 char eeprom_libre_patient_id[64] = {0};
 char eeprom_libre_token[512] = {0};
 char libre_account_id[64] = {0};
@@ -785,7 +755,6 @@ void startup_read_eeprom(void)
       strcpy(my_lat, eeprom_lat);
       strcpy(my_lon, eeprom_lon);
       strcpy(my_timezone, eeprom_timezone);
-      migrate_schedule_from_legacy();
 
       nvs_close(nvs_handle);
       rescue_erase_nvs();
@@ -811,19 +780,6 @@ void startup_read_eeprom(void)
       ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Migrated scroll delay %ums -> 60ms", (unsigned)from);
       write_nvs_parameters();
     }
-    if (eeprom_scroll_engine > SCROLL_ENGINE_FRIXOS)
-      eeprom_scroll_engine = SCROLL_ENGINE_FRIXOS;
-
-    // Load display schedule from JSON; migrate from legacy params if absent
-    if (eeprom_disp_sched[0] != '\0')
-        parse_display_schedule(eeprom_disp_sched);
-    else
-        migrate_schedule_from_legacy();
-
-    if (eeprom_disp_sched_aux[0] != '\0')
-        parse_display_schedule_aux(eeprom_disp_sched_aux);
-    else
-        display_schedule_aux_count = 0;
 
     // Close NVS
     nvs_close(nvs_handle);
@@ -838,15 +794,15 @@ void startup_read_eeprom(void)
                 "  Location:    lat=%s, lon=%s, tz=%s\n"
                 "  Fonts:       day=%s, night=%s\n"
                 "  Display:     dim=%u, F=%u, 12h=%u, q_scr=%u, q_wea=%u, lead_zero=%u, dots_breathe=%u, filter=[%u,%u]\n"
-                "  Message:     rgb=([%u,%u,%u],[%u,%u,%u]), font=%u, offset=(%u,%u), rot=%u, mirror=%u, grid=%u\n"
+                "  Layout:      offset=(%u,%u), rot=%u, mirror=%u, grid=%u\n"
                 "  Message txt: %s\n"
-                "  UI:          update=%u, dark=%u, lang=%u, scroll_dly=%u, scroll_speed=%u\n"
+                "  UI:          update=%u, dark=%u, lang=%u, scroll_dly=%u\n"
                 "  Brightness:  led=[%u,%u], lux_sens=%.1f, lux_thresh=%.1f\n"
                 "  HomeAssist:  url=%s, ha_refresh=%u (token redacted)\n"
                 "  Stock:       stock_refresh=%u (key redacted)\n"
                 "  Dexcom:      region=%u, refresh=%u, high=%u, low=%u\n"
                 "  Libre:       region=%u, ns_url=%s\n"
-                "  CGM:         username=%s, validity=%u, sec_time=%u, sec_cgm=%u, unit=%u (password redacted)\n"
+                "  CGM:         username=%s, validity=%u, unit=%u (password redacted)\n"
                 "  PWM:         freq=%u, max_power=%u, board_rev=%u, poh=%u",
                 eeprom_hostname, eeprom_wifi_ssid, eeprom_wifi_start, eeprom_wifi_end,
                 eeprom_lat, eeprom_lon, eeprom_timezone,
@@ -855,21 +811,18 @@ void startup_read_eeprom(void)
                 eeprom_quiet_scroll, eeprom_quiet_weather,
                 eeprom_show_leading_zero, eeprom_dots_breathe,
                 eeprom_color_filter[0], eeprom_color_filter[1],
-                eeprom_msg_red[0], eeprom_msg_green[0], eeprom_msg_blue[0],
-                eeprom_msg_red[1], eeprom_msg_green[1], eeprom_msg_blue[1],
-                eeprom_msg_font,
                 eeprom_ofs_x, eeprom_ofs_y, eeprom_rotation, eeprom_mirroring,
                 eeprom_show_grid,
                 eeprom_message,
-                eeprom_update_firmware, eeprom_dark_theme, eeprom_language, eeprom_scroll_delay, eeprom_scroll_speed,
+                eeprom_update_firmware, eeprom_dark_theme, eeprom_language, eeprom_scroll_delay,
                 eeprom_brightness_LED[0], eeprom_brightness_LED[1],
                 eeprom_lux_sensitivity, eeprom_lux_threshold,
                 eeprom_ha_url, eeprom_ha_refresh_mins,
                 eeprom_stock_refresh_mins,
                 eeprom_dexcom_region, eeprom_glucose_refresh, eeprom_glucose_high, eeprom_glucose_low,
                 eeprom_libre_region, eeprom_ns_url,
-                eeprom_glucose_username, glucose_validity_duration, eeprom_sec_time, eeprom_sec_cgm, eeprom_glucose_unit,
-                eeprom_pwm_frequency, eeprom_max_power, eeprom_board_rev, eeprom_poh);
+                eeprom_glucose_username, glucose_validity_duration, eeprom_glucose_unit,
+                (unsigned)eeprom_pwm_frequency, eeprom_max_power, eeprom_board_rev, (unsigned)eeprom_poh);
   }
 
 } // end startup_read_eeprom
@@ -1163,7 +1116,7 @@ void poh_timer_callback(void *arg)
     return;
 
   current_poh++;
-  ESP_LOG_WEB(ESP_LOG_INFO, TAG, "POH incremented to %u hours", current_poh);
+  ESP_LOG_WEB(ESP_LOG_INFO, TAG, "POH incremented to %u hours", (unsigned)current_poh);
 
   time_t now = time(NULL);
   if (now - last_poh_save < 8 * 3600)

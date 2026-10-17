@@ -1,4 +1,4 @@
-// Test helper: encode default.layout with icon_1 enabled, or decode a wire blob
+// Test helper: encode layouts/default.layout with icon_1 enabled, or decode a wire blob
 // and print the icon_1 widget. Uses the editor's own encoder/decoder.
 //   node tools/icon_roundtrip.js encode <out.bin>
 //   node tools/icon_roundtrip.js decode <in.bin>
@@ -19,7 +19,7 @@ const mode = process.argv[2];
 const file = process.argv[3];
 
 if (mode === 'encode') {
-  const data = JSON.parse(fs.readFileSync(path.join(root, 'spiffs/default.layout'), 'utf8'));
+  const data = JSON.parse(fs.readFileSync(path.join(root, 'spiffs/layouts/default.layout'), 'utf8'));
   sb.DATA = data;
   const u8 = vm.runInContext(
     `const lay = prepareScreenLayout(DATA);

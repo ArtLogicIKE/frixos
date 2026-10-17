@@ -1,39 +1,6 @@
 #include <string.h>
 #include "frixos.h"
-
-static const char *const k_default_static_texts[SCREEN_STATIC_TEXT_COUNT] = {
-    "UV [uv]",
-    "[pressure]",
-    "Wind [wind]",
-    "Gust [gust]",
-    "Rain [precip]",
-    "",
-    "",
-    "",
-};
-
-static void screen_layout_init_static_texts(screen_layout_profile_t *profile)
-{
-  for (int i = 0; i < SCREEN_STATIC_TEXT_COUNT; i++)
-  {
-    screen_widget_t *w = &profile->widget[SCREEN_ELEM_TEXT_1 + i];
-    w->enabled = 0;
-    w->x = 45;
-    w->y = 90;
-    w->z = (uint8_t)((1 + i) <= 4 ? (1 + i) : 4);
-    w->font = 0;
-    w->width = 80;
-    w->align = SCREEN_MSG_ALIGN_LEFT;
-    w->color_r = 255;
-    w->color_g = 255;
-    w->color_b = 255;
-    w->bg_r = 0;
-    w->bg_g = 0;
-    w->bg_b = 0;
-    strncpy(profile->static_text[i], k_default_static_texts[i], SCREEN_STATIC_TEXT_LENGTH - 1);
-    profile->static_text[i][SCREEN_STATIC_TEXT_LENGTH - 1] = '\0';
-  }
-}
+#include "f-text-widget.h"
 
 void screen_layout_apply_factory_defaults(screen_layout_t *layout)
 {
@@ -52,58 +19,7 @@ void screen_layout_apply_factory_defaults(screen_layout_t *layout)
     // setting so a v66->v67 upgrade preserves a user who hid the forecast.
     p->widget[SCREEN_ELEM_WEATHER] = (screen_widget_t){.enabled = eeprom_quiet_weather ? 1 : 0, .x = 54, .y = 24, .z = 3};
     p->widget[SCREEN_ELEM_MOON] = (screen_widget_t){.enabled = 1, .x = 87, .y = 29, .z = 3};
-    p->widget[SCREEN_ELEM_TIME] = (screen_widget_t){.enabled = 1, .x = 22, .y = 47, .z = 1};
-    p->widget[SCREEN_ELEM_AMPM] = (screen_widget_t){.enabled = 1, .x = 101, .y = 54, .z = 2};
-    p->widget[SCREEN_ELEM_TIME_AUX] = (screen_widget_t){.enabled = 0, .x = 22, .y = 47, .z = 1};
-    p->widget[SCREEN_ELEM_DIGIT_LABEL] = (screen_widget_t){
-        .enabled = 0,
-        .x = 22,
-        .y = 84,
-        .z = 1,
-        .font = 0,
-        .width = 80,
-        .align = SCREEN_MSG_ALIGN_LEFT,
-        .color_r = 255,
-        .color_g = 255,
-        .color_b = 255,
-        .bg_r = 0,
-        .bg_g = 0,
-        .bg_b = 0,
-    };
-    p->widget[SCREEN_ELEM_DIGIT_LABEL_AUX] = (screen_widget_t){
-        .enabled = 0,
-        .x = 22,
-        .y = 84,
-        .z = 1,
-        .font = 0,
-        .width = 80,
-        .align = SCREEN_MSG_ALIGN_LEFT,
-        .color_r = 255,
-        .color_g = 255,
-        .color_b = 255,
-        .bg_r = 0,
-        .bg_g = 0,
-        .bg_b = 0,
-    };
-    p->digit_label_text[0] = '\0';
-    p->digit_label_aux_text[0] = '\0';
-    p->widget[SCREEN_ELEM_MESSAGE] = (screen_widget_t){
-        // Message visibility is owned by .enabled (see show_object gate in
-        // f-display.c). Seed from legacy quiet_scroll so a v66->v67 upgrade
-        // preserves a user who turned the scrolling message off.
-        .enabled = eeprom_quiet_scroll ? 1 : 0,
-        .x = 0,
-        .y = 86,
-        .z = 0,
-        .font = eeprom_msg_font <= 4 ? eeprom_msg_font : 0,
-        .align = SCREEN_MSG_ALIGN_LEFT,
-        .color_r = eeprom_msg_red[profile],
-        .color_g = eeprom_msg_green[profile],
-        .color_b = eeprom_msg_blue[profile],
-        .bg_r = 0,
-        .bg_g = 0,
-        .bg_b = 0,
-    };
+    p->widget[SCREEN_ELEM_MESSAGE] = (screen_widget_t){0};
     p->widget[SCREEN_ELEM_GRAPH] = (screen_widget_t){
         .enabled = 0,
         .x = 4,
@@ -139,12 +55,27 @@ void screen_layout_apply_factory_defaults(screen_layout_t *layout)
     };
     strncpy(p->scroll_text, eeprom_message, SCROLL_MSG_LENGTH - 1);
     p->scroll_text[SCROLL_MSG_LENGTH - 1] = '\0';
-    screen_layout_init_static_texts(p);
 
     // User icon slots: disabled by default, centred so they are visible when
     // first enabled. Source is S:/icon<N>.jpg (uploaded by the user).
     for (int i = 0; i < SCREEN_ICON_COUNT; i++)
       p->widget[SCREEN_ELEM_ICON_1 + i] = (screen_widget_t){.enabled = 0, .x = 48, .y = 48, .z = 2};
+  }
+  text_widgets_defaults(&eeprom_text_widgets);
+  for (int profile = 0; profile < FRIXOS_SCREEN_LAYOUT_PROFILES; profile++)
+  {
+    text_widget_cfg_t *scroll = &eeprom_text_widgets.widget[profile][2];
+    scroll->enabled = eeprom_quiet_scroll ? 1 : 0;
+    scroll->x = 0;
+    scroll->y = 86;
+    scroll->z = 0;
+    scroll->width = LCD_H_RES;
+    scroll->family = TW_FAMILY_SANS;
+    scroll->size = 16;
+    scroll->flags = TW_FLAG_SCROLL | TW_FLAG_SHOW_UNITS | TW_FLAG_COLOR_OVERRIDE;
+    scroll->color_r = scroll->color_g = scroll->color_b = 255;
+    eeprom_text_widgets.meta.instanced[profile] |= (uint16_t)(1u << 2);
+    strncpy(eeprom_text_widgets.meta.name[profile][2], "Scroll", WIDGET_NAME_LEN - 1);
   }
 }
 
@@ -159,16 +90,19 @@ void screen_layout_sync_legacy_eeprom(const screen_layout_t *layout)
 
   for (int profile = 0; profile < FRIXOS_SCREEN_LAYOUT_PROFILES; profile++)
   {
-    const screen_widget_t *msg = &layout->profile[profile].widget[SCREEN_ELEM_MESSAGE];
-    eeprom_msg_red[profile] = msg->color_r;
-    eeprom_msg_green[profile] = msg->color_g;
-    eeprom_msg_blue[profile] = msg->color_b;
+    bool scroll_enabled = false;
+    for (int i = 0; i < TEXT_WIDGET_COUNT; i++)
+    {
+      const text_widget_cfg_t *w = &eeprom_text_widgets.widget[profile][i];
+      if (w->enabled && (w->flags & TW_FLAG_SCROLL))
+      {
+        scroll_enabled = true;
+        break;
+      }
+    }
+    if (profile == 0)
+      eeprom_quiet_scroll = scroll_enabled;
   }
-
-  eeprom_msg_font = layout->profile[0].widget[SCREEN_ELEM_MESSAGE].font <= 4
-                        ? layout->profile[0].widget[SCREEN_ELEM_MESSAGE].font
-                        : 0;
-  eeprom_quiet_scroll = layout->profile[0].widget[SCREEN_ELEM_MESSAGE].enabled;
   eeprom_quiet_weather = layout->profile[0].widget[SCREEN_ELEM_WEATHER].enabled;
 }
 
@@ -190,6 +124,20 @@ void screen_layout_apply_legacy_message(const char *message)
     strncpy(eeprom_screen_layout.profile[profile].scroll_text, message, SCROLL_MSG_LENGTH - 1);
     eeprom_screen_layout.profile[profile].scroll_text[SCROLL_MSG_LENGTH - 1] = '\0';
   }
+}
+
+void screen_layout_set_scroll_enabled(bool enabled)
+{
+  for (int profile = 0; profile < FRIXOS_SCREEN_LAYOUT_PROFILES; profile++)
+  {
+    for (int i = 0; i < TEXT_WIDGET_COUNT; i++)
+    {
+      text_widget_cfg_t *w = &eeprom_text_widgets.widget[profile][i];
+      if (w->flags & TW_FLAG_SCROLL)
+        w->enabled = enabled ? 1 : 0;
+    }
+  }
+  eeprom_quiet_scroll = enabled ? 1 : 0;
 }
 
 void screen_layout_ensure_valid(void)

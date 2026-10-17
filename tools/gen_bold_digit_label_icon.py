@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""Generate bold-digit-label.jpg: Digit Display preview with a thick red underline."""
+"""Generate the bold theme's digit-label.jpg with a thick red underline."""
 
 from pathlib import Path
 
 from PIL import Image, ImageDraw
 
 SPIFFS = Path(__file__).resolve().parent.parent / "spiffs"
-SRC = SPIFFS / "bold.jpg"
-OUT = SPIFFS / "bold-digit-label.jpg"
+SRC = SPIFFS / "themes" / "bold" / "preview.jpg"
+OUT = SPIFFS / "themes" / "bold" / "digit-label.jpg"
 
 RED = (226, 59, 46)  # matches --proj-red / frixos alarm red
 LINE_THICKNESS = 3

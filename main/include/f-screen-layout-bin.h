@@ -6,6 +6,7 @@
 #include <stdbool.h>
 #include "esp_err.h"
 #include "frixos.h"
+#include "f-text-widget.h"
 
 /* Little-endian magic: "FSXL" */
 #define FRIXOS_SCREEN_BIN_MAGIC 0x4653584Cu
@@ -38,6 +39,35 @@ typedef struct __attribute__((packed))
 
 #define FRIXOS_SCREEN_LAYOUT_WIRE_SIZE ((size_t)sizeof(screen_layout_wire_t))
 
+/* Optional section appended after the base wire/file (text widgets). Payloads of
+ * exactly FRIXOS_SCREEN_LAYOUT_WIRE_SIZE are still accepted (older clients/files). */
+#define FRIXOS_SCREEN_EXT_MAGIC 0x54585346u /* "FSXT" */
+#define FRIXOS_SCREEN_EXT_VERSION 4    /* text widgets, widget meta, and color override mode */
+#define FRIXOS_SCREEN_EXT_VERSION_V3 3 /* text widgets + widget meta */
+#define FRIXOS_SCREEN_EXT_VERSION_V2 2 /* text widgets only */
+
+typedef struct __attribute__((packed))
+{
+    uint32_t magic;
+    uint8_t version;
+    uint8_t count;      /* TEXT_WIDGET_COUNT */
+    uint16_t item_size; /* sizeof(text_widget_cfg_t) */
+} screen_layout_ext_header_t;
+
+typedef struct __attribute__((packed))
+{
+    screen_layout_ext_header_t header;
+    text_widgets_layout_t widgets;
+} screen_layout_ext_wire_t;
+
+#define FRIXOS_SCREEN_LAYOUT_EXT_SIZE ((size_t)sizeof(screen_layout_ext_wire_t))
+#define FRIXOS_SCREEN_LAYOUT_FULL_WIRE_SIZE (FRIXOS_SCREEN_LAYOUT_WIRE_SIZE + FRIXOS_SCREEN_LAYOUT_EXT_SIZE)
+
+/* The ext payload is eeprom_text_widgets itself, sent right after this header. */
+void screen_layout_ext_header(screen_layout_ext_header_t *header);
+/* Validate an ext section and sanitize its widgets in place. */
+esp_err_t screen_layout_ext_decode(screen_layout_ext_wire_t *ext);
+
 #define SCREEN_LAYOUT_FILE_PATH "/spiffs/current.layout.bin"
 
 bool screen_layout_wire_encode(uint8_t *out, size_t out_size, size_t *written);
@@ -49,7 +79,7 @@ esp_err_t screen_layout_wire_decode(const uint8_t *data, size_t len, screen_layo
                                     uint8_t *day_color_filter, uint8_t *night_color_filter);
 
 /* Persist the live layout as a wire-format file on LittleFS. Load always
- * leaves a valid eeprom_screen_layout (file, leftover NVS blob, or factory). */
+ * leaves a valid eeprom_screen_layout (current file, bundled default, or factory). */
 void screen_layout_file_load(void);
 esp_err_t screen_layout_file_save(void);
 void screen_layout_file_remove(void);

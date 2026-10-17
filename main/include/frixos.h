@@ -89,6 +89,7 @@ extern char eeprom_timezone[TZ_LENGTH], my_timezone[TZ_LENGTH]; // EET-2EEST,M3.
 extern char eeprom_iana_tz[64];                                 // human-readable IANA tz, e.g. "Europe/Athens" (priority below POSIX, above auto)
 extern char eeprom_font[2][12];     // [0] = day font, [1] = night font
 extern char eeprom_aux_font[2][12]; // [0] = day aux digit font, [1] = night aux
+extern uint8_t eeprom_weather_theme[2]; // 0 = follow screen font; 1..12 = SCREEN_TIME_FONTS index + 1
 extern float eeprom_lux_sensitivity;
 extern float eeprom_lux_threshold;
 extern uint8_t eeprom_brightness_LED[2]; // in pct
@@ -103,10 +104,6 @@ extern uint8_t  eeprom_quiet_weather;
 extern uint8_t  eeprom_show_leading_zero;
 extern uint8_t  eeprom_dots_breathe;  // Enable breathing effect for time dots (0=disabled, 1=enabled)
 extern uint8_t  eeprom_color_filter[2]; // [0] = day filter, [1] = night filter
-extern uint8_t  eeprom_msg_red[2];      // [0] = day red, [1] = night red
-extern uint8_t  eeprom_msg_green[2];    // [0] = day green, [1] = night green
-extern uint8_t  eeprom_msg_blue[2];     // [0] = day blue, [1] = night blue
-extern uint8_t  eeprom_msg_font;        // Message font size (0=8pt, 1=10pt, 2=12pt, 3=14pt, 4=16pt)
 extern uint8_t  eeprom_ofs_x;
 extern uint8_t  eeprom_ofs_y;
 extern uint8_t  eeprom_rotation;
@@ -115,11 +112,7 @@ extern uint8_t  eeprom_show_grid;
 extern uint8_t  eeprom_update_firmware;
 extern uint8_t  eeprom_dark_theme;
 extern uint8_t  eeprom_language;  // Language index: 0=en, 1=de, 2=fr, 3=it, 4=pt, 5=sv, 6=da, 7=pl
-extern uint8_t  eeprom_scroll_speed;  // Scroll speed in pixels per second
-extern uint8_t  eeprom_scroll_delay;  // Scroll delay in milliseconds (30-200)
-#define SCROLL_ENGINE_LVGL 0
-#define SCROLL_ENGINE_FRIXOS 1
-extern uint8_t  eeprom_scroll_engine; // p67: 0 = LVGL label animation, 1 = Frixos belt
+extern uint8_t  eeprom_scroll_delay;  // Scroll delay in milliseconds per pixel
 extern char eeprom_message[SCROLL_MSG_LENGTH];
 extern char eeprom_ha_url[200];      // Home Assistant server URL
 extern char eeprom_ha_token[255];    // Home Assistant long-lived access token
@@ -169,40 +162,6 @@ extern char eeprom_glucose_password[64];
 extern uint8_t eeprom_glucose_refresh;
 extern uint8_t eeprom_glucose_unit;  // Glucose display unit: 0=mg/dL, 1=mmol/L
 extern uint16_t glucose_validity_duration;
-extern uint8_t eeprom_sec_time;
-extern uint8_t eeprom_sec_cgm;
-extern uint8_t eeprom_sec_weather;
-extern char    eeprom_disp_sched[512];
-extern char    eeprom_disp_sched_aux[512];
-
-/* --- Display schedule --- */
-typedef enum {
-    SLOT_TYPE_TIME         = 0,
-    SLOT_TYPE_CGM          = 1,
-    SLOT_TYPE_WEATHER_TEMP = 2,
-    SLOT_TYPE_HA           = 3,
-} slot_type_t;
-
-#define MAX_DISPLAY_SLOTS  8
-#define SLOT_ENTITY_LEN    64
-#define SLOT_NAME_LEN      26   /* max 25 characters + NUL */
-
-typedef struct {
-    slot_type_t type;
-    uint16_t    duration;                /* seconds to show this slot */
-    char        entity[SLOT_ENTITY_LEN]; /* HA entity ID (SLOT_TYPE_HA only) */
-    char        label[8];               /* short unit shown next to digits, e.g. "°F", "W" */
-    char        name[SLOT_NAME_LEN];    /* optional label on Digit Label while slot is active */
-} display_slot_t;
-
-extern display_slot_t display_schedule[MAX_DISPLAY_SLOTS];
-extern int            display_schedule_count;
-extern display_slot_t display_schedule_aux[MAX_DISPLAY_SLOTS];
-extern int            display_schedule_aux_count;
-
-void parse_display_schedule(const char *json);
-void parse_display_schedule_aux(const char *json);
-void migrate_schedule_from_legacy(void);
 
 extern char eeprom_libre_patient_id[64];
 extern char eeprom_libre_token[512];
@@ -246,10 +205,8 @@ extern char boot_ip_address[18];
 // Screen layout configuration
 // --------------------------
 // Two profiles: [0]=day, [1]=night. Selected at runtime by font_index (lux-driven).
-#define FRIXOS_SCREEN_LAYOUT_VERSION 10
+#define FRIXOS_SCREEN_LAYOUT_VERSION 12
 #define FRIXOS_SCREEN_LAYOUT_PROFILES 2
-#define SCREEN_STATIC_TEXT_LENGTH 96
-#define SCREEN_STATIC_TEXT_COUNT 8
 #define SCREEN_ICON_COUNT 8       // user JPG icon slots (S:/icon1.jpg .. icon8.jpg)
 #define SCREEN_ICON_MAX_DIM 64    // max icon dimension (px), enforced client-side
 
@@ -257,6 +214,7 @@ extern char boot_ip_address[18];
 #define SCREEN_MSG_ALIGN_CENTER 1
 #define SCREEN_MSG_ALIGN_RIGHT 2
 
+// Text, digits and values are drawn by the unified text widgets (f-text-widget.h).
 typedef enum
 {
   SCREEN_ELEM_GLUCOSE_LEVEL = 0,
@@ -264,30 +222,17 @@ typedef enum
   SCREEN_ELEM_WIFI_OFF = 2,
   SCREEN_ELEM_WEATHER = 3,
   SCREEN_ELEM_MOON = 4,
-  SCREEN_ELEM_TIME = 5,
-  SCREEN_ELEM_MESSAGE = 6,
-  SCREEN_ELEM_TEXT_1 = 7,
-  SCREEN_ELEM_TEXT_2 = 8,
-  SCREEN_ELEM_TEXT_3 = 9,
-  SCREEN_ELEM_TEXT_4 = 10,
-  SCREEN_ELEM_TEXT_5 = 11,
-  SCREEN_ELEM_TEXT_6 = 12,
-  SCREEN_ELEM_TEXT_7 = 13,
-  SCREEN_ELEM_TEXT_8 = 14,
-  SCREEN_ELEM_AMPM = 15,
-  SCREEN_ELEM_TIME_AUX = 16,
-  SCREEN_ELEM_DIGIT_LABEL = 17,
-  SCREEN_ELEM_DIGIT_LABEL_AUX = 18,
-  SCREEN_ELEM_GRAPH = 19, // generic single-token time-series graph
+  SCREEN_ELEM_MESSAGE = 5,
+  SCREEN_ELEM_GRAPH = 6, // generic single-token time-series graph
   // User JPG icons, slot N -> S:/icon<N>.jpg (static, decoded on draw, not cached).
-  SCREEN_ELEM_ICON_1 = 20,
-  SCREEN_ELEM_ICON_2 = 21,
-  SCREEN_ELEM_ICON_3 = 22,
-  SCREEN_ELEM_ICON_4 = 23,
-  SCREEN_ELEM_ICON_5 = 24,
-  SCREEN_ELEM_ICON_6 = 25,
-  SCREEN_ELEM_ICON_7 = 26,
-  SCREEN_ELEM_ICON_8 = 27,
+  SCREEN_ELEM_ICON_1 = 7,
+  SCREEN_ELEM_ICON_2 = 8,
+  SCREEN_ELEM_ICON_3 = 9,
+  SCREEN_ELEM_ICON_4 = 10,
+  SCREEN_ELEM_ICON_5 = 11,
+  SCREEN_ELEM_ICON_6 = 12,
+  SCREEN_ELEM_ICON_7 = 13,
+  SCREEN_ELEM_ICON_8 = 14,
   SCREEN_ELEM_COUNT
 } screen_element_id_t;
 
@@ -351,50 +296,22 @@ typedef struct
 {
   screen_widget_t widget[SCREEN_ELEM_COUNT];
   char scroll_text[SCROLL_MSG_LENGTH];
-  char static_text[SCREEN_STATIC_TEXT_COUNT][SCREEN_STATIC_TEXT_LENGTH];
-  char digit_label_text[SCREEN_STATIC_TEXT_LENGTH];
-  char digit_label_aux_text[SCREEN_STATIC_TEXT_LENGTH];
   screen_graph_cfg_t graph;
 } screen_layout_profile_t;
 
 typedef struct
 {
   uint8_t version;
-  uint8_t scroll_delay; // milliseconds, scrolling message only
+  uint8_t scroll_delay; // milliseconds per pixel for scrolling text widgets
   uint16_t reserved;
   screen_layout_profile_t profile[FRIXOS_SCREEN_LAYOUT_PROFILES];
 } screen_layout_t;
 
 extern screen_layout_t eeprom_screen_layout;
 
-static inline bool screen_elem_is_static_text(screen_element_id_t id)
-{
-  return id >= SCREEN_ELEM_TEXT_1 && id <= SCREEN_ELEM_TEXT_8;
-}
-
-static inline bool screen_elem_is_digit_label(screen_element_id_t id)
-{
-  return id == SCREEN_ELEM_DIGIT_LABEL || id == SCREEN_ELEM_DIGIT_LABEL_AUX;
-}
-
 static inline bool screen_elem_is_graph(screen_element_id_t id)
 {
   return id == SCREEN_ELEM_GRAPH;
-}
-
-static inline bool screen_elem_is_text(screen_element_id_t id)
-{
-  return id == SCREEN_ELEM_MESSAGE || screen_elem_is_static_text(id) || screen_elem_is_digit_label(id);
-}
-
-static inline bool screen_elem_has_text_layout(screen_element_id_t id)
-{
-  return screen_elem_is_static_text(id) || screen_elem_is_digit_label(id);
-}
-
-static inline int screen_static_text_index(screen_element_id_t id)
-{
-  return (int)id - (int)SCREEN_ELEM_TEXT_1;
 }
 
 static inline bool screen_elem_is_icon(screen_element_id_t id)
@@ -411,6 +328,7 @@ void build_integration_message_corpus(char *out, size_t out_size);
 void screen_layout_apply_factory_defaults(screen_layout_t *layout);
 void screen_layout_sync_legacy_eeprom(const screen_layout_t *layout);
 void screen_layout_apply_legacy_message(const char *message);
+void screen_layout_set_scroll_enabled(bool enabled);
 void screen_layout_ensure_valid(void);
 
 // TFT Displat ST7735S
@@ -486,6 +404,6 @@ void startup_read_eeprom(void);
 // Function to write all parameters to NVS
 esp_err_t write_nvs_parameters(void);
 void ESP_LOGI_STACK(const char *tag, const char *msg);
-void ESP_LOG_WEB(esp_log_level_t level, const char *tag, const char *format, ...);
+void ESP_LOG_WEB(esp_log_level_t level, const char *tag, const char *format, ...) __attribute__((format(printf, 3, 4)));
 
 #endif
