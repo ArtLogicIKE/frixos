@@ -1,0 +1,748 @@
+{
+  "version": 12,
+  "scroll_delay": 60,
+  "day_color_filter": 0,
+  "night_color_filter": 0,
+  "day_font": "bold",
+  "night_font": "light",
+  "day_aux_font": "bold",
+  "night_aux_font": "bold",
+  "w": 128,
+  "h": 128,
+  "profiles": {
+    "day": {
+      "elements": [
+        {
+          "id": "glucose_level",
+          "enabled": 1,
+          "x": 45,
+          "y": 11,
+          "z": 4
+        },
+        {
+          "id": "glucose_trend",
+          "enabled": 1,
+          "x": 34,
+          "y": 17,
+          "z": 4
+        },
+        {
+          "id": "wifi_off",
+          "enabled": 1,
+          "x": 39,
+          "y": 11,
+          "z": 4
+        },
+        {
+          "id": "weather",
+          "enabled": 1,
+          "x": 58,
+          "y": 9,
+          "z": 3
+        },
+        {
+          "id": "moon",
+          "enabled": 1,
+          "x": 90,
+          "y": 17,
+          "z": 3
+        },
+        {
+          "id": "graph",
+          "enabled": 0,
+          "x": 0,
+          "y": 0,
+          "z": 0,
+          "options": {
+            "color": "#ffffff",
+            "bg_color": "#000000",
+            "token": "",
+            "interval_min": 5,
+            "points": 60,
+            "gwidth": 80,
+            "gheight": 36,
+            "autoscale": false,
+            "show_axis": false,
+            "show_xaxis": false,
+            "band_on": false,
+            "show_value": false,
+            "boolean": false,
+            "thick": false,
+            "band_low": null,
+            "band_high": null,
+            "y_min": null,
+            "y_max": null,
+            "band_color": "#283c28",
+            "warn_color": "#ff5050",
+            "axis_color": "#787878"
+          }
+        },
+        {
+          "id": "icon_1",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2,
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "icon_2",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2,
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "icon_3",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2,
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "icon_4",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2,
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "icon_5",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2,
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "icon_6",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2,
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "icon_7",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2,
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "icon_8",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2,
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "tw_1",
+          "enabled": 1,
+          "x": 23,
+          "y": 31,
+          "z": 1,
+          "options": {
+            "family": 4,
+            "size": 36,
+            "show_units": false,
+            "tabular": false,
+            "transparent": false,
+            "color": "#ffffff",
+            "bg_color": "#000000",
+            "width": 0,
+            "align": 0,
+            "slots": [
+              {
+                "text": "[clock]",
+                "duration": 10
+              }
+            ],
+            "color_enabled": false,
+            "scroll": false
+          },
+          "instanced": 1,
+          "name": "Clock"
+        },
+        {
+          "id": "tw_2",
+          "enabled": 0,
+          "x": 4,
+          "y": 34,
+          "z": 2,
+          "options": {
+            "family": 0,
+            "size": 16,
+            "show_units": true,
+            "tabular": true,
+            "transparent": false,
+            "color": "#ffffff",
+            "color_enabled": false,
+            "bg_color": "#000000",
+            "width": 0,
+            "align": 0,
+            "scroll": false,
+            "slots": [
+              {
+                "text": "",
+                "duration": 10
+              }
+            ]
+          },
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "tw_3",
+          "enabled": 1,
+          "x": 64,
+          "y": 73,
+          "z": 1,
+          "options": {
+            "family": 0,
+            "size": 8,
+            "show_units": true,
+            "tabular": false,
+            "transparent": false,
+            "color": "#ffffff",
+            "bg_color": "#000000",
+            "width": 50,
+            "align": 0,
+            "slots": [
+              {
+                "text": "[HA:sensor.ground_power]W ",
+                "duration": 10
+              }
+            ],
+            "color_enabled": false,
+            "scroll": false
+          },
+          "instanced": 1,
+          "name": "W"
+        },
+        {
+          "id": "tw_4",
+          "enabled": 1,
+          "x": 14,
+          "y": 73,
+          "z": 2,
+          "options": {
+            "family": 0,
+            "size": 8,
+            "show_units": true,
+            "tabular": false,
+            "transparent": false,
+            "color": "#ffffff",
+            "bg_color": "#000000",
+            "width": 50,
+            "align": 2,
+            "slots": [
+              {
+                "text": " [HA:climate.playroom:current_temperature]°C  ",
+                "duration": 10
+              }
+            ],
+            "color_enabled": false,
+            "scroll": false
+          },
+          "instanced": 1,
+          "name": "°C"
+        },
+        {
+          "id": "tw_5",
+          "enabled": 1,
+          "x": 64,
+          "y": 82,
+          "z": 3,
+          "options": {
+            "family": 0,
+            "size": 8,
+            "show_units": true,
+            "tabular": false,
+            "transparent": false,
+            "color": "#ffffff",
+            "bg_color": "#ff0000",
+            "width": 50,
+            "align": 0,
+            "slots": [
+              {
+                "text": "[HA:sensor.living_kitchen_power]W ",
+                "duration": 10
+              }
+            ],
+            "color_enabled": false,
+            "scroll": false
+          },
+          "instanced": 1,
+          "name": "W"
+        },
+        {
+          "id": "tw_6",
+          "enabled": 1,
+          "x": 14,
+          "y": 82,
+          "z": 4,
+          "options": {
+            "family": 0,
+            "size": 8,
+            "show_units": true,
+            "tabular": false,
+            "transparent": false,
+            "color": "#ffffff",
+            "bg_color": "#ff0000",
+            "width": 50,
+            "align": 2,
+            "slots": [
+              {
+                "text": " [HA:climate.living_room:current_temperature]°C  ",
+                "duration": 10
+              }
+            ],
+            "color_enabled": false,
+            "scroll": false
+          },
+          "instanced": 1,
+          "name": "°C"
+        },
+        {
+          "id": "tw_7",
+          "enabled": 1,
+          "x": 64,
+          "y": 91,
+          "z": 4,
+          "options": {
+            "family": 0,
+            "size": 8,
+            "show_units": true,
+            "tabular": false,
+            "transparent": false,
+            "color": "#ffffff",
+            "bg_color": "#000000",
+            "width": 50,
+            "align": 0,
+            "slots": [
+              {
+                "text": "[HA:sensor.2nd_rooms_power]W ",
+                "duration": 10
+              }
+            ],
+            "color_enabled": false,
+            "scroll": false
+          },
+          "instanced": 1,
+          "name": "W"
+        },
+        {
+          "id": "tw_8",
+          "enabled": 1,
+          "x": 14,
+          "y": 91,
+          "z": 4,
+          "options": {
+            "family": 0,
+            "size": 8,
+            "show_units": true,
+            "tabular": false,
+            "transparent": false,
+            "color": "#ffffff",
+            "bg_color": "#000000",
+            "width": 50,
+            "align": 2,
+            "slots": [
+              {
+                "text": " [HA:climate.master:current_temperature]°C  ",
+                "duration": 10
+              }
+            ],
+            "color_enabled": false,
+            "scroll": false
+          },
+          "instanced": 1,
+          "name": "°C"
+        }
+      ],
+      "scroll_text": "[device]: [greeting] [day], [date] [mon], now [temp] today [high]-[low], hum. [hum], sun [rise]-[set]",
+      "weather_theme": 0
+    },
+    "night": {
+      "elements": [
+        {
+          "id": "glucose_level",
+          "enabled": 1,
+          "x": 45,
+          "y": 11,
+          "z": 4
+        },
+        {
+          "id": "glucose_trend",
+          "enabled": 1,
+          "x": 34,
+          "y": 17,
+          "z": 4
+        },
+        {
+          "id": "wifi_off",
+          "enabled": 1,
+          "x": 39,
+          "y": 11,
+          "z": 4
+        },
+        {
+          "id": "weather",
+          "enabled": 1,
+          "x": 58,
+          "y": 9,
+          "z": 3
+        },
+        {
+          "id": "moon",
+          "enabled": 1,
+          "x": 90,
+          "y": 17,
+          "z": 3
+        },
+        {
+          "id": "graph",
+          "enabled": 0,
+          "x": 0,
+          "y": 0,
+          "z": 0,
+          "options": {
+            "color": "#ffffff",
+            "bg_color": "#000000",
+            "token": "",
+            "interval_min": 5,
+            "points": 60,
+            "gwidth": 80,
+            "gheight": 36,
+            "autoscale": false,
+            "show_axis": false,
+            "show_xaxis": false,
+            "band_on": false,
+            "show_value": false,
+            "boolean": false,
+            "thick": false,
+            "band_low": null,
+            "band_high": null,
+            "y_min": null,
+            "y_max": null,
+            "band_color": "#283c28",
+            "warn_color": "#ff5050",
+            "axis_color": "#787878"
+          }
+        },
+        {
+          "id": "icon_1",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2,
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "icon_2",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2,
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "icon_3",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2,
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "icon_4",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2,
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "icon_5",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2,
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "icon_6",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2,
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "icon_7",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2,
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "icon_8",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2,
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "tw_1",
+          "enabled": 1,
+          "x": 23,
+          "y": 31,
+          "z": 1,
+          "options": {
+            "family": 5,
+            "size": 36,
+            "show_units": false,
+            "tabular": false,
+            "transparent": false,
+            "color": "#ffffff",
+            "bg_color": "#000000",
+            "width": 0,
+            "align": 0,
+            "slots": [
+              {
+                "text": "[clock]",
+                "duration": 10
+              }
+            ],
+            "color_enabled": false,
+            "scroll": false
+          },
+          "instanced": 1,
+          "name": "Clock"
+        },
+        {
+          "id": "tw_2",
+          "enabled": 0,
+          "x": 4,
+          "y": 34,
+          "z": 2,
+          "options": {
+            "family": 0,
+            "size": 16,
+            "show_units": true,
+            "tabular": true,
+            "transparent": false,
+            "color": "#ffffff",
+            "color_enabled": false,
+            "bg_color": "#000000",
+            "width": 0,
+            "align": 0,
+            "scroll": false,
+            "slots": [
+              {
+                "text": "",
+                "duration": 10
+              }
+            ]
+          },
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "tw_3",
+          "enabled": 1,
+          "x": 64,
+          "y": 73,
+          "z": 1,
+          "options": {
+            "family": 0,
+            "size": 8,
+            "show_units": true,
+            "tabular": false,
+            "transparent": false,
+            "color": "#ffffff",
+            "bg_color": "#000000",
+            "width": 50,
+            "align": 0,
+            "slots": [
+              {
+                "text": "[HA:sensor.ground_power]W ",
+                "duration": 10
+              }
+            ],
+            "color_enabled": false,
+            "scroll": false
+          },
+          "instanced": 1,
+          "name": "W"
+        },
+        {
+          "id": "tw_4",
+          "enabled": 1,
+          "x": 14,
+          "y": 73,
+          "z": 2,
+          "options": {
+            "family": 0,
+            "size": 8,
+            "show_units": true,
+            "tabular": false,
+            "transparent": false,
+            "color": "#ffffff",
+            "bg_color": "#000000",
+            "width": 50,
+            "align": 2,
+            "slots": [
+              {
+                "text": " [HA:climate.playroom:current_temperature]°C  ",
+                "duration": 10
+              }
+            ],
+            "color_enabled": false,
+            "scroll": false
+          },
+          "instanced": 1,
+          "name": "°C"
+        },
+        {
+          "id": "tw_5",
+          "enabled": 1,
+          "x": 64,
+          "y": 82,
+          "z": 3,
+          "options": {
+            "family": 0,
+            "size": 8,
+            "show_units": true,
+            "tabular": false,
+            "transparent": false,
+            "color": "#ffffff",
+            "bg_color": "#ff0000",
+            "width": 50,
+            "align": 0,
+            "slots": [
+              {
+                "text": "[HA:sensor.living_kitchen_power]W ",
+                "duration": 10
+              }
+            ],
+            "color_enabled": false,
+            "scroll": false
+          },
+          "instanced": 1,
+          "name": "W"
+        },
+        {
+          "id": "tw_6",
+          "enabled": 1,
+          "x": 14,
+          "y": 82,
+          "z": 4,
+          "options": {
+            "family": 0,
+            "size": 8,
+            "show_units": true,
+            "tabular": false,
+            "transparent": false,
+            "color": "#ffffff",
+            "bg_color": "#ff0000",
+            "width": 50,
+            "align": 2,
+            "slots": [
+              {
+                "text": " [HA:climate.living_room:current_temperature]°C  ",
+                "duration": 10
+              }
+            ],
+            "color_enabled": false,
+            "scroll": false
+          },
+          "instanced": 1,
+          "name": "°C"
+        },
+        {
+          "id": "tw_7",
+          "enabled": 1,
+          "x": 64,
+          "y": 91,
+          "z": 4,
+          "options": {
+            "family": 0,
+            "size": 8,
+            "show_units": true,
+            "tabular": false,
+            "transparent": false,
+            "color": "#ffffff",
+            "bg_color": "#000000",
+            "width": 50,
+            "align": 0,
+            "slots": [
+              {
+                "text": "[HA:sensor.2nd_rooms_power]W ",
+                "duration": 10
+              }
+            ],
+            "color_enabled": false,
+            "scroll": false
+          },
+          "instanced": 1,
+          "name": "W"
+        },
+        {
+          "id": "tw_8",
+          "enabled": 1,
+          "x": 14,
+          "y": 91,
+          "z": 4,
+          "options": {
+            "family": 0,
+            "size": 8,
+            "show_units": true,
+            "tabular": false,
+            "transparent": false,
+            "color": "#ffffff",
+            "bg_color": "#000000",
+            "width": 50,
+            "align": 2,
+            "slots": [
+              {
+                "text": " [HA:climate.master:current_temperature]°C  ",
+                "duration": 10
+              }
+            ],
+            "color_enabled": false,
+            "scroll": false
+          },
+          "instanced": 1,
+          "name": "°C"
+        }
+      ],
+      "scroll_text": "[device]: [greeting] [day], [date] [mon], now [temp] today [high]-[low], hum. [hum], sun [rise]-[set]",
+      "weather_theme": 0
+    }
+  }
+}

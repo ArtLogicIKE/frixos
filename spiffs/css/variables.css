@@ -34,6 +34,9 @@
   --switch-off:rgba(140,148,160,.32);
   --knob:radial-gradient(60% 60% at 38% 30%, #ffffff, #dde0e5);
   --net-bg:rgba(255,255,255,.45);
+  --palette-menu-bg:#ffffff;
+  --font-card-bg:#ffffff;
+  --font-card-selected-bg:#eaf7ff;
   --net-border:rgba(255,255,255,.72);
   --ctrl-bg:rgba(255,255,255,.6);
   --code-bg:rgba(255,255,255,.6);
@@ -60,6 +63,9 @@
   --switch-off:#252b34;
   --knob:radial-gradient(60% 60% at 38% 30%, #ffffff, #cfd4db);
   --net-bg:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.015));
+  --palette-menu-bg:#151a22;
+  --font-card-bg:#171c24;
+  --font-card-selected-bg:#102a38;
   --net-border:rgba(255,255,255,.08);
   --ctrl-bg:rgba(255,255,255,.05);
   --code-bg:rgba(255,255,255,.05);

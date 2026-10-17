@@ -1,0 +1,702 @@
+{
+  "version": 12,
+  "scroll_delay": 65,
+  "day_font": "bold",
+  "night_font": "light",
+  "day_aux_font": "bold",
+  "night_aux_font": "light",
+  "day_color_filter": 0,
+  "night_color_filter": 0,
+  "w": 128,
+  "h": 128,
+  "profiles": {
+    "day": {
+      "scroll_text": "[device]: [greeting] [day], [date] [mon], now [temp] today [high]-[low], hum. [hum], sun [rise]-[set]",
+      "elements": [
+        {
+          "id": "glucose_level",
+          "enabled": 1,
+          "x": 26,
+          "y": 20,
+          "z": 4
+        },
+        {
+          "id": "glucose_trend",
+          "enabled": 1,
+          "x": 40,
+          "y": 28,
+          "z": 4
+        },
+        {
+          "id": "wifi_off",
+          "enabled": 1,
+          "x": 23,
+          "y": 22,
+          "z": 4
+        },
+        {
+          "id": "weather",
+          "enabled": 1,
+          "x": 48,
+          "y": 20,
+          "z": 0
+        },
+        {
+          "id": "moon",
+          "enabled": 1,
+          "x": 86,
+          "y": 26,
+          "z": 3
+        },
+        {
+          "id": "icon_1",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2,
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "icon_2",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2,
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "icon_3",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2,
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "icon_4",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2,
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "icon_5",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2,
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "icon_6",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2,
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "icon_7",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2,
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "icon_8",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2,
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "graph",
+          "enabled": 0,
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        {
+          "id": "tw_1",
+          "enabled": 1,
+          "x": 32,
+          "y": 42,
+          "z": 1,
+          "options": {
+            "family": 4,
+            "size": 36,
+            "show_units": false,
+            "tabular": false,
+            "transparent": false,
+            "color": "#ffffff",
+            "bg_color": "#000000",
+            "width": 0,
+            "align": 1,
+            "slots": [
+              {
+                "text": "[clock]",
+                "duration": 10
+              }
+            ],
+            "color_enabled": false,
+            "scroll": false
+          },
+          "instanced": 1,
+          "name": "Clock"
+        },
+        {
+          "id": "tw_2",
+          "enabled": 1,
+          "x": 93,
+          "y": 65,
+          "z": 2,
+          "options": {
+            "family": 0,
+            "size": 12,
+            "show_units": true,
+            "tabular": false,
+            "transparent": true,
+            "color": "#ffffff",
+            "bg_color": "#000000",
+            "width": 0,
+            "align": 0,
+            "slots": [
+              {
+                "text": "[ampm12]",
+                "duration": 10
+              }
+            ],
+            "color_enabled": false,
+            "scroll": false
+          },
+          "instanced": 1,
+          "name": "AM/PM"
+        },
+        {
+          "id": "tw_3",
+          "enabled": 1,
+          "x": 0,
+          "y": 82,
+          "z": 0,
+          "options": {
+            "family": 0,
+            "size": 10,
+            "show_units": true,
+            "tabular": false,
+            "transparent": false,
+            "color": "#ffffff",
+            "bg_color": "#000000",
+            "width": 128,
+            "align": 0,
+            "scroll": true,
+            "slots": [
+              {
+                "text": "",
+                "duration": 10
+              }
+            ],
+            "color_enabled": false
+          },
+          "name": "Scroll",
+          "instanced": 1
+        },
+        {
+          "id": "tw_4",
+          "enabled": 0,
+          "x": 4,
+          "y": 94,
+          "z": 2,
+          "options": {
+            "family": 0,
+            "size": 16,
+            "show_units": true,
+            "tabular": true,
+            "transparent": false,
+            "color": "#ffffff",
+            "bg_color": "#000000",
+            "width": 0,
+            "align": 0,
+            "slots": [
+              {
+                "text": "",
+                "duration": 10
+              }
+            ],
+            "color_enabled": false,
+            "scroll": false
+          },
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "tw_5",
+          "enabled": 0,
+          "x": 4,
+          "y": 4,
+          "z": 2,
+          "options": {
+            "family": 0,
+            "size": 16,
+            "show_units": true,
+            "tabular": true,
+            "transparent": false,
+            "color": "#ffffff",
+            "bg_color": "#000000",
+            "width": 0,
+            "align": 0,
+            "slots": [
+              {
+                "text": "",
+                "duration": 10
+              }
+            ],
+            "color_enabled": false,
+            "scroll": false
+          },
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "tw_6",
+          "enabled": 0,
+          "x": 4,
+          "y": 34,
+          "z": 2,
+          "options": {
+            "family": 0,
+            "size": 16,
+            "show_units": true,
+            "tabular": true,
+            "transparent": false,
+            "color": "#ffffff",
+            "bg_color": "#000000",
+            "width": 0,
+            "align": 0,
+            "slots": [
+              {
+                "text": "",
+                "duration": 10
+              }
+            ],
+            "color_enabled": false,
+            "scroll": false
+          },
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "tw_7",
+          "enabled": 0,
+          "x": 4,
+          "y": 64,
+          "z": 2,
+          "options": {
+            "family": 0,
+            "size": 16,
+            "show_units": true,
+            "tabular": true,
+            "transparent": false,
+            "color": "#ffffff",
+            "bg_color": "#000000",
+            "width": 0,
+            "align": 0,
+            "slots": [
+              {
+                "text": "",
+                "duration": 10
+              }
+            ],
+            "color_enabled": false,
+            "scroll": false
+          },
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "tw_8",
+          "enabled": 0,
+          "x": 4,
+          "y": 94,
+          "z": 2,
+          "options": {
+            "family": 0,
+            "size": 16,
+            "show_units": true,
+            "tabular": true,
+            "transparent": false,
+            "color": "#ffffff",
+            "bg_color": "#000000",
+            "width": 0,
+            "align": 0,
+            "slots": [
+              {
+                "text": "",
+                "duration": 10
+              }
+            ],
+            "color_enabled": false,
+            "scroll": false
+          },
+          "instanced": 0,
+          "name": ""
+        }
+      ],
+      "weather_theme": 0
+    },
+    "night": {
+      "scroll_text": "[device]: [greeting] [day], [date] [mon], now [temp] today [high]-[low], hum. [hum], sun [rise]-[set]",
+      "elements": [
+        {
+          "id": "glucose_level",
+          "enabled": 1,
+          "x": 26,
+          "y": 20,
+          "z": 4
+        },
+        {
+          "id": "glucose_trend",
+          "enabled": 1,
+          "x": 40,
+          "y": 28,
+          "z": 4
+        },
+        {
+          "id": "wifi_off",
+          "enabled": 1,
+          "x": 23,
+          "y": 22,
+          "z": 4
+        },
+        {
+          "id": "weather",
+          "enabled": 1,
+          "x": 48,
+          "y": 20,
+          "z": 0
+        },
+        {
+          "id": "moon",
+          "enabled": 1,
+          "x": 86,
+          "y": 26,
+          "z": 3
+        },
+        {
+          "id": "icon_1",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2,
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "icon_2",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2,
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "icon_3",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2,
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "icon_4",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2,
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "icon_5",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2,
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "icon_6",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2,
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "icon_7",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2,
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "icon_8",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2,
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "graph",
+          "enabled": 0,
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        {
+          "id": "tw_1",
+          "enabled": 1,
+          "x": 31,
+          "y": 45,
+          "z": 1,
+          "options": {
+            "family": 5,
+            "size": 36,
+            "show_units": false,
+            "tabular": false,
+            "transparent": false,
+            "color": "#ffffff",
+            "bg_color": "#000000",
+            "width": 0,
+            "align": 1,
+            "slots": [
+              {
+                "text": "[clock]",
+                "duration": 10
+              }
+            ],
+            "color_enabled": false,
+            "scroll": false
+          },
+          "instanced": 1,
+          "name": "Clock"
+        },
+        {
+          "id": "tw_2",
+          "enabled": 1,
+          "x": 91,
+          "y": 66,
+          "z": 2,
+          "options": {
+            "family": 0,
+            "size": 12,
+            "show_units": true,
+            "tabular": false,
+            "transparent": true,
+            "color": "#ffffff",
+            "bg_color": "#000000",
+            "width": 0,
+            "align": 0,
+            "slots": [
+              {
+                "text": "[ampm12]",
+                "duration": 10
+              }
+            ],
+            "color_enabled": false,
+            "scroll": false
+          },
+          "instanced": 1,
+          "name": "AM/PM"
+        },
+        {
+          "id": "tw_3",
+          "enabled": 1,
+          "x": 0,
+          "y": 82,
+          "z": 0,
+          "options": {
+            "family": 0,
+            "size": 10,
+            "show_units": true,
+            "tabular": false,
+            "transparent": false,
+            "color": "#ffffff",
+            "bg_color": "#000000",
+            "width": 128,
+            "align": 0,
+            "scroll": true,
+            "slots": [
+              {
+                "text": "",
+                "duration": 10
+              }
+            ],
+            "color_enabled": false
+          },
+          "name": "Scroll",
+          "instanced": 1
+        },
+        {
+          "id": "tw_4",
+          "enabled": 0,
+          "x": 4,
+          "y": 94,
+          "z": 2,
+          "options": {
+            "family": 0,
+            "size": 16,
+            "show_units": true,
+            "tabular": true,
+            "transparent": false,
+            "color": "#ffffff",
+            "bg_color": "#000000",
+            "width": 0,
+            "align": 0,
+            "slots": [
+              {
+                "text": "",
+                "duration": 10
+              }
+            ],
+            "color_enabled": false,
+            "scroll": false
+          },
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "tw_5",
+          "enabled": 0,
+          "x": 4,
+          "y": 4,
+          "z": 2,
+          "options": {
+            "family": 0,
+            "size": 16,
+            "show_units": true,
+            "tabular": true,
+            "transparent": false,
+            "color": "#ffffff",
+            "bg_color": "#000000",
+            "width": 0,
+            "align": 0,
+            "slots": [
+              {
+                "text": "",
+                "duration": 10
+              }
+            ],
+            "color_enabled": false,
+            "scroll": false
+          },
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "tw_6",
+          "enabled": 0,
+          "x": 4,
+          "y": 34,
+          "z": 2,
+          "options": {
+            "family": 0,
+            "size": 16,
+            "show_units": true,
+            "tabular": true,
+            "transparent": false,
+            "color": "#ffffff",
+            "bg_color": "#000000",
+            "width": 0,
+            "align": 0,
+            "slots": [
+              {
+                "text": "",
+                "duration": 10
+              }
+            ],
+            "color_enabled": false,
+            "scroll": false
+          },
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "tw_7",
+          "enabled": 0,
+          "x": 4,
+          "y": 64,
+          "z": 2,
+          "options": {
+            "family": 0,
+            "size": 16,
+            "show_units": true,
+            "tabular": true,
+            "transparent": false,
+            "color": "#ffffff",
+            "bg_color": "#000000",
+            "width": 0,
+            "align": 0,
+            "slots": [
+              {
+                "text": "",
+                "duration": 10
+              }
+            ],
+            "color_enabled": false,
+            "scroll": false
+          },
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "tw_8",
+          "enabled": 0,
+          "x": 4,
+          "y": 94,
+          "z": 2,
+          "options": {
+            "family": 0,
+            "size": 16,
+            "show_units": true,
+            "tabular": true,
+            "transparent": false,
+            "color": "#ffffff",
+            "bg_color": "#000000",
+            "width": 0,
+            "align": 0,
+            "slots": [
+              {
+                "text": "",
+                "duration": 10
+              }
+            ],
+            "color_enabled": false,
+            "scroll": false
+          },
+          "instanced": 0,
+          "name": ""
+        }
+      ],
+      "weather_theme": 0
+    }
+  }
+}

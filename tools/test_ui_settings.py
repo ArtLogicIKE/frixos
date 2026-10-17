@@ -80,8 +80,6 @@ EXPECTED_SCREEN = {
     "p08": 1,
     "p24": 1,
     "p50": 1,
-    "p58": '[{"t":2,"d":15}]',
-    "p59": '[{"t":0,"d":20}]',
 }
 
 
@@ -166,6 +164,130 @@ def check_ui(observed: dict, failures: list[str]) -> None:
             fail("screen save omitted %s (expected %r)" % (key, expected), failures)
         elif not same(screen[key], expected):
             fail("screen %s: expected %r, got %r" % (key, expected, screen[key]), failures)
+
+    check_widgets(observed.get("widgets"), failures)
+
+    def find_translation(node: object, key: str) -> str | None:
+        if isinstance(node, dict):
+            if isinstance(node.get(key), str):
+                return node[key]
+            for value in node.values():
+                found = find_translation(value, key)
+                if found is not None:
+                    return found
+        return None
+
+    for locale in ("da", "de", "en", "es", "fr", "it", "pl", "pt", "sv"):
+        try:
+            translations = json.loads((ROOT / "spiffs" / "i18n" / f"language_{locale}.json").read_text(encoding="utf-8"))
+            message = translations["advanced"]["message"]
+        except (OSError, KeyError, json.JSONDecodeError) as exc:
+            fail("%s translations could not be checked: %s" % (locale, exc), failures)
+            continue
+        if "(+3 @ 12:01)" in message.get("token_cgm_glucose", ""):
+            fail("%s CGM glucose help still advertises a trend/time suffix" % locale, failures)
+        width_label = find_translation(translations, "text_width") or ""
+        if "0 = " not in width_label or any(term in width_label.lower() for term in ("no limit", "sans limite", "kein limit", "sin límite", "nessun limite", "bez limitu", "sem limite", "ingen gräns", "ingen grænse")):
+            fail("%s width label does not describe automatic sizing" % locale, failures)
+
+
+def check_widgets(w: dict | None, failures: list[str]) -> None:
+    if not isinstance(w, dict):
+        fail("harness produced no widget results", failures)
+        return
+
+    def expect(label: str, got, expected) -> None:
+        if got != expected:
+            fail("widgets %s: expected %r, got %r" % (label, expected, got), failures)
+
+    factory = w.get("factory") or {}
+    expect("factory clock defaults", factory.get("clock"), {"name": "Clock", "width": 0, "align": 1, "height": 40})
+    expect("default canvas template clock defaults", w.get("templateClock"), {"name": "Clock", "width": 0, "align": 1})
+    expect("preset widget name omits its token", w.get("templateWeatherName"), "Now")
+    expect("factory AMPM defaults", factory.get("ampm"), {"name": "AMPM", "width": 25, "height": 15})
+    expect("factory scroll widget is full width", factory.get("scroll"),
+           {"name": "Scroll", "enabled": 1, "scroll": True, "width": 128})
+    expect("user theme font upload is stored without its prefix", w.get("userThemeUploadPath"),
+           "themes/user1/font.jpg")
+    expect("theme preview upload is stored as preview.jpg", w.get("themePreviewUploadPath"),
+           "themes/bold/preview.jpg")
+    expect("nested layout name hides its folder", w.get("layoutDisplayName"), "Default")
+    expect("nested layout URL preserves its path separator", w.get("layoutFileUrl"), "/layouts/Default.layout")
+    expect("layouts folder accepts saved layouts", w.get("nestedLayoutSaveName"), "layouts/Default.layout")
+    expect("layout traversal is rejected", w.get("layoutTraversalRejected"), True)
+    expect("nested shipped layout takes precedence over legacy root copy", w.get("layoutNames"),
+           ["custom.layout", "layouts/Default.layout"])
+    if not 0 < w.get("autoWidth", 0) < 100:
+        fail("zero-width widget does not fit its content (width=%r)" % w.get("autoWidth"), failures)
+    expect("empty text height uses the selected font", w.get("emptyHeight"), w.get("emptyLineHeight"))
+    expect("empty token expands to empty", w.get("emptyTokenSample"), "")
+    expect("empty token height uses the selected font", w.get("emptyTokenHeight"), w.get("emptyLineHeight"))
+    if w.get("centerShiftAfterSizeChange", 99) > 0.5:
+        fail("auto-width font change moved the widget center by %r px" % w.get("centerShiftAfterSizeChange"), failures)
+    expect("text widget settings sections", w.get("optionSectionTitles"), ["General", "Font", "Text"])
+    expect("font groups remain identifiable without heading-level styling", w.get("fontGroupLabels"),
+           ["Text fonts", "Digit themes"])
+    expect("font group labels are not section headings", w.get("fontGroupLabelTags"), ["DIV", "DIV"])
+    expect("content caption is not a section heading", w.get("contentsLabelTag"), "SPAN")
+    expect("enabled setting is in General", w.get("enabledSection"), "General")
+    expect("scroll setting is in General", w.get("scrollSection"), "General")
+    expect("width setting is in General", w.get("widthSection"), "General")
+    expect("font picker is in Font", w.get("fontSectionHasPicker"), True)
+    expect("text editor is in Text", w.get("textSection"), "Text")
+    expect("default font color mode", w.get("defaultColorMode"), "default")
+    expect("custom font color can be enabled", w.get("customColorEnabled"), True)
+    expect("none removes the custom font color", w.get("colorModeAfterNone"), False)
+    expect("standard widgets have no delete option button", w.get("standardDeleteButton"), False)
+    expect("instanced text widgets have a delete option button", w.get("instanceDeleteButton"), True)
+    expect("trash drop area is detected", w.get("trashZone"), True)
+    expect("dragging a widget to the trash deletes its instance", w.get("deletedByDrop"), 0)
+    expect("dragging a standard widget to the trash disables it", w.get("disabledByTrash"), 0)
+    expect("weather theme defaults to screen theme", w.get("weatherThemeDefault"), "0")
+    expect("weather theme can be overridden", w.get("weatherThemeSelected"), 4)
+
+    initial = w.get("paletteInitial") or []
+    expect("palette lists only instances (no add entries)", [i for i in initial if i in ("text", "icon")], [])
+    expect("palette keeps the disabled instance", "tw_2" in initial, True)
+    expect("palette hides unused slots", "tw_3" in initial, False)
+
+    cards = w.get("fontCards") or []
+    expect("font picker has no profile/aux theme or missing user fonts",
+           [c for c in cards if "theme" in c.lower() or c in ("User1", "User2")], [])
+    expect("font picker keeps the built-in themes", "Nixie" in cards and "Bold" in cards, True)
+    expect("active font is highlighted when selected", w.get("activeFontBeforeChange"), "Sans")
+    expect("active font highlight follows font changes", w.get("activeFontAfterChange"), "Nixie")
+
+    typed = "[hour24][colon][min]"
+    expect("text after typing and a font change", w.get("textAfterFontChange"), typed)
+    expect("stored text after typing and a font change", w.get("textStoredAfterFontChange"), typed)
+    expect("digit theme selected", w.get("familyAfterFontChange"), 7)  # SPRITE_FIRST + nixie
+
+    added = w.get("added") or {}
+    expect("added widget", [added.get("selected"), added.get("enabled"), added.get("instanced"), added.get("name"), added.get("x")],
+           ["tw_3", 1, 1, "Text 3", 24])
+    if not 50 <= added.get("y", -1) <= 58:
+        fail("added widget is not vertically centred (y=%r)" % added.get("y"), failures)
+    expect("name clamped to 15 bytes", w.get("renamed"), "Température é")
+    expect("palette label is the name", w.get("paletteLabel"), "Température é")
+    expect("deleted widget leaves the palette", "tw_3" in (w.get("paletteAfterDelete") or []), False)
+    expect("deleted widget is no longer an instance", w.get("deletedInstanced"), 0)
+
+    expect("24h clock tokens", w.get("clock24"), "15:07")
+    expect("12h clock tokens", w.get("clock12"), "03:07pm")
+    expect("12h clock without leading zero", w.get("clock12NoZero"), "3:07")
+    expect("units stripped", w.get("stripped"), "72")
+    expect("unknown token kept", w.get("unknown"), "[bogus]")
+
+    wire = w.get("wire") or {}
+    expect("wire size", wire.get("size"), wire.get("expected"))
+    expect("wire size value", wire.get("size"), 5634)
+    expect("weather theme override survives the wire", wire.get("weatherThemeDay"), 4)
+    expect("other profile keeps inherited weather theme", wire.get("weatherThemeNight"), 0)
+    expect("disabled instance survives the wire", wire.get("tw2"), {"enabled": 0, "instanced": 1, "name": "Off one"})
+    expect("custom color override survives the wire", w.get("colorOverrideWire"), {"enabled": True, "color": "#ff4020"})
+    expect("version 3 wire still decodes", w.get("v3Decoded"), True)
+    expect("version 3 custom color remains custom", w.get("v3ColorOverride"), True)
+    expect("version 2 wire still decodes", w.get("v2Decoded"), True)
 
 
 def macros() -> dict[str, int]:

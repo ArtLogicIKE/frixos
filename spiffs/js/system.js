@@ -31,41 +31,7 @@ async function loadStatus() {
   if (typeof updateIntegrationDots === 'function') updateIntegrationDots();
 }
 /* The System tab hosts status, files, update and restart. */
-sectionLoaders.status = function () { loadStatus(); loadFiles(); loadScrollEngine(); };
-
-/* Scrolling-line engine. Applies immediately, like the auto-update switch. */
-function applyScrollEngine(engine) {
-  const frixos = Number(engine) !== 0;
-  const lvglBtn = el('scrollEngineLvgl');
-  const frixosBtn = el('scrollEngineFrixos');
-  if (!lvglBtn || !frixosBtn) return;
-  lvglBtn.classList.toggle('active', !frixos);
-  frixosBtn.classList.toggle('active', frixos);
-  lvglBtn.setAttribute('aria-pressed', !frixos ? 'true' : 'false');
-  frixosBtn.setAttribute('aria-pressed', frixos ? 'true' : 'false');
-}
-async function loadScrollEngine() {
-  const res = await apiGet('/api/settings?params=p67');
-  if (!res.data || res.data.p67 == null) return;
-  window.settings.p67 = res.data.p67;
-  applyScrollEngine(res.data.p67);
-}
-document.querySelectorAll('#scrollEngine .seg-btn').forEach(btn => {
-  btn.addEventListener('click', async () => {
-    const p67 = parseInt(btn.dataset.engine, 10) === 0 ? 0 : 1;
-    if (Number(window.settings.p67) === p67) return;
-    const previous = window.settings.p67;
-    window.settings.p67 = p67;
-    applyScrollEngine(p67);
-    const res = await apiPostJson('/api/settings', { p67 });
-    if (res.ok && res.data && res.data.status === 'ok') toast(getMessage('settings_saved'), 'ok');
-    else {
-      window.settings.p67 = previous;
-      applyScrollEngine(previous == null ? 1 : previous);
-      toast(getMessage('save_failed'), 'err');
-    }
-  });
-});
+sectionLoaders.status = function () { loadStatus(); loadFiles(); };
 el('refreshStatus').addEventListener('click', () => { loadStatus(); toast(getMessage('status_refreshed'), 'ok'); });
 el('supportCopy').addEventListener('click', async () => {
   try { await navigator.clipboard.writeText(JSON.stringify(window.statusData || {}, null, 2)); toast(getMessage('info_copied_clipboard'), 'ok'); }
@@ -127,6 +93,22 @@ el('filesRename').addEventListener('click', async () => {
 
 /* ---------- UPDATE ---------- */
 const fwFile = el('fwFile'), uploadBtn = el('uploadBtn');
+const THEME_UPLOAD_NAMES = new Set([
+  'default', 'bold', 'light', 'lcd', 'nixie', 'robrito', 'ficasso',
+  'lichten', 'kablame', 'kablamo', 'kaboom', 'text', 'user1', 'user2'
+]);
+function themeUploadPath(filename) {
+  const prefixed = /^([a-z0-9]+)-([a-z0-9-]+)\.(bmp|jpe?g)$/i.exec(filename);
+  if (prefixed && THEME_UPLOAD_NAMES.has(prefixed[1].toLowerCase())) {
+    const ext = prefixed[3].toLowerCase() === 'bmp' ? 'bmp' : 'jpg';
+    return `themes/${prefixed[1].toLowerCase()}/${prefixed[2].toLowerCase()}.${ext}`;
+  }
+  const preview = /^([a-z0-9]+)\.jpe?g$/i.exec(filename);
+  if (preview && THEME_UPLOAD_NAMES.has(preview[1].toLowerCase())) {
+    return `themes/${preview[1].toLowerCase()}/preview.jpg`;
+  }
+  return filename;
+}
 fwFile.addEventListener('change', () => { uploadBtn.disabled = !fwFile.files.length; });
 uploadBtn.addEventListener('click', () => {
   const file = fwFile.files[0]; if (!file) return;
@@ -134,7 +116,7 @@ uploadBtn.addEventListener('click', () => {
   wrap.style.display = 'block'; uploadBtn.disabled = true;
   const xhr = new XMLHttpRequest();
   xhr.open('POST', '/api/ota', true);
-  xhr.setRequestHeader('X-Filename', file.name);
+  xhr.setRequestHeader('X-Filename', themeUploadPath(file.name));
   xhr.upload.addEventListener('progress', e => { if (e.lengthComputable) { const p = Math.round(e.loaded / e.total * 100); fill.style.width = p + '%'; txt.textContent = p + '%'; } });
   xhr.addEventListener('load', () => {
     let d = {}; try { d = JSON.parse(xhr.responseText); } catch (e) { }

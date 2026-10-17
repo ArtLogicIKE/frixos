@@ -59,6 +59,29 @@ const SCREEN_TIME_FONTS = [
     'bold', 'light', 'lcd', 'nixie', 'robrito', 'ficasso',
     'lichten', 'kablame', 'kablamo', 'kaboom', 'user1', 'user2'
 ];
+/* Unified text widgets (firmware f-text-widget.h). Family 0/1 are bitmap fonts,
+   2 = profile digit theme, 3 = profile aux theme, 4+ = SCREEN_TIME_FONTS[family - 4]. */
+const SCREEN_TW_IDS = ['tw_1', 'tw_2', 'tw_3', 'tw_4', 'tw_5', 'tw_6', 'tw_7', 'tw_8'];
+const SCREEN_TW_TEXT_LEN = 64;
+const SCREEN_TW_SLOTS = 3;           // contents a widget can rotate through
+const SCREEN_TW_DURATION_DEFAULT = 10;
+const SCREEN_TW_DURATION_MAX = 3600;
+const SCREEN_TW_SIZE_MIN = 8;
+const SCREEN_TW_SIZE_MAX = 36;
+const SCREEN_TW_SIZES = [8, 10, 12, 14, 16, 20, 24, 28, 32, 36]; // generated bitmap sizes
+const SCREEN_TW_FAMILY = { SANS: 0, BOLD: 1, SPRITE_THEME: 2, SPRITE_AUX: 3, SPRITE_FIRST: 4 };
+const SCREEN_TW_FLAG = { SHOW_UNITS: 0x01, TABULAR: 0x02, TRANSPARENT_BG: 0x04, COLOR_OVERRIDE: 0x08, SCROLL: 0x10 };
+// [line_height, base_line, cap_height] of main/fonts/tw_<family>_<size>.c. Sans also has the
+// 40-52 sizes the device uses for units next to digit sprites.
+const SCREEN_TW_METRICS = {
+    0: { 8: [10, 2, 5], 10: [11, 2, 7], 12: [16, 3, 9], 14: [18, 3, 10], 16: [21, 4, 12], 20: [22, 4, 14], 24: [26, 5, 17], 28: [29, 5, 20], 32: [33, 6, 22], 36: [37, 7, 25], 40: [43, 8, 29], 44: [48, 9, 31], 48: [50, 9, 34], 52: [55, 10, 37] },
+    1: { 8: [11, 2, 6], 10: [14, 3, 7], 12: [16, 4, 9], 14: [18, 4, 10], 16: [20, 5, 12], 20: [21, 5, 15], 24: [26, 6, 17], 28: [31, 7, 20], 32: [35, 9, 23], 36: [38, 9, 26] }
+};
+// Web copies of the two text fonts (spiffs/tw-*.woff), so previews look like the device.
+const SCREEN_TW_CSS_FONTS = {
+    0: { family: "TWSans, Montserrat, 'Segoe UI', Arial, sans-serif", weight: '500' },
+    1: { family: "TWBold, 'DejaVu Sans', Verdana, sans-serif", weight: '700' }
+};
 const SCREEN_COLOR_FILTER_OPTIONS = [
     { v: 0, key: 'advanced.color_filter.none', label: 'None' },
     { v: 1, key: 'advanced.color_filter.red', label: 'Red' },
@@ -67,19 +90,6 @@ const SCREEN_COLOR_FILTER_OPTIONS = [
     { v: 4, key: 'advanced.color_filter.bw', label: 'Black & White' }
 ];
 const SCREEN_DEFAULT_SCROLL_TEXT = '[device]: [greeting] [day], [date] [mon], now [temp] today [high]-[low], hum. [hum], sun [rise]-[set]';
-const SCREEN_DEFAULT_STATIC_TEXTS = {
-    text_1: 'UV [uv]',
-    text_2: '[pressure]',
-    text_3: 'Wind [wind]',
-    text_4: 'Gust [gust]',
-    text_5: 'Rain [precip]',
-    text_6: '',
-    text_7: '',
-    text_8: '',
-    digit_label: '',
-    digit_label_aux: ''
-};
-const SCREEN_TEXT_SLOT_MAX = 8;
 const SCREEN_PALETTE_LABEL_MAX = 24;
 const SCREEN_TOKEN_CODES = [
     '[device]', '[greeting]', '[day]', '[date]', '[mon]', '[time]', '[hour12]', '[hour24]', '[min]', '[ampm]',
@@ -114,7 +124,7 @@ const TOKEN_HELP = {
     '[3low]': { i18nKey: 'advanced.message.token_3low', example: '58°F' },
     '[HA:entity_id:path]': { i18nKey: 'advanced.message.token_ha', example: '72' },
     '[$:symbol]': { i18nKey: 'advanced.message.token_stock', example: '$182.45' },
-    '[CGM:glucose]': { i18nKey: 'advanced.message.token_cgm_glucose', example: '157 mg/dl (+3 @ 12:01)' },
+    '[CGM:glucose]': { i18nKey: 'advanced.message.token_cgm_glucose', example: '157 mg/dL' },
     '[CGM:reading]': { i18nKey: 'advanced.message.token_cgm_reading', example: '157' },
     '[CGM:time]': { i18nKey: 'advanced.message.token_cgm_time', example: '12:01pm' },
     '[wu:temp]': { i18nKey: 'advanced.message.token_wu_temp', example: '72°F' },
@@ -124,7 +134,8 @@ const TOKEN_HELP = {
     '[wu:gust]': { i18nKey: 'advanced.message.token_wu_gust', example: '17.9 mph NW' },
     '[wu:pressure]': { i18nKey: 'advanced.message.token_wu_pressure', example: '29.92 inHg' },
     '[wu:rain]': { i18nKey: 'advanced.message.token_wu_rain', example: '0.06 in.' },
-    '[wu:uv]': { i18nKey: 'advanced.message.token_wu_uv', example: '6.2' }
+    '[wu:uv]': { i18nKey: 'advanced.message.token_wu_uv', example: '6.2' },
+    '[colon]': { i18nKey: 'screen.tw_token_colon', example: ':' }
 };
 
 function getTokenCode(btn) {
@@ -317,6 +328,8 @@ function getScreenTranslation(key, fallback) {
 }
 
 function getScreenElementLabel(id) {
+    const named = getScreenInstanceName(id);
+    if (named) return named;
     const def = findElementDef(id);
     return getScreenTranslation(`screen.elements.${id}`, def ? def.label : id);
 }
@@ -504,8 +517,7 @@ const SCREEN_THEME_ASSETS = {
     glucose_trend: 'trend',
     wifi_off: 'wifi-off',
     weather: 'weather',
-    moon: 'moon',
-    ampm: 'ampm'
+    moon: 'moon'
 };
 
 window.screenSpiffsFileSet = null;
@@ -529,12 +541,20 @@ function getScreenLayoutFileNames() {
     const names = (window.screenSpiffsFileList || [])
         .map(f => f.name)
         .filter(name => name && name.toLowerCase().endsWith('.layout'));
-    return [...new Set(names)].sort((a, b) => a.localeCompare(b));
+    const nestedBasenames = new Set(names
+        .filter(name => name.includes('/'))
+        .map(name => name.split('/').pop().toLowerCase()));
+    return [...new Set(names.filter(name => name.includes('/') || !nestedBasenames.has(name.toLowerCase())))]
+        .sort((a, b) => a.localeCompare(b));
 }
 
 // Human-facing name for a .layout file: extension stripped, separators spaced.
 function screenLayoutDisplayName(name) {
-    return name.replace(/\.layout$/i, '').replace(/[-_]/g, ' ');
+    return name.split('/').pop().replace(/\.layout$/i, '').replace(/[-_]/g, ' ');
+}
+
+function screenFileUrl(name) {
+    return '/' + name.split('/').map(part => encodeURIComponent(part)).join('/');
 }
 
 // Fill a <select> with "Current" (value '') followed by every .layout file on
@@ -624,7 +644,7 @@ async function applySettingsLayoutToDevice() {
     try {
         toggleLoading(btn, true);
         showStatus(getMessage('saving_settings'), 'info');
-        const response = await fetch('/' + encodeURIComponent(filename));
+        const response = await fetch(screenFileUrl(filename));
         if (!response.ok) { showStatus(getMessage('layout_read_invalid'), 'error'); return; }
         const data = await response.json();
         if (!data || !data.profiles) { showStatus(getMessage('layout_read_invalid'), 'error'); return; }
@@ -636,8 +656,8 @@ async function applySettingsLayoutToDevice() {
         ensureScreenProfileShape(layout.profiles.night);
 
         const body = encodeScreenLayoutBinary(layout);
-        if (body.byteLength !== SCREEN_BIN_WIRE_SIZE) {
-            throw new Error(`screen wire size mismatch: ${body.byteLength} != ${SCREEN_BIN_WIRE_SIZE}`);
+        if (body.byteLength !== SCREEN_BIN_FULL_WIRE_SIZE) {
+            throw new Error(`screen wire size mismatch: ${body.byteLength} != ${SCREEN_BIN_FULL_WIRE_SIZE}`);
         }
         const post = await fetch('/api/screen', {
             method: 'POST',
@@ -673,20 +693,27 @@ function hasSpiffsFile(name) {
 
 function resolveThemeAssetUrl(theme, item) {
     for (const ext of ['bmp', 'jpg']) {
-        const themed = `${theme}-${item}.${ext}`;
+        const themed = `themes/${theme}/${item}.${ext}`;
         if (hasSpiffsFile(themed)) return themed;
+        const legacy = `${theme}-${item}.${ext}`;
+        if (hasSpiffsFile(legacy)) return legacy;
     }
     for (const ext of ['bmp', 'jpg']) {
-        const fallback = `default-${item}.${ext}`;
+        const fallback = `themes/default/${item}.${ext}`;
         if (hasSpiffsFile(fallback)) return fallback;
+        const legacy = `default-${item}.${ext}`;
+        if (hasSpiffsFile(legacy)) return legacy;
     }
     return 'logo.jpg';
 }
 
 function resolveTimeFontPreviewUrl(font) {
-    if (hasSpiffsFile(`${font}.jpg`)) return `${font}.jpg`;
-    if (font === 'user1' || font === 'user2') return 'bold.jpg';
-    return `${font}.jpg`;
+    const preview = `themes/${font}/preview.jpg`;
+    if (hasSpiffsFile(preview)) return preview;
+    const legacy = `${font}.jpg`;
+    if (hasSpiffsFile(legacy)) return legacy;
+    if (font === 'user1' || font === 'user2') return 'themes/bold/preview.jpg';
+    return preview;
 }
 
 function getScreenAuxFont(mode) {
@@ -698,14 +725,6 @@ function getScreenAuxFont(mode) {
 
 function getPreviewImageUrl(def, inMatrix) {
     if (!inMatrix && def.paletteImg) return def.paletteImg;
-    if (def.id === 'time') {
-        const font = inMatrix ? getScreenTimeFont(window.screenEditor.mode) : 'bold';
-        return resolveTimeFontPreviewUrl(font);
-    }
-    if (def.id === 'time_aux') {
-        const font = inMatrix ? getScreenAuxFont(window.screenEditor.mode) : 'bold';
-        return resolveTimeFontPreviewUrl(font);
-    }
     if (isScreenIconElement(def.id)) {
         // Show the uploaded JPG only once it has loaded (dims cached); until then
         // return null so the placeholder "Icon N" label is shown instead.
@@ -714,32 +733,21 @@ function getPreviewImageUrl(def, inMatrix) {
     }
     const item = SCREEN_THEME_ASSETS[def.id];
     if (item && inMatrix) {
-        return resolveThemeAssetUrl(getScreenTimeFont(window.screenEditor.mode), item);
+        const theme = def.id === 'weather'
+            ? getScreenWeatherFont(window.screenEditor.mode)
+            : getScreenTimeFont(window.screenEditor.mode);
+        return resolveThemeAssetUrl(theme, item);
     }
     return def.img;
 }
 
 const SCREEN_ELEMENT_DEFS = [
-    { id: 'glucose_level', label: 'Glucose Level', w: 14, h: 20, img: 'default-glucose.jpg', paletteImg: 'palette-glucose.png', paletteFitFullImage: true, spriteSheet: { index: 2, frames: 4 } },
-    { id: 'glucose_trend', label: 'Glucose Trend', w: 12, h: 14, img: 'default-trend.jpg', paletteImg: 'palette-trend.png', paletteFitFullImage: true, spriteSheet: { index: 2, frames: 5 } },
-    { id: 'wifi_off', label: 'WiFi off', w: 20, h: 20, img: 'default-wifi-off.jpg', paletteImg: 'palette-wifi-off.png', paletteFitFullImage: true },
-    { id: 'weather', label: 'Weather', w: 32, h: 22, img: 'default-weather.jpg' },
-    { id: 'moon', label: 'Moon', w: 14, h: 14, img: 'default-moon.jpg', paletteImg: 'palette-moon.jpg', paletteFitFullImage: true, spriteSheet: { index: 2, frames: 8 } },
-    { id: 'time', label: 'Digit Display', w: 80, h: 36, img: 'bold.jpg', paletteFitFullImage: true },
-    { id: 'digit_label', label: 'Digit Label', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.digit_label, img: 'bold-digit-label.jpg', paletteFitFullImage: true },
-    { id: 'time_aux', label: 'Digit Display (Aux)', w: 80, h: 36, img: 'bold.jpg', paletteFitFullImage: true },
-    { id: 'digit_label_aux', label: 'Digit Label (Aux)', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.digit_label_aux, img: 'bold-digit-label.jpg', paletteFitFullImage: true },
-    { id: 'ampm', label: 'AM/PM', w: 10, h: 20, img: 'default-ampm.jpg' },
-    { id: 'message', label: 'Scrolling Message', w: 128, h: 8, dynamicHeight: true, text: SCREEN_PREVIEW_MESSAGE, paletteImg: 'palette-message.png', paletteFitFullImage: true },
-    { id: 'text_1', label: 'Text 1', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.text_1 },
-    { id: 'text_2', label: 'Text 2', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.text_2 },
-    { id: 'text_3', label: 'Text 3', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.text_3 },
-    { id: 'text_4', label: 'Text 4', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.text_4 },
-    { id: 'text_5', label: 'Text 5', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.text_5 },
-    { id: 'text_6', label: 'Text 6', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.text_6 },
-    { id: 'text_7', label: 'Text 7', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.text_7 },
-    { id: 'text_8', label: 'Text 8', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.text_8 },
-    { id: 'graph', label: 'Graph', w: 80, h: 36, img: 'default-graph.jpg', paletteImg: 'palette-graph.png', paletteFitFullImage: true },
+    { id: 'glucose_level', label: 'Glucose Level', w: 14, h: 20, img: 'themes/default/glucose.jpg', paletteImg: 'palette-glucose.png', paletteFitFullImage: true, spriteSheet: { index: 2, frames: 4 } },
+    { id: 'glucose_trend', label: 'Glucose Trend', w: 12, h: 14, img: 'themes/default/trend.jpg', paletteImg: 'palette-trend.png', paletteFitFullImage: true, spriteSheet: { index: 2, frames: 5 } },
+    { id: 'wifi_off', label: 'WiFi off', w: 20, h: 20, img: 'themes/default/wifi-off.jpg', paletteImg: 'palette-wifi-off.png', paletteFitFullImage: true },
+    { id: 'weather', label: 'Weather', w: 32, h: 22, img: 'themes/default/weather.jpg' },
+    { id: 'moon', label: 'Moon', w: 14, h: 14, img: 'themes/default/moon.jpg', paletteImg: 'palette-moon.jpg', paletteFitFullImage: true, spriteSheet: { index: 2, frames: 8 } },
+    { id: 'graph', label: 'Graph', w: 80, h: 36, img: 'themes/default/graph.jpg', paletteImg: 'palette-graph.png', paletteFitFullImage: true },
     { id: 'icon_1', label: 'Icon 1', w: 24, h: 24, isIcon: true, paletteFitFullImage: true },
     { id: 'icon_2', label: 'Icon 2', w: 24, h: 24, isIcon: true, paletteFitFullImage: true },
     { id: 'icon_3', label: 'Icon 3', w: 24, h: 24, isIcon: true, paletteFitFullImage: true },
@@ -747,65 +755,43 @@ const SCREEN_ELEMENT_DEFS = [
     { id: 'icon_5', label: 'Icon 5', w: 24, h: 24, isIcon: true, paletteFitFullImage: true },
     { id: 'icon_6', label: 'Icon 6', w: 24, h: 24, isIcon: true, paletteFitFullImage: true },
     { id: 'icon_7', label: 'Icon 7', w: 24, h: 24, isIcon: true, paletteFitFullImage: true },
-    { id: 'icon_8', label: 'Icon 8', w: 24, h: 24, isIcon: true }
+    { id: 'icon_8', label: 'Icon 8', w: 24, h: 24, isIcon: true },
+    { id: 'tw_1', label: 'Text 1', w: 80, h: 21 },
+    { id: 'tw_2', label: 'Text 2', w: 80, h: 21 },
+    { id: 'tw_3', label: 'Text 3', w: 80, h: 21 },
+    { id: 'tw_4', label: 'Text 4', w: 80, h: 21 },
+    { id: 'tw_5', label: 'Text 5', w: 80, h: 21 },
+    { id: 'tw_6', label: 'Text 6', w: 80, h: 21 },
+    { id: 'tw_7', label: 'Text 7', w: 80, h: 21 },
+    { id: 'tw_8', label: 'Text 8', w: 80, h: 21 }
 ];
 
 const SCREEN_ELEMENT_DEFS_MAP = new Map(SCREEN_ELEMENT_DEFS.map(d => [d.id, d]));
 
-const SCREEN_TEXT_SLOT_IDS = ['text_1', 'text_2', 'text_3', 'text_4', 'text_5', 'text_6', 'text_7', 'text_8'];
-
-const SCREEN_PALETTE_TEXT_DEF = {
-    id: 'text',
-    label: 'New Text Line',
-    w: 80,
-    h: 8,
-    dynamicHeight: true
-};
-
 const SCREEN_ICON_SLOT_IDS = ['icon_1', 'icon_2', 'icon_3', 'icon_4', 'icon_5', 'icon_6', 'icon_7', 'icon_8'];
 const SCREEN_ICON_MAX_DIM = 64; // must match firmware SCREEN_ICON_MAX_DIM
-
-const SCREEN_PALETTE_ICON_DEF = {
-    id: 'icon',
-    label: 'New Icon',
-    w: 24,
-    h: 24,
-    isIcon: true
-};
 
 const SCREEN_PALETTE_SETTINGS_DEF = {
     id: 'screen_settings',
     label: 'Screen settings',
     w: 32,
     h: 32,
-    img: 'default-settings.jpg',
+    img: 'themes/default/settings.jpg',
     paletteFitFullImage: true,
     paletteMeta: true
 };
 
 const SCREEN_PALETTE_ORDER = [
     'screen_settings',
-    'time',
-    'digit_label',
-    'ampm',
-    'message',
-    'time_aux',
-    'digit_label_aux',
     'weather',
     'moon',
     'wifi_off',
     'glucose_level',
     'glucose_trend',
-    'graph',
-    'text',
-    'icon'
+    'graph'
 ];
 
 const SCREEN_ALIGNMENT_GRID_LINES = [20, 30, 40, 90, 100, 110];
-
-function getPaletteNewTextIconLabel() {
-    return getScreenTranslation('screen.palette_text_icon', 'Text');
-}
 
 function truncatePaletteLabel(text, maxLen = SCREEN_PALETTE_LABEL_MAX) {
     const s = (text || '').trim();
@@ -813,24 +799,35 @@ function truncatePaletteLabel(text, maxLen = SCREEN_PALETTE_LABEL_MAX) {
     return s.length > maxLen ? s.slice(0, maxLen) + '\u2026' : s;
 }
 
-function getStaticTextContent(profile, id) {
-    if (!profile) return '';
-    if (profile.static_texts && profile.static_texts[id] !== undefined) {
-        return profile.static_texts[id];
-    }
-    return SCREEN_DEFAULT_STATIC_TEXTS[id] || '';
+// User-given name of a text/icon widget instance in the current profile ('' when unnamed).
+function getScreenInstanceName(id) {
+    if (!isScreenTextWidgetElement(id) && !isScreenIconElement(id)) return '';
+    const e = screenFindProfileElement(getProfileObj(window.screenEditor.mode), id);
+    return e && typeof e.name === 'string' ? e.name.trim() : '';
 }
 
 function getTextPaletteLabel(profile, id) {
+    const name = getScreenInstanceName(id);
+    if (name) return name;
     const emptyLabel = getScreenTranslation('screen.empty_text_label', '(empty)');
-    const content = getStaticTextContent(profile, id).trim();
-    return truncatePaletteLabel(content) || emptyLabel;
+    const e = screenFindProfileElement(profile, id);
+    return screenDefaultTextWidgetName(e) || emptyLabel;
+}
+
+function screenDefaultTextWidgetName(e) {
+    if (!e || !isScreenTextWidgetElement(e.id)) return '';
+    const options = ensureScreenTwOptions(e);
+    if (options.scroll) return 'Scroll';
+    const template = String((options.slots[0] && options.slots[0].text) || '').trim();
+    if (/\[clock\]/i.test(template)) return 'Clock';
+    if (/\[(?:ampm12|ampm)\]/i.test(template)) return 'AM/PM';
+    const plain = template.replace(/\[[^\]]+\]/g, ' ').replace(/\s+/g, ' ')
+        .replace(/^[\s:;,./-]+|[\s:;,./-]+$/g, '').trim();
+    return screenClampUtf8(plain || `Text ${e.id.split('_')[1]}`, SCREEN_BIN_NAME_LEN - 1);
 }
 
 function getScreenPaletteItemLabel(def, profile) {
-    if (def.id === 'text') return getScreenElementLabel('text');
-    if (def.id === 'icon') return getScreenElementLabel('icon');
-    if (isScreenStaticTextElement(def.id) && profile) return getTextPaletteLabel(profile, def.id);
+    if (isScreenTextWidgetElement(def.id) && profile) return getTextPaletteLabel(profile, def.id);
     return getScreenElementLabel(def.id);
 }
 
@@ -838,22 +835,18 @@ function isPaletteItemSelected(def) {
     return window.screenEditor.selectedId === def.id;
 }
 
+// A slot is free when it was never added, or was deleted again.
+function isScreenSlotFree(profile, id) {
+    const elem = profile && profile.elements ? profile.elements.find(e => e.id === id) : null;
+    return !elem || (!elem.instanced && !elem.enabled);
+}
+
 function getNextTextSlot(profile) {
-    if (!profile || !profile.elements) return SCREEN_TEXT_SLOT_IDS[0];
-    for (const id of SCREEN_TEXT_SLOT_IDS) {
-        const elem = profile.elements.find(e => e.id === id);
-        if (!elem || !elem.enabled) return id;
-    }
-    return null;
+    return SCREEN_TW_IDS.find(id => isScreenSlotFree(profile, id)) || null;
 }
 
 function getNextIconSlot(profile) {
-    if (!profile || !profile.elements) return SCREEN_ICON_SLOT_IDS[0];
-    for (const id of SCREEN_ICON_SLOT_IDS) {
-        const elem = profile.elements.find(e => e.id === id);
-        if (!elem || !elem.enabled) return id;
-    }
-    return null;
+    return SCREEN_ICON_SLOT_IDS.find(id => isScreenSlotFree(profile, id)) || null;
 }
 
 function isScreenIconElement(id) {
@@ -875,35 +868,16 @@ function getScreenPaletteDefs() {
             items.push(SCREEN_PALETTE_SETTINGS_DEF);
             return;
         }
-        if (id === 'text') {
-            if (getNextTextSlot(profile) !== null) {
-                items.push(SCREEN_PALETTE_TEXT_DEF);
-            }
-            return;
-        }
-        if (id === 'icon') {
-            if (getNextIconSlot(profile) !== null) {
-                items.push(SCREEN_PALETTE_ICON_DEF);
-            }
-            return;
-        }
         const def = findElementDef(id);
-        if (def && !isScreenStaticTextElement(def.id) && !isScreenIconElement(def.id)) {
+        if (def && !isScreenTextWidgetElement(def.id) && !isScreenIconElement(def.id)) {
             items.push(def);
         }
     });
 
     if (profile) {
-        SCREEN_TEXT_SLOT_IDS.forEach(id => {
+        SCREEN_INSTANCE_IDS.forEach(id => {
             const elem = profile.elements.find(e => e.id === id);
-            if (elem && elem.enabled) {
-                const def = findElementDef(id);
-                if (def) items.push({ ...def });
-            }
-        });
-        SCREEN_ICON_SLOT_IDS.forEach(id => {
-            const elem = profile.elements.find(e => e.id === id);
-            if (elem && elem.enabled) {
+            if (elem && (elem.instanced || elem.enabled)) {
                 const def = findElementDef(id);
                 if (def) items.push({ ...def });
             }
@@ -936,30 +910,8 @@ function setScreenGridEnabled(enabled) {
     window.settings.p08 = enabled ? 1 : 0;
 }
 
-function resolvePaletteElementId(paletteId, profile) {
-    if (paletteId === 'text') return getNextTextSlot(profile);
-    if (paletteId === 'icon') return getNextIconSlot(profile);
-    return paletteId;
-}
-
-function isScreenDigitLabelElement(id) {
-    return id === 'digit_label' || id === 'digit_label_aux';
-}
-
 function isScreenTextElement(id) {
-    return id === 'message' || /^text_[1-8]$/.test(id) || isScreenDigitLabelElement(id);
-}
-
-function isScreenStaticTextElement(id) {
-    return /^text_[1-8]$/.test(id);
-}
-
-function isScreenClippedTextElement(id) {
-    return isScreenStaticTextElement(id) || isScreenDigitLabelElement(id);
-}
-
-function getDigitLabelTextKey(id) {
-    return id;
+    return id === 'message';
 }
 
 function ensureScreenTextOptions(element) {
@@ -967,14 +919,930 @@ function ensureScreenTextOptions(element) {
     if (element.options.font === undefined || element.options.font === 255) element.options.font = 0;
     if (!element.options.color) element.options.color = '#ffffff';
     if (!element.options.bg_color) element.options.bg_color = '#000000';
-    if (isScreenStaticTextElement(element.id)) {
-        if (element.options.width === undefined) element.options.width = 80;
-        if (element.options.align === undefined) element.options.align = 0;
+}
+
+/* ---------- unified text widgets (tw_1..tw_8) ---------- */
+function isScreenTextWidgetElement(id) {
+    return /^tw_[1-8]$/.test(id);
+}
+
+function twIsSprite(family) {
+    return family >= SCREEN_TW_FAMILY.SPRITE_THEME;
+}
+
+// Device picks the largest generated bitmap size <= the requested one.
+function twBitmapSize(size) {
+    let s = SCREEN_TW_SIZES[0];
+    SCREEN_TW_SIZES.forEach(v => { if (v <= size) s = v; });
+    return s;
+}
+
+function twMetrics(family, size) {
+    return SCREEN_TW_METRICS[family === SCREEN_TW_FAMILY.BOLD ? 1 : 0][twBitmapSize(size)];
+}
+
+// Sans font the device uses for units/letters next to sprite digits: capitals as tall as
+// the digit ink (about 34/36 of the cell height). Mirrors font_registry_match_cap().
+function twSpriteFallbackEm(size) {
+    const cap = Math.round(size * 34 / 36);
+    let best = 8;
+    let bestDiff = 1e9;
+    Object.keys(SCREEN_TW_METRICS[0]).forEach(k => {
+        const d = Math.abs(SCREEN_TW_METRICS[0][k][2] - cap);
+        if (d < bestDiff) { bestDiff = d; best = parseInt(k, 10); }
+    });
+    return best;
+}
+
+function twSpriteTheme(family, mode) {
+    if (family === SCREEN_TW_FAMILY.SPRITE_THEME) return getScreenTimeFont(mode);
+    if (family === SCREEN_TW_FAMILY.SPRITE_AUX) return getScreenAuxFont(mode);
+    return SCREEN_TIME_FONTS[family - SCREEN_TW_FAMILY.SPRITE_FIRST] || 'bold';
+}
+
+// Sprite digits sit on the baseline of the cap-matched sans fallback (units, letters).
+function twLineHeight(o) {
+    if (twIsSprite(o.family)) return o.size + SCREEN_TW_METRICS[0][twSpriteFallbackEm(o.size)][1];
+    return twMetrics(o.family, o.size)[0];
+}
+
+function twMeasureTextBounds(text, family, size) {
+    const css = SCREEN_TW_CSS_FONTS[family] || SCREEN_TW_CSS_FONTS[0];
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext && canvas.getContext('2d');
+    const metrics = SCREEN_TW_METRICS[family === SCREEN_TW_FAMILY.BOLD ? 1 : 0][size] || twMetrics(family, size);
+    if (!context) return {
+        width: Math.ceil([...String(text)].length * size * 0.6),
+        ascent: metrics[2], descent: 0
+    };
+    context.font = `${css.weight} ${size}px ${css.family}`;
+    const measured = context.measureText(String(text));
+    return {
+        width: Math.max(1, Math.ceil(measured.width)),
+        ascent: Number.isFinite(measured.actualBoundingBoxAscent) ? measured.actualBoundingBoxAscent : metrics[2],
+        descent: Number.isFinite(measured.actualBoundingBoxDescent) ? measured.actualBoundingBoxDescent : 0
+    };
+}
+
+function twMeasureTextWidth(text, family, size) {
+    return twMeasureTextBounds(text, family, size).width;
+}
+
+function twContentHeight(o, text) {
+    const value = String(text || '');
+    if (!value.trim()) return twLineHeight(o);
+    if (!twIsSprite(o.family)) {
+        const bounds = twMeasureTextBounds(value, o.family, twBitmapSize(o.size));
+        return Math.max(1, Math.ceil(bounds.ascent + bounds.descent));
     }
-    if (isScreenDigitLabelElement(element.id)) {
-        if (element.options.width === undefined) element.options.width = 80;
-        if (element.options.align === undefined) element.options.align = 0;
+
+    let top = Infinity;
+    let bottom = -Infinity;
+    if (/[0-9:.]/.test(value)) {
+        top = 0;
+        bottom = o.size;
     }
+    const fallbackText = value.replace(/[0-9:.]/g, '');
+    if (fallbackText) {
+        const bounds = twMeasureTextBounds(fallbackText, SCREEN_TW_FAMILY.SANS, twSpriteFallbackEm(o.size));
+        top = Math.min(top, o.size - bounds.ascent);
+        bottom = Math.max(bottom, o.size + bounds.descent);
+    }
+    return Number.isFinite(top) ? Math.max(1, Math.ceil(bottom - top)) : 1;
+}
+
+function twWidgetHeight(o, text) {
+    return twContentHeight(o, text) + 4;
+}
+
+function twContentWidth(o, text) {
+    if (!twIsSprite(o.family)) return twMeasureTextWidth(text, o.family, twBitmapSize(o.size));
+    const px = v => Math.round(v * o.size / 36);
+    const digitWidth = Math.max(1, px(18));
+    const separatorWidth = px(1) * 2 + Math.max(1, px(4));
+    const fallbackSize = twSpriteFallbackEm(o.size);
+    let width = 0;
+    for (const ch of String(text)) {
+        if (ch >= '0' && ch <= '9') width += digitWidth;
+        else if (ch === ':' || ch === '.') width += separatorWidth;
+        else width += twMeasureTextWidth(ch, 0, fallbackSize);
+    }
+    return Math.max(1, width);
+}
+
+function updateTwFontAndCenter(e, o, update) {
+    const autoWidth = o.width === 0;
+    const def = findElementDef(e.id);
+    const centerX = autoWidth
+        ? (e.x || 0) + getScreenElementSize(def, e).w / 2
+        : 0;
+    update();
+    if (autoWidth) {
+        const width = getScreenElementSize(def, e).w;
+        e.x = clamp(Math.round(centerX - width / 2), 0, Math.max(0, SCREEN_SIZE - width));
+    }
+}
+
+function twDefaultOptions() {
+    return {
+        family: SCREEN_TW_FAMILY.SANS, size: 16, show_units: true, tabular: true, transparent: false,
+        color: '#ffffff', color_enabled: false, bg_color: '#000000', width: 0, align: 0, scroll: false,
+        slots: [{ text: '', duration: SCREEN_TW_DURATION_DEFAULT }]
+    };
+}
+
+function twDefaultElement(id) {
+    const i = Math.max(0, SCREEN_TW_IDS.indexOf(id));
+    return { id, enabled: 0, x: 4, y: 4 + (i % 4) * 30, z: 2, options: twDefaultOptions() };
+}
+
+function ensureScreenTwOptions(e) {
+    if (!e.options) e.options = {};
+    const o = e.options;
+    const d = twDefaultOptions();
+    const colorModeSpecified = o.color_enabled !== undefined;
+    for (const k in d) if (o[k] === undefined) o[k] = d[k];
+    if (!colorModeSpecified) o.color_enabled = o.color !== '#ffffff';
+    // Layout files written before rotation had a single `text`.
+    if (typeof o.text === 'string') {
+        if (!Array.isArray(o.slots) || !o.slots.length || (o.slots.length === 1 && !o.slots[0].text)) {
+            o.slots = [{ text: o.text, duration: SCREEN_TW_DURATION_DEFAULT }];
+        }
+        delete o.text;
+    }
+    if (!Array.isArray(o.slots) || !o.slots.length) o.slots = [{ text: '', duration: SCREEN_TW_DURATION_DEFAULT }];
+    o.slots = o.slots.slice(0, SCREEN_TW_SLOTS).map(s => (s && typeof s === 'object') ? s : {});
+    // In place: editor handlers keep references to these objects between renders.
+    o.slots.forEach(s => {
+        s.text = String(s.text || '');
+        s.duration = clamp(parseInt(s.duration, 10) || SCREEN_TW_DURATION_DEFAULT, 1, SCREEN_TW_DURATION_MAX);
+    });
+    o.size = clamp(parseInt(o.size, 10) || 16, SCREEN_TW_SIZE_MIN, SCREEN_TW_SIZE_MAX);
+    o.family = clamp(parseInt(o.family, 10) || 0, 0,
+        SCREEN_TW_FAMILY.SPRITE_FIRST + SCREEN_TIME_FONTS.length - 1);
+    o.scroll = !!o.scroll;
+    if (o.scroll) {
+        if (o.family > SCREEN_TW_FAMILY.BOLD) o.family = SCREEN_TW_FAMILY.SANS;
+        if (o.size > 20) o.size = 20;
+    }
+    return o;
+}
+
+// Longest prefix of `text` that fits a slot without cutting a [token] in half.
+function twFitSlotText(text) {
+    let s = String(text || '').slice(0, SCREEN_TW_TEXT_LEN - 1);
+    const open = s.lastIndexOf('[');
+    if (open > s.lastIndexOf(']') && s.length < String(text || '').length) s = s.slice(0, open);
+    return s;
+}
+
+// Slot being edited / previewed per widget (editor-only state).
+function twEditedSlot(e) {
+    const o = ensureScreenTwOptions(e);
+    const map = window.screenEditor.twSlot = window.screenEditor.twSlot || {};
+    return Math.min(map[e.id] || 0, o.slots.length - 1);
+}
+
+// Same rule as strip_units() in f-text-widget.c.
+function twStripUnits(value) {
+    const m = /^\s*([-+]?\d[\d.,:]*)/.exec(value);
+    return m ? m[1].replace(/[.,:]+$/, '') : value;
+}
+
+// Wall clock of the device (its IANA timezone when known) in the UI language.
+function twFormatDate(now, lang, opts) {
+    const tz = window.settings && window.settings.tz_iana ? String(window.settings.tz_iana) : undefined;
+    try {
+        return new Intl.DateTimeFormat(lang, Object.assign({ timeZone: tz }, opts)).format(now);
+    } catch (err) {
+        return new Intl.DateTimeFormat(lang, opts).format(now);
+    }
+}
+
+function twClock(now) {
+    const lang = (typeof currentLanguage === 'string' && currentLanguage) || 'en';
+    const num = opts => parseInt(twFormatDate(now, 'en-US', opts), 10);
+    return {
+        hour: num({ hour: 'numeric', hourCycle: 'h23' }) % 24,
+        min: num({ minute: 'numeric' }),
+        mday: num({ day: 'numeric' }),
+        weekday: twFormatDate(now, lang, { weekday: 'long' }),
+        month: twFormatDate(now, lang, { month: 'long' })
+    };
+}
+
+// Tokens the device never strips units from (see text_widget_render() in f-text-widget.c).
+const SCREEN_TW_RAW_TOKENS = new Set(['[colon]', '[clock]', '[ampm12]']);
+
+// Value of one token as the device would show it; null when the token is unknown.
+// Time, date and device tokens are live; data tokens (weather, CGM, ...) show their example.
+function twTokenValue(tok, clock) {
+    const s = window.settings || {};
+    const h12 = !!s.p37;
+    const lead = s.p24 === undefined ? true : !!s.p24;
+    const pad = n => String(n).padStart(2, '0');
+    const hour12 = clock.hour === 0 ? 12 : (clock.hour > 12 ? clock.hour - 12 : clock.hour);
+    const ampm = h12 ? (clock.hour >= 12 ? 'pm' : 'am') : '';
+    switch (tok) {
+        case '[colon]': return ':';
+        case '[clock]': {
+            const h = h12 ? hour12 : clock.hour;
+            return `${lead ? pad(h) : h}:${pad(clock.min)}`;
+        }
+        case '[ampm12]':
+        case '[ampm]': return ampm;
+        case '[hour12]': return String(hour12);
+        case '[hour24]': return pad(clock.hour);
+        case '[min]': return pad(clock.min);
+        case '[time]': return h12 ? `${hour12}:${pad(clock.min)}${ampm}` : `${pad(clock.hour)}:${pad(clock.min)}`;
+        case '[date]': return String(clock.mday);
+        case '[day]': return clock.weekday;
+        case '[mon]': return clock.month;
+        case '[device]': return s.p00 || TOKEN_HELP[tok].example;
+        default:
+            if (TOKEN_HELP[tok]) return TOKEN_HELP[tok].example;
+            return /^\[(HA|\$):/.test(tok) ? '42' : null;
+    }
+}
+
+// Expands the tokens of a template the way the device does before drawing it.
+function twExpandText(text, showUnits, now) {
+    const clock = twClock(now || new Date());
+    return String(text || '').replace(/\[[^\]\[]+\]/g, tok => {
+        const v = twTokenValue(tok, clock);
+        if (v === null) return tok;
+        return showUnits || SCREEN_TW_RAW_TOKENS.has(tok) ? v : twStripUnits(v);
+    });
+}
+
+function twSampleText(o, slot) {
+    return twExpandText((o.slots[slot || 0] || o.slots[0]).text, o.show_units);
+}
+
+// The canvas shows live values, so repaint when the expanded text of a visible widget changes.
+let screenTokenTicker = null;
+function refreshScreenTokenPreviews() {
+    const canvas = el('screenCanvas');
+    if (!window.screenLayout || !canvas || canvas.offsetParent === null || window.screenEditor.dragging) return;
+    const profile = getProfileObj(window.screenEditor.mode);
+    if (!profile || !Array.isArray(profile.elements)) return;
+    const sig = profile.elements
+        .filter(e => isScreenTextWidgetElement(e.id) && e.enabled)
+        .map(e => {
+            const o = ensureScreenTwOptions(e);
+            return `${e.id}=${o.scroll ? twExpandText(profile.scroll_text, o.show_units) : twSampleText(o, twEditedSlot(e))}`;
+        })
+        .join('\n');
+    if (sig === window.screenEditor.tokenSig) return;
+    window.screenEditor.tokenSig = sig;
+    renderScreenCanvas();
+}
+
+function startScreenTokenTicker() {
+    if (!screenTokenTicker) screenTokenTicker = setInterval(refreshScreenTokenPreviews, 1000);
+}
+
+function createTwPreview(def, inMatrix, e, matrixScale) {
+    const preview = document.createElement('div');
+    preview.className = `screen-preview screen-preview-tw ${inMatrix ? 'screen-preview-matrix' : 'screen-preview-palette'}`;
+    preview.setAttribute('aria-label', def.label);
+    if (!inMatrix || !e) {
+        applyPalettePreviewSize(preview, def);
+        const t = document.createElement('div');
+        t.className = 'screen-preview-text';
+        t.style.fontWeight = '700';
+        t.textContent = '12:34';
+        preview.appendChild(t);
+        return preview;
+    }
+
+    const o = ensureScreenTwOptions(e);
+    const s = matrixScale || getScreenScale();
+    const sprite = twIsSprite(o.family);
+    preview.style.display = 'flex';
+    preview.style.alignItems = 'flex-start';
+    preview.style.overflow = 'hidden';
+    preview.style.boxSizing = 'border-box';
+    preview.style.padding = `${2 * s}px 0`;
+    preview.style.justifyContent = ['flex-start', 'center', 'flex-end'][o.align] || 'flex-start';
+    preview.style.backgroundColor = sprite ? '#000000' : (o.transparent ? 'transparent' : o.bg_color);
+
+    const editedSlot = twEditedSlot(e);
+    const profile = getProfileObj(window.screenEditor.mode);
+    const hasTemplate = o.scroll || !!o.slots[editedSlot].text;
+    const sample = o.scroll
+        ? twExpandText(profile && profile.scroll_text, o.show_units)
+        : (hasTemplate ? twSampleText(o, editedSlot) : '');
+    const text = hasTemplate ? sample : getScreenElementLabel(def.id);
+    const contentH = twContentHeight(o, sample);
+    if (!sprite) {
+        const css = SCREEN_TW_CSS_FONTS[o.family] || SCREEN_TW_CSS_FONTS[0];
+        const span = document.createElement('div');
+        span.textContent = text;
+        span.style.fontFamily = css.family;
+        span.style.fontWeight = css.weight;
+        span.style.fontSize = `${twBitmapSize(o.size) * s}px`;
+        span.style.lineHeight = `${contentH * s}px`;
+        span.style.color = o.color_enabled ? o.color : '#ffffff';
+        span.style.whiteSpace = 'pre';
+        span.style.fontVariantNumeric = o.tabular ? 'tabular-nums' : 'normal';
+        preview.appendChild(span);
+        return preview;
+    }
+
+    // Sprite theme: slice the 180x36 sheet like the device does (cells reduced to size/36).
+    const theme = twSpriteTheme(o.family, window.screenEditor.mode);
+    const sheet = resolveThemeAssetUrl(theme, 'font');
+    const dot = resolveThemeAssetUrl(theme, 'dot');
+    const h = o.size;
+    const px = v => Math.round(v * h / 36);
+    const dw = Math.max(1, px(18));
+    const dotSize = Math.max(1, px(4));
+    const sepW = px(1) * 2 + dotSize;
+    const fallbackPx = twSpriteFallbackEm(h);
+    const row = document.createElement('div');
+    row.style.display = 'flex';
+    row.style.alignItems = 'baseline';
+    row.style.height = `${contentH * s}px`;
+    row.style.whiteSpace = 'pre';
+    for (const ch of text) {
+        const cell = document.createElement('div');
+        cell.style.flex = '0 0 auto';
+        if (ch >= '0' && ch <= '9') {
+            cell.style.width = `${dw * s}px`;
+            cell.style.height = `${h * s}px`;
+            cell.style.backgroundImage = `url('${sheet}')`;
+            cell.style.backgroundSize = `${dw * 10 * s}px ${h * s}px`;
+            cell.style.backgroundPosition = `${-(ch.charCodeAt(0) - 48) * dw * s}px 0`;
+        } else if (ch === ':' || ch === '.') {
+            cell.style.position = 'relative';
+            cell.style.width = `${sepW * s}px`;
+            cell.style.height = `${h * s}px`;
+            (ch === ':' ? [10, 26] : [30]).forEach(y => {
+                const d = document.createElement('div');
+                d.style.position = 'absolute';
+                d.style.left = `${px(1) * s}px`;
+                d.style.top = `${px(y) * s}px`;
+                d.style.width = d.style.height = `${dotSize * s}px`;
+                d.style.backgroundImage = `url('${dot}')`;
+                d.style.backgroundSize = '100% 100%';
+                cell.appendChild(d);
+            });
+        } else {
+            cell.textContent = ch;
+            cell.style.fontFamily = SCREEN_TW_CSS_FONTS[0].family;
+            cell.style.fontSize = `${fallbackPx * s}px`;
+            cell.style.lineHeight = '1';
+            cell.style.color = o.color_enabled ? o.color : '#ffffff';
+        }
+        row.appendChild(cell);
+    }
+    preview.appendChild(row);
+    return preview;
+}
+
+function appendScreenTwOptions(opt, e, profile, trans) {
+    const o = ensureScreenTwOptions(e);
+    const T = (k, d) => getNestedTranslation(trans, k) || d;
+    let sectionTarget = opt;
+    const mkRow = (labelText, control) => {
+        const row = document.createElement('div');
+        row.className = 'form-group';
+        const lab = document.createElement('label');
+        lab.textContent = labelText;
+        row.appendChild(lab);
+        row.appendChild(control);
+        sectionTarget.appendChild(row);
+        return control;
+    };
+    const mkSelect = (labelText, items, value, onCh) => {
+        const sel = document.createElement('select');
+        items.forEach(([v, t]) => {
+            const op = document.createElement('option');
+            op.value = String(v);
+            op.textContent = t;
+            sel.appendChild(op);
+        });
+        sel.value = String(value);
+        sel.addEventListener('change', () => onCh(parseInt(sel.value, 10) || 0));
+        return mkRow(labelText, sel);
+    };
+    const mkSection = title => {
+        const section = document.createElement('section');
+        section.className = 'screen-tw-section';
+        const heading = document.createElement('h4');
+        heading.className = 'screen-tw-section-title';
+        heading.textContent = title;
+        section.appendChild(heading);
+        opt.appendChild(section);
+        return section;
+    };
+    const generalSection = mkSection(T('screen.tw_section_general', 'General'));
+    const fontSection = mkSection(T('screen.tw_section_font', 'Font'));
+    const textSection = mkSection(T('screen.tw_section_text', 'Text'));
+    sectionTarget = generalSection;
+    appendScreenSwitchRow(generalSection, {
+        id: 'screen_element_enabled',
+        label: T('screen.enabled', 'Enabled'),
+        checked: e.enabled !== 0,
+        onChange: on => {
+            e.enabled = on ? 1 : 0;
+            renderScreenCanvas();
+            renderScreenPalette();
+        }
+    });
+    const scrolling = !!o.scroll;
+    appendScreenSwitchRow(generalSection, {
+        id: 'tw_scroll',
+        label: T('screen.tw_scroll', 'Scroll text'),
+        checked: scrolling,
+        onChange: on => {
+            o.scroll = on;
+            if (on) {
+                if (!profile.scroll_text) profile.scroll_text = o.slots[0].text || SCREEN_DEFAULT_SCROLL_TEXT;
+                profile.elements.forEach(other => {
+                    if (other.id !== e.id && isScreenTextWidgetElement(other.id))
+                        ensureScreenTwOptions(other).scroll = false;
+                });
+            } else if (!o.slots[0].text) {
+                // The long text may not fit a slot: keep its leading whole tokens.
+                o.slots[0].text = twFitSlotText(profile.scroll_text);
+            }
+            renderScreenCanvas();
+            renderScreenOptions();
+            renderScreenPalette();
+        }
+    });
+
+    const sprite = !scrolling && twIsSprite(o.family);
+
+    sectionTarget = fontSection;
+    appendScreenTwFontPicker(fontSection, o, T, e, scrolling);
+    if (sprite) {
+        // Sprites are reduced from 36 px, so any height in range is exact.
+        const inp = document.createElement('input');
+        inp.type = 'number';
+        inp.min = String(SCREEN_TW_SIZE_MIN);
+        inp.max = String(SCREEN_TW_SIZE_MAX);
+        inp.value = String(o.size);
+        inp.addEventListener('change', () => {
+            const size = clamp(parseInt(inp.value, 10) || 36, SCREEN_TW_SIZE_MIN, SCREEN_TW_SIZE_MAX);
+            updateTwFontAndCenter(e, o, () => { o.size = size; });
+            inp.value = String(o.size);
+            renderScreenCanvas();
+        });
+        mkRow(T('screen.tw_size', 'Size (px)'), inp);
+    } else {
+        const sizes = scrolling ? SCREEN_TW_SIZES.filter(v => v <= 20) : SCREEN_TW_SIZES;
+        mkSelect(T('screen.tw_size', 'Size (px)'), sizes.map(v => [v, `${v} px`]), twBitmapSize(o.size), v => {
+            updateTwFontAndCenter(e, o, () => { o.size = v; });
+            renderScreenCanvas();
+        });
+    }
+
+    const colorControl = document.createElement('div');
+    colorControl.className = 'screen-tw-color-control';
+    colorControl.setAttribute('role', 'radiogroup');
+    colorControl.setAttribute('aria-label', sprite
+        ? T('screen.tw_units_color', 'Units / text color')
+        : T('screen.message_color', 'Color'));
+    const makeColorChoice = (id, value, labelText, checked, onChange) => {
+        const label = document.createElement('label');
+        label.className = 'screen-tw-color-choice';
+        const radio = document.createElement('input');
+        radio.type = 'radio';
+        radio.name = 'tw_color_mode';
+        radio.id = id;
+        radio.value = value;
+        radio.checked = checked;
+        radio.addEventListener('change', () => {
+            if (radio.checked) onChange();
+        });
+        const text = document.createElement('span');
+        text.textContent = labelText;
+        label.appendChild(radio);
+        label.appendChild(text);
+        return label;
+    };
+    const color = document.createElement('input');
+    color.type = 'color';
+    color.value = o.color;
+    color.disabled = !o.color_enabled;
+    const defaultChoice = makeColorChoice(
+        'tw_color_mode_default', 'default', T('screen.tw_color_default', 'Default'),
+        !o.color_enabled, () => {
+            o.last_custom_color = o.color;
+            o.color = '#ffffff';
+            o.color_enabled = false;
+            color.disabled = true;
+            renderScreenCanvas();
+        });
+    const customGroup = document.createElement('div');
+    customGroup.className = 'screen-tw-color-custom';
+    const customChoice = makeColorChoice(
+        'tw_color_mode_custom', 'custom', T('screen.tw_color_custom', 'Custom'),
+        !!o.color_enabled, () => {
+            o.color = o.last_custom_color || color.value;
+            o.color_enabled = true;
+            color.disabled = false;
+            renderScreenCanvas();
+        });
+    color.addEventListener('input', () => {
+        o.color = color.value;
+        o.last_custom_color = color.value;
+        o.color_enabled = true;
+        renderScreenCanvas();
+    });
+    colorControl.appendChild(defaultChoice);
+    customGroup.appendChild(customChoice);
+    customGroup.appendChild(color);
+    colorControl.appendChild(customGroup);
+    mkRow(sprite ? T('screen.tw_units_color', 'Units / text color') : T('screen.message_color', 'Color'), colorControl);
+
+    if (sprite) {
+        const note = document.createElement('p');
+        note.className = 'screen-options-mode-note';
+        note.textContent = T('screen.tw_sprite_note',
+            'Digit themes keep their own colours on a black background; the colour applies to units and other characters.');
+        fontSection.appendChild(note);
+    }
+
+    sectionTarget = generalSection;
+    const width = document.createElement('input');
+    width.type = 'number';
+    width.min = '0';
+    width.max = String(SCREEN_SIZE);
+    width.value = String(o.width || 0);
+    width.addEventListener('change', () => {
+        o.width = clamp(parseInt(width.value, 10) || 0, 0, SCREEN_SIZE);
+        renderScreenCanvas();
+    });
+    mkRow(T('screen.text_width', 'Width (px, 0 = auto)'), width);
+
+    if (scrolling) {
+        const delay = document.createElement('input');
+        delay.type = 'number';
+        delay.min = '30';
+        delay.max = '255';
+        delay.value = String(window.screenLayout.scroll_delay || 60);
+        delay.addEventListener('change', () => {
+            window.screenLayout.scroll_delay = clamp(parseInt(delay.value, 10) || 60, 30, 255);
+        });
+        mkRow(T('screen.scroll_delay', 'Scroll delay (ms)'), delay);
+    }
+
+    sectionTarget = textSection;
+    appendScreenSwitchRow(textSection, {
+        id: 'tw_show_units',
+        label: T('screen.tw_show_units', 'Show units'),
+        checked: !!o.show_units,
+        onChange: on => { o.show_units = on; renderScreenCanvas(); }
+    });
+    mkSelect(T('screen.text_align', 'Alignment'), SCREEN_ALIGN_OPTIONS.map(a => [a.v, getScreenAlignLabel(a.v)]), o.align || 0, v => {
+        o.align = v;
+        renderScreenCanvas();
+    });
+
+    if (!sprite) {
+        appendScreenSwitchRow(textSection, {
+            id: 'tw_transparent',
+            label: T('screen.tw_transparent', 'Transparent background'),
+            checked: !!o.transparent,
+            onChange: on => { o.transparent = on; renderScreenCanvas(); renderScreenOptions(); }
+        });
+        if (!o.transparent) {
+            const bg = document.createElement('input');
+            bg.type = 'color';
+            bg.value = o.bg_color;
+            bg.addEventListener('input', () => { o.bg_color = bg.value; renderScreenCanvas(); });
+            mkRow(T('screen.background_color', 'Background Color'), bg);
+        }
+        appendScreenSwitchRow(textSection, {
+            id: 'tw_tabular',
+            label: T('screen.tw_tabular', 'Fixed-width digits'),
+            checked: !!o.tabular,
+            onChange: on => { o.tabular = on; renderScreenCanvas(); }
+        });
+    }
+
+    if (scrolling) {
+        const textArea = document.createElement('textarea');
+        textArea.id = 'editor-textarea-' + e.id;
+        textArea.maxLength = SCREEN_BIN_SCROLL_LEN - 1;
+        textArea.rows = 4;
+        textArea.value = profile.scroll_text || '';
+        const counter = document.createElement('div');
+        counter.id = textArea.id + '-counter';
+        counter.className = 'counter';
+        counter.setAttribute('aria-live', 'polite');
+        textArea.setAttribute('aria-describedby', counter.id);
+        textArea.addEventListener('input', () => {
+            profile.scroll_text = textArea.value;
+            renderScreenCanvas();
+            updateCharCounter(textArea, counter);
+        });
+        const row = document.createElement('div');
+        row.className = 'form-group';
+        const label = document.createElement('label');
+        label.textContent = T('screen.message_text', 'Text');
+        row.appendChild(label);
+        row.appendChild(textArea);
+        row.appendChild(counter);
+        textSection.appendChild(row);
+        updateCharCounter(textArea, counter);
+        setupTokenHighlightTextarea(textArea);
+        appendScreenTokenButtons(textSection, textArea);
+    } else {
+        appendScreenTwSlots(textSection, e, o, T);
+    }
+}
+
+// Font picker: one card per font showing how it looks. Text fonts and digit themes are
+// separate sections, so card names stay short ("Nixie", not "Digits: Nixie").
+function appendScreenTwFontPicker(opt, o, T, e, scrollOnly = false) {
+    const wrap = document.createElement('div');
+    wrap.className = 'screen-font-samples tw-font-picker';
+    const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+
+    const addSection = (title, wide, cards) => {
+        const h = document.createElement('div');
+        h.className = 'tw-font-group-label';
+        h.textContent = title;
+        wrap.appendChild(h);
+        const grid = document.createElement('div');
+        grid.className = 'screen-font-samples-grid' + (wide ? ' tw-font-grid-wide' : '');
+        cards.forEach(c => grid.appendChild(c));
+        wrap.appendChild(grid);
+    };
+    const card = (family, name, thumb) => {
+        const box = document.createElement('button');
+        box.type = 'button';
+        box.className = 'screen-font-sample-box' + (o.family === family ? ' selected' : '');
+        box.setAttribute('aria-pressed', o.family === family ? 'true' : 'false');
+        const label = document.createElement('div');
+        label.className = 'screen-font-sample-name';
+        label.textContent = name;
+        box.appendChild(thumb);
+        box.appendChild(label);
+        box.addEventListener('click', () => {
+            updateTwFontAndCenter(e, o, () => { o.family = family; });
+            renderScreenCanvas();
+            renderScreenOptions();
+        });
+        return box;
+    };
+    const textThumb = family => {
+        const t = document.createElement('div');
+        t.className = 'screen-font-sample-thumb tw-font-sample';
+        const css = SCREEN_TW_CSS_FONTS[family];
+        t.style.fontFamily = css.family;
+        t.style.fontWeight = css.weight;
+        t.textContent = 'Aa 12:34 \u00b0C';
+        return t;
+    };
+    const sheetThumb = theme => {
+        const t = document.createElement('div');
+        t.className = 'screen-font-sample-thumb tw-sheet-sample';
+        t.style.backgroundImage = `url('${resolveThemeAssetUrl(theme, 'font')}')`;
+        return t;
+    };
+
+    addSection(T('screen.tw_text_fonts', 'Text fonts'), false, [
+        card(SCREEN_TW_FAMILY.SANS, T('screen.tw_family_sans', 'Sans'), textThumb(0)),
+        card(SCREEN_TW_FAMILY.BOLD, T('screen.tw_family_bold', 'Bold'), textThumb(1))
+    ]);
+
+    // User fonts only appear once their sprite sheet has been uploaded.
+    const themes = [];
+    if (!scrollOnly) SCREEN_TIME_FONTS.forEach((f, i) => {
+        const isUser = f === 'user1' || f === 'user2';
+        if (isUser && !hasSpiffsFile(`themes/${f}/font.jpg`) && !hasSpiffsFile(`themes/${f}/font.bmp`) &&
+            !hasSpiffsFile(`${f}-font.jpg`) && !hasSpiffsFile(`${f}-font.bmp`)) return;
+        themes.push(card(SCREEN_TW_FAMILY.SPRITE_FIRST + i, cap(f), sheetThumb(f)));
+    });
+    if (themes.length) addSection(T('screen.tw_digit_themes', 'Digit themes'), true, themes);
+    opt.appendChild(wrap);
+}
+
+// Up to SCREEN_TW_SLOTS contents shown in turn, each for its own duration.
+function appendScreenTwSlots(opt, e, o, T) {
+    const cur = twEditedSlot(e);
+    const select = i => {
+        window.screenEditor.twSlot[e.id] = i;
+        renderScreenCanvas();
+        renderScreenOptions();
+    };
+
+    const head = document.createElement('div');
+    head.className = 'tw-slots-head';
+    const title = document.createElement('span');
+    title.className = 'tw-slots-label';
+    title.textContent = T('screen.tw_contents', 'Content');
+    head.appendChild(title);
+    const chips = document.createElement('div');
+    chips.className = 'tw-slot-chips';
+    o.slots.forEach((s, i) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'tw-slot-chip' + (i === cur ? ' selected' : '');
+        b.textContent = String(i + 1);
+        b.title = (s.text || '').slice(0, 40);
+        b.addEventListener('click', () => select(i));
+        chips.appendChild(b);
+    });
+    if (o.slots.length < SCREEN_TW_SLOTS) {
+        const add = document.createElement('button');
+        add.type = 'button';
+        add.className = 'tw-slot-chip tw-slot-add';
+        add.textContent = '+';
+        add.title = T('screen.tw_add_content', 'Add alternating content');
+        add.addEventListener('click', () => {
+            o.slots.push({ text: '', duration: SCREEN_TW_DURATION_DEFAULT });
+            select(o.slots.length - 1);
+        });
+        chips.appendChild(add);
+    }
+    if (o.slots.length > 1) {
+        const del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'tw-slot-chip tw-slot-del';
+        del.textContent = '\u00d7';
+        del.title = T('screen.tw_remove_content', 'Remove this content');
+        del.addEventListener('click', () => {
+            o.slots.splice(cur, 1);
+            select(Math.max(0, cur - 1));
+        });
+        chips.appendChild(del);
+    }
+    head.appendChild(chips);
+    opt.appendChild(head);
+
+    const slot = o.slots[cur];
+    const textArea = document.createElement('textarea');
+    textArea.id = 'editor-textarea-' + e.id;
+    textArea.maxLength = SCREEN_TW_TEXT_LEN - 1;
+    textArea.rows = 2;
+    textArea.value = slot.text || '';
+    const counter = document.createElement('div');
+    counter.id = textArea.id + '-counter';
+    counter.className = 'counter';
+    counter.setAttribute('aria-live', 'polite');
+    textArea.setAttribute('aria-describedby', counter.id);
+    textArea.addEventListener('input', () => {
+        slot.text = textArea.value;
+        renderScreenCanvas();
+        updateCharCounter(textArea, counter);
+    });
+    const textRow = document.createElement('div');
+    textRow.className = 'form-group';
+    const textLabel = document.createElement('label');
+    textLabel.textContent = T('screen.message_text', 'Text');
+    textRow.appendChild(textLabel);
+    textRow.appendChild(textArea);
+    textRow.appendChild(counter);
+    opt.appendChild(textRow);
+    updateCharCounter(textArea, counter);
+    setupTokenHighlightTextarea(textArea);
+
+    if (o.slots.length > 1) {
+        const dur = document.createElement('input');
+        dur.type = 'number';
+        dur.min = '1';
+        dur.max = String(SCREEN_TW_DURATION_MAX);
+        dur.value = String(slot.duration);
+        dur.addEventListener('change', () => {
+            slot.duration = clamp(parseInt(dur.value, 10) || SCREEN_TW_DURATION_DEFAULT, 1, SCREEN_TW_DURATION_MAX);
+            dur.value = String(slot.duration);
+        });
+        const row = document.createElement('div');
+        row.className = 'form-group';
+        const lab = document.createElement('label');
+        lab.textContent = T('screen.tw_duration', 'Show for (seconds)');
+        row.appendChild(lab);
+        row.appendChild(dur);
+        opt.appendChild(row);
+        const note = document.createElement('p');
+        note.className = 'screen-options-mode-note';
+        note.textContent = T('screen.tw_rotation_note', 'Contents are shown in turn; empty ones are skipped.');
+        opt.appendChild(note);
+    }
+    appendScreenTokenButtons(opt, textArea, ['[colon]']);
+}
+
+function screenWriteTextWidgets(view, off, layout) {
+    view.setUint32(off, SCREEN_BIN_EXT_MAGIC, true);
+    view.setUint8(off + 4, SCREEN_BIN_EXT_VERSION);
+    view.setUint8(off + 5, SCREEN_TW_IDS.length);
+    view.setUint16(off + 6, SCREEN_BIN_TW_SIZE, true);
+    off += SCREEN_BIN_EXT_HEADER_SIZE;
+    ['day', 'night'].forEach(mode => {
+        const profile = layout.profiles[mode];
+        SCREEN_TW_IDS.forEach(id => {
+            const e = screenFindProfileElement(profile, id) || twDefaultElement(id);
+            const o = ensureScreenTwOptions(e);
+            const fg = screenHexToRgb(o.color, { r: 255, g: 255, b: 255 });
+            const bg = screenHexToRgb(o.bg_color, { r: 0, g: 0, b: 0 });
+            const flags = (o.show_units ? SCREEN_TW_FLAG.SHOW_UNITS : 0) |
+                (o.tabular ? SCREEN_TW_FLAG.TABULAR : 0) |
+                (o.transparent ? SCREEN_TW_FLAG.TRANSPARENT_BG : 0) |
+                (o.color_enabled ? SCREEN_TW_FLAG.COLOR_OVERRIDE : 0) |
+                (o.scroll ? SCREEN_TW_FLAG.SCROLL : 0);
+            [e.enabled ? 1 : 0, e.x || 0, e.y || 0, e.z || 0, o.width || 0, o.align || 0,
+                o.family, o.size, flags, o.slots.length, fg.r, fg.g, fg.b, bg.r, bg.g, bg.b]
+                .forEach((v, i) => view.setUint8(off + i, v & 0xff));
+            for (let s = 0; s < SCREEN_TW_SLOTS; s++) {
+                const slot = o.slots[s];
+                view.setUint16(off + 16 + s * 2, slot ? slot.duration : SCREEN_TW_DURATION_DEFAULT, true);
+                screenWriteFixedString(view, off + 24 + s * SCREEN_TW_TEXT_LEN, SCREEN_TW_TEXT_LEN, slot ? slot.text : '');
+            }
+            off += SCREEN_BIN_TW_SIZE;
+        });
+    });
+    screenWriteWidgetMeta(view, off, layout);
+}
+
+// Largest prefix of `text` that fits `maxBytes` of UTF-8 without cutting a character.
+function screenClampUtf8(text, maxBytes) {
+    let out = '';
+    let used = 0;
+    for (const ch of String(text == null ? '' : text)) {
+        const n = new TextEncoder().encode(ch).length;
+        if (used + n > maxBytes) break;
+        out += ch;
+        used += n;
+    }
+    return out;
+}
+
+function screenWriteWidgetMeta(view, off, layout) {
+    ['day', 'night'].forEach((mode, p) => {
+        const profile = layout.profiles[mode];
+        let mask = 0;
+        SCREEN_INSTANCE_IDS.forEach((id, i) => {
+            const e = screenFindProfileElement(profile, id);
+            if (e && (e.instanced || e.enabled)) mask |= 1 << i;
+            screenWriteFixedString(view, off + 4 + (p * SCREEN_INSTANCE_IDS.length + i) * SCREEN_BIN_NAME_LEN,
+                SCREEN_BIN_NAME_LEN, e ? screenClampUtf8(e.name, SCREEN_BIN_NAME_LEN - 1) : '');
+        });
+        view.setUint16(off + p * 2, mask, true);
+    });
+}
+
+function screenReadWidgetMeta(view, off, layout) {
+    ['day', 'night'].forEach((mode, p) => {
+        const profile = layout.profiles[mode];
+        const mask = view.getUint16(off + p * 2, true);
+        SCREEN_INSTANCE_IDS.forEach((id, i) => {
+            const e = screenFindProfileElement(profile, id);
+            if (!e) return;
+            e.instanced = ((mask >> i) & 1) || e.enabled ? 1 : 0;
+            e.name = screenReadFixedString(view, off + 4 + (p * SCREEN_INSTANCE_IDS.length + i) * SCREEN_BIN_NAME_LEN,
+                SCREEN_BIN_NAME_LEN);
+        });
+    });
+}
+
+function screenReadTextWidgets(view, off, layout) {
+    const extVersion = view.getUint8(off + 4);
+    if (view.getUint32(off, true) !== SCREEN_BIN_EXT_MAGIC ||
+        (extVersion !== SCREEN_BIN_EXT_VERSION && extVersion !== SCREEN_BIN_EXT_VERSION_V3 &&
+            extVersion !== SCREEN_BIN_EXT_VERSION_V2) ||
+        view.getUint8(off + 5) !== SCREEN_TW_IDS.length ||
+        view.getUint16(off + 6, true) !== SCREEN_BIN_TW_SIZE) return;
+    off += SCREEN_BIN_EXT_HEADER_SIZE;
+    ['day', 'night'].forEach(mode => {
+        const profile = layout.profiles[mode];
+        SCREEN_TW_IDS.forEach(id => {
+            const u = i => view.getUint8(off + i);
+            const flags = u(8);
+            const count = clamp(u(9), 1, SCREEN_TW_SLOTS);
+            const slots = [];
+            for (let s = 0; s < count; s++) {
+                slots.push({
+                    text: screenReadFixedString(view, off + 24 + s * SCREEN_TW_TEXT_LEN, SCREEN_TW_TEXT_LEN),
+                    duration: view.getUint16(off + 16 + s * 2, true)
+                });
+            }
+            profile.elements = profile.elements.filter(x => x.id !== id);
+            const color = screenRgbToHex(u(10), u(11), u(12));
+            profile.elements.push({
+                id, enabled: u(0), x: u(1), y: u(2), z: u(3),
+                options: {
+                    width: u(4), align: u(5), family: u(6), size: u(7),
+                    show_units: !!(flags & SCREEN_TW_FLAG.SHOW_UNITS),
+                    tabular: !!(flags & SCREEN_TW_FLAG.TABULAR),
+                    transparent: !!(flags & SCREEN_TW_FLAG.TRANSPARENT_BG),
+                    scroll: !!(flags & SCREEN_TW_FLAG.SCROLL),
+                    color_enabled: extVersion >= SCREEN_BIN_EXT_VERSION ? !!(flags & SCREEN_TW_FLAG.COLOR_OVERRIDE) : color !== '#ffffff',
+                    color,
+                    bg_color: screenRgbToHex(u(13), u(14), u(15)),
+                    slots
+                }
+            });
+            off += SCREEN_BIN_TW_SIZE;
+        });
+    });
+    if (extVersion >= SCREEN_BIN_EXT_VERSION_V3) screenReadWidgetMeta(view, off, layout);
 }
 
 function makeDefaultScreenProfile() {
@@ -984,66 +1852,201 @@ function makeDefaultScreenProfile() {
         { id: 'wifi_off', enabled: 1, x: 22, y: 27, z: 4 },
         { id: 'weather', enabled: 1, x: 54, y: 24, z: 3 },
         { id: 'moon', enabled: 1, x: 87, y: 29, z: 3 },
-        { id: 'time', enabled: 1, x: 22, y: 47, z: 1 },
-        { id: 'digit_label', enabled: 0, x: 22, y: 84, z: 1, options: { font: 0, color: '#ffffff', bg_color: '#000000', width: 80, align: 0 } },
-        { id: 'ampm', enabled: 1, x: 101, y: 54, z: 2 },
-        { id: 'time_aux', enabled: 0, x: 22, y: 47, z: 1 },
-        { id: 'digit_label_aux', enabled: 0, x: 22, y: 84, z: 1, options: { font: 0, color: '#ffffff', bg_color: '#000000', width: 80, align: 0 } },
-        { id: 'message', enabled: 1, x: 0, y: 86, z: 0, options: { font: 0, color: '#ffffff', bg_color: '#000000' } }
     ];
-    SCREEN_TEXT_SLOT_IDS.forEach((id, index) => {
-        elements.push({
-            id,
-            enabled: 0,
-            x: 45,
-            y: 90,
-            z: Math.min(4, 1 + index),
-            options: { font: 0, color: '#ffffff', bg_color: '#000000', width: 80, align: 0 }
-        });
-    });
     SCREEN_ICON_SLOT_IDS.forEach(id => {
         // Icons carry no text styling; only enabled/x/y/z are used. Source is
         // S:/icon<N>.jpg, uploaded by the user.
         elements.push({ id, enabled: 0, x: 48, y: 48, z: 2 });
     });
+    SCREEN_TW_IDS.forEach(id => elements.push(twDefaultElement(id)));
+    // Factory clock (same as text_widgets_defaults() in the firmware): profile digit theme
+    // and the AM/PM mark that stays empty in 24 h mode.
+    const clock = elements.find(e => e.id === 'tw_1');
+    Object.assign(clock, { enabled: 1, x: 22, y: 47, z: 1, name: 'Clock' });
+    Object.assign(clock.options, {
+        family: SCREEN_TW_FAMILY.SPRITE_THEME, size: 36, show_units: false, tabular: false,
+        width: 0, align: 1,
+        slots: [{ text: '[clock]', duration: SCREEN_TW_DURATION_DEFAULT }]
+    });
+    const ampm = elements.find(e => e.id === 'tw_2');
+    Object.assign(ampm, { enabled: 1, x: 101, y: 54, z: 2, name: 'AMPM' });
+    Object.assign(ampm.options, {
+        family: SCREEN_TW_FAMILY.SANS, size: 12, show_units: true, tabular: false, transparent: true,
+        width: 25,
+        slots: [{ text: '[ampm12]', duration: SCREEN_TW_DURATION_DEFAULT }]
+    });
+    const scroll = elements.find(e => e.id === 'tw_3');
+    Object.assign(scroll, { enabled: 1, x: 0, y: 86, z: 0, name: 'Scroll' });
+    Object.assign(scroll.options, { scroll: true, family: SCREEN_TW_FAMILY.SANS, size: 16, width: SCREEN_SIZE, align: 0 });
     return {
         scroll_text: SCREEN_DEFAULT_SCROLL_TEXT,
-        static_texts: { ...SCREEN_DEFAULT_STATIC_TEXTS },
+        weather_theme: 0,
         elements
     };
 }
 
-const SCREEN_LAYOUT_VERSION = 10;
+/* Layouts saved before the unified text widget (version <= 10) hold digit displays, digit
+   labels, the AM/PM sprite and static text lines. They are converted when loaded, with the same
+   rules as screen_layout_migrate_v10() in the firmware. */
+const SCREEN_LEGACY_ELEMENT_IDS = ['time', 'time_aux', 'ampm', 'digit_label', 'digit_label_aux',
+    'text_1', 'text_2', 'text_3', 'text_4', 'text_5', 'text_6', 'text_7', 'text_8'];
+const SCREEN_LEGACY_FONT_PX = [8, 10, 12, 14, 16, 8];
+const SCREEN_LEGACY_DIGIT_MIN_SIZE = 9;
+
+function screenLegacyTextOptions(src, family, size, text) {
+    const o = twDefaultOptions();
+    const so = (src && src.options) || {};
+    o.family = family;
+    o.size = size;
+    o.width = so.width || 0;
+    o.align = so.align || 0;
+    o.color = so.color || '#ffffff';
+    o.bg_color = so.bg_color || '#000000';
+    o.slots = [{ text: String(text || '').slice(0, SCREEN_TW_TEXT_LEN - 1), duration: SCREEN_TW_DURATION_DEFAULT }];
+    return o;
+}
+
+function screenConvertLegacyProfile(profile) {
+    if (!profile || !Array.isArray(profile.elements)) return;
+    const find = id => profile.elements.find(e => e && e.id === id);
+    const legacyMessage = find('message');
+    if (!SCREEN_LEGACY_ELEMENT_IDS.some(id => find(id)) && !legacyMessage) {
+        delete profile.static_texts;
+        return;
+    }
+    const texts = profile.static_texts || {};
+    const on = id => { const e = find(id); return !!(e && e.enabled !== 0); };
+    const made = [];
+    const make = (src, options) => made.push({ enabled: 1, x: src.x || 0, y: src.y || 0, z: src.z || 0, options });
+    const digitSize = src => {
+        const f = src.options && src.options.font;
+        return (f >= SCREEN_LEGACY_DIGIT_MIN_SIZE && f < SCREEN_TW_SIZE_MAX) ? f : SCREEN_TW_SIZE_MAX;
+    };
+    const digits = (src, family) => {
+        const o = screenLegacyTextOptions(src, family, digitSize(src), '[clock]');
+        o.show_units = false;
+        o.tabular = false;
+        o.color = '#ffffff';
+        o.bg_color = '#000000';
+        o.width = 0;
+        o.align = 0;
+        return o;
+    };
+    const label = (src, text) => {
+        const o = screenLegacyTextOptions(src, SCREEN_TW_FAMILY.SANS,
+            SCREEN_LEGACY_FONT_PX[(src.options && src.options.font) <= 5 ? src.options.font : 0] || 8, text);
+        o.tabular = false;
+        return o;
+    };
+
+    if (on('time')) make(find('time'), digits(find('time'), SCREEN_TW_FAMILY.SPRITE_THEME));
+    if (on('time_aux')) make(find('time_aux'), digits(find('time_aux'), SCREEN_TW_FAMILY.SPRITE_AUX));
+    if (on('time') && find('ampm') && find('ampm').enabled !== 0) {
+        const a = find('ampm');
+        const o = twDefaultOptions();
+        o.size = 12; o.tabular = false; o.transparent = true;
+        o.slots = [{ text: '[ampm12]', duration: SCREEN_TW_DURATION_DEFAULT }];
+        make(a, o);
+    }
+    if (on('digit_label')) make(find('digit_label'), label(find('digit_label'), texts.digit_label));
+    if (on('digit_label_aux')) make(find('digit_label_aux'), label(find('digit_label_aux'), texts.digit_label_aux));
+    for (let i = 1; i <= 8; i++) {
+        if (on(`text_${i}`)) make(find(`text_${i}`), label(find(`text_${i}`), texts[`text_${i}`]));
+    }
+
+    profile.elements = profile.elements.filter(e => e && !SCREEN_LEGACY_ELEMENT_IDS.includes(e.id));
+    // Widgets written by the earlier text-widget editor keep their slot; converted ones fill the rest.
+    SCREEN_TW_IDS.forEach(id => {
+        let e = find(id);
+        if (!e) { e = twDefaultElement(id); profile.elements.push(e); }
+        if (e.enabled || !made.length) return;
+        const m = made.shift();
+        e.enabled = 1; e.x = m.x; e.y = m.y; e.z = m.z; e.options = m.options;
+    });
+    if (legacyMessage) {
+        let target = SCREEN_TW_IDS.map(id => find(id)).find(e => e && !e.enabled && !e.instanced) || null;
+        if (!target) {
+            const clock = SCREEN_TW_IDS.map(id => find(id)).find(e => e &&
+                (e.options.slots || []).some(s => String(s.text || '').includes('[clock]')));
+            const ampm = SCREEN_TW_IDS.map(id => find(id)).find(e => e &&
+                (e.options.slots || []).some(s => String(s.text || '').includes('[ampm12]')));
+            if (clock && ampm && clock !== ampm) {
+                const slot = clock.options.slots.find(s => String(s.text || '').includes('[clock]'));
+                if (slot && slot.text.length + '[ampm12]'.length < SCREEN_TW_TEXT_LEN) {
+                    slot.text += '[ampm12]';
+                    ampm.enabled = 0;
+                    target = ampm;
+                }
+            }
+        }
+        if (target) {
+            const old = legacyMessage.options || {};
+            const px = SCREEN_LEGACY_FONT_PX[old.font <= 5 ? old.font : 0] || 8;
+            target.enabled = legacyMessage.enabled === 0 ? 0 : 1;
+            target.x = legacyMessage.x || 0;
+            target.y = legacyMessage.y || 0;
+            target.z = legacyMessage.z || 0;
+            target.name = 'Scroll';
+            target.options = Object.assign(twDefaultOptions(), {
+                scroll: true,
+                family: SCREEN_TW_FAMILY.SANS,
+                size: Math.min(20, px),
+                width: old.width || 0,
+                align: old.align || 0,
+                color: old.color || '#ffffff',
+                color_enabled: true,
+                bg_color: old.bg_color || '#000000',
+                slots: [{ text: '', duration: SCREEN_TW_DURATION_DEFAULT }]
+            });
+        } else {
+            console.warn('Legacy scrolling message has no available text widget slot');
+        }
+    }
+    profile.elements = profile.elements.filter(e => e && e.id !== 'message');
+    delete profile.static_texts;
+}
+
+const SCREEN_LAYOUT_VERSION = 12;
 
 /* Compact binary wire format for /api/screen (must match f-screen-layout-bin.h). */
 const SCREEN_BIN_MAGIC = 0x4653584C;
 const SCREEN_BIN_FORMAT = 1;
 const SCREEN_BIN_FONT_LEN = 12;
 const SCREEN_BIN_WIDGET_SIZE = 13;
-const SCREEN_BIN_WIDGET_COUNT = 28; // glucose..graph (20) + 8 icon slots
+const SCREEN_BIN_WIDGET_COUNT = 15; // glucose..graph (7) + 8 icon slots
 const SCREEN_BIN_SCROLL_LEN = 512;
-const SCREEN_BIN_STATIC_TEXT_LEN = 96;
-const SCREEN_BIN_STATIC_TEXT_COUNT = 8;
 const SCREEN_BIN_GRAPH_SIZE = 88; // screen_graph_cfg_t (token[64] + 24)
 const SCREEN_BIN_GRAPH_TOKEN_LEN = 64;
 const SCREEN_BIN_HEADER_SIZE = 64;
 const SCREEN_BIN_PROFILE_SIZE =
     SCREEN_BIN_WIDGET_COUNT * SCREEN_BIN_WIDGET_SIZE +
     SCREEN_BIN_SCROLL_LEN +
-    SCREEN_BIN_STATIC_TEXT_COUNT * SCREEN_BIN_STATIC_TEXT_LEN +
-    SCREEN_BIN_STATIC_TEXT_LEN * 2 +
     SCREEN_BIN_GRAPH_SIZE;
 const SCREEN_BIN_WIRE_SIZE = SCREEN_BIN_HEADER_SIZE + SCREEN_BIN_PROFILE_SIZE * 2;
 const SCREEN_BIN_MIME = 'application/vnd.frixos.screen-layout+1';
+
+/* Text-widget section appended after the base wire (screen_layout_ext_wire_t). Version 3 adds the
+   widget meta: per profile a bitmask of existing slots and a 16-byte name for each slot. */
+const SCREEN_BIN_EXT_MAGIC = 0x54585346;
+const SCREEN_BIN_EXT_VERSION = 4;
+const SCREEN_BIN_EXT_VERSION_V3 = 3;
+const SCREEN_BIN_EXT_VERSION_V2 = 2;
+const SCREEN_BIN_EXT_HEADER_SIZE = 8;
+const SCREEN_BIN_TW_SIZE = 216; // text_widget_cfg_t
+const SCREEN_BIN_NAME_LEN = 16;
+const SCREEN_INSTANCE_IDS = SCREEN_TW_IDS.concat(SCREEN_ICON_SLOT_IDS); // widget_meta_t slot order
+const SCREEN_BIN_META_SIZE = 2 * 2 + 2 * SCREEN_INSTANCE_IDS.length * SCREEN_BIN_NAME_LEN;
+const SCREEN_BIN_EXT_V2_SIZE = SCREEN_BIN_EXT_HEADER_SIZE + SCREEN_BIN_TW_SIZE * SCREEN_TW_IDS.length * 2;
+const SCREEN_BIN_EXT_SIZE = SCREEN_BIN_EXT_V2_SIZE + SCREEN_BIN_META_SIZE;
+const SCREEN_BIN_FULL_WIRE_SIZE_V2 = SCREEN_BIN_WIRE_SIZE + SCREEN_BIN_EXT_V2_SIZE;
+const SCREEN_BIN_FULL_WIRE_SIZE = SCREEN_BIN_WIRE_SIZE + SCREEN_BIN_EXT_SIZE;
 
 const GRAPH_VAL_UNSET = -32768; // int16 sentinel for "not set"
 const GRAPH_FLAG = { AUTOSCALE: 0x01, SHOW_AXIS: 0x02, BAND: 0x04, BACKFILL: 0x08, SHOW_VALUE: 0x10, BOOLEAN: 0x20, THICK: 0x40, SHOW_XAXIS: 0x80 };
 
 /* Firmware widget[] index order (screen_element_id_t). */
 const SCREEN_WIRE_ELEM_IDS = [
-    'glucose_level', 'glucose_trend', 'wifi_off', 'weather', 'moon', 'time', 'message',
-    'text_1', 'text_2', 'text_3', 'text_4', 'text_5', 'text_6', 'text_7', 'text_8',
-    'ampm', 'time_aux', 'digit_label', 'digit_label_aux', 'graph',
+    'glucose_level', 'glucose_trend', 'wifi_off', 'weather', 'moon', 'message', 'graph',
     'icon_1', 'icon_2', 'icon_3', 'icon_4', 'icon_5', 'icon_6', 'icon_7', 'icon_8'
 ];
 
@@ -1076,11 +2079,7 @@ function screenWriteFixedString(view, offset, len, value) {
 
 function screenFindProfileElement(profile, id) {
     if (!profile || !Array.isArray(profile.elements)) return null;
-    let elem = profile.elements.find(e => e && e.id === id);
-    if (!elem && id === 'time_aux') {
-        elem = profile.elements.find(e => e && e.id === 'glucose');
-    }
-    return elem;
+    return profile.elements.find(e => e && e.id === id);
 }
 
 function screenReadWidget(view, offset) {
@@ -1186,8 +2185,7 @@ function screenWriteGraphCfg(view, off, o) {
 function screenWireProfileToJson(view, offset) {
     const profile = {
         elements: [],
-        scroll_text: '',
-        static_texts: { ...SCREEN_DEFAULT_STATIC_TEXTS }
+        scroll_text: ''
     };
     let off = offset;
 
@@ -1201,10 +2199,6 @@ function screenWireProfileToJson(view, offset) {
                 color: screenRgbToHex(w.color_r, w.color_g, w.color_b),
                 bg_color: screenRgbToHex(w.bg_r, w.bg_g, w.bg_b)
             };
-            if (isScreenClippedTextElement(id) || id === 'message') {
-                elem.options.width = w.width;
-                elem.options.align = w.align;
-            }
         } else if (id === 'graph') {
             // line colour reuses the widget colour, background reuses bg
             elem.options = {
@@ -1217,14 +2211,6 @@ function screenWireProfileToJson(view, offset) {
 
     profile.scroll_text = screenReadFixedString(view, off, SCREEN_BIN_SCROLL_LEN);
     off += SCREEN_BIN_SCROLL_LEN;
-    SCREEN_TEXT_SLOT_IDS.forEach(id => {
-        profile.static_texts[id] = screenReadFixedString(view, off, SCREEN_BIN_STATIC_TEXT_LEN);
-        off += SCREEN_BIN_STATIC_TEXT_LEN;
-    });
-    profile.static_texts.digit_label = screenReadFixedString(view, off, SCREEN_BIN_STATIC_TEXT_LEN);
-    off += SCREEN_BIN_STATIC_TEXT_LEN;
-    profile.static_texts.digit_label_aux = screenReadFixedString(view, off, SCREEN_BIN_STATIC_TEXT_LEN);
-    off += SCREEN_BIN_STATIC_TEXT_LEN;
 
     // Per-profile graph config -> merge into the graph element's options.
     const gcfg = screenReadGraphCfg(view, off);
@@ -1236,7 +2222,8 @@ function screenWireProfileToJson(view, offset) {
 }
 
 function decodeScreenLayoutBinary(bytes) {
-    if (!bytes || bytes.byteLength !== SCREEN_BIN_WIRE_SIZE) {
+    if (!bytes || (bytes.byteLength !== SCREEN_BIN_WIRE_SIZE &&
+        bytes.byteLength !== SCREEN_BIN_FULL_WIRE_SIZE_V2 && bytes.byteLength !== SCREEN_BIN_FULL_WIRE_SIZE)) {
         throw new Error('invalid screen wire size');
     }
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -1267,6 +2254,12 @@ function decodeScreenLayoutBinary(bytes) {
     const night = screenWireProfileToJson(view, off);
     layout.profiles.day = day.profile;
     layout.profiles.night = night.profile;
+    layout.profiles.day.weather_theme = clamp(view.getUint8(9), 0, SCREEN_TIME_FONTS.length);
+    layout.profiles.night.weather_theme = clamp(view.getUint8(10), 0, SCREEN_TIME_FONTS.length);
+    // Older firmware sends no ext section: ensureScreenProfileShape adds default widgets.
+    if (bytes.byteLength !== SCREEN_BIN_WIRE_SIZE) {
+        screenReadTextWidgets(view, SCREEN_BIN_WIRE_SIZE, layout);
+    }
     return layout;
 }
 
@@ -1275,7 +2268,7 @@ function encodeScreenLayoutBinary(layout) {
     ensureScreenProfileShape(layout.profiles.day);
     ensureScreenProfileShape(layout.profiles.night);
 
-    const buf = new ArrayBuffer(SCREEN_BIN_WIRE_SIZE);
+    const buf = new ArrayBuffer(SCREEN_BIN_FULL_WIRE_SIZE);
     const view = new DataView(buf);
     const bytes = new Uint8Array(buf);
     bytes.fill(0);
@@ -1287,9 +2280,11 @@ function encodeScreenLayoutBinary(layout) {
     view.setUint8(7, layout.day_color_filter != null ? layout.day_color_filter : 0);
     view.setUint8(8, layout.night_color_filter != null ? layout.night_color_filter : 0);
     screenWriteFixedString(view, 12, SCREEN_BIN_FONT_LEN, layout.day_font || 'bold');
-    screenWriteFixedString(view, 24, SCREEN_BIN_FONT_LEN, layout.night_font || 'bold');
+    screenWriteFixedString(view, 24, SCREEN_BIN_FONT_LEN, layout.night_font || 'light');
     screenWriteFixedString(view, 36, SCREEN_BIN_FONT_LEN, layout.day_aux_font || layout.day_font || 'bold');
-    screenWriteFixedString(view, 48, SCREEN_BIN_FONT_LEN, layout.night_aux_font || layout.night_font || 'bold');
+    screenWriteFixedString(view, 48, SCREEN_BIN_FONT_LEN, layout.night_aux_font || layout.night_font || 'light');
+    view.setUint8(9, clamp(parseInt(layout.profiles.day.weather_theme, 10) || 0, 0, SCREEN_TIME_FONTS.length));
+    view.setUint8(10, clamp(parseInt(layout.profiles.night.weather_theme, 10) || 0, 0, SCREEN_TIME_FONTS.length));
     view.setUint16(60, layout.w || SCREEN_SIZE, true);
     view.setUint16(62, layout.h || SCREEN_SIZE, true);
 
@@ -1302,24 +2297,12 @@ function encodeScreenLayoutBinary(layout) {
         });
         screenWriteFixedString(view, off, SCREEN_BIN_SCROLL_LEN, profile.scroll_text || '');
         off += SCREEN_BIN_SCROLL_LEN;
-        SCREEN_TEXT_SLOT_IDS.forEach(id => {
-            const text = profile.static_texts && profile.static_texts[id] != null
-                ? profile.static_texts[id]
-                : '';
-            screenWriteFixedString(view, off, SCREEN_BIN_STATIC_TEXT_LEN, text);
-            off += SCREEN_BIN_STATIC_TEXT_LEN;
-        });
-        screenWriteFixedString(view, off, SCREEN_BIN_STATIC_TEXT_LEN,
-            profile.static_texts && profile.static_texts.digit_label != null ? profile.static_texts.digit_label : '');
-        off += SCREEN_BIN_STATIC_TEXT_LEN;
-        screenWriteFixedString(view, off, SCREEN_BIN_STATIC_TEXT_LEN,
-            profile.static_texts && profile.static_texts.digit_label_aux != null ? profile.static_texts.digit_label_aux : '');
-        off += SCREEN_BIN_STATIC_TEXT_LEN;
         const gelem = screenFindProfileElement(profile, 'graph');
         screenWriteGraphCfg(view, off, gelem && gelem.options ? gelem.options : {});
         off += SCREEN_BIN_GRAPH_SIZE;
     });
 
+    screenWriteTextWidgets(view, off, layout);
     return bytes;
 }
 
@@ -1327,9 +2310,9 @@ const SCREEN_DEFAULT_LAYOUT = {
     version: SCREEN_LAYOUT_VERSION,
     scroll_delay: 60,
     day_font: 'bold',
-    night_font: 'bold',
+    night_font: 'light',
     day_aux_font: 'bold',
-    night_aux_font: 'bold',
+    night_aux_font: 'light',
     day_color_filter: 0,
     night_color_filter: 0,
     w: 128,
@@ -1391,8 +2374,6 @@ function getProfileObj(mode) {
 }
 
 function findElementDef(id) {
-    if (id === 'text') return SCREEN_PALETTE_TEXT_DEF;
-    if (id === 'icon') return SCREEN_PALETTE_ICON_DEF;
     if (id === 'screen_settings') return SCREEN_PALETTE_SETTINGS_DEF;
     return SCREEN_ELEMENT_DEFS_MAP.get(id) || null;
 }
@@ -1464,15 +2445,19 @@ function getScreenElementSize(def, elementState) {
     let h;
     if (isScreenTextElement(def.id)) {
         const font = elementState && elementState.options && elementState.options.font !== undefined ? elementState.options.font : 0;
-        w = isScreenClippedTextElement(def.id) && elementState && elementState.options && elementState.options.width > 0
-            ? elementState.options.width
-            : (isScreenClippedTextElement(def.id) ? def.w : 128);
-        h = getScreenLabelBoxHeight(font);
-        return { w: evenPx(w), h };
+        return { w: 128, h: getScreenLabelBoxHeight(font) };
     }
     if (isScreenIconElement(def.id)) {
         const d = getIconDims(def.id); // null until the JPG (if any) has loaded
         return { w: evenPx(d ? d.w : def.w), h: evenPx(d ? d.h : def.h) };
+    }
+    if (isScreenTextWidgetElement(def.id)) {
+        if (!elementState) return { w: evenPx(def.w), h: evenPx(def.h) };
+        const o = ensureScreenTwOptions(elementState);
+        const slot = o.slots[twEditedSlot(elementState)];
+        const text = slot && slot.text ? twSampleText(o, twEditedSlot(elementState)) : '';
+        const widthText = text || ' ';
+        return { w: o.width > 0 ? o.width : twContentWidth(o, widthText), h: twWidgetHeight(o, text) };
     }
     if (def.id === 'graph') {
         // Use the configured graph size so the editor preview tracks Width/Height.
@@ -1487,8 +2472,14 @@ function getScreenElementSize(def, elementState) {
 function getScreenTimeFont(mode) {
     if (!window.screenLayout) return 'bold';
     return mode === 'night'
-        ? (window.screenLayout.night_font || 'bold')
+        ? (window.screenLayout.night_font || 'light')
         : (window.screenLayout.day_font || 'bold');
+}
+
+function getScreenWeatherFont(mode) {
+    const profile = window.screenLayout && window.screenLayout.profiles && window.screenLayout.profiles[mode];
+    const override = clamp(parseInt(profile && profile.weather_theme, 10) || 0, 0, SCREEN_TIME_FONTS.length);
+    return override ? SCREEN_TIME_FONTS[override - 1] : getScreenTimeFont(mode);
 }
 
 function getScreenColorFilter(mode) {
@@ -1501,9 +2492,9 @@ function getScreenColorFilter(mode) {
 function ensureScreenLayoutMeta(layout) {
     if (!layout) return;
     if (!layout.day_font) layout.day_font = (window.settings && window.settings.p04) || 'bold';
-    if (!layout.night_font) layout.night_font = (window.settings && window.settings.p05) || 'bold';
+    if (!layout.night_font) layout.night_font = (window.settings && window.settings.p05) || 'light';
     if (!layout.day_aux_font) layout.day_aux_font = layout.day_font || 'bold';
-    if (!layout.night_aux_font) layout.night_aux_font = layout.night_font || 'bold';
+    if (!layout.night_aux_font) layout.night_aux_font = layout.night_font || 'light';
     if (layout.day_color_filter === undefined) layout.day_color_filter = (window.settings && window.settings.p10) || 0;
     if (layout.night_color_filter === undefined) layout.night_color_filter = (window.settings && window.settings.p11) || 0;
 }
@@ -1522,14 +2513,27 @@ function ensureScreenProfileShape(profile) {
     if (!profile) return;
     if (!profile.elements) profile.elements = [];
     if (!profile.scroll_text) profile.scroll_text = SCREEN_DEFAULT_SCROLL_TEXT;
-    if (!profile.static_texts) profile.static_texts = { ...SCREEN_DEFAULT_STATIC_TEXTS };
+    profile.weather_theme = clamp(parseInt(profile.weather_theme, 10) || 0, 0, SCREEN_TIME_FONTS.length);
 
     SCREEN_ELEMENT_DEFS.forEach(def => {
         const element = ensureElementInProfile(profile, def.id);
         ensureElementLayer(element);
         if (isScreenTextElement(def.id)) ensureScreenTextOptions(element);
+        if (isScreenTextWidgetElement(def.id)) ensureScreenTwOptions(element);
     });
     dedupeScreenProfileElements(profile);
+    let scrollFound = false;
+    SCREEN_TW_IDS.forEach(id => {
+        const e = screenFindProfileElement(profile, id);
+        if (!e) return;
+        const o = ensureScreenTwOptions(e);
+        if (!o.scroll) return;
+        if (scrollFound) {
+            o.scroll = false;
+            return;
+        }
+        scrollFound = true;
+    });
 }
 
 function cloneScreenDefaults() {
@@ -1544,9 +2548,7 @@ function prepareScreenLayout(layout) {
     ['day', 'night'].forEach(mode => {
         const profile = layout.profiles[mode];
         if (!profile || !Array.isArray(profile.elements)) return;
-        profile.elements.forEach(elem => {
-            if (elem && elem.id === 'glucose') elem.id = 'time_aux';
-        });
+        screenConvertLegacyProfile(profile);
     });
     ensureScreenLayoutMeta(layout);
     ['day', 'night'].forEach(mode => {
@@ -1561,28 +2563,211 @@ function ensureElementInProfile(profile, id) {
     if (!profile.elements) profile.elements = [];
     let e = profile.elements.find(x => x.id === id);
     if (!e) {
-        if (id === 'time_aux') {
-            e = { id, enabled: 0, x: 22, y: 47, z: 1 };
-        } else if (id === 'digit_label') {
-            e = { id, enabled: 0, x: 22, y: 84, z: 1, options: { font: 0, color: '#ffffff', bg_color: '#000000', width: 80, align: 0 } };
-        } else if (id === 'digit_label_aux') {
-            e = { id, enabled: 0, x: 22, y: 84, z: 1, options: { font: 0, color: '#ffffff', bg_color: '#000000', width: 80, align: 0 } };
-        } else if (isScreenIconElement(id)) {
+        if (isScreenIconElement(id)) {
             e = { id, enabled: 0, x: 48, y: 48, z: 2 };
+        } else if (isScreenTextWidgetElement(id)) {
+            e = twDefaultElement(id);
         } else {
             e = { id, enabled: 1, x: 0, y: 0, z: 0 };
         }
         profile.elements.push(e);
     }
     if (e.enabled === undefined) {
-        if (id === 'time_aux' || id === 'digit_label' || id === 'digit_label_aux' || isScreenIconElement(id)) e.enabled = 0;
-        else e.enabled = 1;
+        e.enabled = (isScreenIconElement(id) || isScreenTextWidgetElement(id)) ? 0 : 1;
     }
-    if (id === 'ampm') e.enabled = 1;
     if (e.x === undefined) e.x = 0;
     if (e.y === undefined) e.y = 0;
     ensureElementLayer(e);
+    if (isScreenIconElement(id) || isScreenTextWidgetElement(id)) {
+        // Layouts without instance data: every enabled widget exists.
+        if (e.instanced === undefined) e.instanced = e.enabled ? 1 : 0;
+        else if (e.enabled) e.instanced = 1;
+        if (typeof e.name !== 'string') e.name = '';
+        if (isScreenTextWidgetElement(id) && e.instanced && !e.name.trim()) {
+            const o = ensureScreenTwOptions(e);
+            const template = String((o.slots[0] && o.slots[0].text) || '').trim();
+            if (/^\[clock\]$/i.test(template)) {
+                o.width = 0;
+                o.align = 1;
+            }
+            e.name = screenDefaultTextWidgetName(e);
+        }
+    }
     return e;
+}
+
+function screenFreshInstanceElement(id) {
+    const e = isScreenIconElement(id) ? { id, enabled: 0, x: 48, y: 48, z: 2 } : twDefaultElement(id);
+    e.instanced = 0;
+    e.name = '';
+    return e;
+}
+
+// Adds a text or icon widget in the first free slot, centred on the canvas and selected.
+function addScreenWidgetInstance(kind) {
+    const profile = getProfileObj(window.screenEditor.mode);
+    if (!profile) return false;
+    const isIcon = kind === 'icon';
+    const id = isIcon ? getNextIconSlot(profile) : getNextTextSlot(profile);
+    if (!id) {
+        showStatus(isIcon
+            ? getScreenTranslation('screen.no_free_icon', 'All 8 icon slots are in use')
+            : getScreenTranslation('screen.no_free_text', 'All 8 text slots are in use'), 'warning');
+        return false;
+    }
+    ensureElementInProfile(profile, id);
+    const e = screenFreshInstanceElement(id);
+    profile.elements[profile.elements.findIndex(x => x.id === id)] = e;
+    e.instanced = 1;
+    e.enabled = 1;
+    const base = isIcon ? getScreenTranslation('screen.default_icon_name', 'Icon')
+        : getScreenTranslation('screen.default_text_name', 'Text');
+    e.name = screenClampUtf8(`${base} ${id.split('_')[1]}`, SCREEN_BIN_NAME_LEN - 1);
+
+    const def = findElementDef(id);
+    let size;
+    if (isIcon) {
+        size = getScreenElementSize(def, e);
+    } else {
+        const o = ensureScreenTwOptions(e);
+        const slot = o.slots[twEditedSlot(e)];
+        const text = slot && slot.text ? twSampleText(o, twEditedSlot(e)) : getScreenElementLabel(def.id);
+        size = { w: def.w, h: twWidgetHeight(o, text) };
+    }
+    e.x = clamp(Math.round((SCREEN_SIZE - size.w) / 2), 0, SCREEN_SIZE - 1);
+    e.y = visualYToLayoutY(clamp(Math.round((SCREEN_SIZE - size.h) / 2), 0, SCREEN_SIZE - 1), id);
+
+    setScreenSelection([id]);
+    renderScreenCanvas();
+    renderScreenOptions();
+    renderScreenPalette();
+    updateScreenStatusLine();
+    return true;
+}
+
+function removeScreenWidgetInstance(id) {
+    const profile = getProfileObj(window.screenEditor.mode);
+    const idx = profile && profile.elements ? profile.elements.findIndex(x => x.id === id) : -1;
+    if (idx < 0) return;
+    profile.elements[idx] = screenFreshInstanceElement(id);
+    if (window.screenEditor.twSlot) delete window.screenEditor.twSlot[id];
+    setScreenSelection([]);
+    renderScreenCanvas();
+    renderScreenOptions();
+    renderScreenPalette();
+    updateScreenStatusLine();
+}
+
+function updateScreenPaletteMenu() {
+    const profile = getProfileObj(window.screenEditor.mode);
+    const textBtn = el('screenAddTextBtn');
+    const iconBtn = el('screenAddIconBtn');
+    if (textBtn) textBtn.disabled = !getNextTextSlot(profile);
+    if (iconBtn) iconBtn.disabled = !getNextIconSlot(profile);
+}
+
+function setupScreenPaletteMenu() {
+    const btn = el('screenPaletteAddBtn');
+    const menu = el('screenPaletteAddMenu');
+    if (!btn || !menu) return;
+    const setOpen = open => {
+        menu.hidden = !open;
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if (open) updateScreenPaletteMenu();
+    };
+    btn.addEventListener('click', ev => {
+        if (ev && ev.stopPropagation) ev.stopPropagation();
+        setOpen(menu.hidden);
+    });
+    [['screenAddTextBtn', 'text'], ['screenAddIconBtn', 'icon']].forEach(([id, kind]) => {
+        const item = el(id);
+        if (item) item.addEventListener('click', () => { setOpen(false); addScreenWidgetInstance(kind); });
+    });
+    document.addEventListener('pointerdown', ev => {
+        const inside = ev.target && ev.target.closest && ev.target.closest('.palette-add');
+        if (!menu.hidden && !inside) setOpen(false);
+    });
+    document.addEventListener('keydown', ev => {
+        if (ev.key === 'Escape' && !menu.hidden) { setOpen(false); btn.focus(); }
+    });
+}
+
+function appendScreenInstanceNameRow(container, e, trans) {
+    const row = document.createElement('div');
+    row.className = 'form-group';
+    const label = document.createElement('label');
+    label.textContent = getNestedTranslation(trans, 'screen.widget_name') || 'Name';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.id = 'screen_widget_name';
+    input.maxLength = SCREEN_BIN_NAME_LEN - 1;
+    input.value = e.name || '';
+    input.setAttribute('autocomplete', 'off');
+    input.addEventListener('input', () => {
+        const clamped = screenClampUtf8(input.value, SCREEN_BIN_NAME_LEN - 1);
+        if (clamped !== input.value) input.value = clamped;
+        e.name = clamped;
+        renderScreenPalette();
+        updateScreenStatusLine();
+    });
+    row.appendChild(label);
+    row.appendChild(input);
+    container.appendChild(row);
+}
+
+function appendScreenDeleteRow(container, e, trans) {
+    const row = document.createElement('div');
+    row.className = 'form-group screen-delete-widget-row';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn screen-delete-widget-btn';
+    btn.id = 'screen_widget_delete';
+    btn.setAttribute('aria-label', getNestedTranslation(trans, 'screen.delete_widget') || 'Delete widget');
+    const icon = document.createElement('span');
+    icon.className = 'screen-delete-widget-icon';
+    icon.setAttribute('aria-hidden', 'true');
+    const label = document.createElement('span');
+    label.textContent = getNestedTranslation(trans, 'screen.delete_widget') || 'Delete widget';
+    btn.appendChild(icon);
+    btn.appendChild(label);
+    btn.addEventListener('click', () => removeScreenWidgetInstance(e.id));
+    row.appendChild(btn);
+    container.appendChild(row);
+}
+
+function screenCanTrashDraggedWidget(drag) {
+    return !!(drag && !drag.fromPalette && drag.elem && !isScreenMetaElement(drag.id) &&
+        (!drag.members || drag.members.length === 1));
+}
+
+function screenDeletesDraggedInstance(drag) {
+    return !!(screenCanTrashDraggedWidget(drag) && drag.elem.instanced &&
+        (isScreenTextWidgetElement(drag.id) || isScreenIconElement(drag.id)));
+}
+
+function screenPointerOverTrash(clientX, clientY, rect) {
+    const width = 80;
+    const height = 60;
+    const inset = 12;
+    const left = rect.left + rect.width - inset - width;
+    const top = rect.top + rect.height - inset - height;
+    return clientX >= left && clientX <= left + width && clientY >= top && clientY <= top + height;
+}
+
+function appendScreenTrashTarget(canvas, drag) {
+    if (!screenCanTrashDraggedWidget(drag)) return;
+    const target = document.createElement('div');
+    target.className = 'screen-canvas-trash-target' + (drag.deleteTarget ? ' active' : '');
+    target.setAttribute('aria-hidden', 'true');
+    const icon = document.createElement('span');
+    icon.className = 'screen-canvas-trash-icon';
+    const label = document.createElement('span');
+    label.textContent = screenDeletesDraggedInstance(drag)
+        ? getScreenTranslation('screen.delete_widget', 'Delete widget')
+        : getScreenTranslation('screen.disable_widget', 'Disable widget');
+    target.appendChild(icon);
+    target.appendChild(label);
+    canvas.appendChild(target);
 }
 
 function isScreenSectionVisible() {
@@ -1734,6 +2919,8 @@ function setupScreenSection() {
 
     document.addEventListener('keydown', onScreenArrowKeyDown);
 
+    setupScreenPaletteMenu();
+    startScreenTokenTicker();
     renderScreenPalette();
     updateScreenModeButtons();
     updateScreenStatusLine();
@@ -1767,19 +2954,8 @@ function updateScreenModeButtons() {
 }
 
 const PALETTE_SWATCH_SIZE = 56;
-// Aspect of bold-digit-label.jpg (must match tools/gen_palette_icons.py).
-const DIGIT_LABEL_PALETTE_ASPECT = 94 / 154;
 
 function getPalettePreviewSize(def) {
-    if (isScreenStaticTextElement(def.id)) {
-        return { w: PALETTE_SWATCH_SIZE, h: PALETTE_SWATCH_SIZE };
-    }
-    if (def.paletteFitFullImage && isScreenDigitLabelElement(def.id)) {
-        return { w: PALETTE_SWATCH_SIZE, h: evenPx(PALETTE_SWATCH_SIZE * DIGIT_LABEL_PALETTE_ASPECT) };
-    }
-    if (def.paletteFitFullImage && (def.id === 'time' || def.id === 'time_aux')) {
-        return { w: PALETTE_SWATCH_SIZE, h: evenPx(PALETTE_SWATCH_SIZE * 36 / 80) };
-    }
     if (def.id === 'message') {
         return { w: PALETTE_SWATCH_SIZE, h: evenPx(PALETTE_SWATCH_SIZE * 60 / 160) };
     }
@@ -1850,7 +3026,7 @@ function createFontSamplePreview(font) {
     thumb.setAttribute('role', 'img');
     thumb.setAttribute('aria-label', `${font} font sample`);
     const url = resolveTimeFontPreviewUrl(font);
-    const fallback = (font === 'user1' || font === 'user2') ? 'bold.jpg' : null;
+    const fallback = (font === 'user1' || font === 'user2') ? 'themes/bold/preview.jpg' : null;
     setupContainedBackground(thumb, url, fallback);
     return thumb;
 }
@@ -1871,6 +3047,7 @@ function setupPaletteContainedBackground(preview, def) {
 }
 
 function createScreenPreview(def, inMatrix, elementState, matrixScale) {
+    if (isScreenTextWidgetElement(def.id)) return createTwPreview(def, inMatrix, elementState, matrixScale);
     const preview = document.createElement('div');
     const size = getScreenElementSize(def, elementState);
     const orientation = size.w > size.h ? 'wide' : (size.w < size.h ? 'tall' : 'square');
@@ -1917,42 +3094,22 @@ function createScreenPreview(def, inMatrix, elementState, matrixScale) {
 
     const text = document.createElement('div');
     text.className = 'screen-preview-text screen-preview-text-' + def.id;
-    if (!inMatrix && (def.id === 'text' || (isScreenStaticTextElement(def.id) && !inMatrix && !elementState))) {
-        preview.classList.add('screen-preview-palette-static-label');
-        text.classList.add('screen-preview-text-palette-static');
-        text.textContent = getPaletteNewTextIconLabel();
-    } else {
-        text.textContent = def.text || def.label;
-        if (isScreenTextElement(def.id)) {
-            const font = elementState && elementState.options && elementState.options.font !== undefined ? elementState.options.font : 0;
-            const pt = SCREEN_MESSAGE_FONT_SIZES[font] || 8;
-            const previewScale = inMatrix ? (matrixScale || getScreenScale()) : 1;
-            text.style.fontSize = `${pt * previewScale}px`;
-            text.style.lineHeight = '1';
-            if (inMatrix) {
-                preview.style.alignItems = 'flex-start';
-                const align = elementState && elementState.options ? elementState.options.align : 0;
-                if (align === 1) {
-                    text.style.textAlign = 'center';
-                    preview.style.justifyContent = 'center';
-                } else if (align === 2) {
-                    text.style.textAlign = 'right';
-                    preview.style.justifyContent = 'flex-end';
-                } else {
-                    text.style.textAlign = 'left';
-                    preview.style.justifyContent = 'flex-start';
-                }
-            }
-            if (elementState && elementState.options) {
-                if (elementState.options.color) text.style.color = elementState.options.color;
-                if (elementState.options.bg_color) {
-                    preview.style.backgroundColor = elementState.options.bg_color;
-                }
-            }
-            if (isScreenStaticTextElement(def.id) || isScreenDigitLabelElement(def.id)) {
-                const profile = getProfileObj(window.screenEditor.mode);
-                const staticText = profile && profile.static_texts ? profile.static_texts[def.id] : def.text;
-                text.textContent = staticText || def.text || def.label;
+    text.textContent = def.text || def.label;
+    if (isScreenTextElement(def.id)) {
+        const font = elementState && elementState.options && elementState.options.font !== undefined ? elementState.options.font : 0;
+        const pt = SCREEN_MESSAGE_FONT_SIZES[font] || 8;
+        const previewScale = inMatrix ? (matrixScale || getScreenScale()) : 1;
+        text.style.fontSize = `${pt * previewScale}px`;
+        text.style.lineHeight = '1';
+        if (inMatrix) {
+            preview.style.alignItems = 'flex-start';
+            preview.style.justifyContent = 'flex-start';
+            text.style.textAlign = 'left';
+        }
+        if (elementState && elementState.options) {
+            if (elementState.options.color) text.style.color = elementState.options.color;
+            if (elementState.options.bg_color) {
+                preview.style.backgroundColor = elementState.options.bg_color;
             }
         }
     }
@@ -1972,15 +3129,12 @@ function renderScreenPalette() {
         item.className = 'palette-item';
         item.setAttribute('data-id', def.id);
         item.setAttribute('role', 'button');
-
-        const slotId = def.id === 'text' ? resolvePaletteElementId(def.id, profile) : def.id;
-        const unavailable = def.id === 'text' && !slotId;
-        if (unavailable) {
-            item.classList.add('palette-item-disabled');
-            item.setAttribute('aria-disabled', 'true');
-            item.tabIndex = -1;
-        } else {
-            item.tabIndex = 0;
+        item.tabIndex = 0;
+        const instance = isScreenTextWidgetElement(def.id) || isScreenIconElement(def.id)
+            ? screenFindProfileElement(profile, def.id) : null;
+        if (instance && !instance.enabled) {
+            item.classList.add('palette-item-off');
+            item.setAttribute('aria-label', `${getScreenPaletteItemLabel(def, profile)} (${getScreenTranslation('screen.disabled', 'disabled')})`);
         }
         if (isPaletteItemSelected(def)) {
             item.classList.add('palette-item-selected');
@@ -2000,74 +3154,55 @@ function renderScreenPalette() {
         item.appendChild(swatch);
         item.appendChild(label);
 
-        if (!unavailable) {
-            const selectPaletteItem = () => {
-                if (def.paletteMeta) {
-                    setScreenSelection([def.id]);
-                    renderScreenCanvas();
-                    renderScreenOptions();
-                    renderScreenPalette();
-                    updateScreenStatusLine();
-                    focusScreenCanvas();
-                    return;
-                }
-                const activeProfile = getProfileObj(window.screenEditor.mode);
-                if (!activeProfile) return;
-                const resolvedId = resolvePaletteElementId(def.id, activeProfile);
-                if (!resolvedId) return;
-                const elObj = ensureElementInProfile(activeProfile, resolvedId);
-                elObj.enabled = 1;
-                setScreenSelection([resolvedId]);
+        const selectPaletteItem = () => {
+            if (def.paletteMeta) {
+                setScreenSelection([def.id]);
                 renderScreenCanvas();
                 renderScreenOptions();
                 renderScreenPalette();
+                updateScreenStatusLine();
                 focusScreenCanvas();
-            };
-
-            if (def.paletteMeta) {
-                item.addEventListener('pointerdown', (e) => {
-                    e.preventDefault();
-                    selectPaletteItem();
-                });
-            } else {
-                item.addEventListener('pointerdown', (e) => {
-                    e.preventDefault();
-                    const resolvedId = resolvePaletteElementId(def.id, getProfileObj(window.screenEditor.mode));
-                    if (!resolvedId) return;
-                    beginDrag(resolvedId, e, true);
-                });
+                return;
             }
-            item.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    if (def.paletteMeta) {
-                        selectPaletteItem();
-                        return;
-                    }
-                    const activeProfile = getProfileObj(window.screenEditor.mode);
-                    if (!activeProfile) return;
-                    const resolvedId = resolvePaletteElementId(def.id, activeProfile);
-                    if (!resolvedId) return;
-                    const elObj = ensureElementInProfile(activeProfile, resolvedId);
-                    elObj.enabled = 1;
-                    setScreenSelection([resolvedId]);
-                    renderScreenCanvas();
-                    renderScreenOptions();
-                    renderScreenPalette();
-                    focusScreenCanvas();
-                }
+            const activeProfile = getProfileObj(window.screenEditor.mode);
+            if (!activeProfile) return;
+            const elObj = ensureElementInProfile(activeProfile, def.id);
+            elObj.enabled = 1;
+            setScreenSelection([def.id]);
+            renderScreenCanvas();
+            renderScreenOptions();
+            renderScreenPalette();
+            focusScreenCanvas();
+        };
+
+        if (def.paletteMeta) {
+            item.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
+                selectPaletteItem();
+            });
+        } else {
+            item.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
+                beginDrag(def.id, e, true);
             });
         }
+        item.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                selectPaletteItem();
+            }
+        });
 
         list.appendChild(item);
     });
+    updateScreenPaletteMenu();
 }
 
 async function fetchScreenLayout() {
     try {
         await refreshScreenLayoutFiles();
         const [settingsResp, response] = await Promise.all([
-            fetchSettingsJson('/api/settings?params=p08,p24,p50,p48,p49,p57,p58,p59', {
+            fetchSettingsJson('/api/settings?params=p00,p08,p19,p24,p37,p50', {
                 fallbackUrl: '/api/settings'
             }).catch(() => fetchSettingsJson('/api/settings')),
             fetch('/api/screen')
@@ -2100,8 +3235,6 @@ async function fetchScreenLayout() {
 async function saveScreenTimeDisplaySettings() {
     const leading = el('screen_show_leading_zero');
     const dots = el('screen_dots_breathe');
-    const scheduleList = el('display-schedule-list');
-    const auxScheduleList = el('display-schedule-aux-list');
 
     const formData = {};
     const gridEnabled = getScreenGridEnabled() ? 1 : 0;
@@ -2116,19 +3249,6 @@ async function saveScreenTimeDisplaySettings() {
         const p50 = isScreenSwitchOn('screen_dots_breathe') ? 1 : 0;
         if (p50 !== (window.settings && window.settings.p50 || 0)) formData.p50 = p50;
     }
-    if (scheduleList) {
-        const newSched = serializeDisplaySchedule('display-schedule-list');
-        if (newSched !== (window.settings.p58 || '')) {
-            formData.p58 = newSched;
-        }
-    }
-    if (auxScheduleList) {
-        const newAuxSched = serializeDisplaySchedule('display-schedule-aux-list');
-        if (newAuxSched !== (window.settings.p59 || '')) {
-            formData.p59 = newAuxSched;
-        }
-    }
-
     if (Object.keys(formData).length === 0) return true;
 
     try {
@@ -2161,8 +3281,8 @@ async function saveScreenLayout() {
         toggleLoading(saveBtn, true);
         showStatus(getMessage('saving_settings'), 'info');
         const body = encodeScreenLayoutBinary(window.screenLayout);
-        if (body.byteLength !== SCREEN_BIN_WIRE_SIZE) {
-            throw new Error(`screen wire size mismatch: ${body.byteLength} != ${SCREEN_BIN_WIRE_SIZE}`);
+        if (body.byteLength !== SCREEN_BIN_FULL_WIRE_SIZE) {
+            throw new Error(`screen wire size mismatch: ${body.byteLength} != ${SCREEN_BIN_FULL_WIRE_SIZE}`);
         }
         const response = await fetch('/api/screen', {
             method: 'POST',
@@ -2246,20 +3366,22 @@ function saveScreenLayoutToFile() {
 // Built-in presets ship in the firmware image. A same-named save is allowed,
 // but the next file reconcile puts the shipped copy back.
 const SHIPPED_LAYOUT_NAMES = new Set([
-    'default.layout',
-    'diabetic.layout',
-    'homeassistant.layout',
-    'weather.layout',
-    'hagraph.layout'
+    'layouts/default.layout',
+    'layouts/diabetic.layout',
+    'layouts/homeassistant.layout',
+    'layouts/weather.layout',
+    'layouts/hagraph.layout'
 ]);
 
-// Single LittleFS basename: no directories, within the firmware name limit.
+// Layout saves may target the root or the shipped layouts directory.
 function normalizeDeviceLayoutName(raw) {
     const trimmed = String(raw == null ? '' : raw).trim();
     if (!trimmed) return '';
     const file = /\.layout$/i.test(trimmed) ? trimmed : trimmed + '.layout';
     if (file.length > 110 || /^\.layout$/i.test(file)) return null;
-    if (file.includes('..') || /[\\/]/.test(file) || /[\u0000-\u001f]/.test(file)) return null;
+    const parts = file.split('/');
+    if (file.includes('..') || file.includes('\\') || parts.some(part => !part || part === '.') ||
+        (parts.length > 1 && parts[0].toLowerCase() !== 'layouts') || /[\u0000-\u001f]/.test(file)) return null;
     return file;
 }
 
@@ -2350,7 +3472,7 @@ async function uploadScreenLayoutToDevice(layout, filename) {
         for (let attempt = 0; attempt < 10 && !landed; attempt++) {
             if (attempt) await new Promise(r => setTimeout(r, 400));
             const text = await Promise.race([
-                fetch('/' + encodeURIComponent(filename) + '?t=' + Date.now(), { cache: 'no-store' })
+                fetch(screenFileUrl(filename) + '?t=' + Date.now(), { cache: 'no-store' })
                     .then(check => check.ok ? check.text() : '')
                     .catch(() => ''),
                 new Promise(resolve => setTimeout(() => resolve(''), 4000))
@@ -2385,7 +3507,7 @@ async function uploadScreenLayoutToDevice(layout, filename) {
 async function loadSystemScreenLayout(filename) {
     if (!filename) return;
     try {
-        const response = await fetch('/' + encodeURIComponent(filename));
+        const response = await fetch(screenFileUrl(filename));
         if (!response.ok) {
             showStatus(getMessage('layout_read_invalid'), 'error');
             return;
@@ -2515,7 +3637,7 @@ function renderScreenCanvas() {
     const elems = (profile.elements || []).slice().sort((a, b) => (a.z || 0) - (b.z || 0));
 
     elems.forEach(e => {
-        if (e.enabled === 0 && e.id !== 'ampm') return;
+        if (e.enabled === 0) return;
 
         const def = findElementDef(e.id);
         if (!def) return;
@@ -2570,6 +3692,7 @@ function renderScreenCanvas() {
 
     appendScreenGuides(fragment, scale);
     canvas.appendChild(fragment);
+    appendScreenTrashTarget(canvas, window.screenEditor.dragging);
     updateScreenStatusLine();
 }
 
@@ -2606,6 +3729,40 @@ async function appendScreenThemeFilterOptions(container, trans) {
     timeFontRow.appendChild(timeFontLabel);
     timeFontRow.appendChild(timeFontSelect);
     container.appendChild(timeFontRow);
+
+    const auxFontKey = mode === 'night' ? 'night_aux_font' : 'day_aux_font';
+    const auxFontRow = document.createElement('div');
+    auxFontRow.className = 'form-group';
+    const auxFontLabel = document.createElement('label');
+    auxFontLabel.textContent = getNestedTranslation(trans, 'screen.aux_time_font') || 'Aux digit theme';
+    const auxFontSelect = document.createElement('select');
+    SCREEN_TIME_FONTS.forEach(font => {
+        const option = document.createElement('option');
+        option.value = font;
+        option.textContent = font.charAt(0).toUpperCase() + font.slice(1);
+        auxFontSelect.appendChild(option);
+    });
+    auxFontSelect.value = window.screenLayout[auxFontKey] || 'bold';
+    auxFontSelect.addEventListener('change', () => {
+        window.screenLayout[auxFontKey] = auxFontSelect.value;
+        renderScreenCanvas();
+    });
+    auxFontRow.appendChild(auxFontLabel);
+    auxFontRow.appendChild(auxFontSelect);
+    container.appendChild(auxFontRow);
+
+    appendScreenSwitchRow(container, {
+        id: 'screen_show_leading_zero',
+        label: getNestedTranslation(trans, 'screen.show_leading_zero') || 'Show 0 for single digit hour',
+        checked: !!(window.settings && window.settings.p24),
+        onChange: () => saveScreenTimeDisplaySettings()
+    });
+    appendScreenSwitchRow(container, {
+        id: 'screen_dots_breathe',
+        label: getNestedTranslation(trans, 'screen.disable_dots_breathe') || 'Disable breathing time dots',
+        checked: !!(window.settings && window.settings.p50),
+        onChange: () => saveScreenTimeDisplaySettings()
+    });
 
     const filterRow = document.createElement('div');
     filterRow.className = 'form-group';
@@ -2768,7 +3925,7 @@ function initFontsShortcut() {
     box.addEventListener('toggle', () => { if (box.open) renderFontsShortcut(); });
 }
 
-function appendScreenTokenButtons(container, textarea) {
+function appendScreenTokenButtons(container, textarea, extraCodes) {
     const tokenWrap = document.createElement('div');
     tokenWrap.className = 'message-tokens screen-message-tokens';
     const tokenTitle = document.createElement('h4');
@@ -2777,7 +3934,7 @@ function appendScreenTokenButtons(container, textarea) {
     tokenWrap.appendChild(tokenTitle);
     const tokenList = document.createElement('div');
     tokenList.className = 'screen-token-list';
-    SCREEN_TOKEN_CODES.forEach(code => {
+    SCREEN_TOKEN_CODES.concat(extraCodes || []).forEach(code => {
         const btn = createTokenButton(code);
         bindTokenInsert(btn, textarea);
         tokenList.appendChild(btn);
@@ -2821,7 +3978,11 @@ function getGraphNumericTokens() {
             const p = window.screenLayout && window.screenLayout.profiles && window.screenLayout.profiles[mode];
             if (!p) return;
             scrape(p.scroll_text);
-            if (p.static_texts) Object.values(p.static_texts).forEach(scrape);
+            (p.elements || []).forEach(e => {
+                if (isScreenTextWidgetElement(e.id) && e.options && Array.isArray(e.options.slots)) {
+                    e.options.slots.forEach(sl => scrape(sl.text));
+                }
+            });
         });
     } catch (_) { /* best effort */ }
     return Array.from(found);
@@ -2925,6 +4086,34 @@ async function onScreenIconFileSelected(ev, id) {
     }
 }
 
+function appendScreenWeatherThemePicker(container, profile, trans) {
+    const row = document.createElement('div');
+    row.className = 'form-group';
+    const label = document.createElement('label');
+    label.htmlFor = 'screen_weather_theme';
+    label.textContent = getNestedTranslation(trans, 'screen.weather_theme') || 'Weather theme';
+    const select = document.createElement('select');
+    select.id = 'screen_weather_theme';
+    const inherited = document.createElement('option');
+    inherited.value = '0';
+    inherited.textContent = getNestedTranslation(trans, 'screen.weather_theme_default') || 'Follow screen theme';
+    select.appendChild(inherited);
+    SCREEN_TIME_FONTS.forEach((font, i) => {
+        const option = document.createElement('option');
+        option.value = String(i + 1);
+        option.textContent = font.charAt(0).toUpperCase() + font.slice(1);
+        select.appendChild(option);
+    });
+    select.value = String(clamp(parseInt(profile.weather_theme, 10) || 0, 0, SCREEN_TIME_FONTS.length));
+    select.addEventListener('change', () => {
+        profile.weather_theme = clamp(parseInt(select.value, 10) || 0, 0, SCREEN_TIME_FONTS.length);
+        renderScreenCanvas();
+    });
+    row.appendChild(label);
+    row.appendChild(select);
+    container.appendChild(row);
+}
+
 async function deleteScreenIcon(id) {
     const fname = iconFileName(id);
     if (!fname) return;
@@ -2989,99 +4178,34 @@ function renderScreenOptions() {
     title.textContent = (getNestedTranslation(trans, 'screen.options') || 'Options') + `: ${getScreenElementLabel(e.id)}`;
     opt.appendChild(title);
 
+    if (isScreenTextWidgetElement(e.id) || isScreenIconElement(e.id)) appendScreenInstanceNameRow(opt, e, trans);
     appendScreenLayerRow(opt, e);
 
-    if (e.id === 'ampm') {
-        e.enabled = 1;
-        const note = document.createElement('p');
-        note.className = 'screen-options-mode-note';
-        note.textContent = getNestedTranslation(trans, 'screen.ampm_note')
-            || 'AM/PM indicator is only visible when 12-hour format is used (from Settings).';
-        opt.appendChild(note);
-        return;
+    if (!isScreenTextWidgetElement(e.id)) {
+        appendScreenSwitchRow(opt, {
+            id: 'screen_element_enabled',
+            label: getNestedTranslation(trans, 'screen.enabled') || 'Enabled',
+            checked: e.enabled !== 0,
+            onChange: (on) => {
+                e.enabled = on ? 1 : 0;
+                renderScreenCanvas();
+                if (isScreenIconElement(e.id)) renderScreenPalette();
+            }
+        });
     }
 
-    appendScreenSwitchRow(opt, {
-        id: 'screen_element_enabled',
-        label: getNestedTranslation(trans, 'screen.enabled') || 'Enabled',
-        checked: e.enabled !== 0,
-        onChange: (on) => {
-            e.enabled = on ? 1 : 0;
-            renderScreenCanvas();
-            if (isScreenStaticTextElement(e.id) || isScreenIconElement(e.id)) renderScreenPalette();
-        }
-    });
+    if (e.id === 'weather') appendScreenWeatherThemePicker(opt, profile, trans);
 
     if (isScreenIconElement(e.id)) {
         appendScreenIconOptions(opt, e);
+        if (e.instanced) appendScreenDeleteRow(opt, e, trans);
     }
 
-    if (e.id === 'time') {
-        appendScreenSwitchRow(opt, {
-            id: 'screen_show_leading_zero',
-            label: getNestedTranslation(trans, 'screen.show_leading_zero') || 'Show 0 for single digit hour',
-            checked: !!(window.settings && window.settings.p24),
-            onChange: () => saveScreenTimeDisplaySettings()
-        });
-
-        appendScreenSwitchRow(opt, {
-            id: 'screen_dots_breathe',
-            label: getNestedTranslation(trans, 'screen.disable_dots_breathe') || 'Disable breathing time dots',
-            checked: !!(window.settings && window.settings.p50),
-            onChange: () => saveScreenTimeDisplaySettings()
-        });
-
-        appendDisplayScheduleSection(opt, {
-            listId: 'display-schedule-list',
-            titleKey: 'screen.display_schedule.title',
-            descriptionKey: 'screen.display_schedule.description',
-            settingsKey: 'p58'
-        });
+    if (isScreenTextWidgetElement(e.id)) {
+        appendScreenTwOptions(opt, e, profile, trans);
+        if (e.instanced) appendScreenDeleteRow(opt, e, trans);
+        return;
     }
-
-    if (e.id === 'time_aux') {
-        const mode = window.screenEditor.mode;
-        const fontKey = mode === 'night' ? 'night_aux_font' : 'day_aux_font';
-        ensureScreenLayoutMeta(window.screenLayout);
-
-        const modeNote = document.createElement('p');
-        modeNote.className = 'screen-options-mode-note';
-        modeNote.textContent = mode === 'night'
-            ? (getNestedTranslation(trans, 'screen.night_profile') || 'Night profile')
-            : (getNestedTranslation(trans, 'screen.day_profile') || 'Day profile');
-        opt.appendChild(modeNote);
-
-        const auxFontRow = document.createElement('div');
-        auxFontRow.className = 'form-group';
-        const auxFontLabel = document.createElement('label');
-        auxFontLabel.textContent = getNestedTranslation(trans, 'screen.aux_time_font') || 'Digit font';
-        const auxFontSelect = document.createElement('select');
-        SCREEN_TIME_FONTS.forEach(font => {
-            const option = document.createElement('option');
-            option.value = font;
-            option.textContent = font.charAt(0).toUpperCase() + font.slice(1);
-            auxFontSelect.appendChild(option);
-        });
-        auxFontSelect.value = window.screenLayout[fontKey] || 'bold';
-        auxFontSelect.addEventListener('change', () => {
-            window.screenLayout[fontKey] = auxFontSelect.value;
-            renderScreenCanvas();
-            renderScreenOptions();
-        });
-        auxFontRow.appendChild(auxFontLabel);
-        auxFontRow.appendChild(auxFontSelect);
-        opt.appendChild(auxFontRow);
-
-        appendScreenFontSamples(opt, window.screenLayout[fontKey] || 'bold', fontKey);
-
-        appendDisplayScheduleSection(opt, {
-            listId: 'display-schedule-aux-list',
-            titleKey: 'screen.display_schedule_aux.title',
-            descriptionKey: 'screen.display_schedule_aux.description',
-            settingsKey: 'p59'
-        });
-    }
-
     if (isScreenTextElement(e.id)) {
         ensureScreenTextOptions(e);
 
@@ -3153,81 +4277,26 @@ function renderScreenOptions() {
             opt.appendChild(delayRow);
         }
 
-        if (isScreenClippedTextElement(e.id)) {
-            const widthRow = document.createElement('div');
-            widthRow.className = 'form-group';
-            const widthLabel = document.createElement('label');
-            widthLabel.textContent = isScreenDigitLabelElement(e.id)
-                ? (getNestedTranslation(trans, 'screen.digit_label_width') || 'Width (px)')
-                : (getNestedTranslation(trans, 'screen.text_width') || 'Width (px, 0 = no limit)');
-            const widthInput = document.createElement('input');
-            widthInput.type = 'number';
-            widthInput.min = '0';
-            widthInput.max = '127';
-            widthInput.value = String(e.options.width !== undefined
-                ? e.options.width
-                : (isScreenDigitLabelElement(e.id) ? 80 : 0));
-            widthInput.addEventListener('change', () => {
-                e.options.width = clamp(parseInt(widthInput.value, 10) || 0, 0, 127);
-                renderScreenCanvas();
-            });
-            widthRow.appendChild(widthLabel);
-            widthRow.appendChild(widthInput);
-            opt.appendChild(widthRow);
-
-            const alignRow = document.createElement('div');
-            alignRow.className = 'form-group';
-            const alignLabel = document.createElement('label');
-            alignLabel.textContent = getNestedTranslation(trans, 'screen.text_align') || 'Alignment';
-            const alignSelect = document.createElement('select');
-            SCREEN_ALIGN_OPTIONS.forEach(o => {
-                const option = document.createElement('option');
-                option.value = String(o.v);
-                option.textContent = getScreenAlignLabel(o.v);
-                alignSelect.appendChild(option);
-            });
-            alignSelect.value = String(e.options.align || 0);
-            alignSelect.addEventListener('change', () => {
-                e.options.align = parseInt(alignSelect.value, 10) || 0;
-                renderScreenCanvas();
-            });
-            alignRow.appendChild(alignLabel);
-            alignRow.appendChild(alignSelect);
-            opt.appendChild(alignRow);
-        }
-
         const textRow = document.createElement('div');
         textRow.className = 'form-group';
         const textLabel = document.createElement('label');
         textLabel.textContent = getNestedTranslation(trans, 'screen.message_text') || 'Text';
         const textArea = document.createElement('textarea');
-        const maxLen = e.id === 'message' ? 511 : 96;
+        const maxLen = 511;
         textArea.maxLength = maxLen;
         textArea.id = 'editor-textarea-' + e.id;
-        textArea.rows = e.id === 'message' ? 3 : 2;
+        textArea.rows = 3;
 
         const counter = document.createElement('div');
         counter.id = textArea.id + '-counter';
         counter.className = 'counter';
 
-        if (e.id === 'message') {
-            textArea.value = profile.scroll_text || '';
-            textArea.addEventListener('input', () => {
-                profile.scroll_text = textArea.value;
-                renderScreenCanvas();
-                updateCharCounter(textArea, counter);
-            });
-        } else {
-            if (!profile.static_texts) profile.static_texts = { ...SCREEN_DEFAULT_STATIC_TEXTS };
-            const textKey = getDigitLabelTextKey(e.id);
-            textArea.value = profile.static_texts[textKey] || '';
-            textArea.addEventListener('input', () => {
-                profile.static_texts[textKey] = textArea.value;
-                renderScreenCanvas();
-                if (isScreenStaticTextElement(e.id)) renderScreenPalette();
-                updateCharCounter(textArea, counter);
-            });
-        }
+        textArea.value = profile.scroll_text || '';
+        textArea.addEventListener('input', () => {
+            profile.scroll_text = textArea.value;
+            renderScreenCanvas();
+            updateCharCounter(textArea, counter);
+        });
         textRow.appendChild(textLabel);
         textRow.appendChild(textArea);
         textRow.appendChild(counter);
@@ -3467,6 +4536,7 @@ function onScreenPointerMove(e) {
             m.elem.y = visualYToLayoutY(m.visualY + cdy, m.id);
         });
     }
+    d.deleteTarget = screenCanTrashDraggedWidget(d) && screenPointerOverTrash(e.clientX, e.clientY, d.rect);
 
     // Throttle rendering to the display's refresh rate (typically 60Hz) using RAF.
     // This prevents redundant DOM re-renders and reduces CPU/GPU load during dragging.
@@ -3485,10 +4555,24 @@ function onScreenPointerUp(e) {
         cancelAnimationFrame(window.screenEditor.dragRafHandle);
         window.screenEditor.dragRafHandle = null;
     }
-    const placedFromPalette = d.fromPalette && d.moved && isScreenStaticTextElement(d.id);
+    const placedFromPalette = d.fromPalette && d.moved;
+    const droppedOnTrash = d.deleteTarget && screenCanTrashDraggedWidget(d);
+    const deleteWidget = droppedOnTrash && screenDeletesDraggedInstance(d);
     // A plain click (no drag) on a member of a multi-selection collapses to just it.
     const collapseTo = (!d.moved && d.clickSelectId) ? d.clickSelectId : null;
     window.screenEditor.dragging = null;
+    if (droppedOnTrash) {
+        if (deleteWidget) {
+            removeScreenWidgetInstance(d.id);
+        } else {
+            d.elem.enabled = 0;
+            renderScreenCanvas();
+            renderScreenOptions();
+            renderScreenPalette();
+            updateScreenStatusLine();
+        }
+        return;
+    }
     if (collapseTo) setScreenSelection([collapseTo]);
     renderScreenCanvas();
     renderScreenOptions();

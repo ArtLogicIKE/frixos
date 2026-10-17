@@ -86,7 +86,7 @@ async def post_screen(request: Request):
 
 @app.get("/api/files")
 async def get_files():
-    return JSONResponse(content={"files": [{"name": "bold.jpg", "size": 1000}, {"name": "default-weather.jpg", "size": 1000}]})
+    return JSONResponse(content={"files": [{"name": "themes/bold/preview.jpg", "size": 1000}, {"name": "themes/default/weather.jpg", "size": 1000}]})
 
 @app.get("/i18n/language_{lang}.json")
 async def get_i18n_language(lang: str):

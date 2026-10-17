@@ -1,5 +1,5 @@
-// Generates spiffs/diabetic.layout: a layout tuned for CGM users.
-//   Top:    clock + weather / moon / glucose readout / wifi / trend
+// Generates spiffs/layouts/diabetic.layout: a layout tuned for CGM users.
+//   Top:    clock (text widget) + weather / moon / glucose readout / wifi / trend
 //   Middle: scrolling message
 //   Bottom: glucose chart (graph bound to [CGM:glucose])
 // Built by running the screen editor's own code (same harness as
@@ -36,8 +36,8 @@ sandbox.POS = {
   wifi_off:      [22, 5],
   moon:          [87, 7],
   glucose_trend: [42, 8],
-  time:          [22, 25],
-  ampm:          [101, 32],
+  tw_1:          [22, 25], // clock
+  tw_2:          [101, 32], // AM/PM mark
   // Middle: scrolling message centred in the clock->graph gap.
   message:       [0, 68],
   // Bottom: glucose chart, 80x36 centred horizontally, 6px bottom margin.
@@ -54,7 +54,7 @@ const json = vm.runInContext(
        if (byId[id]) { byId[id].x = POS[id][0]; byId[id].y = POS[id][1]; }
      }
      // Visible: clock, status, message, graph.
-     ['weather','glucose_level','wifi_off','moon','glucose_trend','time','ampm','message','graph']
+     ['weather','glucose_level','wifi_off','moon','glucose_trend','tw_1','tw_2','message','graph']
        .forEach(id => { if (byId[id]) byId[id].enabled = 1; });
      // Configure the bottom glucose chart.
      const g = byId.graph;
@@ -85,12 +85,12 @@ const json = vm.runInContext(
 );
 
 const bytes = vm.runInContext(`encodeScreenLayoutBinary(window.screenLayout).byteLength;`, sandbox);
-const expected = vm.runInContext(`SCREEN_BIN_WIRE_SIZE;`, sandbox);
+const expected = vm.runInContext(`SCREEN_BIN_FULL_WIRE_SIZE;`, sandbox);
 if (bytes !== expected) {
   console.error(`FAIL: encodes to ${bytes} bytes, expected ${expected}`);
   process.exit(1);
 }
 
-const out = path.join(root, 'spiffs/diabetic.layout');
+const out = path.join(root, 'spiffs/layouts/diabetic.layout');
 fs.writeFileSync(out, json + '\n');
 console.log(`Wrote ${out} (${json.length} chars, encodes to ${bytes} bytes OK)`);

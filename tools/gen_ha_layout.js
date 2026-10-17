@@ -1,4 +1,4 @@
-// Generates spiffs/homeassistant.layout: a dashboard for Home Assistant users.
+// Generates spiffs/layouts/homeassistant.layout: a dashboard for Home Assistant users.
 //   Top:  clock + AM/PM (+ wifi-off when offline)
 //   Grid: 9 HA value cells in a 3x3 grid, grouped into 3 colour-coded rows:
 //           Climate (blue)  |  Energy (green)  |  System (amber)
@@ -31,32 +31,29 @@ sandbox.window.settings = undefined;
 vm.createContext(sandbox);
 vm.runInContext(src, sandbox, { filename: 'screen-editor.js' });
 
-sandbox.POS = { time: [4, 2], ampm: [86, 8], wifi_off: [96, 2], message: [0, 90] };
+sandbox.POS = { tw_1: [4, 2], tw_2: [86, 8], wifi_off: [96, 2], message: [0, 90] };
 
-// id -> [token text, x, y, width, bgColor]. Columns touch (0-43 / 43-86 / 86-128)
-// so each 3-cell row reads as one solid colour band. digit_label is the 9th cell.
-const BLUE = '#163a5a', GREEN = '#1a4a1a', AMBER = '#5a3a14';
+// id -> [token text, x, y, width, bgColor]. The clock and the AM/PM mark use tw_1 and tw_2,
+// which leaves six text widgets. Columns touch (0-43 / 43-86 / 86-128) so each 3-cell row reads
+// as one solid colour band.
+const BLUE = '#163a5a', GREEN = '#1a4a1a';
 sandbox.CELLS = {
   // Climate (blue)
-  text_1: ['In [HA:sensor.living_room_temperature]', 0, 46, 43, BLUE],
-  text_2: ['Hum [HA:sensor.living_room_humidity]', 43, 46, 43, BLUE],
-  text_3: ['Out [HA:sensor.outdoor_temperature]', 86, 46, 42, BLUE],
+  tw_3: ['In [HA:sensor.living_room_temperature]', 0, 46, 43, BLUE],
+  tw_4: ['Hum [HA:sensor.living_room_humidity]', 43, 46, 43, BLUE],
+  tw_5: ['Out [HA:sensor.outdoor_temperature]', 86, 46, 42, BLUE],
   // Energy (green)
-  text_4: ['Pwr [HA:sensor.power_consumption]', 0, 60, 43, GREEN],
-  text_5: ['Sol [HA:sensor.solar_power]', 43, 60, 43, GREEN],
-  text_6: ['kWh [HA:sensor.energy_today]', 86, 60, 42, GREEN],
-  // System (amber)
-  text_7: ['CPU [HA:sensor.processor_use]', 0, 74, 43, AMBER],
-  text_8: ['Bat [HA:sensor.battery_level]', 43, 74, 43, AMBER],
-  digit_label: ['RAM [HA:sensor.memory_use_percent]', 86, 74, 42, AMBER],
+  tw_6: ['Pwr [HA:sensor.power_consumption]', 0, 60, 43, GREEN],
+  tw_7: ['Sol [HA:sensor.solar_power]', 43, 60, 43, GREEN],
+  tw_8: ['kWh [HA:sensor.energy_today]', 86, 60, 42, GREEN],
 };
 
 const json = vm.runInContext(
   `window.screenLayout = cloneScreenDefaults();
    const exp = prepareScreenLayoutForExport();
-   const ENABLE = ['time','ampm','wifi_off','message',
-                   'text_1','text_2','text_3','text_4','text_5','text_6','text_7','text_8','digit_label'];
-   const DISABLE = ['glucose_level','glucose_trend','weather','moon','graph','time_aux','digit_label_aux'];
+   const ENABLE = ['tw_1','tw_2','wifi_off','message',
+                   'tw_3','tw_4','tw_5','tw_6','tw_7','tw_8'];
+   const DISABLE = ['glucose_level','glucose_trend','weather','moon','graph'];
    ['day','night'].forEach(mode => {
      const prof = exp.profiles[mode];
      const byId = Object.fromEntries(prof.elements.map(e => [e.id, e]));
@@ -68,13 +65,10 @@ const json = vm.runInContext(
        const e = byId[id];
        if (!e) continue;
        e.x = x; e.y = y;
-       if (!e.options) e.options = {};
-       e.options.width = w;
-       e.options.font = 0;
-       e.options.align = 0;
-       e.options.color = '#ffffff';
-       e.options.bg_color = bg;
-       prof.static_texts[id] = text; // static_texts.digit_label maps to digit_label_text
+       Object.assign(e.options, {
+         width: w, size: 8, family: 0, align: 0, show_units: true, tabular: false,
+         color: '#ffffff', bg_color: bg, slots: [{ text, duration: 10 }]
+       });
      }
      prof.scroll_text = '[greeting] [day], [date] [mon]';
    });
@@ -85,12 +79,12 @@ const json = vm.runInContext(
 );
 
 const bytes = vm.runInContext(`encodeScreenLayoutBinary(window.screenLayout).byteLength;`, sandbox);
-const expected = vm.runInContext(`SCREEN_BIN_WIRE_SIZE;`, sandbox);
+const expected = vm.runInContext(`SCREEN_BIN_FULL_WIRE_SIZE;`, sandbox);
 if (bytes !== expected) {
   console.error(`FAIL: encodes to ${bytes} bytes, expected ${expected}`);
   process.exit(1);
 }
 
-const out = path.join(root, 'spiffs/homeassistant.layout');
+const out = path.join(root, 'spiffs/layouts/homeassistant.layout');
 fs.writeFileSync(out, json + '\n');
 console.log(`Wrote ${out} (${json.length} chars, encodes to ${bytes} bytes OK)`);

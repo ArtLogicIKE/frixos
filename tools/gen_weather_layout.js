@@ -1,4 +1,4 @@
-// Generates spiffs/weather.layout: a layout for weather fans.
+// Generates spiffs/layouts/weather.layout: a layout for weather fans.
 //   Top:  clock + weather icon + moon + AM/PM (+ wifi-off when offline)
 //   Grid: 8 static cells (2 columns x 4 rows) showing the live weather params
 //   Msg:  scrolling line carrying the remaining params (pressure, 3-day, sun)
@@ -29,35 +29,34 @@ sandbox.window.settings = undefined;
 vm.createContext(sandbox);
 vm.runInContext(src, sandbox, { filename: 'screen-editor.js' });
 
-// Element top-left positions in 128x128 panel space.
+// Element top-left positions in 128x128 panel space. tw_1 is the clock, tw_2 the AM/PM mark,
+// tw_3..tw_8 the six cells of the weather grid.
 sandbox.POS = {
-  time:    [4, 2],   // clock spans ~x4-82
-  ampm:    [86, 8],  // tucked between clock and weather icon
+  tw_1:    [4, 2],   // clock spans ~x4-82
+  tw_2:    [86, 8],  // tucked between clock and weather icon
   weather: [96, 2],  // weather icon, top-right
   moon:    [100, 24],
   wifi_off:[96, 2],  // shares the weather slot (mutually exclusive: shown only offline)
-  // Weather grid: 2 columns (x2 / x66), 4 rows.
-  text_1: [2, 44],  text_2: [66, 44],
-  text_3: [2, 56],  text_4: [66, 56],
-  text_5: [2, 68],  text_6: [66, 68],
-  text_7: [2, 80],  text_8: [66, 80],
+  // Weather grid: 2 columns (x2 / x66), 3 rows.
+  tw_3: [2, 44],  tw_4: [66, 44],
+  tw_5: [2, 58],  tw_6: [66, 58],
+  tw_7: [2, 72],  tw_8: [66, 72],
   message: [0, 94],
 };
 sandbox.TEXTS = {
-  text_1: 'Now [temp]',  text_2: 'Hum [hum]',
-  text_3: 'Hi [high]',   text_4: 'Lo [low]',
-  text_5: 'Wind [wind]', text_6: 'Gust [gust]',
-  text_7: 'UV [uv]',     text_8: 'Rain [precip]',
+  tw_3: 'Now [temp]',  tw_4: 'Hum [hum]',
+  tw_5: 'Hi [high]',   tw_6: 'Lo [low]',
+  tw_7: 'Wind [wind]', tw_8: 'Gust [gust]',
 };
 sandbox.SCROLL =
-  '[greeting] [day] [date] [mon], Press [pressure], 3-day [3high]/[3low], Sun [rise]-[set]';
+  '[greeting] [day] [date] [mon], UV [uv], Rain [precip], Press [pressure], 3-day [3high]/[3low], Sun [rise]-[set]';
 
 const json = vm.runInContext(
   `window.screenLayout = cloneScreenDefaults();
    const exp = prepareScreenLayoutForExport();
-   const ENABLE = ['time','ampm','weather','moon','wifi_off','message',
-                   'text_1','text_2','text_3','text_4','text_5','text_6','text_7','text_8'];
-   const DISABLE = ['glucose_level','glucose_trend','graph','digit_label','time_aux','digit_label_aux'];
+   const ENABLE = ['tw_1','tw_2','weather','moon','wifi_off','message',
+                   'tw_3','tw_4','tw_5','tw_6','tw_7','tw_8'];
+   const DISABLE = ['glucose_level','glucose_trend','graph'];
    // Day and Night share the exact same layout; only the font differs (below).
    ['day','night'].forEach(mode => {
      const prof = exp.profiles[mode];
@@ -66,8 +65,9 @@ const json = vm.runInContext(
      ENABLE.forEach(id => { if (byId[id]) byId[id].enabled = 1; });
      DISABLE.forEach(id => { if (byId[id]) byId[id].enabled = 0; });
      for (const id in TEXTS) {
-       prof.static_texts[id] = TEXTS[id];
-       if (byId[id] && byId[id].options) { byId[id].options.width = 60; byId[id].options.font = 0; }
+       const o = byId[id].options;
+       o.slots = [{ text: TEXTS[id], duration: 10 }];
+       o.width = 60; o.size = 8; o.family = 0; o.show_units = true; o.tabular = false;
      }
      prof.scroll_text = SCROLL;
    });
@@ -79,12 +79,12 @@ const json = vm.runInContext(
 );
 
 const bytes = vm.runInContext(`encodeScreenLayoutBinary(window.screenLayout).byteLength;`, sandbox);
-const expected = vm.runInContext(`SCREEN_BIN_WIRE_SIZE;`, sandbox);
+const expected = vm.runInContext(`SCREEN_BIN_FULL_WIRE_SIZE;`, sandbox);
 if (bytes !== expected) {
   console.error(`FAIL: encodes to ${bytes} bytes, expected ${expected}`);
   process.exit(1);
 }
 
-const out = path.join(root, 'spiffs/weather.layout');
+const out = path.join(root, 'spiffs/layouts/weather.layout');
 fs.writeFileSync(out, json + '\n');
 console.log(`Wrote ${out} (${json.length} chars, encodes to ${bytes} bytes OK)`);

@@ -1,0 +1,750 @@
+{
+  "version": 12,
+  "scroll_delay": 60,
+  "day_color_filter": 0,
+  "night_color_filter": 0,
+  "day_font": "bold",
+  "night_font": "light",
+  "day_aux_font": "bold",
+  "night_aux_font": "bold",
+  "w": 128,
+  "h": 128,
+  "profiles": {
+    "day": {
+      "elements": [
+        {
+          "id": "glucose_level",
+          "enabled": 1,
+          "x": 40,
+          "y": 14,
+          "z": 4
+        },
+        {
+          "id": "glucose_trend",
+          "enabled": 1,
+          "x": 78,
+          "y": 92,
+          "z": 4
+        },
+        {
+          "id": "wifi_off",
+          "enabled": 1,
+          "x": 33,
+          "y": 13,
+          "z": 4
+        },
+        {
+          "id": "weather",
+          "enabled": 1,
+          "x": 50,
+          "y": 13,
+          "z": 3
+        },
+        {
+          "id": "moon",
+          "enabled": 1,
+          "x": 86,
+          "y": 19,
+          "z": 3
+        },
+        {
+          "id": "graph",
+          "enabled": 1,
+          "x": 15,
+          "y": 77,
+          "z": 0,
+          "options": {
+            "color": "#04ff00",
+            "bg_color": "#000000",
+            "token": "[CGM:glucose]",
+            "interval_min": 5,
+            "points": 60,
+            "gwidth": 60,
+            "gheight": 36,
+            "autoscale": true,
+            "show_axis": true,
+            "show_xaxis": true,
+            "band_on": true,
+            "backfill": true,
+            "show_value": true,
+            "boolean": false,
+            "thick": false,
+            "band_low": 70,
+            "band_high": 180,
+            "y_min": null,
+            "y_max": null,
+            "band_color": "#1ea96d",
+            "warn_color": "#ff5050",
+            "axis_color": "#ffffff"
+          }
+        },
+        {
+          "id": "icon_1",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2,
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "icon_2",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2,
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "icon_3",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2,
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "icon_4",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2,
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "icon_5",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2,
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "icon_6",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2,
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "icon_7",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2,
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "icon_8",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2,
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "tw_1",
+          "enabled": 1,
+          "x": 30,
+          "y": 34,
+          "z": 1,
+          "options": {
+            "family": 4,
+            "size": 36,
+            "show_units": false,
+            "tabular": false,
+            "transparent": false,
+            "color": "#ffffff",
+            "bg_color": "#000000",
+            "width": 0,
+            "align": 1,
+            "slots": [
+              {
+                "text": "[clock]",
+                "duration": 10
+              }
+            ],
+            "color_enabled": false,
+            "scroll": false
+          },
+          "instanced": 1,
+          "name": "Clock"
+        },
+        {
+          "id": "tw_2",
+          "enabled": 1,
+          "x": 91,
+          "y": 60,
+          "z": 2,
+          "options": {
+            "family": 0,
+            "size": 12,
+            "show_units": true,
+            "tabular": false,
+            "transparent": true,
+            "color": "#ffffff",
+            "bg_color": "#000000",
+            "width": 0,
+            "align": 0,
+            "slots": [
+              {
+                "text": "[ampm12]",
+                "duration": 10
+              }
+            ],
+            "color_enabled": false,
+            "scroll": false
+          },
+          "instanced": 1,
+          "name": "AM/PM"
+        },
+        {
+          "id": "tw_3",
+          "enabled": 1,
+          "x": 78,
+          "y": 78,
+          "z": 2,
+          "options": {
+            "family": 1,
+            "size": 12,
+            "show_units": false,
+            "tabular": true,
+            "transparent": false,
+            "color": "#ffffff",
+            "color_enabled": false,
+            "bg_color": "#000000",
+            "width": 0,
+            "align": 0,
+            "scroll": false,
+            "slots": [
+              {
+                "text": "[CGM:glucose]",
+                "duration": 10
+              }
+            ]
+          },
+          "instanced": 1,
+          "name": "Glucose"
+        },
+        {
+          "id": "tw_4",
+          "enabled": 0,
+          "x": 4,
+          "y": 94,
+          "z": 2,
+          "options": {
+            "family": 0,
+            "size": 16,
+            "show_units": true,
+            "tabular": true,
+            "transparent": false,
+            "color": "#ffffff",
+            "bg_color": "#000000",
+            "width": 0,
+            "align": 0,
+            "slots": [
+              {
+                "text": "",
+                "duration": 10
+              }
+            ],
+            "color_enabled": false,
+            "scroll": false
+          },
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "tw_5",
+          "enabled": 0,
+          "x": 4,
+          "y": 4,
+          "z": 2,
+          "options": {
+            "family": 0,
+            "size": 16,
+            "show_units": true,
+            "tabular": true,
+            "transparent": false,
+            "color": "#ffffff",
+            "bg_color": "#000000",
+            "width": 0,
+            "align": 0,
+            "slots": [
+              {
+                "text": "",
+                "duration": 10
+              }
+            ],
+            "color_enabled": false,
+            "scroll": false
+          },
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "tw_6",
+          "enabled": 0,
+          "x": 4,
+          "y": 34,
+          "z": 2,
+          "options": {
+            "family": 0,
+            "size": 16,
+            "show_units": true,
+            "tabular": true,
+            "transparent": false,
+            "color": "#ffffff",
+            "bg_color": "#000000",
+            "width": 0,
+            "align": 0,
+            "slots": [
+              {
+                "text": "",
+                "duration": 10
+              }
+            ],
+            "color_enabled": false,
+            "scroll": false
+          },
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "tw_7",
+          "enabled": 0,
+          "x": 4,
+          "y": 64,
+          "z": 2,
+          "options": {
+            "family": 0,
+            "size": 16,
+            "show_units": true,
+            "tabular": true,
+            "transparent": false,
+            "color": "#ffffff",
+            "bg_color": "#000000",
+            "width": 0,
+            "align": 0,
+            "slots": [
+              {
+                "text": "",
+                "duration": 10
+              }
+            ],
+            "color_enabled": false,
+            "scroll": false
+          },
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "tw_8",
+          "enabled": 0,
+          "x": 4,
+          "y": 94,
+          "z": 2,
+          "options": {
+            "family": 0,
+            "size": 16,
+            "show_units": true,
+            "tabular": true,
+            "transparent": false,
+            "color": "#ffffff",
+            "bg_color": "#000000",
+            "width": 0,
+            "align": 0,
+            "slots": [
+              {
+                "text": "",
+                "duration": 10
+              }
+            ],
+            "color_enabled": false,
+            "scroll": false
+          },
+          "instanced": 0,
+          "name": ""
+        }
+      ],
+      "scroll_text": "[device]: [greeting] [day], [date] [mon], now [temp] today [high]-[low], hum. [hum], sun [rise]-[set]",
+      "weather_theme": 0
+    },
+    "night": {
+      "elements": [
+        {
+          "id": "glucose_level",
+          "enabled": 0,
+          "x": 111,
+          "y": 107,
+          "z": 4
+        },
+        {
+          "id": "glucose_trend",
+          "enabled": 1,
+          "x": 78,
+          "y": 89,
+          "z": 4
+        },
+        {
+          "id": "wifi_off",
+          "enabled": 1,
+          "x": 26,
+          "y": 14,
+          "z": 4
+        },
+        {
+          "id": "weather",
+          "enabled": 1,
+          "x": 32,
+          "y": 11,
+          "z": 3
+        },
+        {
+          "id": "moon",
+          "enabled": 0,
+          "x": 108,
+          "y": 110,
+          "z": 3
+        },
+        {
+          "id": "graph",
+          "enabled": 1,
+          "x": 16,
+          "y": 74,
+          "z": 0,
+          "options": {
+            "color": "#fafafa",
+            "bg_color": "#000000",
+            "token": "[CGM:glucose]",
+            "interval_min": 5,
+            "points": 60,
+            "gwidth": 60,
+            "gheight": 36,
+            "autoscale": true,
+            "show_axis": false,
+            "show_xaxis": false,
+            "band_on": false,
+            "backfill": true,
+            "show_value": false,
+            "boolean": false,
+            "thick": true,
+            "band_low": 70,
+            "band_high": 180,
+            "y_min": null,
+            "y_max": null,
+            "band_color": "#1ea96d",
+            "warn_color": "#ff5050",
+            "axis_color": "#ffffff"
+          }
+        },
+        {
+          "id": "icon_1",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2,
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "icon_2",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2,
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "icon_3",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2,
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "icon_4",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2,
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "icon_5",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2,
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "icon_6",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2,
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "icon_7",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2,
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "icon_8",
+          "enabled": 0,
+          "x": 48,
+          "y": 48,
+          "z": 2,
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "tw_1",
+          "enabled": 1,
+          "x": 25,
+          "y": 33,
+          "z": 1,
+          "options": {
+            "family": 5,
+            "size": 36,
+            "show_units": false,
+            "tabular": false,
+            "transparent": false,
+            "color": "#ffffff",
+            "bg_color": "#000000",
+            "width": 0,
+            "align": 1,
+            "slots": [
+              {
+                "text": "[clock]",
+                "duration": 10
+              }
+            ],
+            "color_enabled": false,
+            "scroll": false
+          },
+          "instanced": 1,
+          "name": "Clock"
+        },
+        {
+          "id": "tw_2",
+          "enabled": 1,
+          "x": 90,
+          "y": 59,
+          "z": 2,
+          "options": {
+            "family": 0,
+            "size": 12,
+            "show_units": true,
+            "tabular": false,
+            "transparent": true,
+            "color": "#ffffff",
+            "bg_color": "#000000",
+            "width": 0,
+            "align": 0,
+            "slots": [
+              {
+                "text": "[ampm12]",
+                "duration": 10
+              }
+            ],
+            "color_enabled": false,
+            "scroll": false
+          },
+          "instanced": 1,
+          "name": "AM/PM"
+        },
+        {
+          "id": "tw_3",
+          "enabled": 1,
+          "x": 76,
+          "y": 74,
+          "z": 2,
+          "options": {
+            "family": 1,
+            "size": 14,
+            "show_units": false,
+            "tabular": true,
+            "transparent": false,
+            "color": "#ffffff",
+            "color_enabled": false,
+            "bg_color": "#000000",
+            "width": 0,
+            "align": 0,
+            "scroll": false,
+            "slots": [
+              {
+                "text": "[CGM:glucose]",
+                "duration": 10
+              }
+            ]
+          },
+          "instanced": 1,
+          "name": "Glucose"
+        },
+        {
+          "id": "tw_4",
+          "enabled": 1,
+          "x": 72,
+          "y": 18,
+          "z": 2,
+          "options": {
+            "family": 1,
+            "size": 10,
+            "show_units": true,
+            "tabular": true,
+            "transparent": false,
+            "color": "#ffffff",
+            "color_enabled": false,
+            "bg_color": "#000000",
+            "width": 0,
+            "align": 0,
+            "scroll": false,
+            "slots": [
+              {
+                "text": "[temp]",
+                "duration": 10
+              }
+            ]
+          },
+          "instanced": 1,
+          "name": "Text 4"
+        },
+        {
+          "id": "tw_5",
+          "enabled": 0,
+          "x": 4,
+          "y": 4,
+          "z": 2,
+          "options": {
+            "family": 0,
+            "size": 16,
+            "show_units": true,
+            "tabular": true,
+            "transparent": false,
+            "color": "#ffffff",
+            "bg_color": "#000000",
+            "width": 0,
+            "align": 0,
+            "slots": [
+              {
+                "text": "",
+                "duration": 10
+              }
+            ],
+            "color_enabled": false,
+            "scroll": false
+          },
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "tw_6",
+          "enabled": 0,
+          "x": 4,
+          "y": 34,
+          "z": 2,
+          "options": {
+            "family": 0,
+            "size": 16,
+            "show_units": true,
+            "tabular": true,
+            "transparent": false,
+            "color": "#ffffff",
+            "bg_color": "#000000",
+            "width": 0,
+            "align": 0,
+            "slots": [
+              {
+                "text": "",
+                "duration": 10
+              }
+            ],
+            "color_enabled": false,
+            "scroll": false
+          },
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "tw_7",
+          "enabled": 0,
+          "x": 4,
+          "y": 64,
+          "z": 2,
+          "options": {
+            "family": 0,
+            "size": 16,
+            "show_units": true,
+            "tabular": true,
+            "transparent": false,
+            "color": "#ffffff",
+            "bg_color": "#000000",
+            "width": 0,
+            "align": 0,
+            "slots": [
+              {
+                "text": "",
+                "duration": 10
+              }
+            ],
+            "color_enabled": false,
+            "scroll": false
+          },
+          "instanced": 0,
+          "name": ""
+        },
+        {
+          "id": "tw_8",
+          "enabled": 0,
+          "x": 4,
+          "y": 94,
+          "z": 2,
+          "options": {
+            "family": 0,
+            "size": 16,
+            "show_units": true,
+            "tabular": true,
+            "transparent": false,
+            "color": "#ffffff",
+            "bg_color": "#000000",
+            "width": 0,
+            "align": 0,
+            "slots": [
+              {
+                "text": "",
+                "duration": 10
+              }
+            ],
+            "color_enabled": false,
+            "scroll": false
+          },
+          "instanced": 0,
+          "name": ""
+        }
+      ],
+      "scroll_text": "[device]: [greeting] [day], [date] [mon], now [temp] today [high]-[low], hum. [hum], sun [rise]-[set]",
+      "weather_theme": 0
+    }
+  }
+}

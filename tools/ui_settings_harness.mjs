@@ -41,6 +41,7 @@ function createNode(tag) {
     id: '',
     children: [],
     parentElement: null,
+    parentNode: null,
     isConnected: false,
     attributes: {},
     dataset: {},
@@ -58,6 +59,19 @@ function createNode(tag) {
     maxLength: -1,
   };
   attachClassList(node, []);
+  if (node.tagName === 'CANVAS') {
+    node.getContext = kind => kind === '2d' ? {
+      font: '',
+      measureText(text) {
+        const size = Number((this.font.match(/([0-9.]+)px/) || [])[1]) || 16;
+        return {
+          width: [...String(text)].length * size * 0.5,
+          actualBoundingBoxAscent: size * 0.7,
+          actualBoundingBoxDescent: size * 0.2
+        };
+      }
+    } : null;
+  }
   let explicit = null;
   Object.defineProperty(node, 'value', {
     get() {
@@ -109,9 +123,26 @@ function createNode(tag) {
   node.addEventListener = (ev, fn) => { (node._listeners[ev] ||= []).push(fn); };
   node.removeEventListener = () => {};
   node.appendChild = (child) => {
+    if (child.parentNode) {
+      const oldIndex = child.parentNode.children.indexOf(child);
+      if (oldIndex >= 0) child.parentNode.children.splice(oldIndex, 1);
+    }
     child.parentElement = node;
+    child.parentNode = node;
     child.isConnected = true;
     node.children.push(child);
+    return child;
+  };
+  node.insertBefore = (child, reference) => {
+    if (child.parentNode) {
+      const oldIndex = child.parentNode.children.indexOf(child);
+      if (oldIndex >= 0) child.parentNode.children.splice(oldIndex, 1);
+    }
+    const index = node.children.indexOf(reference);
+    child.parentElement = node;
+    child.parentNode = node;
+    child.isConnected = true;
+    node.children.splice(index < 0 ? node.children.length : index, 0, child);
     return child;
   };
   node.focus = () => {};
@@ -282,6 +313,13 @@ const sandbox = {
   queueMicrotask,
   structuredClone,
   AbortController,
+  Image: class {},
+  TextEncoder,
+  TextDecoder,
+  getComputedStyle: () => ({
+    fontFamily: '', fontSize: '', fontWeight: '', lineHeight: '', letterSpacing: '',
+    wordSpacing: '', padding: '', borderWidth: '', borderStyle: '', boxSizing: '', tabSize: ''
+  }),
   URL,
   URLSearchParams,
   Intl,
@@ -289,6 +327,8 @@ const sandbox = {
   navigator: { language: 'en-US', clipboard: { async writeText() {} } },
   location: { reload() {} },
   fetch: fetchImpl,
+  defaultLayoutData: fs.readFileSync(path.join(spiffs, 'layouts', 'Default.layout'), 'utf8'),
+  weatherLayoutData: fs.readFileSync(path.join(spiffs, 'layouts', 'Weather.layout'), 'utf8'),
   state,
   localStorage: (() => {
     const m = new Map();
@@ -342,7 +382,7 @@ globalThis.__done = (async () => {
     p25: 'http://old.local', p26: 'old-token', p27: 1, p28: 'old-key', p29: 5,
     p64: 'OLDSTATION', p65: 'old-wu-key', p66: 15,
     p30: 0, p31: '', p32: '', p33: 5, p44: 0, p45: 30, p51: 175, p52: 70,
-    p53: 0, p54: '', p08: 0, p24: 0, p50: 0, p58: '', p59: ''
+    p53: 0, p54: '', p08: 0, p24: 0, p50: 0
   };
 
   await sectionLoaders.settings();
@@ -423,8 +463,6 @@ globalThis.__done = (async () => {
   window.settings.p08 = 1;
   window.settings.p24 = 0;
   window.settings.p50 = 0;
-  window.settings.p58 = '';
-  window.settings.p59 = '';
   screenGridDeviceState = 0;
   const leading = document.createElement('button');
   leading.id = 'screen_show_leading_zero';
@@ -434,18 +472,194 @@ globalThis.__done = (async () => {
   dots.id = 'screen_dots_breathe';
   dots.className = 'gswitch on';
   document.body.appendChild(dots);
-  const list = document.createElement('div');
-  list.id = 'display-schedule-list';
-  list.appendChild(buildSlotRow({ t: 2, d: 15 }));
-  document.body.appendChild(list);
-  const aux = document.createElement('div');
-  aux.id = 'display-schedule-aux-list';
-  aux.appendChild(buildSlotRow({ t: 0, d: 20 }));
-  document.body.appendChild(aux);
 
   const sm = state.posts.length;
   await saveScreenTimeDisplaySettings();
   result.screen = (state.posts.slice(sm).find(p => String(p.url).includes('/api/settings')) || {}).body || null;
+
+  window.screenLayout = prepareScreenLayout(cloneScreenDefaults());
+  window.screenEditor.mode = 'day';
+  const day = getProfileObj('day');
+  const find = id => day.elements.find(e => e.id === id);
+  const widgets = {};
+  widgets.userThemeUploadPath = themeUploadPath('user1-font.jpg');
+  widgets.themePreviewUploadPath = themeUploadPath('bold.jpg');
+  widgets.layoutDisplayName = screenLayoutDisplayName('layouts/Default.layout');
+  widgets.layoutFileUrl = screenFileUrl('layouts/Default.layout');
+  widgets.nestedLayoutSaveName = normalizeDeviceLayoutName('layouts/Default.layout');
+  widgets.layoutTraversalRejected = normalizeDeviceLayoutName('../Default.layout') === null;
+  const originalScreenFiles = window.screenSpiffsFileList;
+  window.screenSpiffsFileList = [
+    { name: 'layouts/Default.layout' }, { name: 'Default.layout' }, { name: 'custom.layout' }
+  ];
+  widgets.layoutNames = getScreenLayoutFileNames();
+  window.screenSpiffsFileList = originalScreenFiles;
+  const defaultTemplate = prepareScreenLayout(JSON.parse(defaultLayoutData));
+  const defaultClock = defaultTemplate.profiles.day.elements.find(e => e.id === 'tw_1');
+  const weatherTemplate = prepareScreenLayout(JSON.parse(weatherLayoutData));
+  const weatherTemperature = weatherTemplate.profiles.day.elements.find(e => e.id === 'tw_3');
+  widgets.templateClock = { name: defaultClock.name, width: defaultClock.options.width, align: defaultClock.options.align };
+  widgets.templateWeatherName = weatherTemperature.name;
+  setScreenSelection(['weather']);
+  renderScreenOptions();
+  widgets.standardDeleteButton = !!el('screenOptions').querySelector('#screen_widget_delete');
+  const weatherThemeSelect = el('screen_weather_theme');
+  widgets.weatherThemeDefault = weatherThemeSelect.value;
+  weatherThemeSelect.value = '4';
+  renderScreenCanvas = () => {};
+  await fire(weatherThemeSelect, 'change');
+  widgets.weatherThemeSelected = day.weather_theme;
+  setScreenSelection(['tw_1']);
+  renderScreenOptions();
+  widgets.instanceDeleteButton = !!el('screenOptions').querySelector('#screen_widget_delete');
+  const tw1 = find('tw_1');
+  const factoryClock = getScreenElementSize(findElementDef('tw_1'), tw1);
+  const factoryAmpm = getScreenElementSize(findElementDef('tw_2'), find('tw_2'));
+  const factoryWidgets = {
+    clock: { name: tw1.name, width: tw1.options.width, align: tw1.options.align, height: factoryClock.h },
+    ampm: { name: find('tw_2').name, width: find('tw_2').options.width, height: factoryAmpm.h },
+    scroll: { name: find('tw_3').name, enabled: find('tw_3').enabled, scroll: find('tw_3').options.scroll, width: find('tw_3').options.width }
+  };
+  Object.assign(tw1, { enabled: 1, x: 20, y: 20 });
+  Object.assign(tw1.options, { family: 0, size: 16 });
+  tw1.options.slots = [{ text: '', duration: 10 }];
+  window.settings.p37 = 0;
+  Object.assign(find('tw_2'), { enabled: 0, instanced: 1, name: 'Off one' });
+  // The factory scroll widget owns tw_3; free it so the add/delete checks below use a free slot.
+  Object.assign(find('tw_3'), { enabled: 0, instanced: 0, name: '' });
+  find('tw_3').options.scroll = false;
+
+  widgets.factory = factoryWidgets;
+  const autoProbe = { ...tw1, options: { ...tw1.options, width: 0, slots: [{ text: 'abc', duration: 10 }] } };
+  widgets.autoWidth = getScreenElementSize(findElementDef('tw_1'), autoProbe).w;
+  const emptyProbe = { ...tw1, options: { ...tw1.options, slots: [{ text: '', duration: 10 }] } };
+  const emptyTokenProbe = { ...tw1, options: { ...tw1.options, slots: [{ text: '[ampm12]', duration: 10 }] } };
+  widgets.emptyHeight = getScreenElementSize(findElementDef('tw_1'), emptyProbe).h;
+  widgets.emptyTokenHeight = getScreenElementSize(findElementDef('tw_1'), emptyTokenProbe).h;
+  widgets.emptyTokenSample = twSampleText(emptyTokenProbe.options, 0);
+  widgets.emptyLineHeight = twLineHeight(emptyProbe.options) + 4;
+  widgets.trashZone = screenPointerOverTrash(562, 522, { left: 100, top: 50, width: 514, height: 514 });
+  widgets.paletteInitial = getScreenPaletteDefs().map(d => d.id);
+
+  // Every canvas repaint normalizes the options again, as the real one does.
+  renderScreenCanvas = () => ensureScreenTwOptions(tw1);
+  setScreenSelection(['tw_1']);
+  renderScreenOptions();
+  const area = el('editor-textarea-tw_1');
+  const optionSections = el('screenOptions').querySelectorAll('.screen-tw-section');
+  const sectionTitleFor = node => node.closest('.screen-tw-section')
+    ?.querySelector('.screen-tw-section-title')?.textContent || '';
+  widgets.optionSectionTitles = optionSections.map(section =>
+    section.querySelector('.screen-tw-section-title')?.textContent || '');
+  widgets.enabledSection = sectionTitleFor(el('screen_element_enabled'));
+  widgets.scrollSection = sectionTitleFor(el('tw_scroll'));
+  widgets.textSection = sectionTitleFor(area);
+  widgets.fontSectionHasPicker = !!optionSections[1]?.querySelector('.tw-font-picker');
+  const fontGroupLabels = el('screenOptions').querySelectorAll('.tw-font-group-label');
+  widgets.fontGroupLabels = fontGroupLabels.map(label => label.textContent);
+  widgets.fontGroupLabelTags = fontGroupLabels.map(label => label.tagName);
+  widgets.contentsLabelTag = el('screenOptions').querySelectorAll('.tw-slots-label')[0]?.tagName || '';
+  widgets.widthSection = optionSections.find(section =>
+    section.querySelectorAll('.form-group').some(row =>
+      (row.children[0]?.textContent || '').startsWith('Width'))
+  )?.querySelector('.screen-tw-section-title')?.textContent || '';
+  for (const ch of '[hour24][colon][min]') {
+    area.value += ch;
+    await fire(area, 'input');
+  }
+  const nixie = el('screenOptions').querySelectorAll('.screen-font-sample-box')
+    .find(button => button.children[1] && button.children[1].textContent === 'Nixie');
+  if (!nixie) throw new Error('missing Nixie font option');
+  widgets.activeFontBeforeChange = el('screenOptions').querySelectorAll('.screen-font-sample-box')
+    .find(button => button.classList.contains('selected'))?.children[1].textContent || '';
+  widgets.fontCards = el('screenOptions').querySelectorAll('.screen-font-sample-box')
+    .map(button => button.children[1].textContent);
+  const sizeSelect = el('screenOptions').querySelectorAll('select')[1];
+  const centerBeforeSizeChange = tw1.x + getScreenElementSize(findElementDef('tw_1'), tw1).w / 2;
+  sizeSelect.value = '24';
+  await fire(sizeSelect, 'change');
+  widgets.centerShiftAfterSizeChange = Math.abs(centerBeforeSizeChange -
+    (tw1.x + getScreenElementSize(findElementDef('tw_1'), tw1).w / 2));
+  await fire(nixie, 'click');
+  widgets.activeFontAfterChange = el('screenOptions').querySelectorAll('.screen-font-sample-box')
+    .find(button => button.classList.contains('selected'))?.children[1].textContent || '';
+  widgets.textAfterFontChange = el('editor-textarea-tw_1').value;
+  widgets.textStoredAfterFontChange = tw1.options.slots[0].text;
+  widgets.familyAfterFontChange = tw1.options.family;
+
+  const defaultColorMode = el('tw_color_mode_default');
+  const customColorMode = el('tw_color_mode_custom');
+  widgets.defaultColorMode = defaultColorMode.checked ? 'default' : 'custom';
+  customColorMode.checked = true;
+  await fire(customColorMode, 'change');
+  const colorInput = el('screenOptions').querySelectorAll('input[type=color]')[0];
+  colorInput.value = '#ff4020';
+  await fire(colorInput, 'input');
+  widgets.customColorEnabled = tw1.options.color_enabled;
+  defaultColorMode.checked = true;
+  customColorMode.checked = false;
+  await fire(defaultColorMode, 'change');
+  widgets.colorModeAfterNone = tw1.options.color_enabled;
+
+  renderScreenCanvas = () => {};
+  addScreenWidgetInstance('text');
+  const tw3 = find('tw_3');
+  widgets.added = { selected: window.screenEditor.selectedId, enabled: tw3.enabled, instanced: tw3.instanced, name: tw3.name, x: tw3.x, y: tw3.y };
+  const nameInput = el('screen_widget_name');
+  nameInput.value = 'Température élevée';
+  await fire(nameInput, 'input');
+  widgets.renamed = tw3.name;
+  widgets.paletteLabel = getScreenPaletteItemLabel(findElementDef('tw_3'), day);
+  await fire(el('screen_widget_delete'), 'click');
+  widgets.paletteAfterDelete = getScreenPaletteDefs().map(d => d.id);
+  widgets.deletedInstanced = find('tw_3').instanced;
+  addScreenWidgetInstance('text');
+  const dragDelete = find('tw_3');
+  window.screenEditor.dragging = {
+    id: 'tw_3', elem: dragDelete, fromPalette: false, moved: true, deleteTarget: true,
+    members: [{ id: 'tw_3' }]
+  };
+  onScreenPointerUp({});
+  widgets.deletedByDrop = find('tw_3').instanced;
+  const weatherWidget = find('weather');
+  window.screenEditor.dragging = {
+    id: 'weather', elem: weatherWidget, fromPalette: false, moved: true, deleteTarget: true,
+    members: [{ id: 'weather' }]
+  };
+  onScreenPointerUp({});
+  widgets.disabledByTrash = weatherWidget.enabled;
+
+  window.settings.tz_iana = 'Etc/UTC';
+  const noon = new Date(Date.UTC(2026, 9, 16, 15, 7));
+  window.settings.p37 = 0;
+  widgets.clock24 = twExpandText('[hour24][colon][min]', true, noon);
+  window.settings.p37 = 1;
+  window.settings.p24 = 1;
+  widgets.clock12 = twExpandText('[clock][ampm12]', true, noon);
+  window.settings.p24 = 0;
+  widgets.clock12NoZero = twExpandText('[clock]', true, noon);
+  widgets.stripped = twExpandText('[temp]', false, noon);
+  widgets.unknown = twExpandText('[bogus]', true, noon);
+
+  const wire = encodeScreenLayoutBinary(window.screenLayout);
+  tw1.options.color_enabled = true;
+  tw1.options.color = '#ff4020';
+  const colorWire = encodeScreenLayoutBinary(window.screenLayout);
+  const back = decodeScreenLayoutBinary(colorWire);
+  const backTw2 = back.profiles.day.elements.find(e => e.id === 'tw_2');
+  const backTw1 = back.profiles.day.elements.find(e => e.id === 'tw_1');
+  widgets.colorOverrideWire = { enabled: backTw1.options.color_enabled, color: backTw1.options.color };
+  widgets.wire = { size: colorWire.byteLength, expected: SCREEN_BIN_FULL_WIRE_SIZE, weatherThemeDay: back.profiles.day.weather_theme, weatherThemeNight: back.profiles.night.weather_theme, tw2: { enabled: backTw2.enabled, instanced: backTw2.instanced, name: backTw2.name } };
+  const v3 = colorWire.slice();
+  v3[SCREEN_BIN_WIRE_SIZE + 4] = SCREEN_BIN_EXT_VERSION_V3;
+  const v3Back = decodeScreenLayoutBinary(v3);
+  widgets.v3Decoded = v3Back.profiles.day.elements.some(e => e.id === 'tw_1');
+  widgets.v3ColorOverride = v3Back.profiles.day.elements.find(e => e.id === 'tw_1').options.color_enabled;
+  const v2 = wire.slice(0, SCREEN_BIN_FULL_WIRE_SIZE_V2);
+  v2[SCREEN_BIN_WIRE_SIZE + 4] = SCREEN_BIN_EXT_VERSION_V2;
+  widgets.v2Decoded = decodeScreenLayoutBinary(v2).profiles.day.elements.some(e => e.id === 'tw_1');
+
+  result.widgets = widgets;
   return result;
 })();
 `;

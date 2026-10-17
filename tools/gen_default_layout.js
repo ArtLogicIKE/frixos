@@ -1,4 +1,4 @@
-// Generates spiffs/default.layout by running the screen editor's OWN default
+// Generates spiffs/layouts/default.layout by running the screen editor's OWN default
 // layout code (cloneScreenDefaults -> prepareScreenLayoutForExport), so the
 // preset is byte-identical to what the editor's old "Restore default" produced
 // and what saveScreenLayoutToFile() would download. Run: node tools/gen_default_layout.js
@@ -49,12 +49,12 @@ const bytes = vm.runInContext(
   `encodeScreenLayoutBinary(window.screenLayout).byteLength;`,
   sandbox
 );
-const expected = vm.runInContext(`SCREEN_BIN_WIRE_SIZE;`, sandbox);
+const expected = vm.runInContext(`SCREEN_BIN_FULL_WIRE_SIZE;`, sandbox);
 if (bytes !== expected) {
   console.error(`FAIL: encodes to ${bytes} bytes, expected ${expected}`);
   process.exit(1);
 }
 
-const out = path.join(root, 'spiffs/default.layout');
+const out = path.join(root, 'spiffs/layouts/default.layout');
 fs.writeFileSync(out, json + '\n');
 console.log(`Wrote ${out} (${json.length} chars, encodes to ${bytes} bytes OK)`);
