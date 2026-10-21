@@ -1594,7 +1594,7 @@ void startup_integrations(void)
     BaseType_t task_created = xTaskCreatePinnedToCore(
         integration_update_task,         // Task function
         "integration_update_task",       // Task name
-        8960,                            // Reduced proportionally from 10240 words
+        8448,                            // 5736 B peak measured on fw 72 (HA + LibreView) + 25% + 1 KB
         NULL,                            // Task parameters
         3,                               // Task priority (reduced from 5 to 3)
         &integration_update_task_handle, // Task handle

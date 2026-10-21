@@ -1226,7 +1226,7 @@ void startup_threads()
   xTaskCreatePinnedToCore(
       display_task,   /* Task function. */
       "display_task", /* name of task, from f-display.c */
-      8960,           /* Stack size of task (reduced proportionally) */
+      6656,           /* 4452 B peak measured on fw 72 + 25% + 1 KB */
       NULL,           /* parameter of the task */
       4,              /* above wifi_task so a 1 s notify cannot preempt a blit */
       NULL,           /* Task handle to keep track of created task */
