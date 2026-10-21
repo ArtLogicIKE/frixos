@@ -49,5 +49,7 @@ void f_ota_start_update_thread(void);
 void f_ota_stop_update_thread(void);
 void f_ota_trigger_update(void);
 void f_ota_trigger_reinstall(void);
+// Lowest free stack (bytes) seen by an OTA run; SIZE_MAX before the first run.
+size_t f_ota_stack_free_min(void);
 
 #endif // F_OTA_H 

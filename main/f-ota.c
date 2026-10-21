@@ -35,6 +35,8 @@ static bool ota_thread_enabled = false;
 static bool ota_task_running = false;
 static bool ota_run_pending = false;
 static bool ota_reinstall_mode = false;
+// Lowest free stack seen by any OTA run (the task is gone between runs).
+static size_t ota_stack_free_min = SIZE_MAX;
 
 // Internal function declarations
 static esp_err_t download_file(const char *url, const char *dest_path, int *progress,
@@ -1528,6 +1530,8 @@ static void ota_update_task(void *pvParameters)
             }
 
             stack_free_bytes = uxTaskGetStackHighWaterMark(NULL) * sizeof(StackType_t);
+            if (stack_free_bytes < ota_stack_free_min)
+                ota_stack_free_min = stack_free_bytes;
             ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "OTA update finished - Stack free: %u bytes", (unsigned)stack_free_bytes);
         }
         else
@@ -1598,6 +1602,11 @@ static void ota_run(bool reinstall)
                     (unsigned)heap_caps_get_free_size(MALLOC_CAP_8BIT),
                     (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
     }
+}
+
+size_t f_ota_stack_free_min(void)
+{
+    return ota_stack_free_min;
 }
 
 void f_ota_trigger_update(void)
