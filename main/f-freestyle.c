@@ -923,6 +923,12 @@ static bool login_request(bool *redirected)
                 ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "login_freestyle: Failed to recreate client after SSL failure");
             }
         }
+        else
+        {
+            // A read timeout (EAGAIN) leaves the client mid-request; the next perform
+            // would only wait for headers again. Close so the next request starts clean.
+            freestyle_reset_connection();
+        }
     }
 
     free(post_data);
@@ -1000,7 +1006,12 @@ static bool fetch_patient_id(void)
     bool success = false;
     esp_err_t patient_err = esp_http_client_perform(freestyle_client);
     if (patient_err != ESP_OK)
+    {
         ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Freestyle connections HTTP %s (errno %d)", esp_err_to_name(patient_err), esp_http_client_get_errno(freestyle_client));
+        // A read timeout (EAGAIN) leaves the client mid-request and every later
+        // perform only waits for headers again; close so the retry sends a new request.
+        freestyle_reset_connection();
+    }
     if (patient_err == ESP_OK)
     {
         int status_code = esp_http_client_get_status_code(freestyle_client);
