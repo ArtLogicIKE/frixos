@@ -1169,10 +1169,10 @@ bool fetch_freestyle_glucose(void)
         }
         else
         {
+            // Transport failure (often a TLS handshake that ran out of heap): the
+            // token is still valid, and re-login is the costliest request (~45 KB).
             ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Freestyle fetch failed: %s (errno %d)", esp_err_to_name(http_err), esp_http_client_get_errno(freestyle_client));
             freestyle_reset_connection();
-            eeprom_libre_token[0] = '\0';
-            eeprom_libre_patient_id[0] = '\0';
         }
 
         // Disable chunk processing mode and release SSL semaphore before any retry/return.
@@ -1182,6 +1182,10 @@ bool fetch_freestyle_glucose(void)
 
         if (success)
             return true;
+
+        // A transfer cut mid-stream leaves only the oldest graphData points; a
+        // graph backfill seeded from that would keep a gap until the ring rolls over.
+        cgm_history_begin();
     }
 
     ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Freestyle fetch failed (retry)");

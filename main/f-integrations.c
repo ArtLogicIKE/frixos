@@ -12,6 +12,7 @@
 #include "esp_heap_caps.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/event_groups.h"
 #include "esp_wifi.h"
 #include "esp_netif.h"
 #include "esp_tls.h"     // Added for TLS types
@@ -166,6 +167,9 @@ const int32_t int_update_secs = 60; // update timer should tick every 60 seconds
 static time_t ha_http_connect_backoff_until = 0;
 /** Set when a HA entity hit connect error; skip remaining entities this cycle. */
 static bool ha_abort_remaining_tokens = false;
+/** Freestyle backoff after failed fetches; cleared on success and on a settings change. */
+static uint8_t freestyle_failures = 0;
+static time_t freestyle_retry_after = 0;
 
 // One TLS session at a time, device-wide. Recursive so nested helpers can re-take it.
 static SemaphoreHandle_t ssl_connection_semaphore = NULL;
@@ -175,12 +179,37 @@ static SemaphoreHandle_t ssl_connection_semaphore = NULL;
 static const char *ssl_semaphore_holder = NULL; // Track which function currently holds the semaphore
 static int ssl_semaphore_depth = 0;             // Only touched by the holder
 
+// Boot gate: a TLS session (36-49 KB) started while httpd/mDNS/LVGL are still
+// allocating starved the WiFi driver and aborted the boot.
+static EventGroupHandle_t ssl_startup_gate = NULL;
+#define SSL_STARTUP_GATE_BIT BIT0
+#define SSL_STARTUP_GATE_MAX_WAIT_MS (60 * 1000)
+
+void ssl_startup_gate_open(void)
+{
+    if (ssl_startup_gate != NULL)
+    {
+        xEventGroupSetBits(ssl_startup_gate, SSL_STARTUP_GATE_BIT);
+        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "TLS startup gate open");
+    }
+}
+
 bool acquire_ssl_semaphore(const char *function_name)
 {
     if (ssl_connection_semaphore == NULL)
     {
         ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "SSL semaphore not initialized");
         return false;
+    }
+
+    // Proceed anyway after the max wait so a stalled boot never blocks TLS forever.
+    if (ssl_startup_gate != NULL &&
+        !(xEventGroupWaitBits(ssl_startup_gate, SSL_STARTUP_GATE_BIT, pdFALSE, pdTRUE,
+                              pdMS_TO_TICKS(SSL_STARTUP_GATE_MAX_WAIT_MS)) & SSL_STARTUP_GATE_BIT))
+    {
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "TLS startup gate still closed after %ds, proceeding (%s)",
+                    SSL_STARTUP_GATE_MAX_WAIT_MS / 1000, function_name ? function_name : "?");
+        xEventGroupSetBits(ssl_startup_gate, SSL_STARTUP_GATE_BIT);
     }
 
     if (xSemaphoreTakeRecursive(ssl_connection_semaphore, pdMS_TO_TICKS(SSL_SEMAPHORE_TIMEOUT_MS)) != pdTRUE)
@@ -1060,13 +1089,32 @@ static void integration_update_task(void *pvParameters)
                 // Freestyle Libre integration, always update if active 
                 if (integration_active[INTEGRATION_FREESTYLE])
                 {
-                    if (time(NULL) - integration_last_update[INTEGRATION_FREESTYLE] >= (eeprom_glucose_refresh * 60))
+                    time_t now_fs = time(NULL);
+                    if (now_fs - integration_last_update[INTEGRATION_FREESTYLE] >= (eeprom_glucose_refresh * 60) &&
+                        now_fs >= freestyle_retry_after)
                     {
                         if (!freestyle_client_initialized)
                             init_freestyle_client();
 
                         if (fetch_freestyle_glucose())
+                        {
                             update_ok[INTEGRATION_FREESTYLE] = true;
+                            freestyle_failures = 0;
+                            freestyle_retry_after = 0;
+                        }
+                        else
+                        {
+                            // 30 s, 60 s, 120 s ... capped at the refresh interval
+                            if (freestyle_failures < 6)
+                                freestyle_failures++;
+                            time_t backoff = (time_t)30 << (freestyle_failures - 1);
+                            time_t cap = (time_t)eeprom_glucose_refresh * 60;
+                            if (cap > 0 && backoff > cap)
+                                backoff = cap;
+                            freestyle_retry_after = now_fs + backoff;
+                            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Freestyle failed %u time(s), next try in %lds",
+                                        freestyle_failures, (long)backoff);
+                        }
                     }
                 }
 
@@ -1463,6 +1511,8 @@ void parse_integrations(void)
     }
 
     // force updating of the integrations
+    freestyle_failures = 0;
+    freestyle_retry_after = 0;
     integration_last_update[INTEGRATION_HA] = 0;
     integration_last_update[INTEGRATION_STOCK] = 0;
     integration_last_update[INTEGRATION_DEXCOM] = 0;
@@ -1529,6 +1579,7 @@ void startup_integrations(void)
         ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "SSL semaphore create failed");
         return;
     }
+    ssl_startup_gate = xEventGroupCreate();
     ESP_LOG_WEB(ESP_LOG_INFO, TAG, "SSL semaphore ready");
 
     // parse for any active integrations
@@ -1591,6 +1642,8 @@ void force_integration_update(void)
 
     ha_http_connect_backoff_until = 0;
     ha_abort_remaining_tokens = false;
+    freestyle_failures = 0;
+    freestyle_retry_after = 0;
 
     // Reset last update times to force immediate update
     integration_last_update[INTEGRATION_HA] = 0;

@@ -135,7 +135,6 @@ static bool icon_src_ok[SCREEN_ICON_COUNT] = {false};
 // the display task under the LVGL lock, so it never races the renderer.
 lv_obj_t *graph_canvas = NULL;
 static uint8_t *graph_canvas_buf = NULL;
-static size_t graph_canvas_buf_size = 0;
 // Set by display_changed() so the next update_graph() redraws immediately on a
 // config edit instead of waiting for the next sample.
 static bool graph_force_redraw = false;
@@ -2600,7 +2599,6 @@ void update_graph(void)
       {
         free(graph_canvas_buf);
         graph_canvas_buf = NULL;
-        graph_canvas_buf_size = 0;
       }
       lvgl_port_unlock();
       last_render_shown = false;
@@ -2743,20 +2741,18 @@ void update_graph(void)
 
   lvgl_port_lock(0);
   lv_obj_add_flag(graph_canvas, LV_OBJ_FLAG_HIDDEN);
-  // (Re)allocate the RGB565 buffer at the configured size (under the LVGL lock,
-  // display task only — never races the renderer). Smaller than max => less heap.
-  size_t need = (size_t)gw * gh * 2;
-  if (graph_canvas_buf_size != need)
+  // Allocated once at max size: resizing on every layout/profile change
+  // fragmented the heap and the realloc then failed on each render.
+  if (graph_canvas_buf == NULL)
   {
-    uint8_t *nb = realloc(graph_canvas_buf, need);
-    if (!nb)
+    size_t need = (size_t)GRAPH_MAX_W * GRAPH_MAX_H * 2;
+    graph_canvas_buf = malloc(need);
+    if (!graph_canvas_buf)
     {
       ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "graph_canvas_buf alloc %u failed", (unsigned)need);
       lvgl_port_unlock();
       return;
     }
-    graph_canvas_buf = nb;
-    graph_canvas_buf_size = need;
   }
   lv_canvas_set_buffer(graph_canvas, graph_canvas_buf, gw, gh, LV_COLOR_FORMAT_RGB565);
   lv_canvas_fill_bg(graph_canvas, col_bg, LV_OPA_COVER);

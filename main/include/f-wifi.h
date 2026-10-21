@@ -39,7 +39,6 @@ extern char greeting[64];
 // OTA update thread control
 extern TaskHandle_t ota_update_task_handle;
 extern bool ota_update_pending;
-extern SemaphoreHandle_t ota_update_semaphore;
 
 //Generate function prototypes for f-wifi.c here. Include and neccessary #includes
 void initialize_mdns(void);

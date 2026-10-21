@@ -15,6 +15,7 @@
 #include "f-dns.h"
 #include "f-settings.h"
 #include "f-display.h"
+#include "f-integrations.h"
 
 #define WIFI_TIMEOUT_SEC 60
 #define AP_SSID "frixos"
@@ -264,6 +265,8 @@ void provision_init(void)
 
         ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Start HTTP server");
         init_settings_server();
+        // app_main does not reach "Startup complete" while the portal runs.
+        ssl_startup_gate_open();
 
         // Start provisioning timeout timer
         ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Provisioning timeout %d min", PROVISIONING_TIMEOUT_MINUTES);

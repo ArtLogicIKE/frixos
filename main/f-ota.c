@@ -30,8 +30,11 @@ static int64_t last_check_us = 0;
 
 // OTA update thread control
 TaskHandle_t ota_update_task_handle = NULL;
-SemaphoreHandle_t ota_update_semaphore = NULL;
-static volatile bool ota_reinstall_mode = false;
+static portMUX_TYPE ota_task_lock = portMUX_INITIALIZER_UNLOCKED;
+static bool ota_thread_enabled = false;
+static bool ota_task_running = false;
+static bool ota_run_pending = false;
+static bool ota_reinstall_mode = false;
 
 // Internal function declarations
 static esp_err_t download_file(const char *url, const char *dest_path, int *progress,
@@ -1505,109 +1508,104 @@ void f_ota_reinstall_current(void)
     f_ota_do_update(fwversion);
 }
 
-// OTA update thread function
+// Runs on demand and deletes itself: the 10 KB stack was idle >99% of the time.
 static void ota_update_task(void *pvParameters)
 {
-    while (1)
+    bool reinstall = (bool)(uintptr_t)pvParameters;
+    for (;;)
     {
-        // Wait for the semaphore to be given
-        if (xSemaphoreTake(ota_update_semaphore, portMAX_DELAY) == pdTRUE)
+        if (wifi_connected)
         {
-            bool reinstall = ota_reinstall_mode;
-            ota_reinstall_mode = false;
-
-            if (wifi_connected)
+            size_t stack_free_bytes = uxTaskGetStackHighWaterMark(NULL) * sizeof(StackType_t);
+            ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "OTA update starting - Stack free: %u bytes", (unsigned)stack_free_bytes);
+            if (reinstall)
             {
-                // Log stack high water mark before update
-                size_t stack_free_bytes = uxTaskGetStackHighWaterMark(NULL) * sizeof(StackType_t);
-                ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "OTA update starting - Stack free: %u bytes", (unsigned)stack_free_bytes);
-                if (reinstall)
-                {
-                    f_ota_reinstall_current();
-                }
-                else
-                {
-                    f_ota_check_update();
-                }
-
-                // Log stack high water mark after update
-                stack_free_bytes = uxTaskGetStackHighWaterMark(NULL) * sizeof(StackType_t);
-                ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "OTA update finished - Stack free: %u bytes", (unsigned)stack_free_bytes);
+                f_ota_reinstall_current();
             }
             else
             {
-                ESP_LOG_WEB(ESP_LOG_WARN, TAG, "OTA update skipped - WiFi not connected");
+                f_ota_check_update();
             }
+
+            stack_free_bytes = uxTaskGetStackHighWaterMark(NULL) * sizeof(StackType_t);
+            ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "OTA update finished - Stack free: %u bytes", (unsigned)stack_free_bytes);
+        }
+        else
+        {
+            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "OTA update skipped - WiFi not connected");
+        }
+
+        taskENTER_CRITICAL(&ota_task_lock);
+        bool again = ota_run_pending;
+        reinstall = ota_reinstall_mode;
+        ota_run_pending = false;
+        ota_reinstall_mode = false;
+        if (!again)
+        {
+            ota_update_task_handle = NULL;
+            ota_task_running = false;
+        }
+        taskEXIT_CRITICAL(&ota_task_lock);
+        if (!again)
+        {
+            vTaskDelete(NULL);
         }
     }
 }
 
 void f_ota_start_update_thread(void)
 {
-    // Create OTA update semaphore
-    ota_update_semaphore = xSemaphoreCreateBinary();
-    if (ota_update_semaphore == NULL)
-    {
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to create OTA update semaphore");
-        return;
-    }
-
-    // Create OTA update task on APP_CPU (core 1). Same rationale as wifi_task /
-    // integration_update_task: keep heavy HTTP / mbedtls work off PRO_CPU so
-    // WiFi, lwIP and httpd remain responsive.
-    // 10240: manifest ECDSA verification (mbedtls_pk_verify) runs on this
-    // task and needs several KB of stack on top of the HTTP/download paths.
-    BaseType_t xReturned = xTaskCreatePinnedToCore(
-        ota_update_task,
-        "ota_update_task",
-        10240,
-        NULL,
-        3,
-        &ota_update_task_handle,
-        1); // APP_CPU
-
-    if (xReturned != pdPASS)
-    {
-        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to create OTA update task");
-        vSemaphoreDelete(ota_update_semaphore);
-        ota_update_semaphore = NULL;
-        return;
-    }
-
-    // Enable stack monitoring for the OTA update task
-    size_t stack_free_bytes = uxTaskGetStackHighWaterMark(ota_update_task_handle) * sizeof(StackType_t);
-    ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "OTA update task created with initial stack free: %u bytes", (unsigned)stack_free_bytes);
+    ota_thread_enabled = true;
 }
 
 void f_ota_stop_update_thread(void)
 {
-    // Cleanup OTA update task and semaphore
-    if (ota_update_task_handle != NULL)
+    ota_thread_enabled = false;
+}
+
+static void ota_run(bool reinstall)
+{
+    if (!ota_thread_enabled)
     {
-        vTaskDelete(ota_update_task_handle);
-        ota_update_task_handle = NULL;
+        return;
     }
-    if (ota_update_semaphore != NULL)
+
+    taskENTER_CRITICAL(&ota_task_lock);
+    bool running = ota_task_running;
+    if (running)
     {
-        vSemaphoreDelete(ota_update_semaphore);
-        ota_update_semaphore = NULL;
+        ota_run_pending = true;
+        ota_reinstall_mode = ota_reinstall_mode || reinstall;
+    }
+    ota_task_running = true;
+    taskEXIT_CRITICAL(&ota_task_lock);
+    if (running)
+    {
+        return;
+    }
+
+    // APP_CPU, like wifi_task / integration_update_task: keep HTTP and the
+    // manifest ECDSA verification (needs several KB of stack) off PRO_CPU.
+    if (xTaskCreatePinnedToCore(ota_update_task, "ota_update_task", 10240,
+                                (void *)(uintptr_t)reinstall, 3, &ota_update_task_handle, 1) != pdPASS)
+    {
+        taskENTER_CRITICAL(&ota_task_lock);
+        ota_task_running = false;
+        ota_run_pending = false;
+        ota_reinstall_mode = false;
+        taskEXIT_CRITICAL(&ota_task_lock);
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "OTA task create failed (heap %u, largest %u), retry next interval",
+                    (unsigned)heap_caps_get_free_size(MALLOC_CAP_8BIT),
+                    (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
     }
 }
 
 void f_ota_trigger_update(void)
 {
-    ota_reinstall_mode = false;
-    if (ota_update_semaphore != NULL)
-    {
-        xSemaphoreGive(ota_update_semaphore);
-    }
+    ota_run(false);
 }
 
 void f_ota_trigger_reinstall(void)
 {
-    ota_reinstall_mode = true;
-    if (ota_update_semaphore != NULL)
-    {
-        xSemaphoreGive(ota_update_semaphore);
-    }
+    ota_run(true);
 }

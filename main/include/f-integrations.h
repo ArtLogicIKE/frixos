@@ -52,5 +52,7 @@ void free_integration_tokens_array(integration_token_t *tokens, int count);
 // SSL connection semaphore helpers (must be used before any SSL connection)
 bool acquire_ssl_semaphore(const char *function_name);
 void release_ssl_semaphore(void);
+// Called once boot is complete; TLS sessions wait for it (bounded wait).
+void ssl_startup_gate_open(void);
 
 #endif // F_INTEGRATIONS_H 
