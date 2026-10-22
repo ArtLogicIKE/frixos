@@ -225,6 +225,12 @@ void screen_layout_file_load(void)
     eeprom_screen_layout.version = FRIXOS_SCREEN_LAYOUT_VERSION;
     eeprom_screen_layout.scroll_delay = (uint8_t)clamp_int(header.scroll_delay, 30, 255);
     eeprom_screen_layout.reserved = 0;
+    // The aux digit themes live only in the layout header (the day/night themes are NVS
+    // settings), so restore them here or they fall back to the defaults on every boot.
+    if (header.day_aux_font[0] != '\0')
+        copy_font_field(eeprom_aux_font[0], sizeof(eeprom_aux_font[0]), header.day_aux_font);
+    if (header.night_aux_font[0] != '\0')
+        copy_font_field(eeprom_aux_font[1], sizeof(eeprom_aux_font[1]), header.night_aux_font);
     for (int pi = 0; pi < FRIXOS_SCREEN_LAYOUT_PROFILES; pi++)
         sanitize_profile(&eeprom_screen_layout.profile[pi]);
     screen_layout_sync_legacy_eeprom(&eeprom_screen_layout);
