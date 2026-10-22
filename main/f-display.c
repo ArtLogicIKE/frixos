@@ -3755,8 +3755,14 @@ void display_task(void *pvParameters)
     // before one, so the 1 s schedule poll cannot share a frame with a blit.
     // Between the calls that do run, paint one owed pixel. A slow section
     // holds the belt for that step; it does not skip ahead.
-    if (!scroll_busy)
+    // When belt steps take longer than their interval (a scroll area over slow-to-draw
+    // images) the loop is busy on every pass; still run this work once a second, or the
+    // clock, the light sensor and the icons stop updating.
+    static int64_t last_housekeeping_us = 0;
+    const int64_t loop_now_us = esp_timer_get_time();
+    if (!scroll_busy || loop_now_us - last_housekeeping_us > 1000000)
     {
+      last_housekeeping_us = loop_now_us;
       int64_t t0 = esp_timer_get_time();
       handle_screen_layout_on_wifi();
       stall_note("layout", esp_timer_get_time() - t0);
