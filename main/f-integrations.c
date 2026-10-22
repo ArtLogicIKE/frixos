@@ -81,8 +81,45 @@ bool init_integration_token(integration_token_t *token, const char *name, const 
 
     // Initialize value to "-"
     strcpy(token->value, "-");
+    token->decimals = -1;
 
     return true;
+}
+
+// Strips a trailing ".N" (N = 0..6) decimals suffix from an HA token part and returns N, or -1.
+// Entity ids and JSON keys never end in ".<digit>", but an entity id keeps its own dot: a bare
+// entity needs one more dot before the suffix (sensor.power.1, not sensor.1).
+static int take_decimals_suffix(char *s, bool keep_one_dot)
+{
+    size_t n = strlen(s);
+    if (n < 3 || s[n - 2] != '.' || s[n - 1] < '0' || s[n - 1] > '6')
+        return -1;
+    if (keep_one_dot && memchr(s, '.', n - 2) == NULL)
+        return -1;
+    s[n - 2] = '\0';
+    return s[n - 1] - '0';
+}
+
+// Rounds a numeric value to `decimals` places in place; text values are left as they are.
+static void apply_token_decimals(char *value, size_t size, int decimals)
+{
+    if (decimals < 0)
+        return;
+    char *end = NULL;
+    double v = strtod(value, &end);
+    if (end == value)
+        return;
+    while (*end == ' ')
+        end++;
+    if (*end != '\0')
+        return;
+    char buf[32];
+    snprintf(buf, sizeof(buf), "%.*f", decimals, v);
+    // -0.04 rounds to "-0" or "-0.0"; show it without the sign.
+    const char *out = buf;
+    if (buf[0] == '-' && strspn(buf + 1, "0.") == strlen(buf + 1))
+        out = buf + 1;
+    snprintf(value, size, "%s", out);
 }
 
 void free_integration_token(integration_token_t *token)
@@ -511,6 +548,7 @@ static bool fetch_ha_entity(integration_token_t *token)
                     size_t copy_len = min(len, sizeof(token->value) - 1);
                     strncpy(token->value, start, copy_len);
                     token->value[copy_len] = '\0';
+                    apply_token_decimals(token->value, sizeof(token->value), token->decimals);
                 }
                 else
                 {
@@ -840,6 +878,11 @@ static void graph_service_backfill(void)
             path[plen] = '\0';
         }
     }
+    // A ".N" decimals suffix only formats the shown value; history uses the plain entity/key.
+    if (path[0] != '\0')
+        take_decimals_suffix(path, false);
+    else
+        take_decimals_suffix(entity, true);
 
     if (!is_wifi_connected())
         return;
@@ -1284,6 +1327,11 @@ void parse_HA_entities(const char *input)
             path_allocated = true;
         }
 
+        // [HA:sensor.power.1] / [HA:sensor.power:state.1]: show the value with 1 decimal.
+        // The token name keeps the suffix, so the message text still matches it.
+        const int decimals = path_allocated ? take_decimals_suffix(path_str, false)
+                                            : take_decimals_suffix(entity_str, true);
+
         // Store the complete token name
         size_t name_len = end - token_start + 1;
         char *name_str = (char *)malloc(name_len + 1);
@@ -1322,6 +1370,7 @@ void parse_HA_entities(const char *input)
             }
             break;
         }
+        integration_active_tokens[INTEGRATION_HA][token_index].decimals = (int8_t)decimals;
 
         // Free temporary strings (they've been copied into the token)
         free(name_str);

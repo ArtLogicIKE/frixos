@@ -24,7 +24,8 @@ typedef struct {
         char *name;          // Token name as it appears in the message (e.g. "[HA:sensor.temperature:state]") - dynamically allocated
         char *entity;        // Home Assistant entity ID, stock symbol, etc. - dynamically allocated
         char *path;          // JSON path to extract value - dynamically allocated
-        char value[64];      // Current value (will be updated by HA integration) - static buffer        
+        char value[64];      // Current value (will be updated by HA integration) - static buffer
+        int8_t decimals;     // Digits after the point from a ".N" token suffix; -1 = as received
 } integration_token_t;
 
 // Global variables for integrations
