@@ -111,6 +111,11 @@ def main():
     args = ap.parse_args()
     if args.files_only and args.firmware_only:
         sys.exit("error: --files-only and --firmware-only are mutually exclusive")
+    config_h = REPO / "main" / "include" / "config.h"
+    if not args.files_only and config_h.is_file() and \
+            "FRIXOS_DISABLE_AUTO_OTA (1 + 0)" in config_h.read_text(encoding="utf-8"):
+        sys.exit("error: build/frixos.bin was built with DISABLE_AUTO_OTA=1; devices running it "
+                 "would never update again. Clear it in .env and rebuild.")
 
     ver_dir = WWW / str(args.version)
     manifest_out = ver_dir / "manifest.txt"
