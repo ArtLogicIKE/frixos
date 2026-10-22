@@ -2993,24 +2993,37 @@ static void handle_screen_layout_on_wifi(void)
   display_changed();
 }
 
+static void display_apply(bool restart_schedule);
+
 // this is the initialization needed when stuff about the display has changed
 void display_changed(void)
+{
+  display_apply(true);
+}
+
+// restart_schedule: start the clock/glucose/weather alternation from its first slot. A day/night
+// switch keeps it running, since both profiles share one schedule; restarting it on every switch
+// left the clock stuck on the first slot while the light hovered around the threshold.
+static void display_apply(bool restart_schedule)
 {
   lv_obj_t *scr = lv_scr_act();
   char buf[128];
   /* Task lock */
 
   sync_schedule_runners();
-  primary_runner.slot_start = 0;
-  primary_runner.current_idx = 0;
-  primary_runner.showing_glucose = false;
-  primary_runner.showing_weather = false;
-  primary_runner.showing_ha = false;
-  aux_runner.slot_start = 0;
-  aux_runner.current_idx = 0;
-  aux_runner.showing_glucose = false;
-  aux_runner.showing_weather = false;
-  aux_runner.showing_ha = false;
+  if (restart_schedule)
+  {
+    primary_runner.slot_start = 0;
+    primary_runner.current_idx = 0;
+    primary_runner.showing_glucose = false;
+    primary_runner.showing_weather = false;
+    primary_runner.showing_ha = false;
+    aux_runner.slot_start = 0;
+    aux_runner.current_idx = 0;
+    aux_runner.showing_glucose = false;
+    aux_runner.showing_weather = false;
+    aux_runner.showing_ha = false;
+  }
 
   lvgl_port_lock(0);
   lv_image_header_cache_drop(NULL); // files may have been uploaded or renamed under the same name
@@ -3299,7 +3312,12 @@ static void handle_als_and_brightness(uint32_t loop_counter)
     ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Font %u->%u (mode %u lux %.1f thres %.1f)",
                 old_font_index, font_index, eeprom_dim_mode, lux, eeprom_lux_threshold);
     set_led_pwm_brightness(eeprom_brightness_LED[font_index]);
-    display_changed();
+    display_apply(false);
+    // The schedule did not restart, so nothing else redraws the digits for the new profile now.
+    time_t now;
+    time(&now);
+    if (time_valid)
+      update_display_content(now);
   }
 }
 
