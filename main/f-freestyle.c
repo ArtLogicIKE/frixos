@@ -923,6 +923,12 @@ static bool login_request(bool *redirected)
                 ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "login_freestyle: Failed to recreate client after SSL failure");
             }
         }
+        else
+        {
+            // A read timeout (EAGAIN) leaves the client mid-request; the next perform
+            // would only wait for headers again. Close so the next request starts clean.
+            freestyle_reset_connection();
+        }
     }
 
     free(post_data);
@@ -1000,7 +1006,12 @@ static bool fetch_patient_id(void)
     bool success = false;
     esp_err_t patient_err = esp_http_client_perform(freestyle_client);
     if (patient_err != ESP_OK)
+    {
         ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Freestyle connections HTTP %s (errno %d)", esp_err_to_name(patient_err), esp_http_client_get_errno(freestyle_client));
+        // A read timeout (EAGAIN) leaves the client mid-request and every later
+        // perform only waits for headers again; close so the retry sends a new request.
+        freestyle_reset_connection();
+    }
     if (patient_err == ESP_OK)
     {
         int status_code = esp_http_client_get_status_code(freestyle_client);
@@ -1169,10 +1180,10 @@ bool fetch_freestyle_glucose(void)
         }
         else
         {
+            // Transport failure (often a TLS handshake that ran out of heap): the
+            // token is still valid, and re-login is the costliest request (~45 KB).
             ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Freestyle fetch failed: %s (errno %d)", esp_err_to_name(http_err), esp_http_client_get_errno(freestyle_client));
             freestyle_reset_connection();
-            eeprom_libre_token[0] = '\0';
-            eeprom_libre_patient_id[0] = '\0';
         }
 
         // Disable chunk processing mode and release SSL semaphore before any retry/return.
@@ -1182,6 +1193,10 @@ bool fetch_freestyle_glucose(void)
 
         if (success)
             return true;
+
+        // A transfer cut mid-stream leaves only the oldest graphData points; a
+        // graph backfill seeded from that would keep a gap until the ring rolls over.
+        cgm_history_begin();
     }
 
     ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Freestyle fetch failed (retry)");

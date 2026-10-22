@@ -83,36 +83,13 @@ char* get_shared_buffer(size_t required_size, const char* owner) {
         }
     }
 
-    // If no unused buffer found, try to reuse the oldest NOT-in-use buffer
-    int64_t oldest_time = INT64_MAX;
-    int oldest_index = -1;
-    for (int i = 0; i < MAX_BUFFER_POOL_SIZE; i++) {
-        if (!global_buffer_pool[i].in_use && global_buffer_pool[i].last_used < oldest_time) {
-            oldest_time = global_buffer_pool[i].last_used;
-            oldest_index = i;
-        }
-    }
-
-    if (oldest_index != -1) {
-        // Free and reallocate if size is insufficient
-        if (global_buffer_pool[oldest_index].size < required_size) {
-            heap_caps_free(global_buffer_pool[oldest_index].buffer);
-            global_buffer_pool[oldest_index].buffer = heap_caps_malloc(required_size, MALLOC_CAP_8BIT);
-            if (global_buffer_pool[oldest_index].buffer == NULL) {
-                ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Buffer realloc failed");
-                xSemaphoreGive(buffer_mutex);
-                return NULL;
-            }
-            global_buffer_pool[oldest_index].size = required_size;
-        }
-        global_buffer_pool[oldest_index].in_use = true;
-        global_buffer_pool[oldest_index].last_used = esp_timer_get_time();
-        global_buffer_pool[oldest_index].owner = owner;
-        xSemaphoreGive(buffer_mutex);
-        return global_buffer_pool[oldest_index].buffer;
-    }
-
     xSemaphoreGive(buffer_mutex);
+    if (required_size > HTTP_BUFFER_SIZE) {
+        // Pool buffers are static: they can never be freed or grown.
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Buffer request %u > pool size %u (%s)",
+                    (unsigned)required_size, (unsigned)HTTP_BUFFER_SIZE, owner ? owner : "?");
+        return NULL;
+    }
     ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "**** No buffer found in pool - buffers exhausted ****");
     return NULL;
 }

@@ -497,6 +497,8 @@ esp_err_t generic_file_handler(httpd_req_t *req)
     file = fopen(filepath, "r");
     if (file != NULL)
     {
+        // We read in 1 KB chunks already; the stdio buffer only cost heap per request.
+        setvbuf(file, NULL, _IONBF, 0);
         ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "File found at: %s", filepath);
         ret = ESP_OK;
     }
@@ -545,6 +547,16 @@ esp_err_t generic_file_handler(httpd_req_t *req)
     else if (strstr(filename, ".png"))
     {
         httpd_resp_set_type(req, "image/png");
+    }
+
+    // UI code/translations only change with an OTA asset update; user-editable
+    // files (layouts, fonts, images) are deliberately left uncached.
+    // Match the extension at the end: strstr(".js") also matched ".json".
+    const char *ext = strrchr(filename, '.');
+    if ((ext != NULL && (strcmp(ext, ".css") == 0 || strcmp(ext, ".js") == 0 || strcmp(ext, ".ico") == 0)) ||
+        strncmp(filename, "i18n/", strlen("i18n/")) == 0)
+    {
+        httpd_resp_set_hdr(req, "Cache-Control", "max-age=600");
     }
 
     // Read and send file in chunks
@@ -2714,6 +2726,27 @@ esp_err_t status_api_handler(httpd_req_t *req)
     cJSON_AddStringToObject(root, "latitude", my_lat);
     cJSON_AddStringToObject(root, "longitude", my_lon);
     cJSON_AddStringToObject(root, "timezone", my_timezone);
+
+    // ?stacks=1: lowest free stack (bytes) per task since boot, for sizing task stacks.
+    char stacks_buffer[8] = {0};
+    get_request_query_param(req, "stacks", stacks_buffer, sizeof(stacks_buffer));
+    if (strcmp(stacks_buffer, "1") == 0)
+    {
+        static const char *const stack_task_names[] = {
+            "display_task", "wifi_task", "integration_upd", "int_reparse", "esp_timer", "sys_evt",
+            "mdns", "Tmr Svc", "httpd", "tiT", "wifi", "DnsServerTask", "main", "IDLE0", "IDLE1"};
+        cJSON *stacks = cJSON_AddObjectToObject(root, "stack_free_min");
+        for (size_t i = 0; stacks != NULL && i < sizeof(stack_task_names) / sizeof(stack_task_names[0]); i++)
+        {
+            TaskHandle_t h = xTaskGetHandle(stack_task_names[i]);
+            if (h != NULL)
+                cJSON_AddNumberToObject(stacks, stack_task_names[i],
+                                        uxTaskGetStackHighWaterMark(h) * sizeof(StackType_t));
+        }
+        size_t ota_min = f_ota_stack_free_min();
+        if (stacks != NULL && ota_min != SIZE_MAX)
+            cJSON_AddNumberToObject(stacks, "ota_update_task", ota_min);
+    }
 
     if (include_logs)
     {

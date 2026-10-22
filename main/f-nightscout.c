@@ -288,6 +288,9 @@ bool fetch_nightscout_glucose(void)
     else
     {
         ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Nightscout fetch %s", esp_err_to_name(err));
+        // A read timeout (EAGAIN) leaves the client mid-request; the next perform
+        // would only wait for headers again. Close so the next request starts clean.
+        esp_http_client_close(nightscout_client);
     }
 
     release_shared_buffer(nightscout_response_buffer);

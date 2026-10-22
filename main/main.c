@@ -1226,7 +1226,7 @@ void startup_threads()
   xTaskCreatePinnedToCore(
       display_task,   /* Task function. */
       "display_task", /* name of task, from f-display.c */
-      8960,           /* Stack size of task (reduced proportionally) */
+      6656,           /* 4452 B peak measured on fw 72 + 25% + 1 KB */
       NULL,           /* parameter of the task */
       4,              /* above wifi_task so a 1 s notify cannot preempt a blit */
       NULL,           /* Task handle to keep track of created task */
@@ -1361,6 +1361,7 @@ void app_main(void)
   }
   startup_led_pwm();
   ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Startup complete");
+  ssl_startup_gate_open();
 
   // Start 120s success timer: clear boot fail count on successful run
   esp_timer_handle_t success_timer = NULL;
