@@ -106,6 +106,7 @@ def run_harness(failures: list[str]) -> dict | None:
             cwd=ROOT,
             capture_output=True,
             text=True,
+            encoding="utf-8",  # the harness prints UTF-8; Windows would decode as cp1252
             timeout=60,
             check=False,
         )
