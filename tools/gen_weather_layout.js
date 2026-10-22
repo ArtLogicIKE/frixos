@@ -1,4 +1,4 @@
-// Generates spiffs/weather.layout: a layout for weather fans.
+// Generates spiffs/Weather.layout: a layout for weather fans.
 //   Top:  clock + weather icon + moon + AM/PM (+ wifi-off when offline)
 //   Grid: 8 static cells (2 columns x 4 rows) showing the live weather params
 //   Msg:  scrolling line carrying the remaining params (pressure, 3-day, sun)
@@ -85,6 +85,6 @@ if (bytes !== expected) {
   process.exit(1);
 }
 
-const out = path.join(root, 'spiffs/weather.layout');
+const out = path.join(root, 'spiffs/Weather.layout');
 fs.writeFileSync(out, json + '\n');
 console.log(`Wrote ${out} (${json.length} chars, encodes to ${bytes} bytes OK)`);

@@ -1,4 +1,4 @@
-// Generates spiffs/homeassistant.layout: a dashboard for Home Assistant users.
+// Generates spiffs/HomeAssistant.layout: a dashboard for Home Assistant users.
 //   Top:  clock + AM/PM (+ wifi-off when offline)
 //   Grid: 9 HA value cells in a 3x3 grid, grouped into 3 colour-coded rows:
 //           Climate (blue)  |  Energy (green)  |  System (amber)
@@ -91,6 +91,6 @@ if (bytes !== expected) {
   process.exit(1);
 }
 
-const out = path.join(root, 'spiffs/homeassistant.layout');
+const out = path.join(root, 'spiffs/HomeAssistant.layout');
 fs.writeFileSync(out, json + '\n');
 console.log(`Wrote ${out} (${json.length} chars, encodes to ${bytes} bytes OK)`);

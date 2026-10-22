@@ -1,4 +1,4 @@
-// Generates spiffs/diabetic.layout: a layout tuned for CGM users.
+// Generates spiffs/Diabetic.layout: a layout tuned for CGM users.
 //   Top:    clock + weather / moon / glucose readout / wifi / trend
 //   Middle: scrolling message
 //   Bottom: glucose chart (graph bound to [CGM:glucose])
@@ -91,6 +91,6 @@ if (bytes !== expected) {
   process.exit(1);
 }
 
-const out = path.join(root, 'spiffs/diabetic.layout');
+const out = path.join(root, 'spiffs/Diabetic.layout');
 fs.writeFileSync(out, json + '\n');
 console.log(`Wrote ${out} (${json.length} chars, encodes to ${bytes} bytes OK)`);
