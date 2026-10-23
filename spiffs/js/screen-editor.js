@@ -734,7 +734,7 @@ const SCREEN_ELEMENT_DEFS = [
     { id: 'digit_label', label: 'Digit Label', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.digit_label, img: 'bold-digit-label.jpg', paletteFitFullImage: true },
     { id: 'time_aux', label: 'Digit Display (Aux)', w: 80, h: 36, img: 'bold.jpg', paletteFitFullImage: true },
     { id: 'digit_label_aux', label: 'Digit Label (Aux)', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.digit_label_aux, img: 'bold-digit-label.jpg', paletteFitFullImage: true },
-    { id: 'ampm', label: 'AM/PM', w: 10, h: 20, img: 'default-ampm.jpg' },
+    { id: 'ampm', label: 'AM/PM', w: 10, h: 24, img: 'default-ampm.jpg' },
     { id: 'message', label: 'Scrolling Message', w: 128, h: 8, dynamicHeight: true, text: SCREEN_PREVIEW_MESSAGE, paletteImg: 'palette-message.png', paletteFitFullImage: true },
     { id: 'text_1', label: 'Text 1', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.text_1 },
     { id: 'text_2', label: 'Text 2', w: 80, h: 8, dynamicHeight: true, text: SCREEN_DEFAULT_STATIC_TEXTS.text_2 },
@@ -3703,7 +3703,6 @@ sectionLoaders.layout = function () {
         window.sectionsInitialized.screen = true;
         setupScreenSection();
     }
-    fetchScreenLayout();
-    renderScreenPresets();
+    return Promise.all([fetchScreenLayout(), renderScreenPresets()]);
 };
 

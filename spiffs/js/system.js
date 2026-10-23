@@ -31,7 +31,7 @@ async function loadStatus() {
   if (typeof updateIntegrationDots === 'function') updateIntegrationDots();
 }
 /* The System tab hosts status, files, update and restart. */
-sectionLoaders.status = function () { loadStatus(); loadFiles(); loadScrollEngine(); };
+sectionLoaders.status = function () { return Promise.all([loadStatus(), loadFiles(), loadScrollEngine()]); };
 
 /* Scrolling-line engine. Applies immediately, like the auto-update switch. */
 function applyScrollEngine(engine) {

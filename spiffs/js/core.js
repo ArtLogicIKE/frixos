@@ -211,14 +211,35 @@ document.addEventListener('click', () => {
 const nav = el('nav'), navWrap = $('.nav-wrap');
 /* The open tab survives a page refresh (per browser tab, so a new window starts on Device). */
 const _TAB_STORE_KEY = 'frixos.tab';
+
+/* "Retrieving settings..." pop-up while a tab waits for the device. It opens only once a
+   wait passes 200 ms, so quick answers do not flash it; overlapping waits share it. */
+let _loadingCount = 0, _loadingTimer = null;
+function setLoadingOverlay(open) {
+  const o = el('loadingOverlay');
+  if (!o) return;
+  o.classList.toggle('open', open);
+  o.setAttribute('aria-hidden', open ? 'false' : 'true');
+}
+function loadingBegin() {
+  if (_loadingCount++ === 0) _loadingTimer = setTimeout(() => setLoadingOverlay(true), 200);
+}
+function loadingEnd() {
+  if (_loadingCount > 0 && --_loadingCount === 0) { clearTimeout(_loadingTimer); setLoadingOverlay(false); }
+}
+function withLoading(work) {
+  loadingBegin();
+  return Promise.resolve(work).finally(loadingEnd);
+}
+
 function showTab(id) {
   try { sessionStorage.setItem(_TAB_STORE_KEY, id); } catch (e) { /* storage disabled */ }
   $$('.tab-page').forEach(p => p.classList.toggle('active', p.id === 'tab-' + id));
   $$('#nav a').forEach(a => a.classList.toggle('active', a.dataset.tab === id));
   window.scrollTo(0, 0);
   const active = $('#nav a.active'); if (active) active.scrollIntoView({ inline: 'center', block: 'nearest' });
-  if (sectionLoaders[id] && !loadedSections[id]) { loadedSections[id] = true; sectionLoaders[id](); }
-  else if (sectionLoaders[id] && id === 'status') sectionLoaders[id](); // System tab: live data, refresh on every visit
+  if (sectionLoaders[id] && !loadedSections[id]) { loadedSections[id] = true; withLoading(sectionLoaders[id]()); }
+  else if (sectionLoaders[id] && id === 'status') withLoading(sectionLoaders[id]()); // System tab: live data, refresh on every visit
   updateNavEdges();
 }
 $$('#nav a').forEach(a => a.addEventListener('click', () => showTab(a.dataset.tab)));
@@ -271,19 +292,24 @@ async function boot() {
   const stored = getStoredLanguage();
   await setLanguage(stored || 'en', false);
 
-  const res = await apiGet('/api/settings?group=theme');
-  let s = settingsResponseHasParams(res.data) ? res.data : null;
-  if (!s) { const full = await apiGet('/api/settings'); s = full.data || {}; }
-  Object.assign(window.settings, s || {});
-  applyTheme(s && s.p40 !== undefined ? !!s.p40 : true); // default dark
-  // The device setting (p41) is authoritative; fall back to the cached language.
-  const devLang = (s && s.p41 != null && LANGUAGES[s.p41]) ? LANGUAGES[s.p41] : null;
-  const lang = devLang || stored || 'en';
-  if (lang !== currentLanguage) await setLanguage(lang, false);
-  initCounters();
+  loadingBegin();
+  try {
+    const res = await apiGet('/api/settings?group=theme');
+    let s = settingsResponseHasParams(res.data) ? res.data : null;
+    if (!s) { const full = await apiGet('/api/settings'); s = full.data || {}; }
+    Object.assign(window.settings, s || {});
+    applyTheme(s && s.p40 !== undefined ? !!s.p40 : true); // default dark
+    // The device setting (p41) is authoritative; fall back to the cached language.
+    const devLang = (s && s.p41 != null && LANGUAGES[s.p41]) ? LANGUAGES[s.p41] : null;
+    const lang = devLang || stored || 'en';
+    if (lang !== currentLanguage) await setLanguage(lang, false);
+    initCounters();
 
-  loadedSections.settings = true;
-  if (sectionLoaders.settings) await sectionLoaders.settings();
+    loadedSections.settings = true;
+    if (sectionLoaders.settings) await sectionLoaders.settings();
+  } finally {
+    loadingEnd();
+  }
 
   let savedTab = null;
   try { savedTab = sessionStorage.getItem(_TAB_STORE_KEY); } catch (e) { /* storage disabled */ }

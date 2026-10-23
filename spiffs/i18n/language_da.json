@@ -32,7 +32,8 @@
     "advanced": "Avanceret",
     "save": "Gem",
     "discard": "Kassér",
-    "unsaved_changes": "Du har ikke-gemte ændringer"
+    "unsaved_changes": "Du har ikke-gemte ændringer",
+    "retrieving_settings": "Henter indstillinger…"
   },
   "settings": {
     "connection": {

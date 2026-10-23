@@ -32,7 +32,8 @@
     "advanced": "Avanzado",
     "save": "Guardar",
     "discard": "Descartar",
-    "unsaved_changes": "Tienes cambios sin guardar"
+    "unsaved_changes": "Tienes cambios sin guardar",
+    "retrieving_settings": "Obteniendo ajustes…"
   },
   "settings": {
     "connection": {

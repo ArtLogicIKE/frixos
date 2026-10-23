@@ -32,7 +32,8 @@
     "advanced": "Erweitert",
     "save": "Speichern",
     "discard": "Verwerfen",
-    "unsaved_changes": "Nicht gespeicherte Änderungen vorhanden"
+    "unsaved_changes": "Nicht gespeicherte Änderungen vorhanden",
+    "retrieving_settings": "Einstellungen werden abgerufen…"
   },
   "settings": {
     "connection": {

@@ -32,7 +32,8 @@
     "advanced": "Avanzate",
     "save": "Salva",
     "discard": "Scarta",
-    "unsaved_changes": "Modifiche non salvate"
+    "unsaved_changes": "Modifiche non salvate",
+    "retrieving_settings": "Recupero delle impostazioni…"
   },
   "settings": {
     "connection": {

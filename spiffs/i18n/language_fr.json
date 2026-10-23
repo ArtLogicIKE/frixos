@@ -32,7 +32,8 @@
     "advanced": "Avancé",
     "save": "Enregistrer",
     "discard": "Ignorer",
-    "unsaved_changes": "Modifications non enregistrées"
+    "unsaved_changes": "Modifications non enregistrées",
+    "retrieving_settings": "Récupération des réglages…"
   },
   "settings": {
     "connection": {

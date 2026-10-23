@@ -3087,7 +3087,7 @@ static void display_apply(bool restart_schedule)
   find_file(buf, sizeof(buf), layout->widget[SCREEN_ELEM_AMPM].font ? text_theme : eeprom_font[font_index], "ampm");
   lv_image_set_src(img_ampm, buf);
   lv_image_set_inner_align(img_ampm, LV_ALIGN_TOP_LEFT);
-  lv_obj_set_size(img_ampm, 10, 20);
+  lv_obj_set_size(img_ampm, 10, 24); // one 10x24 frame of the 20x24 AM|PM sheet
 
   lvgl_port_unlock(); // Unlock LVGL
 

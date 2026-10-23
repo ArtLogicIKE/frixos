@@ -32,7 +32,8 @@
     "advanced": "Zaawansowane",
     "save": "Zapisz",
     "discard": "Odrzuć",
-    "unsaved_changes": "Masz niezapisane zmiany"
+    "unsaved_changes": "Masz niezapisane zmiany",
+    "retrieving_settings": "Pobieranie ustawień…"
   },
   "settings": {
     "connection": {

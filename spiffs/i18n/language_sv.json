@@ -32,7 +32,8 @@
     "advanced": "Avancerat",
     "save": "Spara",
     "discard": "Förkasta",
-    "unsaved_changes": "Du har osparade ändringar"
+    "unsaved_changes": "Du har osparade ändringar",
+    "retrieving_settings": "Hämtar inställningar…"
   },
   "settings": {
     "connection": {

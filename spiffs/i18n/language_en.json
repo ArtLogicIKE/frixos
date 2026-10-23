@@ -32,7 +32,8 @@
     "advanced": "Advanced",
     "save": "Save",
     "discard": "Discard",
-    "unsaved_changes": "You have unsaved changes"
+    "unsaved_changes": "You have unsaved changes",
+    "retrieving_settings": "Retrieving settings…"
   },
   "settings": {
     "connection": {

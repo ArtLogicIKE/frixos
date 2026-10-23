@@ -215,3 +215,7 @@ details.menu-dd > .menu-pop{ position:absolute; top:calc(100% + 6px); right:0; z
 .reboot-overlay .spinner{ margin:0 auto 18px; }
 .reboot-overlay h2{ font-family:var(--jost); font-weight:500; font-size:20px; letter-spacing:.03em; color:var(--ink); margin-bottom:10px; }
 .reboot-overlay p{ font-size:13.5px; color:var(--ink-2); line-height:1.5; }
+/* "Retrieving settings..." uses the same cover, as a smaller pop-up under the reboot one. */
+.loading-overlay{ z-index:350; }
+.loading-overlay .box{ max-width:260px; padding:26px 22px; }
+.loading-overlay p{ color:var(--ink); }
