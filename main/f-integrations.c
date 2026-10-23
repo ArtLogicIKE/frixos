@@ -202,6 +202,8 @@ const int32_t int_update_secs = 60; // update timer should tick every 60 seconds
 
 /** After ESP_ERR_HTTP_CONNECT / CONNECTING, skip HA until this wall time (see fetch_ha_entity). */
 static time_t ha_http_connect_backoff_until = 0;
+/** Set by schedule_parse_integrations(); the integration task rebuilds the token lists. */
+static volatile bool integrations_reparse_requested = false;
 /** Set when a HA entity hit connect error; skip remaining entities this cycle. */
 static bool ha_abort_remaining_tokens = false;
 /** Freestyle backoff after failed fetches; cleared on success and on a settings change. */
@@ -897,6 +899,17 @@ static void integration_update_task(void *pvParameters)
     {
         if (!ota_update_in_progress)
         {
+            // Token lists are rebuilt here, between fetch cycles, never while a fetch below
+            // is writing into them. A rebuild in another task freed the list under a running
+            // HA fetch, and that cycle's success stamp then cancelled the forced refetch, so
+            // the values stayed "-" for a whole refresh interval.
+            if (integrations_reparse_requested)
+            {
+                integrations_reparse_requested = false;
+                parse_integrations();
+                force_integration_update();
+            }
+
             check_stack_usage(); // Monitor stack usage
 
             // Check heap memory and log warning if low
@@ -1229,16 +1242,38 @@ static bool integration_token_name_exists(const integration_token_t *tokens, int
     return false;
 }
 
+// A rebuilt token list (after a layout or message save) keeps the last fetched value of every
+// token it still has, instead of showing "-" until the next fetch.
+void integration_carry_token_values(integration_token_t *tokens, int count,
+                                    const integration_token_t *old, int old_count)
+{
+    for (int i = 0; tokens && i < count; i++)
+        for (int j = 0; old && j < old_count; j++)
+            if (tokens[i].name && old[j].name && strcmp(tokens[i].name, old[j].name) == 0)
+            {
+                memcpy(tokens[i].value, old[j].value, sizeof(tokens[i].value));
+                break;
+            }
+}
+
+static void build_HA_tokens(const char *input);
+
 void parse_HA_entities(const char *input)
 {
-    // Free existing tokens if any
-    if (integration_active_tokens[INTEGRATION_HA] != NULL)
-    {
-        free_integration_tokens_array(integration_active_tokens[INTEGRATION_HA], integration_active_tokens_count[INTEGRATION_HA]);
-        integration_active_tokens[INTEGRATION_HA] = NULL;
-        integration_active_tokens_count[INTEGRATION_HA] = 0;
-    }
+    // Keep the old list until the new one exists, so its values carry over.
+    integration_token_t *old = integration_active_tokens[INTEGRATION_HA];
+    const int old_count = integration_active_tokens_count[INTEGRATION_HA];
+    integration_active_tokens[INTEGRATION_HA] = NULL;
+    integration_active_tokens_count[INTEGRATION_HA] = 0;
 
+    build_HA_tokens(input);
+    integration_carry_token_values(integration_active_tokens[INTEGRATION_HA],
+                                   integration_active_tokens_count[INTEGRATION_HA], old, old_count);
+    free_integration_tokens_array(old, old_count);
+}
+
+static void build_HA_tokens(const char *input)
+{
     // First pass: count tokens
     const char *p = input;
     while ((p = strstr(p, "[HA:")) != NULL)
@@ -1597,6 +1632,14 @@ static void deferred_parse_integrations_task(void *arg)
 
 void schedule_parse_integrations(void)
 {
+    // Once the integration task runs, it does the rebuild itself (see integration_update_task).
+    if (integration_update_task_handle != NULL)
+    {
+        integrations_reparse_requested = true;
+        xTaskNotifyGive(integration_update_task_handle);
+        return;
+    }
+
     if (integrations_reparse_task != NULL)
     {
         integrations_reparse_pending = true;

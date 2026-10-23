@@ -232,18 +232,26 @@ bool fetch_stock_quote(integration_token_t *token)
     return success;
 }
 
+static void build_stock_tokens(const char *input);
+
 void parse_stock_entities(const char *input)
 {
     ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Parse stocks");
 
-    // Free existing tokens if any
-    if (integration_active_tokens[INTEGRATION_STOCK] != NULL)
-    {
-        free_integration_tokens_array(integration_active_tokens[INTEGRATION_STOCK], integration_active_tokens_count[INTEGRATION_STOCK]);
-        integration_active_tokens[INTEGRATION_STOCK] = NULL;
-        integration_active_tokens_count[INTEGRATION_STOCK] = 0;
-    }
+    // Keep the old list until the new one exists, so its quotes carry over.
+    integration_token_t *old = integration_active_tokens[INTEGRATION_STOCK];
+    const int old_count = integration_active_tokens_count[INTEGRATION_STOCK];
+    integration_active_tokens[INTEGRATION_STOCK] = NULL;
+    integration_active_tokens_count[INTEGRATION_STOCK] = 0;
 
+    build_stock_tokens(input);
+    integration_carry_token_values(integration_active_tokens[INTEGRATION_STOCK],
+                                   integration_active_tokens_count[INTEGRATION_STOCK], old, old_count);
+    free_integration_tokens_array(old, old_count);
+}
+
+static void build_stock_tokens(const char *input)
+{
     // First pass: count tokens
     const char *p = input;
     while ((p = strstr(p, "[$:")) != NULL)

@@ -37,6 +37,8 @@ extern time_t integration_last_update[AVAILABLE_INTEGRATIONS];         // Last u
 // Function declarations
 esp_err_t custom_crt_bundle_attach(void *conf);
 void parse_HA_entities(const char *input);
+void integration_carry_token_values(integration_token_t *tokens, int count,
+                                    const integration_token_t *old, int old_count);
 void parse_stock_entities(const char *input);
 void parse_integrations(void);
 void add_display_schedule_ha_entities(void);
