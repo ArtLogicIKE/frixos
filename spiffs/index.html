@@ -349,7 +349,10 @@
             <div id="screenCanvas" class="screen-canvas" role="application" data-i18n-aria-label="screen.editor_aria" aria-label="Screen layout editor" tabindex="0"></div>
           </div>
           <div class="screen-palette">
-            <h3 data-i18n="screen.palette">Palette</h3>
+            <div class="screen-palette-head">
+              <h3 data-i18n="screen.palette">Palette</h3>
+              <button type="button" class="palette-help-btn" id="screenPaletteHelpBtn" data-i18n-aria-label="screen.palette_help_button" aria-label="What the palette items do">?</button>
+            </div>
             <div id="screenPaletteItems" class="palette-items"></div>
           </div>
         </div>
@@ -513,6 +516,24 @@
     <div class="btn-row">
       <button type="button" class="btn ghost" id="layoutSaveCancel" data-i18n="common.cancel">Cancel</button>
       <button type="button" class="btn" id="layoutSaveConfirm" data-i18n="common.save">Save</button>
+    </div>
+  </div>
+</div>
+<div class="modal" id="screenAddModal" role="dialog" aria-modal="true" aria-labelledby="screenAddTitle">
+  <div class="box">
+    <h2 id="screenAddTitle" data-i18n="screen.add_item_title">Add to the screen</h2>
+    <div id="screenAddItems" class="palette-items screen-add-items"></div>
+    <div class="btn-row">
+      <button type="button" class="btn ghost" data-modal-close data-i18n="common.cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+<div class="modal" id="screenPaletteHelpModal" role="dialog" aria-modal="true" aria-labelledby="screenPaletteHelpTitle">
+  <div class="box screen-help-box">
+    <h2 id="screenPaletteHelpTitle" data-i18n="screen.palette_help_title">Palette items</h2>
+    <dl id="screenPaletteHelpList" class="screen-help-list"></dl>
+    <div class="btn-row">
+      <button type="button" class="btn" id="screenPaletteHelpClose" data-modal-close data-i18n="common.close">Close</button>
     </div>
   </div>
 </div>

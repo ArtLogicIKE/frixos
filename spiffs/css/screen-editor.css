@@ -112,6 +112,67 @@
     border-radius: 16px;
     padding: 12px;
 }
+.screen-palette-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+.palette-help-btn {
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    border: 1px solid var(--net-border);
+    background: var(--card-bg-color);
+    color: var(--ink);
+    font-family: var(--jost);
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+}
+.palette-help-btn:hover { border-color: var(--cyan); }
+.palette-swatch.palette-add-swatch {
+    font-size: 28px;
+    font-weight: 300;
+    line-height: 1;
+    color: var(--cyan);
+}
+.palette-item-add {
+    cursor: pointer;
+    border-style: dashed;
+}
+.screen-add-items {
+    max-height: 60vh;
+    text-align: center;
+}
+button.palette-item { cursor: pointer; font-family: inherit; }
+/* .modal .box (components.css) centres and narrows every dialog */
+.modal .box.screen-help-box {
+    max-width: 560px;
+    text-align: left;
+}
+.modal .box.screen-help-box h2 { text-align: center; }
+.screen-help-list {
+    max-height: 60vh;
+    overflow-y: auto;
+    margin: 0;
+    padding-right: 4px;
+}
+.screen-help-list dt {
+    font-weight: 600;
+    font-size: 13.5px;
+    color: var(--ink);
+    margin-top: 12px;
+}
+.screen-help-list dt:first-child { margin-top: 0; }
+.screen-help-list dd {
+    margin: 2px 0 0;
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--ink-2);
+}
 .screen-palette h3 {
     margin-top: 0;
     margin-bottom: 5px;

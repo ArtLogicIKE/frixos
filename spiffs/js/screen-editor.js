@@ -866,52 +866,72 @@ function iconFileName(id) {
     return m ? `icon${m[1]}.jpg` : null;
 }
 
+// Same default as ensureElementInProfile() for elements saved without an enabled flag.
+function isScreenElementOnScreen(profile, id) {
+    const e = profile && profile.elements ? profile.elements.find(x => x.id === id) : null;
+    if (!e) return false;
+    if (e.enabled === undefined) {
+        return !(id === 'time_aux' || isScreenDigitLabelElement(id) || isScreenIconElement(id));
+    }
+    return e.enabled !== 0;
+}
+
+// The palette lists Screen settings and what is on the screen now; everything else is
+// offered by the "Add Item" tile (getScreenAddableDefs).
 function getScreenPaletteDefs() {
     const profile = getProfileObj(window.screenEditor.mode);
-    const items = [];
+    const items = [SCREEN_PALETTE_SETTINGS_DEF];
+    if (!profile) return items;
 
     SCREEN_PALETTE_ORDER.forEach(id => {
-        if (id === 'screen_settings') {
-            items.push(SCREEN_PALETTE_SETTINGS_DEF);
-            return;
-        }
+        const def = findElementDef(id);
+        if (def && isScreenElementOnScreen(profile, id)) items.push(def);
+    });
+    SCREEN_TEXT_SLOT_IDS.concat(SCREEN_ICON_SLOT_IDS).forEach(id => {
+        const def = findElementDef(id);
+        if (def && isScreenElementOnScreen(profile, id)) items.push({ ...def });
+    });
+    return items;
+}
+
+function getScreenAddableDefs(profile) {
+    const items = [];
+    if (!profile) return items;
+    SCREEN_PALETTE_ORDER.forEach(id => {
+        if (id === 'screen_settings') return;
         if (id === 'text') {
-            if (getNextTextSlot(profile) !== null) {
-                items.push(SCREEN_PALETTE_TEXT_DEF);
-            }
+            if (getNextTextSlot(profile) !== null) items.push(SCREEN_PALETTE_TEXT_DEF);
             return;
         }
         if (id === 'icon') {
-            if (getNextIconSlot(profile) !== null) {
-                items.push(SCREEN_PALETTE_ICON_DEF);
-            }
+            if (getNextIconSlot(profile) !== null) items.push(SCREEN_PALETTE_ICON_DEF);
             return;
         }
         const def = findElementDef(id);
-        if (def && !isScreenStaticTextElement(def.id) && !isScreenIconElement(def.id)) {
-            items.push(def);
-        }
+        if (def && !isScreenElementOnScreen(profile, id)) items.push(def);
     });
-
-    if (profile) {
-        SCREEN_TEXT_SLOT_IDS.forEach(id => {
-            const elem = profile.elements.find(e => e.id === id);
-            if (elem && elem.enabled) {
-                const def = findElementDef(id);
-                if (def) items.push({ ...def });
-            }
-        });
-        SCREEN_ICON_SLOT_IDS.forEach(id => {
-            const elem = profile.elements.find(e => e.id === id);
-            if (elem && elem.enabled) {
-                const def = findElementDef(id);
-                if (def) items.push({ ...def });
-            }
-        });
-    }
-
     return items;
 }
+
+// One or two sentences per palette entry for the "?" help window (English fallbacks for
+// screen.palette_help.<id>).
+const SCREEN_PALETTE_HELP = {
+    screen_settings: 'Not a screen item: it opens the settings for the whole screen. Choose the digit theme and color filter of the current profile, and turn the alignment grid on or off.',
+    time: 'The main digit display, showing the clock in the chosen digit theme. Its display schedule can alternate the clock with glucose, the outside temperature or a Home Assistant value, each for its own number of seconds.',
+    digit_label: 'A short line of text that goes with the main digit display. It shows the name of the current schedule slot when the slot has one, otherwise its own text, which can include tokens.',
+    ampm: 'Shows AM or PM next to the clock. It is only visible when the 12-hour format is selected in Settings.',
+    message: 'A line of text that scrolls when it is wider than its area. Mix plain text with tokens such as [temp], [HA:sensor.x] or [CGM:reading] to show live values.',
+    time_aux: 'A second digit display with its own digit theme. Its own schedule cycles independently, for example glucose here while the main display shows the clock.',
+    digit_label_aux: 'A short line of text that goes with the second digit display. Like the main digit label, it shows the current slot name or its own text.',
+    weather: 'An icon for the current weather from the forecast. Needs a location set in Settings.',
+    moon: 'An icon showing the current phase of the moon.',
+    wifi_off: 'Appears only while WiFi is switched off by the WiFi active-hours setting, as a reminder that nothing updates until it is back on.',
+    glucose_level: 'A drop icon for the latest CGM reading: red when low, green in range, yellow when high and gray when the reading is out of date. Needs a CGM integration (Dexcom, FreeStyle Libre or Nightscout).',
+    glucose_trend: 'An arrow showing which way glucose is moving, from the latest CGM reading. Needs a CGM integration.',
+    graph: 'Plots the recent history of one value, such as glucose, a Home Assistant sensor or a stock. Set the value, time span, scale, colors and an optional low/high band in its options.',
+    text: 'Adds a fixed line of text (up to 8). It can include tokens, for example "UV [uv]" or "Kitchen [HA:sensor.kitchen_temperature]".',
+    icon: 'Adds your own picture (up to 8). Upload a JPG of at most 64×64 pixels in its options.'
+};
 
 function isScreenSettingsElement(id) {
     return id === 'screen_settings';
@@ -1710,6 +1730,19 @@ function setupScreenSection() {
     document.addEventListener('keydown', e => {
         if (e.key === 'Escape' && layoutSaveModal && layoutSaveModal.classList.contains('open')) closeLayoutSaveModal();
     });
+    const helpBtn = el('screenPaletteHelpBtn');
+    if (helpBtn) helpBtn.addEventListener('click', openScreenPaletteHelp);
+    ['screenAddModal', 'screenPaletteHelpModal'].forEach(id => {
+        const modal = el(id);
+        if (!modal) return;
+        modal.addEventListener('click', e => {
+            if (e.target === modal || e.target.closest('[data-modal-close]')) closeScreenModal(id);
+        });
+    });
+    document.addEventListener('keydown', e => {
+        if (e.key !== 'Escape') return;
+        ['screenAddModal', 'screenPaletteHelpModal'].forEach(closeScreenModal);
+    });
     if (readFromFileBtn) readFromFileBtn.addEventListener('click', () => layoutFileInput && layoutFileInput.click());
     if (layoutFileInput) layoutFileInput.addEventListener('change', onScreenLayoutFileSelected);
 
@@ -1973,15 +2006,7 @@ function renderScreenPalette() {
         item.setAttribute('data-id', def.id);
         item.setAttribute('role', 'button');
 
-        const slotId = def.id === 'text' ? resolvePaletteElementId(def.id, profile) : def.id;
-        const unavailable = def.id === 'text' && !slotId;
-        if (unavailable) {
-            item.classList.add('palette-item-disabled');
-            item.setAttribute('aria-disabled', 'true');
-            item.tabIndex = -1;
-        } else {
-            item.tabIndex = 0;
-        }
+        item.tabIndex = 0;
         if (isPaletteItemSelected(def)) {
             item.classList.add('palette-item-selected');
         }
@@ -2000,15 +2025,47 @@ function renderScreenPalette() {
         item.appendChild(swatch);
         item.appendChild(label);
 
-        if (!unavailable) {
-            const selectPaletteItem = () => {
+        const selectPaletteItem = () => {
+            if (def.paletteMeta) {
+                setScreenSelection([def.id]);
+                renderScreenCanvas();
+                renderScreenOptions();
+                renderScreenPalette();
+                updateScreenStatusLine();
+                focusScreenCanvas();
+                return;
+            }
+            const activeProfile = getProfileObj(window.screenEditor.mode);
+            if (!activeProfile) return;
+            const resolvedId = resolvePaletteElementId(def.id, activeProfile);
+            if (!resolvedId) return;
+            const elObj = ensureElementInProfile(activeProfile, resolvedId);
+            elObj.enabled = 1;
+            setScreenSelection([resolvedId]);
+            renderScreenCanvas();
+            renderScreenOptions();
+            renderScreenPalette();
+            focusScreenCanvas();
+        };
+
+        if (def.paletteMeta) {
+            item.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
+                selectPaletteItem();
+            });
+        } else {
+            item.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
+                const resolvedId = resolvePaletteElementId(def.id, getProfileObj(window.screenEditor.mode));
+                if (!resolvedId) return;
+                beginDrag(resolvedId, e, true);
+            });
+        }
+        item.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
                 if (def.paletteMeta) {
-                    setScreenSelection([def.id]);
-                    renderScreenCanvas();
-                    renderScreenOptions();
-                    renderScreenPalette();
-                    updateScreenStatusLine();
-                    focusScreenCanvas();
+                    selectPaletteItem();
                     return;
                 }
                 const activeProfile = getProfileObj(window.screenEditor.mode);
@@ -2022,45 +2079,113 @@ function renderScreenPalette() {
                 renderScreenOptions();
                 renderScreenPalette();
                 focusScreenCanvas();
-            };
-
-            if (def.paletteMeta) {
-                item.addEventListener('pointerdown', (e) => {
-                    e.preventDefault();
-                    selectPaletteItem();
-                });
-            } else {
-                item.addEventListener('pointerdown', (e) => {
-                    e.preventDefault();
-                    const resolvedId = resolvePaletteElementId(def.id, getProfileObj(window.screenEditor.mode));
-                    if (!resolvedId) return;
-                    beginDrag(resolvedId, e, true);
-                });
             }
-            item.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    if (def.paletteMeta) {
-                        selectPaletteItem();
-                        return;
-                    }
-                    const activeProfile = getProfileObj(window.screenEditor.mode);
-                    if (!activeProfile) return;
-                    const resolvedId = resolvePaletteElementId(def.id, activeProfile);
-                    if (!resolvedId) return;
-                    const elObj = ensureElementInProfile(activeProfile, resolvedId);
-                    elObj.enabled = 1;
-                    setScreenSelection([resolvedId]);
-                    renderScreenCanvas();
-                    renderScreenOptions();
-                    renderScreenPalette();
-                    focusScreenCanvas();
-                }
-            });
-        }
+        });
 
         list.appendChild(item);
     });
+
+    list.appendChild(createScreenAddItemTile(getScreenAddableDefs(profile).length > 0));
+}
+
+function createScreenAddItemTile(enabled) {
+    const item = document.createElement('div');
+    item.className = 'palette-item palette-item-add';
+    item.id = 'screenPaletteAddItem';
+    item.setAttribute('role', 'button');
+    if (enabled) {
+        item.tabIndex = 0;
+        item.addEventListener('click', openScreenAddModal);
+        item.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                openScreenAddModal();
+            }
+        });
+    } else {
+        item.classList.add('palette-item-disabled');
+        item.setAttribute('aria-disabled', 'true');
+        item.tabIndex = -1;
+        item.title = getScreenTranslation('screen.add_item_none', 'Everything is already on the screen');
+    }
+
+    const swatch = document.createElement('div');
+    swatch.className = 'palette-swatch palette-add-swatch';
+    swatch.setAttribute('aria-hidden', 'true');
+    swatch.textContent = '+';
+    const label = document.createElement('div');
+    label.textContent = getScreenTranslation('screen.add_item', 'Add Item');
+    item.appendChild(swatch);
+    item.appendChild(label);
+    return item;
+}
+
+function openScreenAddModal() {
+    const modal = el('screenAddModal');
+    const grid = el('screenAddItems');
+    const profile = getProfileObj(window.screenEditor.mode);
+    if (!modal || !grid || !profile) return;
+
+    grid.innerHTML = '';
+    getScreenAddableDefs(profile).forEach(def => {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'palette-item';
+        const swatch = document.createElement('div');
+        swatch.className = 'palette-swatch';
+        swatch.appendChild(createScreenPreview(def, false, null));
+        const label = document.createElement('div');
+        label.textContent = getScreenPaletteItemLabel(def, profile);
+        item.appendChild(swatch);
+        item.appendChild(label);
+        item.addEventListener('click', () => {
+            closeScreenModal('screenAddModal');
+            addScreenPaletteElement(def.id);
+        });
+        grid.appendChild(item);
+    });
+    modal.classList.add('open');
+    const first = grid.querySelector('button');
+    if (first) first.focus();
+}
+
+// Puts an element (or the next free text/icon slot) on the screen and selects it.
+function addScreenPaletteElement(paletteId) {
+    const profile = getProfileObj(window.screenEditor.mode);
+    if (!profile) return;
+    const id = resolvePaletteElementId(paletteId, profile);
+    if (!id) return;
+    ensureElementInProfile(profile, id).enabled = 1;
+    setScreenSelection([id]);
+    renderScreenCanvas();
+    renderScreenOptions();
+    renderScreenPalette();
+    updateScreenStatusLine();
+    focusScreenCanvas();
+}
+
+function openScreenPaletteHelp() {
+    const modal = el('screenPaletteHelpModal');
+    const list = el('screenPaletteHelpList');
+    if (!modal || !list) return;
+
+    list.innerHTML = '';
+    SCREEN_PALETTE_ORDER.forEach(id => {
+        const term = document.createElement('dt');
+        term.textContent = getScreenElementLabel(id);
+        const desc = document.createElement('dd');
+        desc.textContent = getScreenTranslation(`screen.palette_help.${id}`, SCREEN_PALETTE_HELP[id] || '');
+        list.appendChild(term);
+        list.appendChild(desc);
+    });
+    modal.classList.add('open');
+    const close = el('screenPaletteHelpClose');
+    if (close) close.focus();
+}
+
+function closeScreenModal(id) {
+    const modal = el(id);
+    if (modal) modal.classList.remove('open');
 }
 
 async function fetchScreenLayout() {
@@ -3008,7 +3133,7 @@ function renderScreenOptions() {
         onChange: (on) => {
             e.enabled = on ? 1 : 0;
             renderScreenCanvas();
-            if (isScreenStaticTextElement(e.id) || isScreenIconElement(e.id)) renderScreenPalette();
+            renderScreenPalette(); // the palette lists only what is on the screen
         }
     });
 
