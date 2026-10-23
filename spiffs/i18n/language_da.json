@@ -104,7 +104,7 @@
       "screen_settings": "Ikke et skærmelement: det åbner indstillingerne for hele skærmen. Vælg cifertema og farvefilter for den aktuelle profil, og slå justeringsgitteret til eller fra.",
       "time": "Hovedcifervisningen, der viser uret i det valgte cifertema. Dens visningsplan kan skifte mellem uret og glukose, udetemperaturen eller en Home Assistant-værdi, hver i sit eget antal sekunder.",
       "digit_label": "En kort tekstlinje, der hører til hovedcifervisningen. Den viser navnet på det aktuelle planlagte felt, når feltet har et, ellers sin egen tekst, som kan indeholde tokens.",
-      "ampm": "Viser formiddag eller eftermiddag ved siden af uret, som sol/måne-symbol eller som AM/PM-tekst. Den er kun synlig, når 12-timers format er valgt under Indstillinger.",
+      "ampm": "Viser formiddag eller eftermiddag ved siden af uret, som sol/måne-symbol eller som AM/PM-tekst. Den følger cifervisningen og er kun synlig i 12-timers format (Indstillinger).",
       "message": "En tekstlinje, der ruller, når den er bredere end sit område. Bland almindelig tekst med tokens som [temp], [HA:sensor.x] eller [CGM:reading] for at vise aktuelle værdier.",
       "time_aux": "En ekstra cifervisning med sit eget cifertema. Dens egen plan skifter uafhængigt, for eksempel glukose her, mens hovedvisningen viser uret.",
       "digit_label_aux": "En kort tekstlinje, der hører til den ekstra cifervisning. Ligesom hovedciferetiketten viser den det aktuelle felts navn eller sin egen tekst.",

@@ -873,6 +873,8 @@ function iconFileName(id) {
 
 // Same default as ensureElementInProfile() for elements saved without an enabled flag.
 function isScreenElementOnScreen(profile, id) {
+    // AM/PM belongs to the digit display: it is on the screen exactly when the clock is.
+    if (id === 'ampm') return isScreenElementOnScreen(profile, 'time');
     const e = profile && profile.elements ? profile.elements.find(x => x.id === id) : null;
     if (!e) return false;
     if (e.enabled === undefined) {
@@ -903,7 +905,7 @@ function getScreenAddableDefs(profile) {
     const items = [];
     if (!profile) return items;
     SCREEN_PALETTE_ORDER.forEach(id => {
-        if (id === 'screen_settings') return;
+        if (id === 'screen_settings' || id === 'ampm') return; // AM/PM comes with the digit display
         if (id === 'text') {
             if (getNextTextSlot(profile) !== null) items.push(SCREEN_PALETTE_TEXT_DEF);
             return;
@@ -924,7 +926,7 @@ const SCREEN_PALETTE_HELP = {
     screen_settings: 'Not a screen item: it opens the settings for the whole screen. Choose the digit theme and color filter of the current profile, and turn the alignment grid on or off.',
     time: 'The main digit display, showing the clock in the chosen digit theme. Its display schedule can alternate the clock with glucose, the outside temperature or a Home Assistant value, each for its own number of seconds.',
     digit_label: 'A short line of text that goes with the main digit display. It shows the name of the current schedule slot when the slot has one, otherwise its own text, which can include tokens.',
-    ampm: 'Shows morning or afternoon next to the clock, as a sun/moon symbol or as AM/PM text. It is only visible when the 12-hour format is selected in Settings.',
+    ampm: 'Shows morning or afternoon next to the clock, as a sun/moon symbol or as AM/PM text. It comes and goes with the Digit Display and is only visible in the 12-hour format (Settings).',
     message: 'A line of text that scrolls when it is wider than its area. Mix plain text with tokens such as [temp], [HA:sensor.x] or [CGM:reading] to show live values.',
     time_aux: 'A second digit display with its own digit theme. Its own schedule cycles independently, for example glucose here while the main display shows the clock.',
     digit_label_aux: 'A short line of text that goes with the second digit display. Like the main digit label, it shows the current slot name or its own text.',
@@ -2657,7 +2659,7 @@ function renderScreenCanvas() {
     const elems = (profile.elements || []).slice().sort((a, b) => (a.z || 0) - (b.z || 0));
 
     elems.forEach(e => {
-        if (e.enabled === 0 && e.id !== 'ampm') return;
+        if (!isScreenElementOnScreen(profile, e.id)) return;
 
         const def = findElementDef(e.id);
         if (!def) return;

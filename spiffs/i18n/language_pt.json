@@ -104,7 +104,7 @@
       "screen_settings": "Não é um item do ecrã: abre as definições de todo o ecrã. Escolha o tema dos dígitos e o filtro de cor do perfil atual, e ative ou desative a grelha de alinhamento.",
       "time": "O mostrador de dígitos principal, que mostra o relógio no tema de dígitos escolhido. O seu horário pode alternar o relógio com a glicose, a temperatura exterior ou um valor do Home Assistant, cada um durante os seus próprios segundos.",
       "digit_label": "Uma linha curta de texto que acompanha o mostrador de dígitos principal. Mostra o nome da faixa atual do horário quando esta tem um; caso contrário, o seu próprio texto, que pode incluir tokens.",
-      "ampm": "Indica manhã ou tarde junto ao relógio, com um símbolo de sol/lua ou com o texto AM/PM. Só é visível quando o formato de 12 horas está selecionado nas Definições.",
+      "ampm": "Indica manhã ou tarde junto ao relógio, com um símbolo de sol/lua ou com o texto AM/PM. Aparece e desaparece com o mostrador de dígitos e só é visível no formato de 12 horas (Definições).",
       "message": "Uma linha de texto que desliza quando é mais larga do que a sua área. Combine texto simples com tokens como [temp], [HA:sensor.x] ou [CGM:reading] para mostrar valores em tempo real.",
       "time_aux": "Um segundo mostrador de dígitos com o seu próprio tema. O seu próprio horário alterna de forma independente, por exemplo a glicose aqui enquanto o principal mostra o relógio.",
       "digit_label_aux": "Uma linha curta de texto que acompanha o segundo mostrador de dígitos. Tal como a etiqueta principal, mostra o nome da faixa atual ou o seu próprio texto.",

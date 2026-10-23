@@ -104,7 +104,7 @@
       "screen_settings": "Kein Bildschirmelement: Es öffnet die Einstellungen für den ganzen Bildschirm. Wähle das Ziffernthema und den Farbfilter des aktuellen Profils und schalte das Ausrichtungsraster ein oder aus.",
       "time": "Die Hauptziffernanzeige zeigt die Uhr im gewählten Ziffernthema. Ihr Anzeigeplan kann die Uhr mit Glukose, der Außentemperatur oder einem Home-Assistant-Wert abwechseln, jeweils für eine eigene Anzahl Sekunden.",
       "digit_label": "Eine kurze Textzeile, die zur Hauptziffernanzeige gehört. Sie zeigt den Namen des aktuellen Planeintrags, wenn er einen hat, sonst ihren eigenen Text, der Tokens enthalten kann.",
-      "ampm": "Zeigt Vormittag oder Nachmittag neben der Uhr, als Sonne/Mond-Symbol oder als Text AM/PM. Nur sichtbar, wenn in den Einstellungen das 12-Stunden-Format gewählt ist.",
+      "ampm": "Zeigt Vormittag oder Nachmittag neben der Uhr, als Sonne/Mond-Symbol oder als Text AM/PM. Sie erscheint und verschwindet mit der Ziffernanzeige und ist nur im 12-Stunden-Format sichtbar (Einstellungen).",
       "message": "Eine Textzeile, die scrollt, wenn sie breiter als ihr Bereich ist. Mische normalen Text mit Tokens wie [temp], [HA:sensor.x] oder [CGM:reading], um aktuelle Werte anzuzeigen.",
       "time_aux": "Eine zweite Ziffernanzeige mit eigenem Ziffernthema. Ihr eigener Plan wechselt unabhängig, zum Beispiel Glukose hier, während die Hauptanzeige die Uhr zeigt.",
       "digit_label_aux": "Eine kurze Textzeile, die zur zweiten Ziffernanzeige gehört. Wie die Hauptziffernbeschriftung zeigt sie den Namen des aktuellen Eintrags oder ihren eigenen Text.",

@@ -104,7 +104,7 @@
       "screen_settings": "No es un elemento de la pantalla: abre los ajustes de toda la pantalla. Elige el tema de dígitos y el filtro de color del perfil actual, y activa o desactiva la cuadrícula de alineación.",
       "time": "La pantalla de dígitos principal, que muestra el reloj con el tema de dígitos elegido. Su programación puede alternar el reloj con la glucosa, la temperatura exterior o un valor de Home Assistant, cada uno durante sus propios segundos.",
       "digit_label": "Una línea corta de texto que acompaña a la pantalla de dígitos principal. Muestra el nombre de la franja actual de la programación cuando lo tiene; si no, su propio texto, que puede incluir tokens.",
-      "ampm": "Indica mañana o tarde junto al reloj, con un símbolo de sol/luna o con el texto AM/PM. Solo es visible cuando el formato de 12 horas está seleccionado en Ajustes.",
+      "ampm": "Indica mañana o tarde junto al reloj, con un símbolo de sol/luna o con el texto AM/PM. Aparece y desaparece con la pantalla de dígitos y solo es visible en formato de 12 horas (Ajustes).",
       "message": "Una línea de texto que se desplaza cuando es más ancha que su área. Combina texto normal con tokens como [temp], [HA:sensor.x] o [CGM:reading] para mostrar valores en vivo.",
       "time_aux": "Una segunda pantalla de dígitos con su propio tema. Su propia programación alterna de forma independiente, por ejemplo la glucosa aquí mientras la principal muestra el reloj.",
       "digit_label_aux": "Una línea corta de texto que acompaña a la segunda pantalla de dígitos. Como la etiqueta principal, muestra el nombre de la franja actual o su propio texto.",

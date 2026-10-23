@@ -209,7 +209,10 @@ document.addEventListener('click', () => {
 
 /* ---------- tabs + scroll indicators ---------- */
 const nav = el('nav'), navWrap = $('.nav-wrap');
+/* The open tab survives a page refresh (per browser tab, so a new window starts on Device). */
+const _TAB_STORE_KEY = 'frixos.tab';
 function showTab(id) {
+  try { sessionStorage.setItem(_TAB_STORE_KEY, id); } catch (e) { /* storage disabled */ }
   $$('.tab-page').forEach(p => p.classList.toggle('active', p.id === 'tab-' + id));
   $$('#nav a').forEach(a => a.classList.toggle('active', a.dataset.tab === id));
   window.scrollTo(0, 0);
@@ -281,6 +284,10 @@ async function boot() {
 
   loadedSections.settings = true;
   if (sectionLoaders.settings) await sectionLoaders.settings();
+
+  let savedTab = null;
+  try { savedTab = sessionStorage.getItem(_TAB_STORE_KEY); } catch (e) { /* storage disabled */ }
+  if (savedTab && savedTab !== 'settings' && $(`#nav a[data-tab="${savedTab}"]`)) showTab(savedTab);
 
   await refreshHeroStatus();
   updateNavEdges();

@@ -104,7 +104,7 @@
       "screen_settings": "Ce n'est pas un élément de l'écran : il ouvre les réglages de tout l'écran. Choisissez le thème des chiffres et le filtre de couleur du profil actuel, et activez ou désactivez la grille d'alignement.",
       "time": "L'affichage principal à chiffres, qui montre l'heure dans le thème choisi. Son programme d'affichage peut alterner l'heure avec la glycémie, la température extérieure ou une valeur Home Assistant, chacune pendant son propre nombre de secondes.",
       "digit_label": "Une courte ligne de texte associée à l'affichage principal à chiffres. Elle montre le nom de la plage en cours du programme quand elle en a un, sinon son propre texte, qui peut contenir des jetons.",
-      "ampm": "Indique le matin ou l'après-midi à côté de l'heure, par un symbole soleil/lune ou par le texte AM/PM. Visible uniquement lorsque le format 12 heures est choisi dans les Réglages.",
+      "ampm": "Indique le matin ou l'après-midi à côté de l'heure, par un symbole soleil/lune ou par le texte AM/PM. Il apparaît et disparaît avec l'affichage à chiffres et n'est visible qu'au format 12 heures (Réglages).",
       "message": "Une ligne de texte qui défile lorsqu'elle est plus large que sa zone. Mélangez du texte et des jetons comme [temp], [HA:sensor.x] ou [CGM:reading] pour afficher des valeurs en direct.",
       "time_aux": "Un second affichage à chiffres avec son propre thème. Son propre programme alterne indépendamment, par exemple la glycémie ici pendant que l'affichage principal montre l'heure.",
       "digit_label_aux": "Une courte ligne de texte associée au second affichage à chiffres. Comme l'étiquette principale, elle montre le nom de la plage en cours ou son propre texte.",

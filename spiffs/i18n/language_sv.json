@@ -104,7 +104,7 @@
       "screen_settings": "Inte ett skärmobjekt: det öppnar inställningarna för hela skärmen. Välj siffertema och färgfilter för den aktuella profilen och slå på eller av justeringsrutnätet.",
       "time": "Huvudsifferdisplayen, som visar klockan i det valda siffertemat. Dess visningsschema kan växla mellan klockan och glukos, utetemperaturen eller ett Home Assistant-värde, vart och ett i sitt eget antal sekunder.",
       "digit_label": "En kort textrad som hör till huvudsifferdisplayen. Den visar namnet på den aktuella schemaplatsen när platsen har ett, annars sin egen text, som kan innehålla tokens.",
-      "ampm": "Visar förmiddag eller eftermiddag bredvid klockan, som sol/måne-symbol eller som texten AM/PM. Den syns bara när 12-timmarsformat är valt under Inställningar.",
+      "ampm": "Visar förmiddag eller eftermiddag bredvid klockan, som sol/måne-symbol eller som texten AM/PM. Den följer sifferdisplayen och syns bara i 12-timmarsformat (Inställningar).",
       "message": "En textrad som rullar när den är bredare än sitt område. Blanda vanlig text med tokens som [temp], [HA:sensor.x] eller [CGM:reading] för att visa aktuella värden.",
       "time_aux": "En andra sifferdisplay med eget siffertema. Dess eget schema växlar oberoende, till exempel glukos här medan huvuddisplayen visar klockan.",
       "digit_label_aux": "En kort textrad som hör till den andra sifferdisplayen. Precis som huvudetiketten visar den den aktuella platsens namn eller sin egen text.",

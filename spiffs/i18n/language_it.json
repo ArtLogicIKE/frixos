@@ -104,7 +104,7 @@
       "screen_settings": "Non è un elemento dello schermo: apre le impostazioni dell'intero schermo. Scegli il tema delle cifre e il filtro colore del profilo attuale e attiva o disattiva la griglia di allineamento.",
       "time": "Il display a cifre principale, che mostra l'orologio nel tema di cifre scelto. La sua programmazione può alternare l'orologio con la glicemia, la temperatura esterna o un valore di Home Assistant, ciascuno per i propri secondi.",
       "digit_label": "Una breve riga di testo abbinata al display a cifre principale. Mostra il nome della fascia attuale della programmazione quando ne ha uno, altrimenti il proprio testo, che può contenere token.",
-      "ampm": "Indica mattina o pomeriggio accanto all'orologio, con un simbolo sole/luna o con il testo AM/PM. È visibile solo quando nelle Impostazioni è scelto il formato a 12 ore.",
+      "ampm": "Indica mattina o pomeriggio accanto all'orologio, con un simbolo sole/luna o con il testo AM/PM. Compare e scompare con il display a cifre ed è visibile solo nel formato a 12 ore (Impostazioni).",
       "message": "Una riga di testo che scorre quando è più larga della sua area. Combina testo normale e token come [temp], [HA:sensor.x] o [CGM:reading] per mostrare valori aggiornati.",
       "time_aux": "Un secondo display a cifre con il proprio tema. La sua programmazione alterna in modo indipendente, ad esempio la glicemia qui mentre il display principale mostra l'orologio.",
       "digit_label_aux": "Una breve riga di testo abbinata al secondo display a cifre. Come l'etichetta principale, mostra il nome della fascia attuale o il proprio testo.",
