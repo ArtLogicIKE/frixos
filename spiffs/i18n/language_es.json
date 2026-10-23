@@ -104,7 +104,7 @@
       "screen_settings": "No es un elemento de la pantalla: abre los ajustes de toda la pantalla. Elige el tema de dígitos y el filtro de color del perfil actual, y activa o desactiva la cuadrícula de alineación.",
       "time": "La pantalla de dígitos principal, que muestra el reloj con el tema de dígitos elegido. Su programación puede alternar el reloj con la glucosa, la temperatura exterior o un valor de Home Assistant, cada uno durante sus propios segundos.",
       "digit_label": "Una línea corta de texto que acompaña a la pantalla de dígitos principal. Muestra el nombre de la franja actual de la programación cuando lo tiene; si no, su propio texto, que puede incluir tokens.",
-      "ampm": "Muestra AM o PM junto al reloj. Solo es visible cuando el formato de 12 horas está seleccionado en Ajustes.",
+      "ampm": "Indica mañana o tarde junto al reloj, con un símbolo de sol/luna o con el texto AM/PM. Solo es visible cuando el formato de 12 horas está seleccionado en Ajustes.",
       "message": "Una línea de texto que se desplaza cuando es más ancha que su área. Combina texto normal con tokens como [temp], [HA:sensor.x] o [CGM:reading] para mostrar valores en vivo.",
       "time_aux": "Una segunda pantalla de dígitos con su propio tema. Su propia programación alterna de forma independiente, por ejemplo la glucosa aquí mientras la principal muestra el reloj.",
       "digit_label_aux": "Una línea corta de texto que acompaña a la segunda pantalla de dígitos. Como la etiqueta principal, muestra el nombre de la franja actual o su propio texto.",
@@ -121,7 +121,7 @@
     "add_item_title": "Añadir a la pantalla",
     "add_item_none": "Todo está ya en la pantalla",
     "options": "Opciones",
-    "enabled": "Activado",
+    "delete_element": "Eliminar",
     "layer": "Capa",
     "layers": {
       "back": "1 (atrás)",
@@ -150,6 +150,7 @@
     "save_to_device": "Guardar en el dispositivo",
     "read_from_file": "Leer desde archivo",
     "ampm_note": "El indicador AM/PM solo es visible con formato de 12 horas (en Ajustes).",
+    "ampm_as_text": "Mostrar como texto (AM/PM) en lugar de sol/luna",
     "display_schedule": {
       "title": "Programación de pantalla",
       "description": "Define qué aparece en el display numérico principal y durante cuánto tiempo. Los intervalos rotan en orden. Un solo intervalo de hora significa que el reloj siempre se muestra.",

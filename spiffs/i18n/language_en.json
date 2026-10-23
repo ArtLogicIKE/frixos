@@ -107,7 +107,7 @@
       "screen_settings": "Not a screen item: it opens the settings for the whole screen. Choose the digit theme and color filter of the current profile, and turn the alignment grid on or off.",
       "time": "The main digit display, showing the clock in the chosen digit theme. Its display schedule can alternate the clock with glucose, the outside temperature or a Home Assistant value, each for its own number of seconds.",
       "digit_label": "A short line of text that goes with the main digit display. It shows the name of the current schedule slot when the slot has one, otherwise its own text, which can include tokens.",
-      "ampm": "Shows AM or PM next to the clock. It is only visible when the 12-hour format is selected in Settings.",
+      "ampm": "Shows morning or afternoon next to the clock, as a sun/moon symbol or as AM/PM text. It is only visible when the 12-hour format is selected in Settings.",
       "message": "A line of text that scrolls when it is wider than its area. Mix plain text with tokens such as [temp], [HA:sensor.x] or [CGM:reading] to show live values.",
       "time_aux": "A second digit display with its own digit theme. Its own schedule cycles independently, for example glucose here while the main display shows the clock.",
       "digit_label_aux": "A short line of text that goes with the second digit display. Like the main digit label, it shows the current slot name or its own text.",
@@ -124,7 +124,7 @@
     "add_item_title": "Add to the screen",
     "add_item_none": "Everything is already on the screen",
     "options": "Options",
-    "enabled": "Enabled",
+    "delete_element": "Delete",
     "disabled": "Disabled",
     "layer": "Layer",
     "layers": {
@@ -154,6 +154,7 @@
     "save_to_device": "Save to device",
     "read_from_file": "Load from File",
     "ampm_note": "AM/PM indicator is only visible when 12-hour format is used (from Settings).",
+    "ampm_as_text": "Show as text (AM/PM) instead of sun/moon",
     "display_schedule": {
       "title": "Display Schedule",
       "description": "Define what appears on the primary digit display and for how long. Slots cycle in order. A single Time slot means the clock always shows.",

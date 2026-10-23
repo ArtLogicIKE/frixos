@@ -104,7 +104,7 @@
       "screen_settings": "To nie jest element ekranu: otwiera ustawienia całego ekranu. Wybierz motyw cyfr i filtr koloru bieżącego profilu oraz włącz lub wyłącz siatkę wyrównania.",
       "time": "Główny wyświetlacz cyfr, pokazujący zegar w wybranym motywie cyfr. Jego harmonogram może przeplatać zegar z glukozą, temperaturą zewnętrzną lub wartością z Home Assistant, każdą przez własną liczbę sekund.",
       "digit_label": "Krótki wiersz tekstu towarzyszący głównemu wyświetlaczowi cyfr. Pokazuje nazwę bieżącego slotu harmonogramu, jeśli ją ma, a w przeciwnym razie własny tekst, który może zawierać tokeny.",
-      "ampm": "Pokazuje AM lub PM obok zegara. Jest widoczny tylko wtedy, gdy w Ustawieniach wybrano format 12-godzinny.",
+      "ampm": "Pokazuje przed- lub popołudnie obok zegara, jako symbol słońca/księżyca lub tekst AM/PM. Jest widoczny tylko wtedy, gdy w Ustawieniach wybrano format 12-godzinny.",
       "message": "Wiersz tekstu, który przewija się, gdy jest szerszy niż jego obszar. Łącz zwykły tekst z tokenami, takimi jak [temp], [HA:sensor.x] lub [CGM:reading], aby pokazywać bieżące wartości.",
       "time_aux": "Drugi wyświetlacz cyfr z własnym motywem. Jego własny harmonogram zmienia się niezależnie, na przykład glukoza tutaj, gdy główny wyświetlacz pokazuje zegar.",
       "digit_label_aux": "Krótki wiersz tekstu towarzyszący drugiemu wyświetlaczowi cyfr. Podobnie jak główna etykieta pokazuje nazwę bieżącego slotu lub własny tekst.",
@@ -121,7 +121,7 @@
     "add_item_title": "Dodaj do ekranu",
     "add_item_none": "Wszystko jest już na ekranie",
     "options": "Opcje",
-    "enabled": "Włączone",
+    "delete_element": "Usuń",
     "layer": "Warstwa",
     "layers": {
       "back": "1 (tył)",
@@ -150,6 +150,7 @@
     "save_to_device": "Zapisz na urządzeniu",
     "read_from_file": "Wczytaj z pliku",
     "ampm_note": "Wskaźnik AM/PM jest widoczny tylko w formacie 12-godzinnym (w Ustawieniach).",
+    "ampm_as_text": "Pokaż jako tekst (AM/PM) zamiast słońca/księżyca",
     "display_schedule": {
       "title": "Harmonogram wyświetlania",
       "description": "Określ, co pojawia się na głównym wyświetlaczu cyfrowym i jak długo. Sloty przełączają się po kolei. Pojedynczy slot czasu oznacza, że zegar jest zawsze widoczny.",

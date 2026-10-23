@@ -160,13 +160,25 @@ button.palette-item { cursor: pointer; font-family: inherit; }
     margin: 0;
     padding-right: 4px;
 }
+.screen-help-item {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    margin-top: 14px;
+}
+.screen-help-item:first-child { margin-top: 0; }
 .screen-help-list dt {
     font-weight: 600;
     font-size: 13.5px;
     color: var(--ink);
-    margin-top: 12px;
 }
-.screen-help-list dt:first-child { margin-top: 0; }
+.screen-delete-row {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid var(--net-border);
+}
 .screen-help-list dd {
     margin: 2px 0 0;
     font-size: 13px;

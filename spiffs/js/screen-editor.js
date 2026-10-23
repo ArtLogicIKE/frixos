@@ -714,7 +714,12 @@ function getPreviewImageUrl(def, inMatrix) {
     }
     const item = SCREEN_THEME_ASSETS[def.id];
     if (item && inMatrix) {
-        return resolveThemeAssetUrl(getScreenTimeFont(window.screenEditor.mode), item);
+        let theme = getScreenTimeFont(window.screenEditor.mode);
+        if (def.id === 'ampm') {
+            const e = screenFindProfileElement(getProfileObj(window.screenEditor.mode), 'ampm');
+            if (e && e.options && e.options.font) theme = 'text';
+        }
+        return resolveThemeAssetUrl(theme, item);
     }
     return def.img;
 }
@@ -919,7 +924,7 @@ const SCREEN_PALETTE_HELP = {
     screen_settings: 'Not a screen item: it opens the settings for the whole screen. Choose the digit theme and color filter of the current profile, and turn the alignment grid on or off.',
     time: 'The main digit display, showing the clock in the chosen digit theme. Its display schedule can alternate the clock with glucose, the outside temperature or a Home Assistant value, each for its own number of seconds.',
     digit_label: 'A short line of text that goes with the main digit display. It shows the name of the current schedule slot when the slot has one, otherwise its own text, which can include tokens.',
-    ampm: 'Shows AM or PM next to the clock. It is only visible when the 12-hour format is selected in Settings.',
+    ampm: 'Shows morning or afternoon next to the clock, as a sun/moon symbol or as AM/PM text. It is only visible when the 12-hour format is selected in Settings.',
     message: 'A line of text that scrolls when it is wider than its area. Mix plain text with tokens such as [temp], [HA:sensor.x] or [CGM:reading] to show live values.',
     time_aux: 'A second digit display with its own digit theme. Its own schedule cycles independently, for example glucose here while the main display shows the clock.',
     digit_label_aux: 'A short line of text that goes with the second digit display. Like the main digit label, it shows the current slot name or its own text.',
@@ -1225,6 +1230,8 @@ function screenWireProfileToJson(view, offset) {
                 elem.options.width = w.width;
                 elem.options.align = w.align;
             }
+        } else if (id === 'ampm') {
+            elem.options = { font: w.font ? 1 : 0 }; // 1 = text AM/PM, 0 = sun/moon
         } else if (id === 'graph') {
             // line colour reuses the widget colour, background reuses bg
             elem.options = {
@@ -2171,12 +2178,22 @@ function openScreenPaletteHelp() {
 
     list.innerHTML = '';
     SCREEN_PALETTE_ORDER.forEach(id => {
+        const entry = document.createElement('div');
+        entry.className = 'screen-help-item';
+        const swatch = document.createElement('div');
+        swatch.className = 'palette-swatch';
+        swatch.setAttribute('aria-hidden', 'true');
+        swatch.appendChild(createScreenPreview(findElementDef(id), false, null));
+        const text = document.createElement('div');
         const term = document.createElement('dt');
         term.textContent = getScreenElementLabel(id);
         const desc = document.createElement('dd');
         desc.textContent = getScreenTranslation(`screen.palette_help.${id}`, SCREEN_PALETTE_HELP[id] || '');
-        list.appendChild(term);
-        list.appendChild(desc);
+        text.appendChild(term);
+        text.appendChild(desc);
+        entry.appendChild(swatch);
+        entry.appendChild(text);
+        list.appendChild(entry);
     });
     modal.classList.add('open');
     const close = el('screenPaletteHelpClose');
@@ -3123,19 +3140,18 @@ function renderScreenOptions() {
         note.textContent = getNestedTranslation(trans, 'screen.ampm_note')
             || 'AM/PM indicator is only visible when 12-hour format is used (from Settings).';
         opt.appendChild(note);
+        // options.font picks the image: 0 = the theme's sun/moon, 1 = text-ampm.jpg ("AM"/"PM").
+        appendScreenSwitchRow(opt, {
+            id: 'screen_ampm_text',
+            label: getNestedTranslation(trans, 'screen.ampm_as_text') || 'Show as text (AM/PM) instead of sun/moon',
+            checked: !!(e.options && e.options.font),
+            onChange: (on) => {
+                e.options = { ...(e.options || {}), font: on ? 1 : 0 };
+                renderScreenCanvas();
+            }
+        });
         return;
     }
-
-    appendScreenSwitchRow(opt, {
-        id: 'screen_element_enabled',
-        label: getNestedTranslation(trans, 'screen.enabled') || 'Enabled',
-        checked: e.enabled !== 0,
-        onChange: (on) => {
-            e.enabled = on ? 1 : 0;
-            renderScreenCanvas();
-            renderScreenPalette(); // the palette lists only what is on the screen
-        }
-    });
 
     if (isScreenIconElement(e.id)) {
         appendScreenIconOptions(opt, e);
@@ -3475,6 +3491,30 @@ function renderScreenOptions() {
         appendScreenSwitchRow(target, { id: 'graph_thick', label: T('screen.graph_thick', 'Thick line (2px)'), checked: !!o.thick, onChange: (on) => { o.thick = on; renderScreenCanvas(); } });
         appendScreenSwitchRow(target, { id: 'graph_boolean', label: T('screen.graph_boolean', 'Boolean (step 0/1)'), checked: !!o.boolean, onChange: (on) => { o.boolean = on; renderScreenCanvas(); } });
     }
+
+    appendScreenDeleteRow(opt, e, trans);
+}
+
+// Takes the element off the screen; "Add Item" in the palette puts it back.
+function appendScreenDeleteRow(container, e, trans) {
+    const row = document.createElement('div');
+    row.className = 'screen-delete-row';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn sm danger';
+    btn.id = 'screen_element_delete';
+    btn.textContent = getNestedTranslation(trans, 'screen.delete_element') || 'Delete';
+    btn.addEventListener('click', () => {
+        e.enabled = 0;
+        setScreenSelection([]);
+        renderScreenCanvas();
+        renderScreenOptions();
+        renderScreenPalette();
+        updateScreenStatusLine();
+        focusScreenCanvas();
+    });
+    row.appendChild(btn);
+    container.appendChild(row);
 }
 
 function beginDrag(id, pointerEvent, fromPalette) {

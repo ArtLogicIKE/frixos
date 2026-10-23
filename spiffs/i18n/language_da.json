@@ -104,7 +104,7 @@
       "screen_settings": "Ikke et skærmelement: det åbner indstillingerne for hele skærmen. Vælg cifertema og farvefilter for den aktuelle profil, og slå justeringsgitteret til eller fra.",
       "time": "Hovedcifervisningen, der viser uret i det valgte cifertema. Dens visningsplan kan skifte mellem uret og glukose, udetemperaturen eller en Home Assistant-værdi, hver i sit eget antal sekunder.",
       "digit_label": "En kort tekstlinje, der hører til hovedcifervisningen. Den viser navnet på det aktuelle planlagte felt, når feltet har et, ellers sin egen tekst, som kan indeholde tokens.",
-      "ampm": "Viser AM eller PM ved siden af uret. Den er kun synlig, når 12-timers format er valgt under Indstillinger.",
+      "ampm": "Viser formiddag eller eftermiddag ved siden af uret, som sol/måne-symbol eller som AM/PM-tekst. Den er kun synlig, når 12-timers format er valgt under Indstillinger.",
       "message": "En tekstlinje, der ruller, når den er bredere end sit område. Bland almindelig tekst med tokens som [temp], [HA:sensor.x] eller [CGM:reading] for at vise aktuelle værdier.",
       "time_aux": "En ekstra cifervisning med sit eget cifertema. Dens egen plan skifter uafhængigt, for eksempel glukose her, mens hovedvisningen viser uret.",
       "digit_label_aux": "En kort tekstlinje, der hører til den ekstra cifervisning. Ligesom hovedciferetiketten viser den det aktuelle felts navn eller sin egen tekst.",
@@ -121,7 +121,7 @@
     "add_item_title": "Tilføj til skærmen",
     "add_item_none": "Alt er allerede på skærmen",
     "options": "Indstillinger",
-    "enabled": "Aktiveret",
+    "delete_element": "Slet",
     "layer": "Lag",
     "layers": {
       "back": "1 (bag)",
@@ -150,6 +150,7 @@
     "save_to_device": "Gem på enheden",
     "read_from_file": "Læs fra fil",
     "ampm_note": "AM/PM-indikatoren vises kun ved 12-timers format (under Indstillinger).",
+    "ampm_as_text": "Vis som tekst (AM/PM) i stedet for sol/måne",
     "display_schedule": {
       "title": "Visningsskema",
       "description": "Angiv hvad der vises på den primære cifervisning og hvor længe. Slots skifter i rækkefølge. Et enkelt tidsslot betyder at uret altid vises.",
