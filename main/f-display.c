@@ -3082,9 +3082,8 @@ static void display_apply(bool restart_schedule)
   lv_image_set_inner_align(img_mgdl_aux, LV_ALIGN_TOP_LEFT);
   lv_obj_set_size(img_mgdl_aux, 12, 24);
 
-  // The AM/PM widget's font byte picks the image: 0 = the theme's sun/moon, 1 = text-ampm.jpg.
-  static char text_theme[] = "text";
-  find_file(buf, sizeof(buf), layout->widget[SCREEN_ELEM_AMPM].font ? text_theme : eeprom_font[font_index], "ampm");
+  // The AM/PM widget's font byte picks the image: 0 = <theme>-ampm (sun/moon), 1 = <theme>-ampmtext (AM/PM text).
+  find_file(buf, sizeof(buf), eeprom_font[font_index], layout->widget[SCREEN_ELEM_AMPM].font ? "ampmtext" : "ampm");
   lv_image_set_src(img_ampm, buf);
   lv_image_set_inner_align(img_ampm, LV_ALIGN_TOP_LEFT);
   lv_obj_set_size(img_ampm, 10, 24); // one 10x24 frame of the 20x24 AM|PM sheet

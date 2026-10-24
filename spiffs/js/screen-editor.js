@@ -714,10 +714,10 @@ function getPreviewImageUrl(def, inMatrix) {
     }
     const item = SCREEN_THEME_ASSETS[def.id];
     if (item && inMatrix) {
-        let theme = getScreenTimeFont(window.screenEditor.mode);
+        const theme = getScreenTimeFont(window.screenEditor.mode);
         if (def.id === 'ampm') {
             const e = screenFindProfileElement(getProfileObj(window.screenEditor.mode), 'ampm');
-            if (e && e.options && e.options.font) theme = 'text';
+            if (e && e.options && e.options.font) return resolveThemeAssetUrl(theme, 'ampmtext');
         }
         return resolveThemeAssetUrl(theme, item);
     }
@@ -3142,7 +3142,7 @@ function renderScreenOptions() {
         note.textContent = getNestedTranslation(trans, 'screen.ampm_note')
             || 'AM/PM indicator is only visible when 12-hour format is used (from Settings).';
         opt.appendChild(note);
-        // options.font picks the image: 0 = the theme's sun/moon, 1 = text-ampm.jpg ("AM"/"PM").
+        // options.font picks the image: 0 = the theme's sun/moon, 1 = <theme>-ampmtext ("AM"/"PM", default-ampmtext.jpg).
         appendScreenSwitchRow(opt, {
             id: 'screen_ampm_text',
             label: getNestedTranslation(trans, 'screen.ampm_as_text') || 'Show as text (AM/PM) instead of sun/moon',
