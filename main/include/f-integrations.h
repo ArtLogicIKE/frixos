@@ -57,5 +57,14 @@ bool acquire_ssl_semaphore(const char *function_name);
 void release_ssl_semaphore(void);
 // Called once boot is complete; TLS sessions wait for it (bounded wait).
 void ssl_startup_gate_open(void);
+// Number of TLS sessions skipped so far because no heap block was large enough.
+uint32_t ssl_low_memory_skip_count(void);
+
+// First network round after boot: each part reports once it has run (success or not).
+#define BOOT_ROUND_WEATHER      (1u << 0)
+#define BOOT_ROUND_INTEGRATIONS (1u << 1)
+void boot_round_done(uint32_t bits);
+// Waits until every part of the first round has run; false on timeout.
+bool boot_round_wait(uint32_t timeout_ms);
 
 #endif // F_INTEGRATIONS_H 

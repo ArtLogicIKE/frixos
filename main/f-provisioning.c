@@ -216,6 +216,21 @@ void start_softap_provisioning(void)
     }
 }
 
+// With WiFi up, the web UI waits for the first fetch round after boot (weather,
+// integrations), at most WEB_SERVER_START_MAX_WAIT_MS. A page load during that
+// round fragmented the heap, so every TLS fetch was skipped for lack of a large
+// enough block. Provisioning mode still starts the server at once.
+#define WEB_SERVER_START_MAX_WAIT_MS (60 * 1000)
+
+static void web_server_start_task(void *arg)
+{
+    if (!boot_round_wait(WEB_SERVER_START_MAX_WAIT_MS))
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "First fetch round still running after %ds, starting web server",
+                    WEB_SERVER_START_MAX_WAIT_MS / 1000);
+    init_settings_server();
+    vTaskDelete(NULL);
+}
+
 void provision_init(void)
 {   
     // wifi parameters read from NVS at startup
@@ -283,7 +298,8 @@ void provision_init(void)
     else
     {
         ESP_LOG_WEB(ESP_LOG_INFO, TAG, "WiFi connected, settings updated");
-        init_settings_server();
+        if (xTaskCreate(web_server_start_task, "web_start", 6144, NULL, 3, NULL) != pdPASS)
+            init_settings_server();
         vTaskDelay(pdMS_TO_TICKS(3000));
         settings_updated = true; // trigger a screen update
     }

@@ -223,6 +223,29 @@ static int ssl_semaphore_depth = 0;             // Only touched by the holder
 static EventGroupHandle_t ssl_startup_gate = NULL;
 #define SSL_STARTUP_GATE_BIT BIT0
 #define SSL_STARTUP_GATE_MAX_WAIT_MS (60 * 1000)
+static volatile uint32_t ssl_low_memory_skips = 0;
+
+// The web server waits for the first fetch round (see f-provisioning.c).
+static EventGroupHandle_t boot_round = NULL;
+
+void boot_round_done(uint32_t bits)
+{
+    if (boot_round != NULL)
+        xEventGroupSetBits(boot_round, bits);
+}
+
+bool boot_round_wait(uint32_t timeout_ms)
+{
+    const EventBits_t all = BOOT_ROUND_WEATHER | BOOT_ROUND_INTEGRATIONS;
+    if (boot_round == NULL)
+        return true;
+    return (xEventGroupWaitBits(boot_round, all, pdFALSE, pdTRUE, pdMS_TO_TICKS(timeout_ms)) & all) == all;
+}
+
+uint32_t ssl_low_memory_skip_count(void)
+{
+    return ssl_low_memory_skips;
+}
 
 void ssl_startup_gate_open(void)
 {
@@ -264,6 +287,7 @@ bool acquire_ssl_semaphore(const char *function_name)
         if (largest < TLS_MIN_FREE_BLOCK)
         {
             xSemaphoreGiveRecursive(ssl_connection_semaphore);
+            ssl_low_memory_skips++;
             ESP_LOG_WEB(ESP_LOG_WARN, TAG, "SSL skip %s: largest block %u < %u",
                         function_name ? function_name : "?", (unsigned)largest, (unsigned)TLS_MIN_FREE_BLOCK);
             return false;
@@ -1197,6 +1221,7 @@ static void integration_update_task(void *pvParameters)
                 }
                 // set the updated flag if any updates were successful
                 integration_tokens_updated = integration_tokens_updated || update_ok_any;
+                boot_round_done(BOOT_ROUND_INTEGRATIONS);
             }
             else
             {
@@ -1672,6 +1697,7 @@ void startup_integrations(void)
         return;
     }
     ssl_startup_gate = xEventGroupCreate();
+    boot_round = xEventGroupCreate();
     ESP_LOG_WEB(ESP_LOG_INFO, TAG, "SSL semaphore ready");
 
     // parse for any active integrations

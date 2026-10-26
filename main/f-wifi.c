@@ -601,7 +601,11 @@ static void wifi_task_do_weather(void)
         return;
     }
 
+    uint32_t low_memory_skips = ssl_low_memory_skip_count();
     bool ok = wifi_get_metno_weather();
+    // Skipped for lack of memory, not a real failure: retry soon, without using up a retry.
+    bool memory_skip = !ok && ssl_low_memory_skip_count() != low_memory_skips;
+    boot_round_done(BOOT_ROUND_WEATHER);
 
     // we might as well calculate the moon phase too
     // we do it here, with every weather, but also when NTP is synchronized
@@ -613,6 +617,12 @@ static void wifi_task_do_weather(void)
         weather_retry_attempts = 0;
         ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Weather next in %.1f minutes.", (weather_delay_ms / (1000 * 60.0)));
         ESP_ERROR_CHECK(esp_timer_start_once(weather_timer, weather_delay_ms * 1000));
+    }
+    else if (memory_skip)
+    {
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Weather skipped (low memory), retry in %.0f seconds.",
+                    WEATHER_RETRY_DELAY_MS / 1000.0);
+        ESP_ERROR_CHECK(esp_timer_start_once(weather_timer, WEATHER_RETRY_DELAY_MS * 1000));
     }
     else if (weather_retry_attempts < WEATHER_MAX_RETRIES)
     {
