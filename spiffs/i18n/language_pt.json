@@ -558,7 +558,9 @@
     "unavailable_message": "O dispositivo ficará temporariamente indisponível durante o reinício.",
     "confirm_button": "Reiniciar",
     "waiting_title": "A aguardar a conclusão do reinício",
-    "waiting_hint": "Esta página irá reconectar-se automaticamente quando o seu dispositivo voltar a estar online."
+    "waiting_hint": "Esta página irá reconectar-se automaticamente quando o seu dispositivo voltar a estar online.",
+    "countdown": "A religar dentro de {n} s",
+    "reconnecting": "A religar..."
   },
   "messages": {
     "error_loading_settings": "Erro ao carregar configurações",

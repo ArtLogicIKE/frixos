@@ -59,20 +59,22 @@ function showStatus(message, type) {
 }
 
 /* ---------- reboot wait ----------
-   Shows a full-screen "Waiting for reboot to be completed" overlay and polls
-   the device until it is reachable again, then reloads the page. Idempotent:
-   calling it while already waiting is a no-op. It waits until the device has
-   actually gone unreachable at least once before trusting an "up" response, so
-   a still-alive pre-reboot device doesn't trigger a premature reload; a hard
-   time cap reloads anyway in case the drop is never observed. */
+   Shows a full-screen "Waiting for reboot to be completed" overlay with a
+   countdown, then polls the device until it is reachable again and reloads the
+   page. The first REBOOT_WAIT_S seconds send no requests at all: a page load
+   during boot fragments the heap the device needs for its first TLS
+   connections (weather, Freestyle, HA). Idempotent: calling it while already
+   waiting is a no-op. A hard time cap reloads anyway. */
+const REBOOT_WAIT_S = 60;
 let _rebootWaiting = false;
 function waitForReboot() {
   if (_rebootWaiting) return;
   _rebootWaiting = true;
   const overlay = el('rebootOverlay');
   if (overlay) { overlay.classList.add('open'); overlay.setAttribute('aria-hidden', 'false'); }
-  const POLL_MS = 1500, MAX_MS = 120000, start = Date.now();
-  let sawDown = false;
+  const countdown = el('rebootCountdown');
+  const POLL_MS = 1500, MAX_MS = 120000;
+  let left = REBOOT_WAIT_S, start = 0;
   const probe = async () => {
     let up = false;
     try {
@@ -82,11 +84,21 @@ function waitForReboot() {
       clearTimeout(to);
       up = r.ok;
     } catch (e) { up = false; }
-    if (!up) sawDown = true;
-    if (up && (sawDown || Date.now() - start > MAX_MS)) { location.reload(); return; }
+    if (up || Date.now() - start > MAX_MS) { location.reload(); return; }
     setTimeout(probe, POLL_MS);
   };
-  probe();
+  const tick = () => {
+    if (left > 0) {
+      if (countdown) countdown.textContent = tr('restart.countdown', 'Reconnecting in {n} s').replace('{n}', left);
+      left--;
+      setTimeout(tick, 1000);
+      return;
+    }
+    if (countdown) countdown.textContent = tr('restart.reconnecting', 'Reconnecting...');
+    start = Date.now();
+    probe();
+  };
+  tick();
 }
 
 /* ---------- settings helpers ---------- */

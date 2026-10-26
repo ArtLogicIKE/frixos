@@ -558,7 +558,9 @@
     "unavailable_message": "L'appareil sera temporairement indisponible pendant le redémarrage.",
     "confirm_button": "Redémarrer",
     "waiting_title": "En attente de la fin du redémarrage",
-    "waiting_hint": "Cette page se reconnectera automatiquement dès que votre appareil sera de nouveau en ligne."
+    "waiting_hint": "Cette page se reconnectera automatiquement dès que votre appareil sera de nouveau en ligne.",
+    "countdown": "Reconnexion dans {n} s",
+    "reconnecting": "Reconnexion..."
   },
   "messages": {
     "error_loading_settings": "Erreur lors du chargement des paramètres",

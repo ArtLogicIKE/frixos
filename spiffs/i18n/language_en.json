@@ -568,7 +568,9 @@
     "unavailable_message": "The device will become temporarily unavailable during restart.",
     "confirm_button": "Restart",
     "waiting_title": "Waiting for reboot to be completed",
-    "waiting_hint": "This page will reconnect automatically when your device is back online."
+    "waiting_hint": "This page will reconnect automatically when your device is back online.",
+    "countdown": "Reconnecting in {n} s",
+    "reconnecting": "Reconnecting..."
   },
   "messages": {
     "error_loading_settings": "Error loading settings",

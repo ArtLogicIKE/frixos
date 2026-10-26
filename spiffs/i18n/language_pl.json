@@ -558,7 +558,9 @@
     "unavailable_message": "Urządzenie będzie tymczasowo niedostępne podczas restartu.",
     "confirm_button": "Restart",
     "waiting_title": "Oczekiwanie na zakończenie ponownego uruchomienia",
-    "waiting_hint": "Ta strona połączy się ponownie automatycznie, gdy urządzenie wróci do trybu online."
+    "waiting_hint": "Ta strona połączy się ponownie automatycznie, gdy urządzenie wróci do trybu online.",
+    "countdown": "Ponowne połączenie za {n} s",
+    "reconnecting": "Ponowne łączenie..."
   },
   "messages": {
     "error_loading_settings": "Błąd wczytywania ustawień",

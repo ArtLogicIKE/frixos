@@ -558,7 +558,9 @@
     "unavailable_message": "Das Gerät wird während des Neustarts vorübergehend nicht verfügbar sein.",
     "confirm_button": "Neu starten",
     "waiting_title": "Warten auf Abschluss des Neustarts",
-    "waiting_hint": "Diese Seite verbindet sich automatisch neu, sobald Ihr Gerät wieder online ist."
+    "waiting_hint": "Diese Seite verbindet sich automatisch neu, sobald Ihr Gerät wieder online ist.",
+    "countdown": "Neue Verbindung in {n} s",
+    "reconnecting": "Verbindung wird hergestellt..."
   },
   "messages": {
     "error_loading_settings": "Fehler beim Laden der Einstellungen",

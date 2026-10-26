@@ -558,7 +558,9 @@
     "unavailable_message": "Enheten kommer att vara tillfälligt otillgänglig under omstarten.",
     "confirm_button": "Starta om",
     "waiting_title": "Väntar på att omstarten ska slutföras",
-    "waiting_hint": "Den här sidan återansluter automatiskt när enheten är online igen."
+    "waiting_hint": "Den här sidan återansluter automatiskt när enheten är online igen.",
+    "countdown": "Återansluter om {n} s",
+    "reconnecting": "Återansluter..."
   },
   "messages": {
     "error_loading_settings": "Fel vid laddning av inställningar",
