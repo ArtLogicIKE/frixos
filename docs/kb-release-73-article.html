@@ -1,0 +1,393 @@
+<!-- wp:paragraph -->
+<p>When we wrote up <a href="https://buyfrixos.com/knowledge-base/frixos-v70-signed-updates-graphing-engine-new-filesystem/">v70</a> we called it a proper geek's update: signed OTA, a graphing engine, a brand-new filesystem. Since then, v71 and v72 went out quietly, and now Frixos reaches <strong>v73</strong> (shown as version 2.80 on the System tab). This article covers everything from v70 to v73.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:paragraph -->
+<p>There are new features, and we'll get to them. But if you only read one paragraph, make it this one: <strong>most of the work in these three releases went into making the clock you already own more dependable.</strong> Better doesn't just mean more. A clock on your wall has one job above all others, which is to keep working without you thinking about it. So we spent these months hunting down every way it could stutter, freeze, drop a connection or run short of memory, and we fixed them one by one.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:paragraph -->
+<p>A big share of that work comes from the community. <strong>Benoit Poirier</strong>, the man behind the v67 graphing engine, sent five pull requests in this period, and his memory work is the backbone of v73. Details below, and a proper thank-you at the end.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:separator -->
+<hr class="wp-block-separator has-alpha-channel-opacity"/>
+<!-- /wp:separator -->
+
+<!-- wp:heading -->
+<h2 class="wp-block-heading">The overview</h2>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>Here are the headlines from v70 to v73:</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:list -->
+<ul class="wp-block-list"><!-- wp:list-item -->
+<li><strong>More memory to spare.</strong> On our own test clock (Home Assistant and FreeStyle Libre both active), the lowest point of free memory went from about 14 KB on v72 to 35–45 KB on v73, with the same settings.</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li><strong>Connections that hold up.</strong> Secure connections to Home Assistant, your CGM, the weather service and the update server now queue up, check memory before they start, and recover from network hiccups instead of getting stuck.</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li><strong>A calmer boot.</strong> After a restart, the clock finishes its first round of fetches before it opens its web page, and the web page waits a minute before reconnecting.</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li><strong>Bugs you could see, fixed.</strong> A clock that froze when the light sensor switched between day and night brightness, Home Assistant values that blanked after a layout save, a last digit that went missing, and a scrolling line that hitched.</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li><strong>A friendlier layout editor.</strong> The palette shows what's on your screen, an <strong>Add Item</strong> tile adds the rest, and a <strong>?</strong> button explains every item.</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li><strong>Some new things, too.</strong> Weather Underground support, rounding for Home Assistant values, AM/PM as text, brightness down to 0%, and saving layouts straight onto the clock.</li>
+<!-- /wp:list-item --></ul>
+<!-- /wp:list -->
+
+<!-- wp:paragraph -->
+<p>Now the details.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:separator -->
+<hr class="wp-block-separator has-alpha-channel-opacity"/>
+<!-- /wp:separator -->
+
+<!-- wp:heading -->
+<h2 class="wp-block-heading">1. Why a robustness release?</h2>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>Frixos runs on an ESP32 with no external RAM. Everything it does (the display, the scrolling text, the web page, Home Assistant, your CGM, the weather, the updates) shares a few hundred kilobytes, and only a few tens of those are free once everything is running.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:paragraph -->
+<p>Every secure (HTTPS) connection needs one unbroken block of roughly 17 KB just for its input buffer. When memory is tight, or chopped into small pieces, that block isn't there, and the connection fails. You'd have seen that as an integration dot turning amber, a gap in a graph, a weather icon that didn't update, or, rarely, a clock that needed a restart.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:paragraph -->
+<p>Adding features makes this harder, not easier. So before adding more, we went after the foundations: how much memory each part of the firmware really needs, how connections share what's left, and what happens in the busiest moments, like the first minute after a restart. That's what most of this release is about.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:heading -->
+<h2 class="wp-block-heading">2. The memory diet</h2>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>Benoit's memory work (PR #227) went through the firmware piece by piece, and we added measurements on top of it to size things exactly:</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:list -->
+<ul class="wp-block-list"><!-- wp:list-item -->
+<li><strong>Measured, not guessed.</strong> Every background task gets its own block of memory for its work (its "stack"). Those were sized generously years ago. We measured the real peak use of each one on v72, added a safety margin, and gave back the rest. The clock can now also report each task's headroom, so we can keep an eye on it.</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li><strong>Buffers that grow only when needed.</strong> Secure connections now allocate their buffers as they need them, instead of reserving the maximum up front.</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li><strong>The update task only exists during an update.</strong> It used to sit in memory permanently, waiting. It's now created when an update starts and removed when it's done.</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li><strong>No more patchwork.</strong> The graph drawing area is now allocated once at its largest size, so changing a graph no longer leaves holes in memory. Serving the web page also uses less memory than before.</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li><strong>Smaller connection buffers.</strong> The Home Assistant, FreeStyle and Nightscout clients each reserved 4 KB receive and transmit buffers they didn't need. They now use the same lean sizes as the update downloader.</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li><strong>A rare memory bug, fixed.</strong> Under the right timing, one of the shared download buffers could be released while it was still in use. That one is gone too.</li>
+<!-- /wp:list-item --></ul>
+<!-- /wp:list -->
+
+<!-- wp:paragraph -->
+<p>The result, on our own test clock with Home Assistant and FreeStyle Libre active: about 64 KB free after start-up on v73 against about 43 KB on v72, and the lowest point never dropped below 35 KB, where v72 regularly dipped to around 14 KB. That headroom is what keeps secure connections from failing when several things happen at once.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:heading -->
+<h2 class="wp-block-heading">3. Connections that hold up</h2>
+<!-- /wp:heading -->
+
+<!-- wp:list -->
+<ul class="wp-block-list"><!-- wp:list-item -->
+<li><strong>One secure connection at a time.</strong> All secure connections in the firmware now take turns behind a single lock, and one won't start unless there's a large enough block of memory for it. Instead of failing halfway through, it waits its turn. (Benoit Poirier, PR #224.) In v73 the time-zone lookup joined the queue as well.</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li><strong>One Home Assistant session per cycle.</strong> The clock used to set up a fresh secure connection for every entity it read. It now keeps one connection open for the whole cycle, so a dashboard with nine values spends far less time and memory on connection setup.</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li><strong>No more stuck connections.</strong> After a single network timeout, the FreeStyle Libre or Nightscout connection could get stuck and stay that way until the clock restarted. They now close and start fresh after any network error.</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li><strong>No interruptions mid-handshake.</strong> The display used to wake up every few milliseconds at a higher priority than the network, which slowed down every connection setup. It now sleeps until the next scroll step is actually due.</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li><strong>Better clues when something does fail.</strong> Connection errors now show up in the web log with the error code and the free memory at that moment, so a bug report tells us what actually happened.</li>
+<!-- /wp:list-item --></ul>
+<!-- /wp:list -->
+
+<!-- wp:heading -->
+<h2 class="wp-block-heading">4. A calmer first minute</h2>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>The busiest moment in a clock's life is the minute after it restarts. Wi-Fi connects, the time is set, and then everything wants to go online at once: sunrise and weather, Home Assistant, your CGM, the update check. If you had the web page open when you restarted the clock, the page reloaded right in the middle of all that, asked for dozens of files, and chopped memory into pieces just as the clock needed big blocks for its connections. The result could be a clock that showed the time but no weather, glucose or Home Assistant values for a while.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:paragraph -->
+<p>v73 fixes this from both ends:</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:list -->
+<ul class="wp-block-list"><!-- wp:list-item -->
+<li><strong>Connections wait for start-up.</strong> No secure connection starts until the clock has finished starting up. (Benoit Poirier, PR #227.)</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li><strong>The web page waits for the first round.</strong> The clock now opens its web page only after its first round of fetches has run, typically 20–25 seconds after Wi-Fi connects, and never more than a minute. (Setting up a brand-new clock is unchanged: its setup page is there straight away.)</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li><strong>The page counts down.</strong> When you restart the clock from the web page, after a firmware update or a setting that needs a restart, the page now shows a 60-second countdown and stays quiet until it's done, then reconnects by itself.</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li><strong>Weather doesn't give up too early.</strong> If the weather fetch has to skip a turn because memory is briefly short, it now tries again 30 seconds later, instead of counting it as a failure and pausing the weather for half an hour.</li>
+<!-- /wp:list-item --></ul>
+<!-- /wp:list -->
+
+<!-- wp:image {"id":1963,"align":"center","sizeSlug":"full","linkDestination":"none"} -->
+<figure class="wp-block-image aligncenter size-full"><img src="https://buyfrixos.com/wp-content/uploads/2026/10/frixos-v73-restart-countdown.png" alt="The Frixos web page after a restart, showing Waiting for reboot to be completed and a Reconnecting in 42 s countdown" class="wp-image-1963"/><figcaption class="wp-element-caption">After a restart, the page counts down instead of reloading in the middle of the clock's busiest minute.</figcaption></figure>
+<!-- /wp:image -->
+
+<!-- wp:heading -->
+<h2 class="wp-block-heading">5. Bugs you could see, fixed</h2>
+<!-- /wp:heading -->
+
+<!-- wp:list -->
+<ul class="wp-block-list"><!-- wp:list-item -->
+<li><strong>The clock that froze at dusk.</strong> A customer told us their clock's time sometimes stopped updating when the light sensor switched between day and night brightness. Two things combined: the switch restarted the clock/glucose alternation from scratch every time, and while the scrolling text was busy, the once-a-second work that updates the time could be put off again and again. The alternation now carries on across the switch, and the once-a-second work always gets its turn.</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li><strong>Home Assistant values that went blank.</strong> Saving a layout or a message could turn every Home Assistant value into "-" until the next scheduled refresh, which can be many minutes away. The values now stay put through a save, and fresh ones arrive within seconds.</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li><strong>The vanishing digit.</strong> Now and then the last digit of the time disappeared after a redraw. Deep in the graphics library, two digit images being decoded at the same moment could fight over a shared buffer, and the loser was simply skipped. The digit now stays put, and the clock does less redrawing to boot.</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li><strong>Smoother scrolling.</strong> The scrolling line now runs on a real-time clock instead of counting frames, so a busy moment elsewhere makes the text catch up instead of pausing. It only draws the characters you can actually see, and it gets priority over background work. If your layout ever stutters anyway, <strong>System → Danger zone → Scrolling line</strong> lets you switch to the graphics library's own animation.</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li><strong>Second digit themes after a restart.</strong> If your layout used a different digit theme for the second (aux) digit display, it now survives a restart.</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li><strong>No full-brightness flash at start-up.</strong> The clock now starts at your saved day or night brightness from the first moment, which matters most when it restarts at 3 a.m.</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li><strong>Schedules saved to the minute.</strong> Wi-Fi and dimming schedule windows set to anything other than a whole hour were quietly rejected. They now save exactly as you set them.</li>
+<!-- /wp:list-item --></ul>
+<!-- /wp:list -->
+
+<!-- wp:heading -->
+<h2 class="wp-block-heading">6. FreeStyle Libre: a much tougher client</h2>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>LibreLinkUp can be fussy. Accounts are tied to regions, the service sometimes asks you to accept new terms, and too many failed logins can lock you out. Benoit rewrote the login flow to deal with all of it (PR #222), and refined it further in v73:</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:list -->
+<ul class="wp-block-list"><!-- wp:list-item -->
+<li><strong>Region redirects are followed automatically.</strong> If your account lives on another regional server, the clock switches to it and retries.</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li><strong>Clear messages for each kind of rejection:</strong> wrong credentials, terms waiting to be accepted in the app, a temporary lockout, or an app version the service considers too old.</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li><strong>It backs off.</strong> After a rejected login the clock pauses instead of hammering the service, so a typo can't get your account locked. Since v73, a short network hiccup no longer triggers a fresh login either.</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li><strong>No more half-drawn graphs.</strong> The HTTP 400 errors that left gaps in the graph are gone, and if a history download fails partway, the clock now discards the partial data instead of drawing an incomplete curve.</li>
+<!-- /wp:list-item --></ul>
+<!-- /wp:list -->
+
+<!-- wp:heading -->
+<h2 class="wp-block-heading">7. A friendlier layout editor</h2>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>The layout editor is for people who really want to make their screen their own. It's powerful, but it used to greet you with every possible item at once, including many that weren't on your screen at all. v73 tidies it up:</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:list -->
+<ul class="wp-block-list"><!-- wp:list-item -->
+<li><strong>The palette shows what's on your screen.</strong> Only the items your layout actually uses are listed, so it doubles as a table of contents for your screen.</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li><strong>Add Item adds the rest.</strong> A new <strong>+ Add Item</strong> tile opens a chooser with everything you can still add: another text line, a graph, an icon, the second digit display and more.</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li><strong>A "?" that explains.</strong> The new <strong>?</strong> button next to the palette lists every item with its icon and two or three sentences on what it's for and how to use it.</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li><strong>Delete means delete.</strong> The old "Enabled" checkbox is replaced by a clear <strong>Delete</strong> button at the bottom of each item's settings.</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li><strong>Save to device.</strong> Give your layout a name and it's stored on the clock next to the built-in presets, ready to apply from the gallery.</li>
+<!-- /wp:list-item --></ul>
+<!-- /wp:list -->
+
+<!-- wp:gallery {"columns":3,"linkTo":"none"} -->
+<figure class="wp-block-gallery has-nested-images columns-3 is-cropped"><!-- wp:image {"id":1964,"sizeSlug":"full","linkDestination":"none"} -->
+<figure class="wp-block-image size-full"><img src="https://buyfrixos.com/wp-content/uploads/2026/10/frixos-v73-palette.png" alt="The Frixos layout editor palette showing only the items on screen, with an Add Item tile and a question-mark help button" class="wp-image-1964"/><figcaption class="wp-element-caption">The palette lists what's on screen.</figcaption></figure>
+<!-- /wp:image -->
+
+<!-- wp:image {"id":1965,"sizeSlug":"full","linkDestination":"none"} -->
+<figure class="wp-block-image size-full"><img src="https://buyfrixos.com/wp-content/uploads/2026/10/frixos-v73-add-item.png" alt="The Add to the screen chooser offering Digit Label, Digit Display (Aux), Graph, New Text Line and New Icon" class="wp-image-1965"/><figcaption class="wp-element-caption">Add Item offers everything else.</figcaption></figure>
+<!-- /wp:image -->
+
+<!-- wp:image {"id":1966,"sizeSlug":"full","linkDestination":"none"} -->
+<figure class="wp-block-image size-full"><img src="https://buyfrixos.com/wp-content/uploads/2026/10/frixos-v73-palette-help.png" alt="The Palette items help window explaining Screen settings, Digit Display, Digit Label, AM/PM and Scrolling Message" class="wp-image-1966"/><figcaption class="wp-element-caption">The "?" explains each item.</figcaption></figure>
+<!-- /wp:image --></figure>
+<!-- /wp:gallery -->
+
+<!-- wp:paragraph -->
+<p>Two smaller touches for the web page as a whole: it now reopens the tab you were on when you refresh it, and while it's fetching settings from the clock it shows a small "Retrieving settings…" note, so you're never looking at half-loaded values.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:heading -->
+<h2 class="wp-block-heading">8. New things, too</h2>
+<!-- /wp:heading -->
+
+<!-- wp:list -->
+<ul class="wp-block-list"><!-- wp:list-item -->
+<li><strong>Weather Underground.</strong> Bring a real personal weather station onto your clock, next to the met.no forecast. Enter an API key and any public station ID on the <strong>Integrations</strong> tab, and eight new tokens become available: <code>[wu:temp]</code>, <code>[wu:hum]</code>, <code>[wu:dew]</code>, <code>[wu:wind]</code>, <code>[wu:gust]</code>, <code>[wu:pressure]</code>, <code>[wu:rain]</code> and <code>[wu:uv]</code>. All eight come from a single fetch per cycle, because a second weather source shouldn't double the network traffic.</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li><strong>Rounding for Home Assistant values.</strong> Some sensors report far more decimals than you want on a wall. Add <code>.N</code> to the end of a token to round to N decimals: <code>[HA:sensor.ground_power.0]</code> shows a whole number, <code>.1</code> one decimal, and so on.</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li><strong>AM/PM as text.</strong> In 12-hour mode, the AM/PM indicator can now show the letters <strong>AM</strong>/<strong>PM</strong> instead of a sun or moon. It now comes and goes with the main digit display, it's shown at its full height, and digit themes can ship their own AM/PM lettering to match.</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li><strong>Brightness down to 0%.</strong> Day and night brightness both accept 0, in the web page, the device API and the Home Assistant integration. If you want the projection completely dark at night, you can have exactly that.</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li><strong>Safe power limits per board.</strong> Revision 2 boards cap LED power at a safe drive level, and the System tab shows your board revision and its power cap side by side.</li>
+<!-- /wp:list-item --></ul>
+<!-- /wp:list -->
+
+<!-- wp:heading -->
+<h2 class="wp-block-heading">9. Under the hood</h2>
+<!-- /wp:heading -->
+
+<!-- wp:list -->
+<ul class="wp-block-list"><!-- wp:list-item -->
+<li><strong>ESP-IDF 6.1 and LVGL 9.6.</strong> The firmware builds on the latest Espressif framework and graphics library, with their bug fixes and the on-demand connection buffers mentioned above.</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li><strong>Layouts and power-on hours moved to LittleFS.</strong> They moved off the small settings partition onto the new filesystem, so the settings can be safely wiped and rewritten if a clock ever needs rescuing.</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li><strong>Update checks that don't cry wolf.</strong> A failed "is there a new version?" check right after start-up no longer looks like a failed update. The clock waits for things to settle and retries first.</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li><strong>For tinkerers.</strong> If you flash your own web files onto the clock, an update no longer overwrites them (Benoit Poirier, PR #228). The settings and screen-layout HTTP API is now documented with examples.</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li><strong>Tests on every change.</strong> A check that compares the web page with the clock's settings runs automatically on every change, so a setting can't silently stop saving again.</li>
+<!-- /wp:list-item --></ul>
+<!-- /wp:list -->
+
+<!-- wp:separator -->
+<hr class="wp-block-separator has-alpha-channel-opacity"/>
+<!-- /wp:separator -->
+
+<!-- wp:heading -->
+<h2 class="wp-block-heading">The people behind this release</h2>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>Our biggest thanks go, once again, to <strong>Benoit Poirier</strong>. After the graphing engine in v67, he turned his attention to the least glamorous and most important part of the firmware: making it reliable. His five pull requests in this period:</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:list -->
+<ul class="wp-block-list"><!-- wp:list-item -->
+<li><strong>Memory optimisations</strong> (PR #227): connections that wait for start-up, on-demand connection buffers, leaner tasks, an update task that only exists during updates, a fixed-size graph canvas, a leaner web server, and the shared-buffer and LibreView fixes. It's the backbone of v73.</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li><strong>The single connection lock</strong> (PR #224), which every secure connection now queues behind.</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li><strong>The hardened LibreLinkUp client</strong> (PR #222).</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li><strong>Aligned time and glucose positions</strong> (PR #223).</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li><strong>Locally flashed web files survive updates</strong> (PR #228), which makes life easier for everyone who tinkers with the web page.</li>
+<!-- /wp:list-item --></ul>
+<!-- /wp:list -->
+
+<!-- wp:paragraph -->
+<p>Thank you, too, to everyone who wrote in about a frozen clock at dusk, stuttering text, a missing digit, blank Home Assistant values, a Libre that wouldn't log in, or an integration that kept going amber. Every one of those reports led to a fix in this release.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:paragraph -->
+<p>Want your name in the next one? The firmware is open on <a href="https://github.com/ArtLogicIKE/frixos">GitHub</a>, with a developer guide and an HTTP API reference. Bug reports, ideas and pull requests are all welcome.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:separator -->
+<hr class="wp-block-separator has-alpha-channel-opacity"/>
+<!-- /wp:separator -->
+
+<!-- wp:heading -->
+<h2 class="wp-block-heading">How you get v73</h2>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>Same as always: <strong>you don't have to do anything.</strong> Frixos checks for updates on its own, and every update arrives over the signed path that shipped in v67, verified on the clock before anything is written. The clock restarts on the new version. (If your clock is still on something older than v70, it does the one-time filesystem rebuild on the way.)</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:paragraph -->
+<p>To check, open your clock's web page on your network and go to <strong>System</strong>. You'll see firmware 73 (version 2.80) there.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:paragraph -->
+<p>Here's to v73: not the longest feature list we've shipped, but the steadiest clock we've built. Hang it, set it, and forget about it.</p>
+<!-- /wp:paragraph -->
