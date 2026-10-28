@@ -77,16 +77,7 @@ frixos/
 │   └── teriyakigod__esp_lcd_st7735/   # ST7735 LCD driver (vendored)
 │
 ├── custom_components/
-│   └── frixos/             # Home Assistant custom integration (Python)
-│       ├── __init__.py     # Platform setup, config entry handler
-│       ├── config_flow.py  # Add device dialog in HA
-│       ├── coordinator.py  # Data coordinator (polls /api/* every 60s)
-│       ├── const.py        # API parameter mappings (p00–p43)
-│       ├── sensor.py       # HA sensors (light level, uptime, WiFi…)
-│       ├── switch.py       # HA switches (12h mode, dark theme…)
-│       ├── number.py       # HA number inputs (brightness, offsets…)
-│       ├── select.py       # HA selectors (font, filter, timezone…)
-│       └── text.py         # HA text inputs (scroll message, tokens…)
+│   └── README.md           # Link to the Home Assistant integration repo
 │
 ├── spiffs/                 # Embedded web UI (served from flash)
 │   ├── index.html          # Single-page app markup
@@ -295,26 +286,7 @@ python tools/verify_ui.py
 
 ## 9. Home Assistant integration
 
-The `custom_components/frixos/` folder contains a **Home Assistant custom integration** that exposes all device settings as HA entities.
-
-### Installation
-
-1. Copy the `custom_components/frixos/` folder to your HA `config/custom_components/` directory.
-2. Restart Home Assistant.
-3. Go to **Settings → Devices & Services → Add Integration** and search for **Frixos**.
-4. Enter the device hostname/IP, port (default `80`), and a display name.
-
-### What it exposes
-
-| HA Platform | Examples |
-|------------|---------|
-| **Sensor** | Light level (lux), uptime, WiFi RSSI, free heap |
-| **Switch** | 12-hour format, dark theme, dim disabled, Fahrenheit |
-| **Number** | Brightness (day/night), X/Y display offset, scroll delay, refresh interval |
-| **Select** | Font (day/night), color filter, CGM source, timezone |
-| **Text** | Scroll message, HA URL, HA token, hostname |
-
-The coordinator polls `/api/settings` and `/api/status` on the device every 60 seconds.
+The Home Assistant custom integration, which exposes the device settings as HA entities, is maintained in its own repository: [ArtLogicIKE/frixos-ha-integration](https://github.com/ArtLogicIKE/frixos-ha-integration). Its README covers installation, the entities it provides and the firmware versions it supports.
 
 ---
 

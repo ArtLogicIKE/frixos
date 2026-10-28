@@ -4,7 +4,7 @@ This guide is for developers who want to **set every firmware parameter with a d
 
 There is **no authentication**. Anyone on the same network can read and change settings.
 
-Source of truth is firmware (`main/f-settings.c`, `main/include/frixos.h`, `main/include/f-screen-layout-bin.h`). The Home Assistant mapping in `custom_components/frixos/const.py` stops around `p43` and is incomplete.
+Source of truth is firmware (`main/f-settings.c`, `main/include/frixos.h`, `main/include/f-screen-layout-bin.h`). The Home Assistant mapping lives in `custom_components/frixos/const.py` of [frixos-ha-integration](https://github.com/ArtLogicIKE/frixos-ha-integration).
 
 ---
 
