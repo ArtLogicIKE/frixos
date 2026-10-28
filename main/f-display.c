@@ -27,6 +27,10 @@
 #include <string.h>
 #include "esp_timer.h"
 #include "esp_system.h"
+#include "esp_attr.h"
+#include "esp_debug_helpers.h"
+#include "esp_cpu_utils.h"
+#include "esp_memory_utils.h"
 #include "esp_lcd_st7735.h"
 #include <unistd.h>
 #include "lvgl.h"
@@ -276,7 +280,7 @@ LV_FONT_DECLARE(frixos_14);
 LV_FONT_DECLARE(frixos_16);
 
 static void fade_timer_cb(void *arg);
-void create_grid(lv_obj_t *scr);
+void create_grid(lv_obj_t *layer);
 void show_object(lv_obj_t *obj, bool show);
 
 // Helper functions for modular display_task
@@ -1405,8 +1409,9 @@ esp_err_t startup_lvgl(void)
 // ~1 KB during TLS handshakes (weather/CGM); the previous ~14 line objects'
 // persistent object/style allocations were enough to tip the system into OOM
 // and reset it once the graph/CGM/weather paths were active. A draw callback
-// costs zero persistent heap, and because it runs on LV_EVENT_DRAW_POST of the
-// screen (after all children are rendered) it is always on top.
+// costs zero persistent heap. It runs on LV_EVENT_DRAW_POST of the top layer,
+// which LVGL draws after the active screen for every refreshed area, so it is
+// always above every widget.
 
 static bool grid_cb_registered = false;
 
@@ -1415,9 +1420,19 @@ static bool grid_cb_registered = false;
 static const int32_t grid_v_lines[] = {20, 30, 40, 90, 100, 110};
 static const int32_t grid_h_lines[] = {20, 30, 40, 90, 100, 110};
 
+// Each grid line is one LVGL draw task from the 24 KB LVGL pool. At boot the pool
+// can be nearly full, and a failed draw task allocation is a fatal LVGL assert, so
+// skip the overlay for this frame when the pool is low.
+#define GRID_MIN_LV_FREE (4 * 1024)
+
 static void grid_draw_event_cb(lv_event_t *e)
 {
   if (!eeprom_show_grid)
+    return;
+
+  lv_mem_monitor_t mon;
+  lv_mem_monitor(&mon);
+  if (mon.free_size < GRID_MIN_LV_FREE)
     return;
 
   lv_layer_t *layer = lv_event_get_layer(e);
@@ -1451,15 +1466,15 @@ static void grid_draw_event_cb(lv_event_t *e)
 }
 
 // Retained for source compatibility with the old object-based grid: the draw
-// callback already renders on top of all children, so nothing to re-raise.
+// callback already renders on the top layer, so nothing to re-raise.
 static void raise_grid_foreground(void) {}
 
-void create_grid(lv_obj_t *scr)
+void create_grid(lv_obj_t *layer)
 {
   if (grid_cb_registered)
     return;
   ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Register grid overlay");
-  lv_obj_add_event_cb(scr, grid_draw_event_cb, LV_EVENT_DRAW_POST, NULL);
+  lv_obj_add_event_cb(layer, grid_draw_event_cb, LV_EVENT_DRAW_POST, NULL);
   grid_cb_registered = true;
 }
 
@@ -1468,9 +1483,9 @@ void show_grid(uint8_t show)
   // eeprom_show_grid is the source of truth read by the draw callback; just make
   // sure the overlay callback is installed, then invalidate so the toggle shows.
   static int shown = -1;
-  create_grid(lv_scr_act());
+  create_grid(lv_layer_top());
   if (shown != (int)show)
-    lv_obj_invalidate(lv_scr_act());
+    lv_obj_invalidate(lv_layer_top());
   shown = show;
 }
 
@@ -1635,10 +1650,56 @@ void set_scroll_message(const char *msg)
   stall_note("msg_lv", esp_timer_get_time() - t_lv);
 }
 
+// LVGL asserts (e.g. its pool running out) halt in a busy loop by default, which
+// starves every task on core 1 until the display watchdog fires. LV_ASSERT_HANDLER
+// (main/lv_assert/frixos_lv_assert.h) calls this instead: record where it failed in
+// RTC memory, which survives the restart, and restart now. The next boot logs it.
+#define LV_ASSERT_REC_MAGIC 0x4C564153u
+typedef struct
+{
+  uint32_t magic;
+  int line;
+  char file[24];
+  uint32_t bt[8];
+} lv_assert_rec_t;
+static RTC_NOINIT_ATTR lv_assert_rec_t lv_assert_rec;
+
+void frixos_lv_assert_failed(const char *file, int line)
+{
+  const char *base = file;
+  for (const char *p = file; *p; p++)
+    if (*p == '/' || *p == '\\')
+      base = p + 1;
+  strlcpy(lv_assert_rec.file, base, sizeof(lv_assert_rec.file));
+  lv_assert_rec.line = line;
+  esp_backtrace_frame_t fr = {0};
+  esp_backtrace_get_start(&fr.pc, &fr.sp, &fr.next_pc);
+  for (size_t i = 0; i < sizeof(lv_assert_rec.bt) / sizeof(lv_assert_rec.bt[0]); i++)
+  {
+    lv_assert_rec.bt[i] = fr.pc;
+    if (fr.pc != 0 && (fr.next_pc == 0 || !esp_stack_ptr_is_sane(fr.sp) || !esp_backtrace_get_next_frame(&fr)))
+      fr.pc = 0;
+  }
+  lv_assert_rec.magic = LV_ASSERT_REC_MAGIC;
+  esp_restart();
+}
+
+static void log_previous_lv_assert(void)
+{
+  if (lv_assert_rec.magic != LV_ASSERT_REC_MAGIC)
+    return;
+  lv_assert_rec.magic = 0;
+  lv_assert_rec.file[sizeof(lv_assert_rec.file) - 1] = '\0';
+  const uint32_t *b = lv_assert_rec.bt;
+  ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Restarted after LVGL assert %s:%d bt %08lx %08lx %08lx %08lx %08lx %08lx %08lx %08lx",
+              lv_assert_rec.file, lv_assert_rec.line, b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7]);
+}
+
 // this is reboot only stuff
 void startup_display(void)
 {
   ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Display startup");
+  log_previous_lv_assert();
   graph_init(); // graph ring mutex + zeroed state, before any sampler/render
   lv_obj_t *scr = lv_scr_act();
 
@@ -3244,6 +3305,48 @@ static uint8_t watchdog_missed_count = 0;
 // deadlocks (e.g. on the LVGL port lock).
 #define WATCHDOG_MISS_LIMIT 2
 
+// Hang diagnostics: log each task's state and saved backtrace to the web log
+// (no serial on deployed boards). Decode with addr2line -e build/frixos.elf.
+// Runs as a high-priority task on core 1 so a task spinning there (LVGL,
+// display_task, wifi_task) is switched out and its saved frame is current.
+static const char *const hang_task_names[] = {
+    "taskLVGL", "display_task", "wifi_task", "integration_upd", "int_reparse", "web_start",
+    "esp_timer", "sys_evt", "httpd", "tiT", "wifi", "mdns", "main", "IDLE0", "IDLE1"};
+
+static void hang_dump_task(void *arg)
+{
+  static const char state_chars[] = "RrBSDI"; // running, ready, blocked, suspended, deleted, invalid
+  for (size_t i = 0; i < sizeof(hang_task_names) / sizeof(hang_task_names[0]); i++)
+  {
+    TaskHandle_t h = xTaskGetHandle(hang_task_names[i]);
+    if (h == NULL)
+      continue;
+    eTaskState st = eTaskGetState(h);
+    char line[160];
+    int n = snprintf(line, sizeof(line), "Hang %s %c", hang_task_names[i],
+                     st < sizeof(state_chars) - 1 ? state_chars[st] : '?');
+    // pxTopOfStack is the TCB's first member; it points at the saved frame.
+    const uint32_t *f = *(const uint32_t *const *)h;
+    if (st != eRunning && esp_ptr_in_dram(f))
+    {
+      // Solicited frame (exit == 0): pc, ps, threadptr, a0, a1. Interrupt frame: pc, ps, a0, a1.
+      esp_backtrace_frame_t fr = {
+          .pc = esp_cpu_process_stack_pc(f[1]),
+          .next_pc = f[0] == 0 ? f[4] : f[3],
+          .sp = f[0] == 0 ? f[5] : f[4],
+      };
+      for (int d = 0; d < 8 && n < (int)sizeof(line) - 12; d++)
+      {
+        n += snprintf(line + n, sizeof(line) - n, " %08lx", (unsigned long)fr.pc);
+        if (fr.next_pc == 0 || !esp_stack_ptr_is_sane(fr.sp) || !esp_backtrace_get_next_frame(&fr))
+          break;
+      }
+    }
+    ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "%s", line);
+  }
+  vTaskDelete(NULL);
+}
+
 static void watchdog_callback(void *arg)
 {
   if (display_task_heartbeat == last_display_task_heartbeat)
@@ -3251,6 +3354,8 @@ static void watchdog_callback(void *arg)
     watchdog_missed_count++;
     ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Watchdog: display task hung (heartbeat %lu, miss %u/%u)",
                 display_task_heartbeat, watchdog_missed_count, WATCHDOG_MISS_LIMIT);
+    if (watchdog_missed_count == 1)
+      xTaskCreatePinnedToCore(hang_dump_task, "hang_dump", 3072, NULL, configMAX_PRIORITIES - 2, NULL, 1);
     if (watchdog_missed_count >= WATCHDOG_MISS_LIMIT)
     {
       ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Restarting now (display hang)");

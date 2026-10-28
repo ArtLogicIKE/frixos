@@ -51,6 +51,9 @@ if(NOT DEFINED ENV{IDF_PATH} OR NOT EXISTS "$ENV{IDF_PATH}/tools/cmake/project.c
     endif()
 endif()
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+# LVGL includes CONFIG_LV_ASSERT_CUSTOM_INCLUDE from every source; only this dir
+# is added globally so main/include's headers can't shadow other components'.
+idf_build_set_property(COMPILE_OPTIONS "-I${CMAKE_CURRENT_SOURCE_DIR}/main/lv_assert" APPEND)
 project(frixos)
 # LittleFS since fw 70 (was spiffs_create_partition_image); same partition,
 # factory images are now LittleFS-formatted.
