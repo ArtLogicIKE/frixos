@@ -95,9 +95,7 @@ frixos/
 │   └── build.ps1           # PowerShell build/flash helper (Windows)
 │
 ├── docs/                   # Knowledge base
-│   ├── developer-guide.md  # This file
-│   ├── kb-flashing-esp32-p1-pgm.md   # UART flashing via P1 PGM header
-│   └── kb-user-font-guide.md         # Custom font creation guide
+│   └── developer-guide.md  # This file
 │
 ├── artwork/                # Paint.NET source files for UI graphics
 │
@@ -230,7 +228,7 @@ To also open the serial monitor immediately after:
 idf.py -p /dev/ttyUSB0 flash monitor
 ```
 
-**Boot mode:** The ESP32 must be placed in UART download mode before flashing. See [kb-flashing-esp32-p1-pgm.md](kb-flashing-esp32-p1-pgm.md) for the full wiring guide and boot mode procedure using the P1 PGM header.
+**Boot mode:** The ESP32 must be placed in UART download mode before flashing. See [Flashing via the P1 PGM connector](https://buyfrixos.com/knowledge-base/flashing-your-frixos-onboard-esp32-via-the-p1-pgm-connector/) for the full wiring guide and boot mode procedure using the P1 PGM header.
 
 ### 6.3 Flashing individual partitions
 
@@ -331,8 +329,8 @@ The device uses a custom 8 MB partition table:
 
 ## 13. Further reading
 
-- [kb-flashing-esp32-p1-pgm.md](kb-flashing-esp32-p1-pgm.md) — Detailed UART flashing guide (P1 PGM connector, wiring, boot mode)
-- [kb-user-font-guide.md](kb-user-font-guide.md) — How to create and install custom fonts
+- [Flashing via the P1 PGM connector](https://buyfrixos.com/knowledge-base/flashing-your-frixos-onboard-esp32-via-the-p1-pgm-connector/) (knowledge base) — Detailed UART flashing guide (P1 PGM connector, wiring, boot mode)
+- [Custom user font / theme](https://buyfrixos.com/knowledge-base/creating-a-custom-user-font-theme-for-frixos-fw-60/) (knowledge base) — How to create and install custom fonts
 - [kb-http-api.md](kb-http-api.md) — Set every parameter and the screen-layout blob over HTTP (curl)
 - [ESP-IDF documentation](https://docs.espressif.com/projects/esp-idf/en/stable/esp32/)
 - [LVGL documentation](https://docs.lvgl.io/master/)

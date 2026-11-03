@@ -52,7 +52,7 @@ LVGL 9 requires significantly larger stacks than LVGL 8.
 ## 📚 Documentation Reference
 - [docs/developer-guide.md](docs/developer-guide.md): build, flash, SPIFFS deployment, local Web UI work.
 - [docs/kb-http-api.md](docs/kb-http-api.md): settings and layout HTTP API.
-- [docs/design-generic-graph-widget.md](docs/design-generic-graph-widget.md), [docs/kb-user-font-guide.md](docs/kb-user-font-guide.md), [docs/kb-flashing-esp32-p1-pgm.md](docs/kb-flashing-esp32-p1-pgm.md): feature and hardware notes.
+- [docs/design-generic-graph-widget.md](docs/design-generic-graph-widget.md): graph widget design. User-facing guides (custom fonts, P1 PGM flashing) live on the buyfrixos.com knowledge base.
 
 ## 🌐 Web UI (SPIFFS)
 
