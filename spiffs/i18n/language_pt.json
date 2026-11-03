@@ -112,7 +112,7 @@
       "weather": "Um ícone do tempo atual segundo a previsão. Precisa de uma localização definida nas Definições.",
       "moon": "Um ícone que mostra a fase atual da lua.",
       "wifi_off": "Aparece apenas enquanto o WiFi está desligado pela definição de horas ativas do WiFi, para lembrar que nada é atualizado até voltar a ligar.",
-      "glucose_level": "Um ícone de gota para a última leitura do CGM: vermelho quando baixa, verde no intervalo, amarelo quando alta e cinzento quando a leitura está desatualizada. Precisa de uma integração CGM (Dexcom, FreeStyle Libre ou Nightscout).",
+      "glucose_level": "Um ícone de gota para a última leitura do CGM: vermelho quando baixa, verde no intervalo, roxo quando alta e cinzento quando a leitura está desatualizada. Precisa de uma integração CGM (Dexcom, FreeStyle Libre ou Nightscout).",
       "glucose_trend": "Uma seta que mostra para onde a glicose está a evoluir, a partir da última leitura do CGM. Precisa de uma integração CGM.",
       "graph": "Desenha o histórico recente de um valor, como a glicose, um sensor do Home Assistant ou uma ação. Defina o valor, o período, a escala, as cores e uma faixa baixa/alta opcional nas suas opções.",
       "text": "Adiciona uma linha de texto fixa (até 8). Pode incluir tokens, por exemplo \"UV [uv]\" ou \"Cozinha [HA:sensor.kitchen_temperature]\".",

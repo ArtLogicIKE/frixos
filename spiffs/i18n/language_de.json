@@ -112,7 +112,7 @@
       "weather": "Ein Symbol für das aktuelle Wetter aus der Vorhersage. Benötigt einen in den Einstellungen festgelegten Standort.",
       "moon": "Ein Symbol, das die aktuelle Mondphase zeigt.",
       "wifi_off": "Erscheint nur, während WLAN durch die Einstellung der WLAN-Aktivzeiten ausgeschaltet ist, als Hinweis, dass nichts aktualisiert wird, bis es wieder an ist.",
-      "glucose_level": "Ein Tropfensymbol für den letzten CGM-Wert: rot bei niedrig, grün im Zielbereich, gelb bei hoch und grau, wenn der Wert veraltet ist. Benötigt eine CGM-Integration (Dexcom, FreeStyle Libre oder Nightscout).",
+      "glucose_level": "Ein Tropfensymbol für den letzten CGM-Wert: rot bei niedrig, grün im Zielbereich, lila bei hoch und grau, wenn der Wert veraltet ist. Benötigt eine CGM-Integration (Dexcom, FreeStyle Libre oder Nightscout).",
       "glucose_trend": "Ein Pfeil, der zeigt, in welche Richtung sich die Glukose bewegt, aus dem letzten CGM-Wert. Benötigt eine CGM-Integration.",
       "graph": "Zeichnet den jüngsten Verlauf eines Werts, etwa Glukose, eines Home-Assistant-Sensors oder einer Aktie. Wert, Zeitraum, Skala, Farben und ein optionales Unter-/Obergrenzen-Band legst du in den Optionen fest.",
       "text": "Fügt eine feste Textzeile hinzu (bis zu 8). Sie kann Tokens enthalten, zum Beispiel \"UV [uv]\" oder \"Küche [HA:sensor.kitchen_temperature]\".",

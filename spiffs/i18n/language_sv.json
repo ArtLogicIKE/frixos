@@ -112,7 +112,7 @@
       "weather": "En ikon för aktuellt väder från prognosen. Kräver en plats angiven under Inställningar.",
       "moon": "En ikon som visar månens aktuella fas.",
       "wifi_off": "Visas bara medan WiFi är avstängt av inställningen för WiFi-aktiva timmar, som en påminnelse om att inget uppdateras förrän det är på igen.",
-      "glucose_level": "En droppikon för den senaste CGM-avläsningen: röd vid lågt, grön inom målområdet, gul vid högt och grå när avläsningen är inaktuell. Kräver en CGM-integration (Dexcom, FreeStyle Libre eller Nightscout).",
+      "glucose_level": "En droppikon för den senaste CGM-avläsningen: röd vid lågt, grön inom målområdet, lila vid högt och grå när avläsningen är inaktuell. Kräver en CGM-integration (Dexcom, FreeStyle Libre eller Nightscout).",
       "glucose_trend": "En pil som visar åt vilket håll glukosen rör sig, utifrån den senaste CGM-avläsningen. Kräver en CGM-integration.",
       "graph": "Ritar den senaste historiken för ett värde, till exempel glukos, en Home Assistant-sensor eller en aktie. Ange värde, tidsperiod, skala, färger och ett valfritt låg/hög-band i dess alternativ.",
       "text": "Lägger till en fast textrad (upp till 8). Den kan innehålla tokens, till exempel \"UV [uv]\" eller \"Kök [HA:sensor.kitchen_temperature]\".",

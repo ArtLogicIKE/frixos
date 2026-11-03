@@ -115,7 +115,7 @@
       "weather": "An icon for the current weather from the forecast. Needs a location set in Settings.",
       "moon": "An icon showing the current phase of the moon.",
       "wifi_off": "Appears only while WiFi is switched off by the WiFi active-hours setting, as a reminder that nothing updates until it is back on.",
-      "glucose_level": "A drop icon for the latest CGM reading: red when low, green in range, yellow when high and gray when the reading is out of date. Needs a CGM integration (Dexcom, FreeStyle Libre or Nightscout).",
+      "glucose_level": "A drop icon for the latest CGM reading: red when low, green in range, purple when high and gray when the reading is out of date. Needs a CGM integration (Dexcom, FreeStyle Libre or Nightscout).",
       "glucose_trend": "An arrow showing which way glucose is moving, from the latest CGM reading. Needs a CGM integration.",
       "graph": "Plots the recent history of one value, such as glucose, a Home Assistant sensor or a stock. Set the value, time span, scale, colors and an optional low/high band in its options.",
       "text": "Adds a fixed line of text (up to 8). It can include tokens, for example \"UV [uv]\" or \"Kitchen [HA:sensor.kitchen_temperature]\".",

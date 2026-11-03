@@ -112,7 +112,7 @@
       "weather": "Ikona bieżącej pogody z prognozy. Wymaga ustawienia lokalizacji w Ustawieniach.",
       "moon": "Ikona pokazująca bieżącą fazę księżyca.",
       "wifi_off": "Pojawia się tylko wtedy, gdy WiFi jest wyłączone przez ustawienie godzin aktywności WiFi, jako przypomnienie, że nic się nie aktualizuje, dopóki nie wróci.",
-      "glucose_level": "Ikona kropli dla ostatniego odczytu CGM: czerwona przy niskim, zielona w zakresie, żółta przy wysokim i szara, gdy odczyt jest nieaktualny. Wymaga integracji CGM (Dexcom, FreeStyle Libre lub Nightscout).",
+      "glucose_level": "Ikona kropli dla ostatniego odczytu CGM: czerwona przy niskim, zielona w zakresie, fioletowa przy wysokim i szara, gdy odczyt jest nieaktualny. Wymaga integracji CGM (Dexcom, FreeStyle Libre lub Nightscout).",
       "glucose_trend": "Strzałka pokazująca, w którą stronę zmienia się glukoza, według ostatniego odczytu CGM. Wymaga integracji CGM.",
       "graph": "Rysuje niedawną historię jednej wartości, np. glukozy, czujnika Home Assistant lub akcji. W jego opcjach ustawisz wartość, zakres czasu, skalę, kolory i opcjonalny pas niski/wysoki.",
       "text": "Dodaje stały wiersz tekstu (do 8). Może zawierać tokeny, na przykład \"UV [uv]\" lub \"Kuchnia [HA:sensor.kitchen_temperature]\".",

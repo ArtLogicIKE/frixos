@@ -3460,7 +3460,7 @@ static void handle_integration_and_messages(void)
     {
       int glucose_index = 1; // green
       if (glucose_data.current_gl_mgdl > eeprom_glucose_high)
-        glucose_index = 2; // yellow
+        glucose_index = 2; // purple
       else if (glucose_data.current_gl_mgdl < eeprom_glucose_low)
         glucose_index = 0; // red
       if (!is_glucose_fresh())
