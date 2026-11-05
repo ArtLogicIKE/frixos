@@ -13,7 +13,7 @@ Frixos is an open-source firmware for the Frixos daylight projection clock—a W
 Frixos firmware powers projection clocks that combine:
 
 - **Time display** — Large projected digits with optional 12/24-hour format, timezone support, and NTP synchronization
-- **Weather** — OpenWeatherMap integration for current conditions and forecasts
+- **Weather** — MET Norway forecast built in, no account needed; optional Weather Underground station
 - **Biometric monitoring** — Continuous glucose monitoring via Dexcom, Freestyle Libre, or Nightscout
 - **Smart home** — Home Assistant integration for custom entity tokens in scroll messages; [custom HA component](https://github.com/ArtLogicIKE/frixos-ha-integration) for full device control
 - **Stock quotes** — Finnhub.io integration for real-time market data
@@ -139,11 +139,11 @@ The device polls Home Assistant at the configured interval and replaces tokens i
 
 *Note: Dexcom, Freestyle, and Nightscout are mutually exclusive; only one CGM source is active at a time.*
 
-### Open Weather
+### Weather
 
-- **Source** — [OpenWeatherMap](https://openweathermap.org/) (`api.openweathermap.org`)
+- **Source** — [MET Norway](https://api.met.no/) Locationforecast and Sunrise (`api.met.no`)
 - **Data** — Current weather, forecast high/low, icons, sunrise/sunset
-- **Config** — Lat/lon from location settings; API key in firmware
+- **Config** — Lat/lon from location settings; no API key. A legacy OpenWeatherMap fetch is kept in the code for reference
 - **Files** — `main/f-wifi.c` (weather fetch logic)
 
 ### Finnhub.io
@@ -184,7 +184,7 @@ The integration uses the device's `/api/settings` and `/api/status` endpoints. F
 
 | Variable | Required | Description |
 |----------|----------|--------------|
-| `WEATHER_API_KEY` | Yes (for weather) | OpenWeatherMap API key from [openweathermap.org/api](https://openweathermap.org/api) |
+| `WEATHER_API_KEY` | No | Only for the legacy OpenWeatherMap code; the MET Norway forecast needs no key |
 | `ARTLOGIC_SSID` | No | Manufacturer fallback WiFi SSID (leave empty to skip) |
 | `ARTLOGIC_PASSWORD` | No | Manufacturer fallback WiFi password |
 
