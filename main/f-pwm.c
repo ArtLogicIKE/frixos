@@ -1,11 +1,14 @@
+#include <string.h>
 #include "frixos.h"
 #include "f-pwm.h"
 #include "driver/dac_oneshot.h"
+#include "driver/dac_continuous.h"
 
 static const char *TAG = "f-pwm";
 static bool led_pwm_configured = false;
 static bool led_dac_configured = false;
 static dac_oneshot_handle_t led_dac_handle = NULL;
+static dac_continuous_handle_t led_dac_chop_handle = NULL;
 // Last brightness percent applied via set_led_pwm_brightness.
 // Until startup_led_pwm() runs, the hardware is not driven; 100 is the
 // pre-init placeholder only.
@@ -14,6 +17,14 @@ static uint8_t current_brightness = 100;
 #define LED_PWM_GPIO GPIO_NUM_32
 #define LED_DAC_GPIO GPIO_NUM_25 /* DAC_CHAN_0 */
 #define DAC_MAX_VALUE 255
+
+// Rev I feeds GPIO25 straight into the PAM2863 VSET pin. VSET shuts the output off at 0.2 V and DC
+// dimming is only specified from 0.3 V, so levels below that chop a steady 0.3 V on and off with DMA.
+#define LED_DAC_CHOP_BOARD_REV 2
+#define LED_DAC_CHOP_LEVEL 24 /* about 0.31 V */
+#define LED_DAC_CHOP_SAMPLES 200
+#define LED_DAC_CHOP_MIN_HZ 100 /* the DMA clock needs at least 19.6 kHz */
+#define LED_DAC_CHOP_MAX_HZ 2000
 
 uint8_t pwm_get_current_brightness(void)
 {
@@ -27,7 +38,7 @@ uint16_t pwm_get_safe_maximum_power(void)
     case 1:
         return 850;
     case 2:
-        return 700;
+        return 600;
     default:
         return 750;
     }
@@ -75,8 +86,47 @@ static uint8_t scale_10bit_to_dac8(uint16_t value_10bit)
                      / PWM_SETTINGS_MAX_POWER);
 }
 
+// Above the chop level the table holds one steady value; below it, the level for part of each cycle.
+static void apply_led_dac_chop(uint16_t duty_10bit)
+{
+    static uint8_t wave[LED_DAC_CHOP_SAMPLES];
+    static int last_level = -1;
+    static int last_on = -1;
+
+    int level = scale_10bit_to_dac8(duty_10bit);
+    int on = LED_DAC_CHOP_SAMPLES;
+    if (level < LED_DAC_CHOP_LEVEL)
+    {
+        const uint32_t full = (uint32_t)LED_DAC_CHOP_LEVEL * PWM_SETTINGS_MAX_POWER;
+        on = (int)(((uint32_t)duty_10bit * DAC_MAX_VALUE * LED_DAC_CHOP_SAMPLES + full / 2) / full);
+        if (on == 0 && duty_10bit > 0)
+            on = 1;
+        level = LED_DAC_CHOP_LEVEL;
+    }
+    // Each new table restarts the DMA, so leave it running when nothing changed.
+    if (level == last_level && on == last_on)
+        return;
+
+    memset(wave, 0, sizeof(wave));
+    memset(wave, level, on);
+    esp_err_t err = dac_continuous_write_cyclically(led_dac_chop_handle, wave, sizeof(wave), NULL);
+    if (err != ESP_OK)
+    {
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "DAC chop write failed: %s", esp_err_to_name(err));
+        return;
+    }
+    last_level = level;
+    last_on = on;
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "DAC GPIO25 level %d on %d/%d", level, on, LED_DAC_CHOP_SAMPLES);
+}
+
 static void apply_led_dac(uint16_t duty_10bit)
 {
+    if (led_dac_chop_handle != NULL)
+    {
+        apply_led_dac_chop(duty_10bit);
+        return;
+    }
     if (!led_dac_configured || led_dac_handle == NULL)
         return;
     uint8_t dac_val = scale_10bit_to_dac8(duty_10bit);
@@ -85,9 +135,48 @@ static void apply_led_dac(uint16_t duty_10bit)
         ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "DAC GPIO25 set failed: %s", esp_err_to_name(err));
 }
 
+// The chop frequency only changes at boot: deleting the channel would float VSET, which is full current.
+static void startup_led_dac_chop(uint16_t duty_10bit)
+{
+    uint32_t chop_hz = normalize_pwm_frequency(eeprom_pwm_frequency);
+    if (chop_hz < LED_DAC_CHOP_MIN_HZ)
+        chop_hz = LED_DAC_CHOP_MIN_HZ;
+    if (chop_hz > LED_DAC_CHOP_MAX_HZ)
+        chop_hz = LED_DAC_CHOP_MAX_HZ;
+
+    dac_continuous_config_t cfg = {
+        .chan_mask = DAC_CHANNEL_MASK_CH0, // GPIO25
+        .desc_num = 4,
+        .buf_size = LED_DAC_CHOP_SAMPLES,
+        .freq_hz = chop_hz * LED_DAC_CHOP_SAMPLES,
+        .offset = 0,
+        .clk_src = DAC_DIGI_CLK_SRC_DEFAULT,
+        .chan_mode = DAC_CHANNEL_MODE_SIMUL,
+    };
+    esp_err_t err = dac_continuous_new_channels(&cfg, &led_dac_chop_handle);
+    if (err == ESP_OK)
+        err = dac_continuous_enable(led_dac_chop_handle);
+    if (err != ESP_OK)
+    {
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "DAC chop config failed: %s", esp_err_to_name(err));
+        led_dac_chop_handle = NULL;
+        led_dac_configured = false;
+        return;
+    }
+    led_dac_configured = true;
+    apply_led_dac_chop(duty_10bit);
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "DAC LED GPIO25 chop %lu Hz", (unsigned long)chop_hz);
+}
+
 static void startup_led_dac(uint16_t duty_10bit)
 {
     gpio_reset_pin(LED_DAC_GPIO);
+
+    if (eeprom_board_rev == LED_DAC_CHOP_BOARD_REV)
+    {
+        startup_led_dac_chop(duty_10bit);
+        return;
+    }
 
     dac_oneshot_config_t dac_cfg = {
         .chan_id = DAC_CHAN_0, // GPIO25

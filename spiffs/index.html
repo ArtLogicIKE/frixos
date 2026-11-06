@@ -222,6 +222,7 @@
   <section class="tab-page" id="tab-integrations" data-screen-label="Integrations">
     <div class="panel">
       <div class="ptitle"><h2><span class="dot off" id="dot-cgm"></span><span data-i18n="integrations.glucose_monitors.title">Glucose monitoring</span></h2><span class="rule"></span><span class="int-state" id="state-cgm"></span></div>
+      <p class="muted-p tight" data-i18n="integrations.glucose_monitors.kb_help">For setup instructions, visit <a href="https://buyfrixos.com/knowledge-base/blood-sugar-cgm-integration-and-projection/" target="_blank" rel="noopener noreferrer">this KB article</a>.</p>
       <div class="field"><label data-i18n="integrations.glucose_monitors.device_type">Device Type</label>
         <select id="cgm_device_type">
           <option value="none" data-i18n="common.none">None</option>
@@ -261,6 +262,7 @@
     </div>
       <div class="panel">
       <div class="ptitle"><h2><span class="dot off" id="dot-ha"></span><span data-i18n="integrations.ha.title">Home Assistant</span></h2><span class="rule"></span><span class="int-state" id="state-ha"></span></div>
+      <p class="muted-p tight" data-i18n="integrations.ha.kb_help">For setup instructions, visit <a href="https://buyfrixos.com/knowledge-base/%f0%9f%93%a1-new-integration-home-assistant-frixos-smart-projections/" target="_blank" rel="noopener noreferrer">this KB article</a>.</p>
       <div class="field"><label data-i18n="integrations.ha.server_url">Server URL</label>
         <input type="text" id="eeprom_ha_url" maxlength="200" data-i18n-placeholder="integrations.ha.server_url_placeholder" placeholder="e.g. http://homeassistant.local:8123">
         <div id="eeprom_ha_url-counter" class="counter"></div>
@@ -280,6 +282,7 @@
     <div class="panel">
       <div class="ptitle"><h2><span class="dot off" id="dot-stock"></span><span data-i18n="integrations.stock.title">Stock quotes</span></h2><span class="rule"></span><span class="int-state" id="state-stock"></span></div>
       <p class="muted-p tight" data-i18n="integrations.stock.via">Via Finnhub.io.</p>
+      <p class="muted-p tight" data-i18n="integrations.stock.kb_help">For setup instructions, visit <a href="https://buyfrixos.com/knowledge-base/get-stock-crypto-etf-fx-quotes-on-your-ceiling/" target="_blank" rel="noopener noreferrer">this KB article</a>.</p>
       <div class="field"><label data-i18n="integrations.stock.api_key">API key</label>
         <div class="pw"><input type="password" id="eeprom_stock_key" maxlength="64" data-i18n-placeholder="integrations.stock.api_key_placeholder" placeholder="Paste API key"><button class="eye" type="button" aria-label="Show key">👁</button></div>
         <div id="eeprom_stock_key-counter" class="counter"></div>
@@ -295,6 +298,7 @@
     <div class="panel">
       <div class="ptitle"><h2><span class="dot off" id="dot-wu"></span><span data-i18n="integrations.wu.title">Weather Underground</span></h2><span class="rule"></span><span class="int-state" id="state-wu"></span></div>
       <p class="muted-p tight" data-i18n="integrations.wu.help">Register a device on your Weather Underground account, generate a key at wunderground.com/member/api-keys, then enter any live public station ID. Tokens: [wu:temp] [wu:hum] [wu:dew] [wu:wind] [wu:gust] [wu:pressure] [wu:rain] [wu:uv].</p>
+      <p class="muted-p tight" data-i18n="integrations.wu.kb_help">For setup instructions, visit <a href="https://buyfrixos.com/knowledge-base/weather-underground-personal-weather-station-on-your-ceiling/" target="_blank" rel="noopener noreferrer">this KB article</a>.</p>
       <div class="field"><label data-i18n="integrations.wu.station_id">Station ID</label>
         <input type="text" id="eeprom_wu_station" maxlength="16" data-i18n-placeholder="integrations.wu.station_id_placeholder" placeholder="e.g. KCASANFR123" autocapitalize="characters" spellcheck="false">
       </div>

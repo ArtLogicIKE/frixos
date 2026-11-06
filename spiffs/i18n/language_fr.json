@@ -472,6 +472,7 @@
     "wu": {
       "title": "Weather Underground",
       "help": "Enregistrez un appareil sur votre compte Weather Underground, générez une clé sur wunderground.com/member/api-keys, puis saisissez l'identifiant d'une station publique active. Jetons : [wu:temp] [wu:hum] [wu:dew] [wu:wind] [wu:gust] [wu:pressure] [wu:rain] [wu:uv].",
+      "kb_help": "Pour les instructions de configuration, consultez <a href=\"https://buyfrixos.com/knowledge-base/weather-underground-personal-weather-station-on-your-ceiling/\" target=\"_blank\" rel=\"noopener noreferrer\">cet article de la base de connaissances</a>.",
       "station_id": "Identifiant de station",
       "station_id_placeholder": "p. ex. KCASANFR123",
       "api_key": "Clé API",
