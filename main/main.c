@@ -49,9 +49,9 @@ static int rescue_mode_this_boot = 0; // Set by check_boot_fail_count() when 3 c
 
 // versioning variables
 const char app[10] = "Frixos";
-const char version[10] = "2.80";
+const char version[10] = "2.90";
 static const char *TAG = "frixos main"; // in case we use ESP_LOGE -rror/W-arning/I-info (also D-ebug/V-erbose)
-const int fwversion = 73;
+const int fwversion = 74;
 const int rescuemode = 0; // 0 = normal, 1 = rescue mode
 const char *revision = "A-G"; // 0=A-G, 1=H, 2=I; set from eeprom_board_rev
 
@@ -281,7 +281,7 @@ uint16_t eeprom_glucose_low = 70;     // Default low threshold in mg/dL
 uint8_t eeprom_glucose_unit = 0;      // Glucose display unit: 0=mg/dL, 1=mmol/L
 uint32_t eeprom_pwm_frequency = 200;  // Default PWM frequency in Hz (range 60-50000)
 uint16_t eeprom_max_power = PWM_SETTINGS_MAX_POWER; // Default max power (range 1-1023)
-// Board revision in NVS: 0=A-G (safe 750), 1=H (850), 2=I (700)
+// Board revision in NVS: 0=A-G (safe 750), 1=H (850), 2=I (600)
 uint8_t eeprom_board_rev = 0;
 
 static void apply_board_rev_label(void)
