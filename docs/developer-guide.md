@@ -321,6 +321,7 @@ The device uses a custom 8 MB partition table:
 | Script | Usage |
 |--------|-------|
 | `tools/mock_server.py` | `python tools/mock_server.py` — starts a FastAPI mock of the device API on port 8080 |
+| `tools/check_timezones.py` | `python -m pip install -U tzdata`, then `python tools/check_timezones.py [--days 180]` — checks `spiffs/timezone.txt` against current IANA data, as the firmware's libc reads it; run before each release |
 | `tools/verify_ui.py` | `python tools/verify_ui.py` — Playwright smoke tests for the web UI |
 | `tools/verify_final.py` | `python tools/verify_final.py` — final integration verification |
 | `scripts/build.ps1` | `.\scripts\build.ps1 [-Flash] [-Monitor] [-Port COMx]` — Windows build helper |
