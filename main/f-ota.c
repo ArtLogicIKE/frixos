@@ -1530,7 +1530,8 @@ static void ota_update_task(void *pvParameters)
     {
         if (wifi_connected)
         {
-            f_reboot_report();
+            if (eeprom_update_firmware) // reboot reports ride on automatic updates (privacy policy)
+                f_reboot_report();
             size_t stack_free_bytes = uxTaskGetStackHighWaterMark(NULL) * sizeof(StackType_t);
             ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "OTA update starting - Stack free: %u bytes", (unsigned)stack_free_bytes);
             if (reinstall)
