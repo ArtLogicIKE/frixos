@@ -643,6 +643,21 @@ static esp_err_t reconcile_entry_cb(const manifest_entry_t *e, int index, void *
     }
     else
     {
+        // The download goes to a .part copy, so the old file and the new one
+        // must fit side by side. On a full filesystem they don't (2026-11-08:
+        // 139 KB free, screen-editor.js is 156 KB), and every retry fails the
+        // same way. The old copy is stale and the release can always supply it
+        // again, so drop it first when space is short.
+        size_t fs_total = 0, fs_used = 0;
+        if (stat(dest_path, &st) == 0 &&
+            esp_littlefs_info("spiffs", &fs_total, &fs_used) == ESP_OK &&
+            fs_total - fs_used < (size_t)e->size + 8 * 1024)
+        {
+            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Low space (%u free): removing stale %s before download",
+                        (unsigned)(fs_total - fs_used), e->path);
+            remove(dest_path);
+        }
+
         snprintf(url, sizeof(url), "%s/%d/%s", UPDATE_SERVER_BASE, ctx->version, e->path);
         esp_err_t err = ESP_FAIL;
         for (int attempt = 1; attempt <= 3 && err != ESP_OK; attempt++)
