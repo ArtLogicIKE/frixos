@@ -496,6 +496,16 @@ esp_err_t generic_file_handler(httpd_req_t *req)
     snprintf(filepath, sizeof(filepath), "/spiffs/%.110s", filename);
 
     file = fopen(filepath, "r");
+    bool gzipped = false;
+    if (file == NULL)
+    {
+        // Releases may ship web files gzipped (about 75% smaller on the
+        // filesystem); the browser unpacks them. A plain file wins when both exist.
+        char gzpath[sizeof(filepath) + 3];
+        snprintf(gzpath, sizeof(gzpath), "%s.gz", filepath);
+        file = fopen(gzpath, "r");
+        gzipped = (file != NULL);
+    }
     if (file != NULL)
     {
         // We read in 1 KB chunks already; the stdio buffer only cost heap per request.
@@ -558,6 +568,10 @@ esp_err_t generic_file_handler(httpd_req_t *req)
         strncmp(filename, "i18n/", strlen("i18n/")) == 0)
     {
         httpd_resp_set_hdr(req, "Cache-Control", "max-age=600");
+    }
+    if (gzipped)
+    {
+        httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
     }
 
     // Read and send file in chunks
