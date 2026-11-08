@@ -1,5 +1,6 @@
 #include "f-provisioning.h"
 #include "frixos.h"
+#include "f-reboot.h"
 #include "config.h"
 #include "esp_wifi.h"
 #include "esp_event.h"
@@ -290,7 +291,7 @@ void provision_init(void)
         // If we're still in provisioning mode after timeout, restart the device
         if (!wifi_connected) {
             ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Provisioning timeout %d min, restart", PROVISIONING_TIMEOUT_MINUTES);
-            esp_restart();
+            f_reboot_restart("provision_timeout", NULL);
         }
 
         ESP_LOGI_STACK(TAG, "After HTTP server");

@@ -94,3 +94,7 @@ CONFIG_LV_FS_POSIX_PATH="/spiffs"
 CONFIG_LV_USE_TJPGD=y
 CONFIG_LV_IMAGE_HEADER_CACHE_DEF_CNT=16
 CONFIG_LV_BUILD_EXAMPLES=n
+
+# Crash summary for /reboot_report (coredump partition exists since the first release)
+CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH=y
+CONFIG_ESP_COREDUMP_MAX_TASKS_NUM=8

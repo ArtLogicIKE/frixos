@@ -6,6 +6,7 @@
 #include "esp_log.h"
 #include "f-integrations.h"
 #include "frixos.h"
+#include "f-reboot.h"
 #include "esp_timer.h"
 #include "esp_http_client.h"
 #include "esp_system.h"
@@ -224,6 +225,9 @@ static EventGroupHandle_t ssl_startup_gate = NULL;
 #define SSL_STARTUP_GATE_BIT BIT0
 #define SSL_STARTUP_GATE_MAX_WAIT_MS (60 * 1000)
 static volatile uint32_t ssl_low_memory_skips = 0;
+// Restart when every TLS attempt has been skipped for low memory this long.
+#define TLS_STARVED_RESTART_US (30LL * 60 * 1000000)
+static int64_t tls_last_ok_us = 0; // boot counts as OK; written under the SSL lock
 
 // The web server waits for the first fetch round (see f-provisioning.c).
 static EventGroupHandle_t boot_round = NULL;
@@ -284,14 +288,26 @@ bool acquire_ssl_semaphore(const char *function_name)
     if (ssl_semaphore_depth == 0)
     {
         size_t largest = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+        int64_t now_us = esp_timer_get_time();
         if (largest < TLS_MIN_FREE_BLOCK)
         {
             xSemaphoreGiveRecursive(ssl_connection_semaphore);
             ssl_low_memory_skips++;
             ESP_LOG_WEB(ESP_LOG_WARN, TAG, "SSL skip %s: largest block %u < %u",
                         function_name ? function_name : "?", (unsigned)largest, (unsigned)TLS_MIN_FREE_BLOCK);
+            // Fragmentation never heals on its own; only a restart frees the heap.
+            if (!ota_update_in_progress && now_us - tls_last_ok_us > TLS_STARVED_RESTART_US)
+            {
+                ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "No TLS for %d min (largest block %u), restarting",
+                            (int)((now_us - tls_last_ok_us) / 60000000LL), (unsigned)largest);
+                char detail[24];
+                snprintf(detail, sizeof(detail), "largest %u", (unsigned)largest);
+                vTaskDelay(pdMS_TO_TICKS(100));
+                f_reboot_restart("tls_starved", detail);
+            }
             return false;
         }
+        tls_last_ok_us = now_us;
         ssl_semaphore_holder = function_name;
     }
     ssl_semaphore_depth++;

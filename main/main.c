@@ -22,6 +22,7 @@
 #include <sys/stat.h>
 
 #include "frixos.h"
+#include "f-reboot.h"
 #include "f-display.h"
 #include "f-wifi.h"
 #include "f-pwm.h"
@@ -49,7 +50,7 @@ static int rescue_mode_this_boot = 0; // Set by check_boot_fail_count() when 3 c
 
 // versioning variables
 const char app[10] = "Frixos";
-const char version[10] = "2.90";
+const char version[10] = "2.91";
 static const char *TAG = "frixos main"; // in case we use ESP_LOGE -rror/W-arning/I-info (also D-ebug/V-erbose)
 const int fwversion = 74;
 const int rescuemode = 0; // 0 = normal, 1 = rescue mode
@@ -1321,6 +1322,7 @@ void app_main(void)
 
   http_mutex = xSemaphoreCreateMutex(); // create a mutex for "important" http operations
 
+  f_reboot_capture(); // before anything else can restart
   startup_diags();
 
   startup_read_eeprom();
@@ -1359,7 +1361,7 @@ void app_main(void)
     ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Auto-rescue reset complete, rebooting for clean startup");
     set_scroll_message("Settings reset, restarting...");
     vTaskDelay(pdMS_TO_TICKS(2000));
-    esp_restart();
+    f_reboot_restart("rescue", NULL);
   }
   startup_led_pwm();
   ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Startup complete");

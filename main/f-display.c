@@ -10,6 +10,7 @@
 // - Integration status display (Dexcom glucose, etc.)
 
 #include "frixos.h"
+#include "f-reboot.h"
 #include "f-display.h"
 #include "f-pwm.h"
 #include "f-time.h"
@@ -1681,7 +1682,9 @@ void frixos_lv_assert_failed(const char *file, int line)
       fr.pc = 0;
   }
   lv_assert_rec.magic = LV_ASSERT_REC_MAGIC;
-  esp_restart();
+  char detail[40];
+  snprintf(detail, sizeof(detail), "%s:%d", lv_assert_rec.file, line);
+  f_reboot_restart("lv_assert", detail);
 }
 
 static void log_previous_lv_assert(void)
@@ -3349,6 +3352,7 @@ static void hang_dump_task(void *arg)
 
 static void watchdog_callback(void *arg)
 {
+  f_reboot_tick();
   if (display_task_heartbeat == last_display_task_heartbeat)
   {
     watchdog_missed_count++;
@@ -3359,7 +3363,7 @@ static void watchdog_callback(void *arg)
     if (watchdog_missed_count >= WATCHDOG_MISS_LIMIT)
     {
       ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Restarting now (display hang)");
-      esp_restart();
+      f_reboot_restart("display_hang", NULL);
     }
   }
   else

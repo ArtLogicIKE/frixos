@@ -1,4 +1,5 @@
 #include "frixos.h"
+#include "f-reboot.h"
 #include "f-ota.h"
 #include "f-display.h"
 #include "f-wifi.h"
@@ -15,6 +16,7 @@
 #include <sys/stat.h>
 #include "esp_task_wdt.h"
 #include "esp_app_format.h"
+#include "esp_attr.h"
 
 #include "cJSON.h"
 #include <dirent.h>
@@ -28,6 +30,9 @@ static update_progress_callback_t progress_callback = NULL;
 // using it as a throttle skipped the first GOT_IP check and then allowed
 // every reconnect after NTP (last_check was still 0). 0 = never attempted.
 static int64_t last_check_us = 0;
+// Survives esp_restart(); set by ota_handle_failure, read once by f_ota_verify.
+#define OTA_FAILED_RESTART_MAGIC 0x0FA1EDu
+static RTC_NOINIT_ATTR uint32_t ota_failed_restart;
 
 // OTA update thread control
 TaskHandle_t ota_update_task_handle = NULL;
@@ -75,6 +80,13 @@ static void log_partition_info(const esp_partition_t *partition, const char *pre
 void f_ota_verify(void)
 {
     last_check_us = 0;
+    if (ota_failed_restart == OTA_FAILED_RESTART_MAGIC)
+    {
+        // Restarted after a failed update: retry in half the usual interval,
+        // not right after boot (a deterministic failure would loop otherwise).
+        ota_failed_restart = 0;
+        last_check_us = esp_timer_get_time() - (int64_t)(UPDATE_CHECK_INTERVAL / 2) * 1000000LL;
+    }
     ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Initializing OTA, checking partitions");
 
     // Get all relevant partitions
@@ -145,25 +157,14 @@ static void ota_handle_failure(const char *error_msg, update_status_t status, bo
         xSemaphoreGive(http_mutex);
     }
 
-    // Restore web server first so UI is back even if report below blocks (e.g. update server unreachable)
-    extern void stop_webserver(void);
-    extern esp_err_t start_webserver(void);
-
-    stop_webserver();
-    vTaskDelay(pdMS_TO_TICKS(500)); // Give time for cleanup
-    start_webserver();
-
-    // Small delay to allow any pending operations to complete
-    vTaskDelay(pdMS_TO_TICKS(100));
-
-    // Report status to update server after UI is restored (report may block on timeout)
     f_ota_report_status(status, error_msg);
 
-    // Allow another attempt in half the usual interval. Use boot-monotonic
-    // time so an NTP step cannot make this look like "never checked".
-    int64_t now_us = esp_timer_get_time();
-    int64_t half_us = (int64_t)(UPDATE_CHECK_INTERVAL / 2) * 1000000LL;
-    last_check_us = (now_us > half_us) ? now_us - half_us : 1;
+    // A failed update leaves the heap too fragmented for TLS (seen on FW74:
+    // Dexcom skipped for good after two failed reinstalls), so start clean.
+    // The flag makes the boot check wait half the interval, as before.
+    ota_failed_restart = OTA_FAILED_RESTART_MAGIC;
+    vTaskDelay(pdMS_TO_TICKS(100));
+    f_reboot_restart("ota_failed", error_msg);
 }
 
 // Unified failure handling function with cleanup
@@ -816,7 +817,9 @@ static void ota_self_heal(void)
                         "Filesystem was repopulated from scratch (%d files) - restarting to load UI assets",
                         downloaded);
             vTaskDelay(pdMS_TO_TICKS(1000)); // let the log lines drain
-            esp_restart();
+            char detail[24];
+            snprintf(detail, sizeof(detail), "%d files", downloaded);
+            f_reboot_restart("self_heal", detail);
         }
     }
     else
@@ -1493,7 +1496,9 @@ static void f_ota_do_update(int version)
 
     // Small delay to ensure logs are written
     vTaskDelay(pdMS_TO_TICKS(100));
-    esp_restart();
+    char detail[16];
+    snprintf(detail, sizeof(detail), "to %d", version);
+    f_reboot_restart("ota_ok", detail);
 }
 
 void f_ota_reinstall_current(void)
@@ -1525,6 +1530,7 @@ static void ota_update_task(void *pvParameters)
     {
         if (wifi_connected)
         {
+            f_reboot_report();
             size_t stack_free_bytes = uxTaskGetStackHighWaterMark(NULL) * sizeof(StackType_t);
             ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "OTA update starting - Stack free: %u bytes", (unsigned)stack_free_bytes);
             if (reinstall)
