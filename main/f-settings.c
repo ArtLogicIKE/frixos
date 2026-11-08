@@ -8,6 +8,7 @@
 #include "f-provisioning.h"
 #include "f-membuffer.h"
 #include "frixos.h"
+#include "f-reboot.h"
 #include "f-display.h"
 #include "f-screen-layout-bin.h"
 #include "f-pwm.h"
@@ -2467,7 +2468,7 @@ esp_err_t settings_post_handler(httpd_req_t *req)
         taskYIELD();
 
         // Create a task to reset after a brief delay to allow response to be sent
-        xTaskCreate(&restart_device, "restart_task", 2048, NULL, 5, NULL);
+        xTaskCreate(&restart_device, "restart_task", 2048, (void *)"settings", 5, NULL);
     }
     else
     {
@@ -3484,7 +3485,7 @@ esp_err_t ota_post_handler(httpd_req_t *req)
         httpd_resp_send(req, response, HTTPD_RESP_USE_STRLEN);
 
         // Schedule reboot task
-        xTaskCreate(&restart_device, "restart_task", 2048, NULL, 5, NULL);
+        xTaskCreate(&restart_device, "restart_task", 2048, (void *)"fw_upload", 5, NULL);
     }
     else
     {
@@ -3551,7 +3552,7 @@ esp_err_t reset_post_handler(httpd_req_t *req)
     httpd_resp_send(req, "{\"status\":\"ok\",\"message\":\"Device is restarting...\"}", HTTPD_RESP_USE_STRLEN);
 
     // Create a task to reset after a brief delay to allow response to be sent
-    xTaskCreate(&restart_device, "restart_task", 2048, NULL, 5, NULL);
+    xTaskCreate(&restart_device, "restart_task", 2048, (void *)"user", 5, NULL);
 
     return ESP_OK;
 }
@@ -3560,7 +3561,7 @@ esp_err_t reset_post_handler(httpd_req_t *req)
 void restart_device(void *pvParameter)
 {
     vTaskDelay(pdMS_TO_TICKS(5000)); // wait 5 seconds to allow response to be sent
-    esp_restart();
+    f_reboot_restart(pvParameter ? (const char *)pvParameter : "user", NULL);
 }
 
 // Add these constants at the top with other defines

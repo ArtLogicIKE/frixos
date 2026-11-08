@@ -15,6 +15,7 @@ idf_component_register(SRCS
     "f-settings.c"
     "f-provisioning.c"
     "f-ota.c"
+    "f-reboot.c"
     "f-manifest.c"
     "f-dns.c"
     "frixos_8.c"
@@ -62,6 +63,7 @@ idf_component_register(SRCS
     REQUIRES lvgl__lvgl
     REQUIRES espressif__esp_lvgl_port
     REQUIRES espressif__mdns
+    REQUIRES espcoredump
     REQUIRES espressif__cjson)
 
     target_compile_options(${COMPONENT_LIB} PRIVATE "-fno-jump-tables" "-fno-tree-switch-conversion")
