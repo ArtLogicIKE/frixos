@@ -1145,7 +1145,7 @@ static bool validate_json_params(cJSON *root, char *err_buf, size_t err_size)
         }
         else
         {
-            char tmp[12];
+            char tmp[COORD_STR_SIZE];
             strncpy(tmp, sval, sizeof(tmp) - 1);
             tmp[sizeof(tmp) - 1] = '\0';
             if (!validate_coordinate(tmp, true))
@@ -1170,7 +1170,7 @@ static bool validate_json_params(cJSON *root, char *err_buf, size_t err_size)
         }
         else
         {
-            char tmp[12];
+            char tmp[COORD_STR_SIZE];
             strncpy(tmp, sval, sizeof(tmp) - 1);
             tmp[sizeof(tmp) - 1] = '\0';
             if (!validate_coordinate(tmp, false))

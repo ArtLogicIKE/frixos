@@ -2202,7 +2202,7 @@ bool wifi_get_location()
                     if (lat && strlen(my_lat) == 0)
                     {
                         dlat = lat->valuedouble;
-                        sprintf(my_lat, "%2.7lf", dlat);
+                        snprintf(my_lat, sizeof(my_lat), "%.7f", dlat);
                         // Validate the coordinate from API
                         if (!validate_coordinate(my_lat, true))
                         {
@@ -2213,7 +2213,7 @@ bool wifi_get_location()
                     if (lon && strlen(my_lon) == 0)
                     {
                         dlon = lon->valuedouble;
-                        sprintf(my_lon, "%2.7lf", dlon);
+                        snprintf(my_lon, sizeof(my_lon), "%.7f", dlon);
                         // Validate the coordinate from API
                         if (!validate_coordinate(my_lon, false))
                         {

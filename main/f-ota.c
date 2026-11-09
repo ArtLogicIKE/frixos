@@ -54,11 +54,11 @@ static void ota_handle_failure(const char *error_msg, update_status_t status, bo
 static void ota_handle_failure_with_cleanup(const char *error_msg, update_status_t status, esp_http_client_handle_t client, esp_ota_handle_t ota_handle, bool release_mutex);
 static void cleanup_update_files(void);
 static void f_ota_do_update(int version);
-static esp_err_t ota_fetch_manifest(int version, manifest_t *m);
+static esp_err_t ota_fetch_manifest(int version, manifest_t *m, bool install);
 static void ota_prune_old_files(int version);
 static esp_err_t ota_reconcile_files(const manifest_t *m, int progress_lo, int progress_hi, bool show_progress,
                                      char *failed_out, size_t failed_len,
-                                     int *downloaded_out, int *skipped_out);
+                                     int *downloaded_out, int *skipped_out, bool *assets_out);
 static void ota_self_heal(void);
 static void ota_self_heal_if_needed(void);
 static bool ota_query_latest(int *new_version);
@@ -446,8 +446,10 @@ static void ota_prepare_space(uint32_t needed)
 
 /* Fetch <base>/<version>/manifest.txt, verify its signature and downgrade
  * stamp, and install it as MANIFEST_PATH. Fills *m from the accepted file.
+ * With install false the file is only checked and then removed (the firmware
+ * step of an update needs the image hash, not the file list).
  * ESP_ERR_INVALID_RESPONSE = authenticity problem (report as SIGNATURE). */
-static esp_err_t ota_fetch_manifest(int version, manifest_t *m)
+static esp_err_t ota_fetch_manifest(int version, manifest_t *m, bool install)
 {
     char url[512];
     char temp_path[64];
@@ -483,6 +485,12 @@ static esp_err_t ota_fetch_manifest(int version, manifest_t *m)
                     (unsigned long)m->generated, (unsigned long)applied);
         remove(temp_path);
         return ESP_ERR_INVALID_RESPONSE;
+    }
+
+    if (!install)
+    {
+        remove(temp_path);
+        return ESP_OK;
     }
 
     remove(MANIFEST_PATH);
@@ -621,8 +629,15 @@ typedef struct
     int progress_lo, progress_hi;
     bool show_progress;
     int downloaded, skipped;
+    bool assets_changed; // a display image (.jpg/.bmp) was replaced: the running UI holds the old one
     char failed_path[MANIFEST_MAX_PATH]; // set to the entry we gave up on (empty = none)
 } reconcile_ctx_t;
+
+static bool path_ends_with(const char *path, const char *ext)
+{
+    size_t n = strlen(path), k = strlen(ext);
+    return n >= k && strcmp(path + n - k, ext) == 0;
+}
 
 static esp_err_t reconcile_entry_cb(const manifest_entry_t *e, int index, void *arg)
 {
@@ -678,8 +693,20 @@ static esp_err_t reconcile_entry_cb(const manifest_entry_t *e, int index, void *
             return ESP_FAIL;
         }
         ctx->downloaded++;
+        if (path_ends_with(e->path, ".jpg") || path_ends_with(e->path, ".bmp"))
+            ctx->assets_changed = true;
         // Breather between writes: let httpd/WiFi/display drain their queues.
         vTaskDelay(pdMS_TO_TICKS(250));
+    }
+
+    // A release that ships foo.js.gz replaces foo.js: the web server prefers the
+    // plain file, so it must go once the gzipped copy is in place. One file at a
+    // time, so the filesystem never holds both sets.
+    if (path_ends_with(e->path, ".gz"))
+    {
+        dest_path[strlen(dest_path) - 3] = '\0';
+        if (stat(dest_path, &st) == 0 && remove(dest_path) == 0)
+            ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Replaced %s with its gzipped copy", dest_path + 8);
     }
 
     if (ctx->show_progress && ctx->entry_count > 0)
@@ -694,7 +721,7 @@ static esp_err_t reconcile_entry_cb(const manifest_entry_t *e, int index, void *
 
 static esp_err_t ota_reconcile_files(const manifest_t *m, int progress_lo, int progress_hi, bool show_progress,
                                      char *failed_out, size_t failed_len,
-                                     int *downloaded_out, int *skipped_out)
+                                     int *downloaded_out, int *skipped_out, bool *assets_out)
 {
     reconcile_ctx_t ctx = {
         .version = m->version,
@@ -717,6 +744,8 @@ static esp_err_t ota_reconcile_files(const manifest_t *m, int progress_lo, int p
         *downloaded_out = ctx.downloaded;
     if (skipped_out)
         *skipped_out = ctx.skipped;
+    if (assets_out)
+        *assets_out = ctx.assets_changed;
     return err;
 }
 
@@ -746,7 +775,13 @@ static void ota_self_heal(void)
         manifest_set_ota_in_progress(false);
         return; // leave self_heal_pending set so it retries next boot
     }
-    if (err == ESP_ERR_NOT_FOUND || err == ESP_ERR_INVALID_RESPONSE)
+    // Fetch this firmware's own manifest even when the stored one is valid.
+    // Since fw 75 an update flashes the firmware first and the files follow
+    // here, so the stored manifest may describe the previous release; and the
+    // server picks the file set by the requester's version (75+ gets the
+    // gzipped web files), so only this firmware can ask for the right one.
+    bool stored_ok = (err == ESP_OK);
+    if (!stored_ok)
     {
         // NOT_FOUND: fresh/empty filesystem. The first boot on LittleFS-era
         // firmware formats the old SPIFFS partition (deliberately - that wipe
@@ -762,39 +797,47 @@ static void ota_self_heal(void)
         if (err == ESP_ERR_NOT_FOUND)
             fs_was_fresh = true;
         remove(MANIFEST_PATH); // no-op when already missing
-        ota_update_in_progress = true;
-        ota_updating_message = false;
-        xSemaphoreTake(http_mutex, portMAX_DELAY);
-        // A few spaced attempts: a fresh filesystem has no web UI (or fonts)
-        // until files arrive, and the first try lands in the boot congestion
-        // window where transient alloc/connect failures are likely.
-        for (int attempt = 1; attempt <= 3; attempt++)
-        {
-            if (attempt > 1)
-            {
-                vTaskDelay(pdMS_TO_TICKS(60 * 1000));
-            }
-            err = ota_fetch_manifest(fwversion, &m);
-            if (err != ESP_FAIL) // OK or a definitive signature/downgrade verdict
-            {
-                break;
-            }
-        }
-        xSemaphoreGive(http_mutex);
-        if (err != ESP_OK)
-        {
-            // No good manifest available right now. Keep self_heal_pending
-            // set: an empty filesystem stays broken until this succeeds, so
-            // retry at every boot and every 8h check rather than giving up.
-            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Self-heal: manifest fetch failed (%s), will retry",
-                        esp_err_to_name(err));
-            f_ota_report_status(UPDATE_ERROR_DOWNLOAD, "Self-heal: manifest re-fetch failed");
-            ota_update_in_progress = false;
-            manifest_set_ota_in_progress(false);
-            return;
-        }
-        // Fresh signed manifest installed; fall through to reconcile against it.
     }
+    ota_update_in_progress = true;
+    ota_updating_message = false;
+    xSemaphoreTake(http_mutex, portMAX_DELAY);
+    // A few spaced attempts: a fresh filesystem has no web UI (or fonts)
+    // until files arrive, and the first try lands in the boot congestion
+    // window where transient alloc/connect failures are likely.
+    for (int attempt = 1; attempt <= 3; attempt++)
+    {
+        if (attempt > 1)
+        {
+            vTaskDelay(pdMS_TO_TICKS(60 * 1000));
+        }
+        err = ota_fetch_manifest(fwversion, &m, true);
+        if (err != ESP_FAIL) // OK or a definitive signature/downgrade verdict
+        {
+            break;
+        }
+    }
+    xSemaphoreGive(http_mutex);
+    if (err == ESP_ERR_INVALID_RESPONSE && stored_ok)
+    {
+        // The server's copy was rejected (e.g. older than the applied
+        // one); the stored manifest is still signed and valid, so heal
+        // against it as before.
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Self-heal: server manifest rejected, using the stored one");
+        err = manifest_load_and_verify(MANIFEST_PATH, &m);
+    }
+    if (err != ESP_OK)
+    {
+        // No good manifest available right now. Keep self_heal_pending
+        // set: an empty filesystem stays broken until this succeeds, so
+        // retry at every boot and every 8h check rather than giving up.
+        ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Self-heal: manifest fetch failed (%s), will retry",
+                    esp_err_to_name(err));
+        f_ota_report_status(UPDATE_ERROR_DOWNLOAD, "Self-heal: manifest re-fetch failed");
+        ota_update_in_progress = false;
+        manifest_set_ota_in_progress(false);
+        return;
+    }
+    // A verified manifest for this firmware is installed; reconcile against it.
 
     ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Self-heal: verifying %d files against release %d",
                 m.entry_count, m.version);
@@ -809,7 +852,8 @@ static void ota_self_heal(void)
     // Without this a full disk makes self-heal fail the same way every boot.
     ota_prune_old_files(m.version);
     int downloaded = 0, skipped = 0;
-    err = ota_reconcile_files(&m, 0, 0, false, failed, sizeof(failed), &downloaded, &skipped);
+    bool assets_changed = false;
+    err = ota_reconcile_files(&m, 0, 0, false, failed, sizeof(failed), &downloaded, &skipped, &assets_changed);
     xSemaphoreGive(http_mutex);
     ota_update_in_progress = false; // display restores the normal message
 
@@ -835,6 +879,14 @@ static void ota_self_heal(void)
             char detail[24];
             snprintf(detail, sizeof(detail), "%d files", downloaded);
             f_reboot_restart("self_heal", detail);
+        }
+        // The display loaded its images at boot; after an update replaced
+        // some, restart once so it shows the new ones.
+        if (assets_changed)
+        {
+            ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Display images updated - restarting to load them");
+            vTaskDelay(pdMS_TO_TICKS(1000)); // let the log lines drain
+            f_reboot_restart("ota_files", "images");
         }
     }
     else
@@ -885,7 +937,7 @@ static void ota_quiet_refresh(void)
         {
             vTaskDelay(pdMS_TO_TICKS(60 * 1000));
         }
-        err = ota_fetch_manifest(fwversion, &m);
+        err = ota_fetch_manifest(fwversion, &m, true);
         if (err != ESP_FAIL) // OK or a definitive signature/downgrade verdict
         {
             break;
@@ -922,7 +974,7 @@ static void ota_quiet_refresh(void)
     // publishes reclaim stale files across the fleet without a version bump.
     ota_prune_old_files(fwversion);
     char failed[MANIFEST_MAX_PATH] = {0};
-    err = ota_reconcile_files(&m, 0, 0, false, failed, sizeof(failed), NULL, NULL);
+    err = ota_reconcile_files(&m, 0, 0, false, failed, sizeof(failed), NULL, NULL, NULL);
     xSemaphoreGive(http_mutex);
     ota_update_in_progress = false; // display restores the normal message
 
@@ -1247,6 +1299,10 @@ void f_ota_check_update(void)
     {
         last_check_us = now_us;
         ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Firmware updates are disabled");
+        // An update the user started (reinstall) flashed only the firmware;
+        // its files still have to follow, so finish that update.
+        if (manifest_get_self_heal_pending())
+            ota_self_heal();
         return;
     }
 
@@ -1310,7 +1366,12 @@ static void f_ota_do_update(int version)
     // until the release provably came from our signing key.
     update_progress(2, "Verifying release...");
     manifest_t m;
-    err = ota_fetch_manifest(version, &m);
+    // Checked only, not installed: this update writes no files. The new
+    // firmware fetches its own manifest and brings the files in line on its
+    // first boot (self-heal), so a failed download leaves the old firmware
+    // and the old files together, and the newest code always does the file
+    // work. Firmware 74 and older still swap files first.
+    err = ota_fetch_manifest(version, &m, false);
     if (err == ESP_ERR_INVALID_RESPONSE)
     {
         ota_handle_failure("Release manifest failed signature/downgrade check", UPDATE_ERROR_SIGNATURE, true);
@@ -1322,35 +1383,14 @@ static void f_ota_do_update(int version)
         return;
     }
 
-    // Raise the boot-loop rescue threshold while SPIFFS writes are in flight:
-    // an interrupted update resumes safely via self-heal, so crash-reboots
-    // here must not factory-reset the user's settings.
+    // Raise the boot-loop rescue threshold through the new firmware's first
+    // boot: its self-heal downloads the files and clears it, so crash-reboots
+    // in that window must not factory-reset the user's settings.
     manifest_set_ota_in_progress(true);
 
-    // Remove files left behind by older firmware before downloading the new
-    // set, so a near-full SPIFFS has room. Driven by the signed prune list;
-    // best-effort, so it never aborts the update on its own.
-    update_progress(3, "Cleaning up old files...");
-    ota_prune_old_files(version);
-
-    // Bring SPIFFS files in line with the manifest (unchanged files are skipped).
-    char failed[MANIFEST_MAX_PATH] = {0};
-    if (ota_reconcile_files(&m, 5, 50, true, failed, sizeof(failed), NULL, NULL) != ESP_OK)
-    {
-        char msg[MANIFEST_MAX_PATH + 48];
-        if (failed[0])
-            snprintf(msg, sizeof(msg), "File reconcile failed after retries on %s", failed);
-        else
-            snprintf(msg, sizeof(msg), "File reconcile failed verification after retries");
-        ota_handle_failure(msg, UPDATE_ERROR_VERIFY, true);
-        return;
-    }
-
-    // Keep what the firmware step needs, then release the entry table.
     uint8_t fw_expected_sha[MANIFEST_SHA256_LEN];
     memcpy(fw_expected_sha, m.fw_sha256, sizeof(fw_expected_sha));
     uint32_t fw_expected_size = m.fw_size;
-    uint32_t manifest_generation = m.generated;
 
     // ****************
     // Download and install firmware
@@ -1367,7 +1407,7 @@ static void f_ota_do_update(int version)
     }
 
     ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Downloading firmware %s...", url);
-    update_progress(50, "Downloading firmware...");
+    update_progress(5, "Downloading firmware...");
 
     esp_ota_handle_t ota_handle;
     err = esp_ota_begin(next, OTA_SIZE_UNKNOWN, &ota_handle);
@@ -1423,7 +1463,7 @@ static void f_ota_do_update(int version)
     int total_read = 0;
     char fw_buffer[1024] __attribute__((aligned(4)));
     int fw_read_len;
-    int last_progress = 50;
+    int last_progress = 5;
     bool first_chunk = true;
 
     // Stream-hash the image; compared against the signed manifest below.
@@ -1458,7 +1498,7 @@ static void f_ota_do_update(int version)
             return;
         }
         total_read += fw_read_len;
-        float progress = 50.0f + ((float)total_read / (float)fw_content_length) * 50.0f;
+        float progress = 5.0f + ((float)total_read / (float)fw_content_length) * 95.0f;
         taskYIELD();
         if ((int)progress - last_progress >= 5)
         {
@@ -1499,11 +1539,10 @@ static void f_ota_do_update(int version)
         return;
     }
 
-    // Record the applied release and ask the new firmware to verify all
-    // SPIFFS files on its first boot (self-heal). ota_in_progress stays set
-    // on purpose: the raised rescue threshold covers the first-boot window
-    // and self-heal clears it once the file set checks out.
-    manifest_set_applied_generation(manifest_generation);
+    // Ask the new firmware to fetch its manifest and bring the files in line
+    // on its first boot (self-heal); it records the applied generation once
+    // they are. ota_in_progress stays set on purpose: the raised rescue
+    // threshold covers the first-boot window and self-heal clears it.
     manifest_set_self_heal_pending(true);
 
     update_progress(100, "Update complete, rebooting...");

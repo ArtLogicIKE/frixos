@@ -18,6 +18,12 @@ the full push: manifest.txt is the tiny anchored bootstrap (served to legacy
 <70 requesters, who cannot write more), manifest_full.txt is the real file
 set (served when the device sends ?fw=<70+>). Two YubiKey touches per push.
 
+Releases >= 75 add manifest_gz.txt (third touch): the same set with web files
+(js/css/html/json) as .gz copies, served to ?fw=<75+>, whose firmware serves
+them gzipped and deletes each plain file once its .gz is in place. Firmware 70-74
+keeps getting manifest_full.txt, so its update to 75 swaps no files; 75 then
+fetches the gz set on its first boot.
+
 Every publish signs manifest.txt on the release YubiKey (touch required) and
 then re-hashes the COPIED server tree against the manifest, so the published
 signature can never disagree with the published content. Any failure aborts
@@ -30,6 +36,7 @@ Replaces push.bat (now a shim). Layout published, matching the device paths:
     www/<ver>/manifest.txt       signed manifest (fw >= 68)
 """
 import argparse
+import gzip
 import shutil
 import sys
 import time
@@ -47,6 +54,12 @@ WWW = REPO.parent / "frixos-web" / "www"
 # self-healed device is guaranteed to have it byte-for-byte (it is a signed
 # manifest entry that has not changed), so reconcile skips it without a write.
 ANCHOR_REL = "favicon.ico"
+
+# Web files shipped gzipped to fw >= GZ_MIN_FW (the device never opens these
+# itself; the browser unpacks them). Staged under build/ for signing.
+GZ_MIN_FW = 75
+GZ_EXT = {".js", ".css", ".html", ".json"}
+GZ_STAGE = REPO / "build" / "spiffs_gz"
 
 
 def spiffs_files():
@@ -99,6 +112,26 @@ def copy_tree(ver_dir: Path):
         shutil.copy2(src, dst)
 
 
+def build_gz_stage(ver_dir: Path):
+    """Stage the spiffs tree with web files as <name>.gz (mtime 0, so an
+    unchanged file always gzips to the same bytes and devices skip it) and
+    publish the .gz copies next to the plain ones."""
+    shutil.rmtree(GZ_STAGE, ignore_errors=True)
+    for src in spiffs_files():
+        rel = src.relative_to(SPIFFS)
+        if src.suffix in GZ_EXT:
+            dst = GZ_STAGE / rel.with_name(rel.name + ".gz")
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            dst.write_bytes(gzip.compress(src.read_bytes(), compresslevel=9, mtime=0))
+            pub = ver_dir / dst.relative_to(GZ_STAGE)
+            pub.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(dst, pub)
+        else:
+            dst = GZ_STAGE / rel
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, dst)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("version", type=int)
@@ -130,12 +163,16 @@ def main():
     # the real file set, served when the device sends ?fw=<70+>.
     dual = args.version >= 70
     audit_manifest = manifest_full_out if dual else manifest_out
+    manifest_gz_out = ver_dir / "manifest_gz.txt"
+    with_gz = args.version >= GZ_MIN_FW
 
     if args.files_only:
         src_manifest = manifest_full_out if dual else manifest_out
         if not src_manifest.is_file():
             sys.exit(f"error: {src_manifest} does not exist - run a full push first")
         fw_line, _, old_generated = parse_manifest(src_manifest)
+        if manifest_gz_out.is_file():
+            old_generated = max(old_generated, parse_manifest(manifest_gz_out)[2])
         if not fw_line:
             sys.exit(f"error: {src_manifest} has no fw entry - corrupt manifest?")
         ver_dir.mkdir(parents=True, exist_ok=True)
@@ -157,6 +194,14 @@ def main():
             make_manifest(args.version, SPIFFS, None, manifest_full_out, args.pin,
                           fw_line=fw_line,
                           min_generated=parse_manifest(manifest_out)[2])
+            if with_gz:
+                # Last, so it carries the highest generation (a 75 device
+                # applies full during the update, then fetches gz).
+                build_gz_stage(ver_dir)
+                print("signing gzip manifest (3rd) - YubiKey touch...")
+                make_manifest(args.version, GZ_STAGE, None, manifest_gz_out, args.pin,
+                              fw_line=fw_line,
+                              min_generated=parse_manifest(manifest_full_out)[2])
         else:
             write_files_txt(ver_dir / "files.txt")
             make_manifest(args.version, SPIFFS, None, manifest_out, args.pin,
@@ -200,6 +245,7 @@ def main():
         old_generated = max(
             parse_manifest(manifest_out)[2] if manifest_out.is_file() else 0,
             parse_manifest(manifest_full_out)[2] if manifest_full_out.is_file() else 0,
+            parse_manifest(manifest_gz_out)[2] if manifest_gz_out.is_file() else 0,
         )
         ver_dir.mkdir(parents=True, exist_ok=True)
         shutil.copy2(FIRMWARE, fw_bin)
@@ -221,12 +267,19 @@ def main():
             print("signing full manifest (2/2) - YubiKey touch...")
             make_manifest(args.version, SPIFFS, FIRMWARE, manifest_full_out, args.pin,
                           min_generated=parse_manifest(manifest_out)[2])
+            if with_gz:
+                build_gz_stage(ver_dir)
+                print("signing gzip manifest (3rd) - YubiKey touch...")
+                make_manifest(args.version, GZ_STAGE, FIRMWARE, manifest_gz_out, args.pin,
+                              min_generated=parse_manifest(manifest_full_out)[2])
         else:
             write_files_txt(ver_dir / "files.txt")
             make_manifest(args.version, SPIFFS, FIRMWARE, manifest_out, args.pin,
                           min_generated=old_generated)
 
     audit_published(ver_dir, audit_manifest, fw_bin)
+    if with_gz and dual and not args.firmware_only:
+        audit_published(ver_dir, manifest_gz_out, fw_bin)
     print(f"published to {ver_dir}")
 
 

@@ -82,8 +82,10 @@ extern uint16_t eeprom_wifi_start;  // WiFi active-hours start, minutes from mid
 extern uint16_t eeprom_wifi_end;    // WiFi active-hours end, minutes from midnight (0-1439)
 extern uint16_t eeprom_dim_start;   // Time-of-day dimming start, minutes from midnight (0-1439)
 extern uint16_t eeprom_dim_end;     // Time-of-day dimming end, minutes from midnight (0-1439)
-extern char eeprom_lat[12], my_lat[12];                         // "48.123456";
-extern char eeprom_lon[12], my_lon[12];                         // "16.123456";
+// Room for the longest coordinate, "-179.9999999" (12 chars), plus NUL; 12 overflowed (#236).
+#define COORD_STR_SIZE 16
+extern char eeprom_lat[COORD_STR_SIZE], my_lat[COORD_STR_SIZE]; // "48.123456";
+extern char eeprom_lon[COORD_STR_SIZE], my_lon[COORD_STR_SIZE]; // "16.123456";
 extern char eeprom_timezone[TZ_LENGTH], my_timezone[TZ_LENGTH]; // EET-2EEST,M3.5.0/3,M10.5.0/4";
 extern char eeprom_iana_tz[64];                                 // human-readable IANA tz, e.g. "Europe/Athens" (priority below POSIX, above auto)
 extern char eeprom_font[2][12];     // [0] = day font, [1] = night font
