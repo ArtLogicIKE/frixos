@@ -50,9 +50,9 @@ static int rescue_mode_this_boot = 0; // Set by check_boot_fail_count() when 3 c
 
 // versioning variables
 const char app[10] = "Frixos";
-const char version[10] = "2.91";
+const char version[10] = "2.92";
 static const char *TAG = "frixos main"; // in case we use ESP_LOGE -rror/W-arning/I-info (also D-ebug/V-erbose)
-const int fwversion = 74;
+const int fwversion = 75;
 const int rescuemode = 0; // 0 = normal, 1 = rescue mode
 const char *revision = "A-G"; // 0=A-G, 1=H, 2=I; set from eeprom_board_rev
 
@@ -100,8 +100,8 @@ uint16_t eeprom_wifi_start = 0;                                     // WiFi acti
 uint16_t eeprom_wifi_end = 0;                                       // WiFi active-hours end, minutes from midnight (0-1439)
 uint16_t eeprom_dim_start = 0;                                      // Time-of-day dimming start, minutes from midnight (0-1439)
 uint16_t eeprom_dim_end = 0;                                        // Time-of-day dimming end, minutes from midnight (0-1439)
-char eeprom_lat[12] = "", my_lat[12] = "";                         // "48.123456";
-char eeprom_lon[12] = "", my_lon[12] = "";                         // "16.123456";
+char eeprom_lat[COORD_STR_SIZE] = "", my_lat[COORD_STR_SIZE] = ""; // "48.123456";
+char eeprom_lon[COORD_STR_SIZE] = "", my_lon[COORD_STR_SIZE] = ""; // "16.123456";
 char eeprom_timezone[TZ_LENGTH] = "", my_timezone[TZ_LENGTH] = ""; // EET-2EEST,M3.5.0/3,M10.5.0/4";
 char eeprom_iana_tz[64] = "";                                      // human-readable IANA tz, e.g. "Europe/Athens"
 char eeprom_font[2][12] = {"bold", "light"};                       // [0] = day font, [1] = night font

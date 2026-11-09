@@ -140,7 +140,7 @@ static bool worth_reporting(void)
     default:
         return false;
     }
-    static const char *const routine[] = {"user", "settings", "fw_upload", "ota_ok", "ota_failed", "provision_timeout"};
+    static const char *const routine[] = {"user", "settings", "fw_upload", "ota_ok", "ota_failed", "ota_files", "provision_timeout"};
     for (size_t i = 0; i < sizeof(routine) / sizeof(routine[0]); i++)
         if (strcmp(rep_cause, routine[i]) == 0)
             return false;
