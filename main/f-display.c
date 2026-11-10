@@ -156,6 +156,14 @@ static lv_obj_t *label_degree_aux = NULL;
 #define MMOL_DECIMAL_SIDE_GAP_PX 1
 /** If LVGL has not laid out the dot image yet, assume this width (typical theme dot). */
 #define MMOL_DOT_WIDTH_FALLBACK_PX 4
+/** Vertical offset of the decimal dot from the top of the digits (weather/HA one-decimal values). */
+#define VALUE_DECIMAL_DOT_Y_PX 30
+/** Largest whole-number part a weather/HA value shows (three digits). */
+#define VALUE_MAX_WHOLE 999
+/** Input cap before scaling to tenths, so a huge state string cannot overflow the int conversion. */
+#define VALUE_PARSE_CAP 9999.0
+/** Tenths per whole unit, for the one-decimal weather/HA readout. */
+#define TENTHS_PER_UNIT 10
 /** Gap between the right edge of digit slot 2 and the glucose unit label (standalone widget). */
 #define GLUCOSE_WIDGET_UNIT_GAP_AFTER_DIGIT2 3
 /** Trim leading space for standalone mmol/L glucose (pixels). */
@@ -2057,6 +2065,7 @@ typedef struct
   int digit[4];
   bool show_dots;
   bool is_mmol;
+  bool decimal; /* weather/HA value shown with one decimal: dot sits between digit[2] and digit[3] */
 } digit_display_t;
 
 static void fill_glucose_digits(digit_display_t *out, bool time_slot)
@@ -2183,6 +2192,7 @@ static void fill_integer_digits(digit_display_t *out, int value)
 {
   out->show_dots = false;
   out->is_mmol = false;
+  out->decimal = false;
   for (int i = 0; i < 4; i++)
     out->digit[i] = -1;
 
@@ -2213,10 +2223,62 @@ static void fill_weather_digits(digit_display_t *out)
   fill_integer_digits(out, temp_val);
 }
 
+/* Split an HA state string into rounded integer and tenths parts. Returns true when the
+ * value should be shown with one decimal: the state text itself has a decimal point
+ * (so whole-number sensors stay whole) and the result still fits the 4 digit slots
+ * (up to 999.9). Otherwise *int_part is the value rounded to a whole number. */
+static bool ha_value_parts(const char *s, int *int_part, int *tenth)
+{
+  *int_part = 0;
+  *tenth = 0;
+  if (!s)
+    return false;
+
+  double v = fabs(atof(s));
+  if (v > VALUE_PARSE_CAP)
+    v = VALUE_PARSE_CAP;
+  const int tenths = (int)round(v * TENTHS_PER_UNIT);
+  if (strchr(s, '.') && tenths / TENTHS_PER_UNIT <= VALUE_MAX_WHOLE)
+  {
+    *int_part = tenths / TENTHS_PER_UNIT;
+    *tenth = tenths % TENTHS_PER_UNIT;
+    return true;
+  }
+  *int_part = (int)round(v);
+  return false;
+}
+
 static void fill_ha_digits(digit_display_t *out, const char *ha_val)
 {
-  int ha_int = ha_val ? (int)round(fabs(atof(ha_val))) : 0;
-  fill_integer_digits(out, ha_int);
+  int ip, tenth;
+  if (!ha_value_parts(ha_val, &ip, &tenth))
+  {
+    fill_integer_digits(out, ip);
+    return;
+  }
+
+  /* Integer digits right-aligned into digit[0..2], the tenth in digit[3]. */
+  out->show_dots = false;
+  out->is_mmol = false;
+  out->decimal = true;
+  for (int i = 0; i < 4; i++)
+    out->digit[i] = -1;
+  if (ip >= 100)
+  {
+    out->digit[0] = ip / 100;
+    out->digit[1] = (ip / 10) % 10;
+    out->digit[2] = ip % 10;
+  }
+  else if (ip >= 10)
+  {
+    out->digit[1] = ip / 10;
+    out->digit[2] = ip % 10;
+  }
+  else
+  {
+    out->digit[2] = ip;
+  }
+  out->digit[3] = tenth;
 }
 
 static void set_digit_sprite(lv_obj_t *objs[NUM_DIGITS], int position, int digit)
@@ -2296,9 +2358,22 @@ static void align_value_with_label_digits(lv_obj_t *objs[NUM_DIGITS], lv_obj_t *
                                           int ox, int y, const digit_display_t *dd,
                                           const char *unit, lv_obj_t *unit_label)
 {
-  const int n_sig = (dd->digit[1] >= 0) ? 3 : (dd->digit[2] >= 0) ? 2 : 1;
-  const int first = NUM_DIGITS - n_sig; /* index of first significant digit */
+  int first = 0; /* index of first significant digit (digit[3] is never blank) */
+  while (first < NUM_DIGITS - 1 && dd->digit[first] < 0)
+    first++;
+  const int n_sig = NUM_DIGITS - first;
   const bool has_unit = unit_label && unit && unit[0] != '\0';
+
+  /* One-decimal values: the dot sits between digit[2] and digit[3], same geometry as
+   * the mmol/L glucose display. */
+  int dec_extra = 0;
+  if (dd->decimal)
+  {
+    int dot_w = lv_obj_get_width(dot_objs[0]);
+    if (dot_w <= 0)
+      dot_w = MMOL_DOT_WIDTH_FALLBACK_PX;
+    dec_extra = 2 * MMOL_DECIMAL_SIDE_GAP_PX + dot_w;
+  }
 
   /* Width of unit (plus its 1px gap); measured after the text is set so it follows
    * whatever label the user configured. */
@@ -2310,7 +2385,7 @@ static void align_value_with_label_digits(lv_obj_t *objs[NUM_DIGITS], lv_obj_t *
     unit_w = 1 + lv_obj_get_width(unit_label);
   }
 
-  int content_w = n_sig * DIGIT_WIDTH + unit_w;
+  int content_w = n_sig * DIGIT_WIDTH + dec_extra + unit_w;
   int start = (TIME_SLOT_RIGHT_PX - content_w) / 2;
   if (start < 0)
     start = 0; /* never push content left of the widget */
@@ -2320,17 +2395,29 @@ static void align_value_with_label_digits(lv_obj_t *objs[NUM_DIGITS], lv_obj_t *
   {
     int rel = i - first;
     int x = x0 + (rel > 0 ? rel : 0) * DIGIT_WIDTH;
+    if (dd->decimal && i == NUM_DIGITS - 1)
+      x += dec_extra; /* the tenths digit sits after the dot */
     lv_obj_align(objs[i], LV_ALIGN_TOP_LEFT, x, y);
   }
 
-  show_object(dot_objs[0], false);
   show_object(dot_objs[1], false);
+  if (dd->decimal)
+  {
+    lv_obj_align(dot_objs[0], LV_ALIGN_TOP_LEFT,
+                 x0 + (NUM_DIGITS - 1 - first) * DIGIT_WIDTH + MMOL_DECIMAL_SIDE_GAP_PX,
+                 y + VALUE_DECIMAL_DOT_Y_PX);
+    show_object(dot_objs[0], true);
+  }
+  else
+  {
+    show_object(dot_objs[0], false);
+  }
 
   if (unit_label)
   {
     if (has_unit)
     {
-      lv_obj_align(unit_label, LV_ALIGN_TOP_LEFT, x0 + n_sig * DIGIT_WIDTH + 1, y);
+      lv_obj_align(unit_label, LV_ALIGN_TOP_LEFT, x0 + n_sig * DIGIT_WIDTH + dec_extra + 1, y);
       show_object(unit_label, true);
     }
     else
@@ -2373,7 +2460,13 @@ static void apply_digit_display_visibility(lv_obj_t *digits[NUM_DIGITS], lv_obj_
 
   for (int i = 0; i < 4; i++)
     show_object(digits[i], show_slot_digits);
-  show_object(dot_objs[0], show_time || show_glucose);
+  bool ha_decimal = false;
+  if (show_ha && runner->count > 0)
+  {
+    int ip, tenth;
+    ha_decimal = ha_value_parts(get_ha_slot_value(runner->schedule[runner->current_idx].entity), &ip, &tenth);
+  }
+  show_object(dot_objs[0], show_time || show_glucose || ha_decimal);
   show_object(dot_objs[1], show_time || show_glucose);
   update_cgm_dots_visibility(dot_objs, show_glucose, NULL);
   show_object(mgdl_img, show_glucose);
@@ -3763,7 +3856,7 @@ static void update_one_digit_display(const screen_layout_profile_t *layout,
 
   for (int i = 0; i < 4; i++)
     show_object(digits[i], show_slot_digits);
-  show_object(dot_objs[0], show_time || show_glucose);
+  show_object(dot_objs[0], show_time || show_glucose || (show_ha && value_digits.decimal));
   show_object(dot_objs[1], show_time || show_glucose);
   update_cgm_dots_visibility(dot_objs, show_glucose, show_glucose ? &digits_data : NULL);
   show_object(mgdl_img, show_glucose);
