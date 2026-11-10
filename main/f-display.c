@@ -2287,20 +2287,39 @@ static void align_glucose_digits(lv_obj_t *objs[NUM_DIGITS], lv_obj_t *dot_objs[
     align_glucose_mgdl_digits(objs, dot_objs, ox, y, dd);
 }
 
-/* Lay out the significant digits of a weather/HA value left-to-right starting at ox,
- * followed by an optional unit label (degree symbol or HA unit). Anchored to the time
- * widget so it follows the user's layout. */
+/* Lay out the significant digits of a weather/HA value followed by an optional unit
+ * label (degree symbol or HA unit), centered horizontally within the time digits' span
+ * (TIME_SLOT_RIGHT_PX wide, starting at the time widget's x) so a 1-2 digit value does
+ * not sit against the left edge. Anchored to the time widget so it follows the user's
+ * layout. */
 static void align_value_with_label_digits(lv_obj_t *objs[NUM_DIGITS], lv_obj_t *dot_objs[2],
                                           int ox, int y, const digit_display_t *dd,
                                           const char *unit, lv_obj_t *unit_label)
 {
-  int n_sig = (dd->digit[1] >= 0) ? 3 : (dd->digit[2] >= 0) ? 2 : 1;
-  int first = NUM_DIGITS - n_sig; /* index of first significant digit */
+  const int n_sig = (dd->digit[1] >= 0) ? 3 : (dd->digit[2] >= 0) ? 2 : 1;
+  const int first = NUM_DIGITS - n_sig; /* index of first significant digit */
+  const bool has_unit = unit_label && unit && unit[0] != '\0';
+
+  /* Width of unit (plus its 1px gap); measured after the text is set so it follows
+   * whatever label the user configured. */
+  int unit_w = 0;
+  if (has_unit)
+  {
+    lv_label_set_text(unit_label, unit);
+    lv_obj_update_layout(unit_label);
+    unit_w = 1 + lv_obj_get_width(unit_label);
+  }
+
+  int content_w = n_sig * DIGIT_WIDTH + unit_w;
+  int start = (TIME_SLOT_RIGHT_PX - content_w) / 2;
+  if (start < 0)
+    start = 0; /* never push content left of the widget */
+  const int x0 = ox + start;
 
   for (int i = 0; i < NUM_DIGITS; i++)
   {
     int rel = i - first;
-    int x = ox + (rel > 0 ? rel : 0) * DIGIT_WIDTH;
+    int x = x0 + (rel > 0 ? rel : 0) * DIGIT_WIDTH;
     lv_obj_align(objs[i], LV_ALIGN_TOP_LEFT, x, y);
   }
 
@@ -2309,10 +2328,9 @@ static void align_value_with_label_digits(lv_obj_t *objs[NUM_DIGITS], lv_obj_t *
 
   if (unit_label)
   {
-    if (unit && unit[0] != '\0')
+    if (has_unit)
     {
-      lv_label_set_text(unit_label, unit);
-      lv_obj_align(unit_label, LV_ALIGN_TOP_LEFT, ox + n_sig * DIGIT_WIDTH + 1, y);
+      lv_obj_align(unit_label, LV_ALIGN_TOP_LEFT, x0 + n_sig * DIGIT_WIDTH + 1, y);
       show_object(unit_label, true);
     }
     else
