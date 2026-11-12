@@ -25,8 +25,20 @@ async function loadIntegrations() {
   }
   initCgmDeviceType();
   updateIntegrationDots();
+  checkHaUrl();
 }
 sectionLoaders.integrations = loadIntegrations;
+
+/* The firmware cannot open an HA URL without a scheme (e.g. "192.168.1.50:8123"):
+   esp_http_client_init fails and every token shows "-". Flag it under the field. */
+function checkHaUrl() {
+  const inp = el('eeprom_ha_url'), err = el('eeprom_ha_url-err');
+  if (!inp || !err) return;
+  const bad = inp.value.trim() !== '' && !/^https?:\/\//i.test(inp.value);
+  err.classList.toggle('show', bad);
+  if (bad) inp.setAttribute('aria-invalid', 'true'); else inp.removeAttribute('aria-invalid');
+}
+if (el('eeprom_ha_url')) el('eeprom_ha_url').addEventListener('input', checkHaUrl);
 
 /* ---------- integration status dots ----------
    Green: configured and the firmware reports active tokens / recent data.

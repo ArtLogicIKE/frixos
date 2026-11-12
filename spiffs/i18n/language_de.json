@@ -459,7 +459,8 @@
       "token": "Langlebiges Zugriffstoken",
       "token_placeholder": "Geben Sie Ihr Token ein",
       "refresh_interval": "Aktualisierung (Min.)",
-      "server_url_placeholder": "z. B. http://homeassistant.local:8123"
+      "server_url_placeholder": "z. B. http://homeassistant.local:8123",
+      "url_protocol_missing": "Die URL muss mit http:// oder https:// beginnen, z. B. http://192.168.1.50:8123"
     },
     "stock": {
       "title": "Aktienkurse",

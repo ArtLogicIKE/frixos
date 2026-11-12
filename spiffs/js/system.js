@@ -68,7 +68,25 @@ document.querySelectorAll('#scrollEngine .seg-btn').forEach(btn => {
 });
 el('refreshStatus').addEventListener('click', () => { loadStatus(); toast(getMessage('status_refreshed'), 'ok'); });
 el('supportCopy').addEventListener('click', async () => {
-  try { await navigator.clipboard.writeText(JSON.stringify(window.statusData || {}, null, 2)); toast(getMessage('info_copied_clipboard'), 'ok'); }
+  const text = JSON.stringify(window.statusData || {}, null, 2);
+  try {
+    // navigator.clipboard only exists on https or localhost; the device page is plain http.
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      if (!ok) throw new Error('copy failed');
+    }
+    toast(getMessage('info_copied_clipboard'), 'ok');
+  }
   catch (e) { toast(getMessage('failed_copy_clipboard'), 'err'); }
 });
 el('supportEmail').addEventListener('click', () => {

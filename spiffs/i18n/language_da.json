@@ -459,7 +459,8 @@
       "token": "Langlivet adgangstoken",
       "token_placeholder": "Indtast dit token",
       "refresh_interval": "Opdatering (min.)",
-      "server_url_placeholder": "f.eks. http://homeassistant.local:8123"
+      "server_url_placeholder": "f.eks. http://homeassistant.local:8123",
+      "url_protocol_missing": "URL'en skal starte med http:// eller https://, f.eks. http://192.168.1.50:8123"
     },
     "stock": {
       "title": "Aktiekurser",

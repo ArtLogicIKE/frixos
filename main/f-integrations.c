@@ -485,7 +485,9 @@ static bool ha_client_ensure(void)
         ha_client = esp_http_client_init(&config);
         if (ha_client == NULL)
         {
-            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "HTTP client init failed (after cleanup)");
+            // Init does no I/O; a NULL here is almost always an unparsable URL
+            // (no http:// or https://, stray spaces), so show it in the log.
+            ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "HA client init failed, check URL [%s]", eeprom_ha_url);
             ha_client_discard();
             return false;
         }

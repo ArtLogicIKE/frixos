@@ -459,7 +459,8 @@
       "token": "Token di accesso a lunga durata",
       "token_placeholder": "Inserisci il tuo token",
       "refresh_interval": "Aggiornamento (min.)",
-      "server_url_placeholder": "es. http://homeassistant.local:8123"
+      "server_url_placeholder": "es. http://homeassistant.local:8123",
+      "url_protocol_missing": "L'URL deve iniziare con http:// o https://, ad es. http://192.168.1.50:8123"
     },
     "stock": {
       "title": "Quotazioni azionarie",
