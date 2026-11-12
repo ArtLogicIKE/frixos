@@ -266,6 +266,7 @@
       <div class="field"><label data-i18n="integrations.ha.server_url">Server URL</label>
         <input type="text" id="eeprom_ha_url" maxlength="200" data-i18n-placeholder="integrations.ha.server_url_placeholder" placeholder="e.g. http://homeassistant.local:8123">
         <div id="eeprom_ha_url-counter" class="counter"></div>
+        <span class="err" id="eeprom_ha_url-err" data-i18n="integrations.ha.url_protocol_missing">The URL must start with http:// or https://, e.g. http://192.168.1.50:8123</span>
       </div>
       <div class="field"><label data-i18n="integrations.ha.token">Long-lived access token</label>
         <div class="pw"><input type="password" id="eeprom_ha_token" maxlength="255" data-i18n-placeholder="integrations.ha.token_placeholder" placeholder="Paste token"><button class="eye" type="button" aria-label="Show token">👁</button></div>

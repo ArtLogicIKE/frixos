@@ -459,7 +459,8 @@
       "token": "Token de acceso de larga duración",
       "token_placeholder": "Ingrese su token",
       "refresh_interval": "Actualización (min.)",
-      "server_url_placeholder": "p. ej. http://homeassistant.local:8123"
+      "server_url_placeholder": "p. ej. http://homeassistant.local:8123",
+      "url_protocol_missing": "La URL debe empezar por http:// o https://, p. ej. http://192.168.1.50:8123"
     },
     "stock": {
       "title": "Cotizaciones bursátiles",

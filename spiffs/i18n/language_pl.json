@@ -459,7 +459,8 @@
       "token": "Długoterminowy token dostępu",
       "token_placeholder": "Wprowadź swój token",
       "refresh_interval": "Odświeżanie (min.)",
-      "server_url_placeholder": "np. http://homeassistant.local:8123"
+      "server_url_placeholder": "np. http://homeassistant.local:8123",
+      "url_protocol_missing": "Adres URL musi zaczynać się od http:// lub https://, np. http://192.168.1.50:8123"
     },
     "stock": {
       "title": "Notowania giełdowe",
