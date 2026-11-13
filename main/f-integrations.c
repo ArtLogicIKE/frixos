@@ -90,7 +90,7 @@ bool init_integration_token(integration_token_t *token, const char *name, const 
 // Strips a trailing ".N" (N = 0..6) decimals suffix from an HA token part and returns N, or -1.
 // Entity ids and JSON keys never end in ".<digit>", but an entity id keeps its own dot: a bare
 // entity needs one more dot before the suffix (sensor.power.1, not sensor.1).
-static int take_decimals_suffix(char *s, bool keep_one_dot)
+int take_decimals_suffix(char *s, bool keep_one_dot)
 {
     size_t n = strlen(s);
     if (n < 3 || s[n - 2] != '.' || s[n - 1] < '0' || s[n - 1] > '6')
@@ -1480,7 +1480,10 @@ void add_display_schedule_ha_entities(void)
     for (int i = 0; i < slot_count; i++)
     {
         if (slots[i].type != SLOT_TYPE_HA) continue;
-        const char *entity = slots[i].entity;
+        /* A ".N" suffix on the slot entity only sets the digits' decimals; fetch the bare entity. */
+        char entity[SLOT_ENTITY_LEN];
+        snprintf(entity, sizeof(entity), "%s", slots[i].entity);
+        take_decimals_suffix(entity, true);
         if (entity[0] == '\0') continue;
 
         /* Check if already present */
