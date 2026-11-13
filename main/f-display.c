@@ -1990,15 +1990,26 @@ static bool is_glucose_fresh()
   return is_fresh;
 }
 
-/* Return cached HA value string for the given entity, or NULL if not available. */
-static const char *get_ha_slot_value(const char *entity)
+/* Return cached HA value string for the given slot entity, or NULL if not available.
+ * The slot entity may end in a ".N" decimals suffix (sensor.temp.1). If decimals is not
+ * NULL it receives the decimals for the digits: the slot's suffix, else the matching
+ * message token's suffix, else 0 (whole number). */
+static const char *get_ha_slot_value(const char *slot_entity, int *decimals)
 {
-  if (!entity || entity[0] == '\0') return NULL;
+  if (decimals) *decimals = 0;
+  if (!slot_entity || slot_entity[0] == '\0') return NULL;
+  char entity[SLOT_ENTITY_LEN];
+  snprintf(entity, sizeof(entity), "%s", slot_entity);
+  const int slot_decimals = take_decimals_suffix(entity, true);
   for (int i = 0; i < integration_active_tokens_count[INTEGRATION_HA]; i++)
   {
     integration_token_t *tok = &integration_active_tokens[INTEGRATION_HA][i];
     if (tok->entity && strcmp(tok->entity, entity) == 0)
+    {
+      if (decimals)
+        *decimals = slot_decimals >= 0 ? slot_decimals : (tok->decimals > 0 ? tok->decimals : 0);
       return (strcmp(tok->value, "-") != 0 && tok->value[0] != '\0') ? tok->value : NULL;
+    }
   }
   return NULL;
 }
@@ -2011,7 +2022,7 @@ static bool slot_is_available(const display_slot_t *s)
     case SLOT_TYPE_TIME:         return true;
     case SLOT_TYPE_CGM:          return is_glucose_on() && is_glucose_fresh();
     case SLOT_TYPE_WEATHER_TEMP: return last_weather_update > 0;
-    case SLOT_TYPE_HA:           return get_ha_slot_value(s->entity) != NULL;
+    case SLOT_TYPE_HA:           return get_ha_slot_value(s->entity, NULL) != NULL;
     default:                     return false;
   }
 }
@@ -2037,7 +2048,7 @@ static bool layout_show_ha_on_digits(const screen_layout_profile_t *layout,
     return false;
   if (runner->count == 0)
     return false;
-  return get_ha_slot_value(runner->schedule[runner->current_idx].entity) != NULL;
+  return get_ha_slot_value(runner->schedule[runner->current_idx].entity, NULL) != NULL;
 }
 
 static bool layout_show_time_digits(const screen_layout_profile_t *layout,
@@ -2224,10 +2235,10 @@ static void fill_weather_digits(digit_display_t *out)
 }
 
 /* Split an HA state string into rounded integer and tenths parts. Returns true when the
- * value should be shown with one decimal: the state text itself has a decimal point
- * (so whole-number sensors stay whole) and the result still fits the 4 digit slots
- * (up to 999.9). Otherwise *int_part is the value rounded to a whole number. */
-static bool ha_value_parts(const char *s, int *int_part, int *tenth)
+ * value should be shown with one decimal: a ".N" suffix asked for decimals (N >= 1; the
+ * digits have room for one) and the result still fits the 4 digit slots (up to 999.9).
+ * Otherwise *int_part is the value rounded to a whole number, as without a suffix. */
+static bool ha_value_parts(const char *s, int decimals, int *int_part, int *tenth)
 {
   *int_part = 0;
   *tenth = 0;
@@ -2238,7 +2249,7 @@ static bool ha_value_parts(const char *s, int *int_part, int *tenth)
   if (v > VALUE_PARSE_CAP)
     v = VALUE_PARSE_CAP;
   const int tenths = (int)round(v * TENTHS_PER_UNIT);
-  if (strchr(s, '.') && tenths / TENTHS_PER_UNIT <= VALUE_MAX_WHOLE)
+  if (decimals >= 1 && tenths / TENTHS_PER_UNIT <= VALUE_MAX_WHOLE)
   {
     *int_part = tenths / TENTHS_PER_UNIT;
     *tenth = tenths % TENTHS_PER_UNIT;
@@ -2248,10 +2259,10 @@ static bool ha_value_parts(const char *s, int *int_part, int *tenth)
   return false;
 }
 
-static void fill_ha_digits(digit_display_t *out, const char *ha_val)
+static void fill_ha_digits(digit_display_t *out, const char *ha_val, int decimals)
 {
   int ip, tenth;
-  if (!ha_value_parts(ha_val, &ip, &tenth))
+  if (!ha_value_parts(ha_val, decimals, &ip, &tenth))
   {
     fill_integer_digits(out, ip);
     return;
@@ -2463,8 +2474,9 @@ static void apply_digit_display_visibility(lv_obj_t *digits[NUM_DIGITS], lv_obj_
   bool ha_decimal = false;
   if (show_ha && runner->count > 0)
   {
-    int ip, tenth;
-    ha_decimal = ha_value_parts(get_ha_slot_value(runner->schedule[runner->current_idx].entity), &ip, &tenth);
+    int ip, tenth, decimals;
+    const char *ha_val = get_ha_slot_value(runner->schedule[runner->current_idx].entity, &decimals);
+    ha_decimal = ha_value_parts(ha_val, decimals, &ip, &tenth);
   }
   show_object(dot_objs[0], show_time || show_glucose || ha_decimal);
   show_object(dot_objs[1], show_time || show_glucose);
@@ -3809,8 +3821,9 @@ static void update_one_digit_display(const screen_layout_profile_t *layout,
   }
   else if (show_ha)
   {
-    const char *ha_val = get_ha_slot_value(runner->schedule[runner->current_idx].entity);
-    fill_ha_digits(&value_digits, ha_val);
+    int ha_decimals;
+    const char *ha_val = get_ha_slot_value(runner->schedule[runner->current_idx].entity, &ha_decimals);
+    fill_ha_digits(&value_digits, ha_val, ha_decimals);
     value_unit = runner->schedule[runner->current_idx].label;
     digits_data = value_digits;
   }

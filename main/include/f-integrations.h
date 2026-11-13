@@ -42,6 +42,7 @@ void integration_carry_token_values(integration_token_t *tokens, int count,
 void parse_stock_entities(const char *input);
 void parse_integrations(void);
 void add_display_schedule_ha_entities(void);
+int take_decimals_suffix(char *s, bool keep_one_dot);
 void schedule_parse_integrations(void);
 void startup_integrations(void);
 void force_integration_update(void);
