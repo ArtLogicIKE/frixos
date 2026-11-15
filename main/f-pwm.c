@@ -38,7 +38,7 @@ uint16_t pwm_get_safe_maximum_power(void)
     case 1:
         return 850;
     case 2:
-        return 600;
+        return 560;
     default:
         return 750;
     }
