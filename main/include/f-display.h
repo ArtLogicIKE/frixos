@@ -6,6 +6,7 @@
 #include "esp_lcd_panel_vendor.h"
 #include "esp_lcd_panel_ops.h"
 #include "esp_lvgl_port.h"
+#include "cJSON.h"
 
 
 // public variables
@@ -26,6 +27,7 @@ void replace_placeholders(const char *input, char* output, size_t output_size);
 void set_scroll_message(const char *message);
 void scroll_stall_report(char *buf, size_t n);
 void prepare_tokens(void);
+void display_lv_pool_json(cJSON *root); // LVGL pool stats for /api/status
 const lv_font_t* get_selected_font(uint8_t font_index);
 uint8_t get_selected_font_height(uint8_t font_index);
 

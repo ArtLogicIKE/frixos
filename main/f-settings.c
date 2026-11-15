@@ -2767,6 +2767,7 @@ esp_err_t status_api_handler(httpd_req_t *req)
     cJSON_AddStringToObject(root, "latitude", my_lat);
     cJSON_AddStringToObject(root, "longitude", my_lon);
     cJSON_AddStringToObject(root, "timezone", my_timezone);
+    display_lv_pool_json(root);
 
     // ?stacks=1: lowest free stack (bytes) per task since boot, for sizing task stacks.
     char stacks_buffer[8] = {0};
