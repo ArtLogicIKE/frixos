@@ -823,6 +823,16 @@ static uint8_t wu_settings_mask(const char *group, const char *params)
     return bits;
 }
 
+// Secrets (passwords, tokens, API keys) can only be replaced, never read back: GET reports
+// whether each one is stored in "secrets_set" instead of returning its value.
+static void add_secret_flag(cJSON *root, cJSON **set, const char *key, const char *value)
+{
+    if (!*set)
+        *set = cJSON_AddObjectToObject(root, "secrets_set");
+    if (*set)
+        cJSON_AddBoolToObject(*set, key, value[0] != '\0');
+}
+
 esp_err_t send_json_settings(httpd_req_t *req)
 {
     ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Settings GET request received");
@@ -845,11 +855,12 @@ esp_err_t send_json_settings(httpd_req_t *req)
     // Pre-calculate inclusion mask once to optimize performance from O(N*M) to O(1)
     uint64_t mask = calculate_include_mask(group_local, params_local);
     uint8_t wu_mask = wu_settings_mask(group_local, params_local);
+    cJSON *secrets = NULL;
 
     // Add parameters based on mask
     if (mask & (1ULL << 0)) cJSON_AddStringToObject(root, "p00", eeprom_hostname);
     if (mask & (1ULL << 34)) cJSON_AddStringToObject(root, "p34", eeprom_wifi_ssid);
-    if (mask & (1ULL << 35)) cJSON_AddStringToObject(root, "p35", eeprom_wifi_pass);
+    if (mask & (1ULL << 35)) add_secret_flag(root, &secrets, "p35", eeprom_wifi_pass);
     if (mask & (1ULL << 60)) cJSON_AddStringToObject(root, "p60", eeprom_static_ip);
     if (mask & (1ULL << 61)) cJSON_AddStringToObject(root, "p61", eeprom_static_gw);
     if (mask & (1ULL << 62)) cJSON_AddStringToObject(root, "p62", eeprom_static_nm);
@@ -924,21 +935,21 @@ esp_err_t send_json_settings(httpd_req_t *req)
 
     // Add Home Assistant integration settings
     if (mask & (1ULL << 25)) cJSON_AddStringToObject(root, "p25", eeprom_ha_url);
-    if (mask & (1ULL << 26)) cJSON_AddStringToObject(root, "p26", eeprom_ha_token);
+    if (mask & (1ULL << 26)) add_secret_flag(root, &secrets, "p26", eeprom_ha_token);
     if (mask & (1ULL << 27)) cJSON_AddNumberToObject(root, "p27", eeprom_ha_refresh_mins);
 
     // Add Stock Quote Service settings
-    if (mask & (1ULL << 28)) cJSON_AddStringToObject(root, "p28", eeprom_stock_key);
+    if (mask & (1ULL << 28)) add_secret_flag(root, &secrets, "p28", eeprom_stock_key);
     if (mask & (1ULL << 29)) cJSON_AddNumberToObject(root, "p29", eeprom_stock_refresh_mins);
     if (wu_mask & 0x1) cJSON_AddStringToObject(root, "p64", eeprom_wu_station);
-    if (wu_mask & 0x2) cJSON_AddStringToObject(root, "p65", eeprom_wu_key);
+    if (wu_mask & 0x2) add_secret_flag(root, &secrets, "p65", eeprom_wu_key);
     if (wu_mask & 0x4) cJSON_AddNumberToObject(root, "p66", eeprom_wu_refresh_mins);
     if (wu_mask & 0x8) cJSON_AddNumberToObject(root, "p67", eeprom_scroll_engine);
 
     // Add Dexcom settings
     if (mask & (1ULL << 30)) cJSON_AddNumberToObject(root, "p30", eeprom_dexcom_region);
     if (mask & (1ULL << 31)) cJSON_AddStringToObject(root, "p31", eeprom_glucose_username);
-    if (mask & (1ULL << 32)) cJSON_AddStringToObject(root, "p32", eeprom_glucose_password);
+    if (mask & (1ULL << 32)) add_secret_flag(root, &secrets, "p32", eeprom_glucose_password);
     if (mask & (1ULL << 33)) cJSON_AddNumberToObject(root, "p33", eeprom_glucose_refresh);
     if (mask & (1ULL << 45)) cJSON_AddNumberToObject(root, "p45", glucose_validity_duration);
     if (mask & (1ULL << 48)) cJSON_AddNumberToObject(root, "p48", eeprom_sec_time);

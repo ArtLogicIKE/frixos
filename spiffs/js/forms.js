@@ -61,15 +61,11 @@ function refreshRangeVals() { ['brightness_LED0', 'brightness_LED1'].forEach(id 
    network-critical restart even when the user only touched an unrelated
    setting (e.g. display rotation). The field is cleared (autofill discarded)
    until the user types. */
-let wifiPassDirty = false;
-const wifiPass = el('wifi_pass');
-if (wifiPass) wifiPass.addEventListener('input', () => { wifiPassDirty = true; });
 
 /* ---------- DEVICE: connection / display / regional ---------- */
 async function loadSettings() {
   await loadGroup('group=settings&params=p03,p09');
-  delete window.settings.p35; // never keep WiFi password in memory
-  if (wifiPass) { wifiPass.value = ''; wifiPassDirty = false; } // discard any browser autofill
+  showSecretState('p35'); // the device never returns the password; clears any autofill
   const s = S();
   setVal('hostname', s.p00); setVal('wifi_ssid', s.p34);
   updateCharCounter(el('hostname'), el('hostname-counter'));
@@ -106,7 +102,7 @@ function collectSettingsPayload() {
   const p = {};
   changed(p, 'p00', host.value.trim());
   changed(p, 'p34', el('wifi_ssid').value);
-  if (wifiPassDirty) changedSecret(p, 'p35', el('wifi_pass').value);
+  changedSecret(p, 'p35', false); // a blank field never clears the Wi-Fi password
   changed(p, 'p03', parseInt(el('rotation').value, 10) || 0);
   changed(p, 'p09', swOn('mirroring') ? 1 : 0);
   changed(p, 'p36', swOn('fahrenheit') ? 1 : 0);

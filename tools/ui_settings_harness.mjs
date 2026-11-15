@@ -339,15 +339,19 @@ globalThis.__done = (async () => {
     p17: '37.9838100', p18: '23.7275400', p19: 'GMT0', tz_iana: 'Etc/UTC',
     p46: 480, p47: 0, p22: 1, p21: 12, p20: 3, p23: [80, 25],
     p42: 133, p43: 1023, p55: 420, p56: 1335,
-    p25: 'http://old.local', p26: 'old-token', p27: 1, p28: 'old-key', p29: 5,
-    p64: 'OLDSTATION', p65: 'old-wu-key', p66: 15,
-    p30: 0, p31: '', p32: '', p33: 5, p44: 0, p45: 30, p51: 175, p52: 70,
+    p25: 'http://old.local', p27: 1, p29: 5,
+    p64: 'OLDSTATION', p66: 15,
+    secrets_set: { p35: true, p26: true, p28: true, p65: true, p32: false }, // secrets are never returned
+    p30: 0, p31: '', p33: 5, p44: 0, p45: 30, p51: 175, p52: 70,
     p53: 0, p54: '', p08: 0, p24: 0, p50: 0, p58: '', p59: ''
   };
 
   await sectionLoaders.settings();
   await sectionLoaders.integrations();
   loadedSections.integrations = true;
+
+  const secretIds = ['wifi_pass', 'eeprom_ha_token', 'eeprom_stock_key', 'eeprom_wu_key', 'eeprom_glucose_password'];
+  result.secretsOnLoad = Object.fromEntries(secretIds.map(id => [id, { value: el(id).value, stored: el(id).getAttribute('data-i18n-placeholder') === 'common.secret_stored' }]));
 
   result.reload = {
     dim_start: el('dim_start').value,
@@ -405,13 +409,17 @@ globalThis.__done = (async () => {
   el('eeprom_glucose_unit').value = '1';
   el('eeprom_ns_url').value = 'https://ns.example.com';
 
-  const pre = collectSettingsPayload();
+  const pre = Object.assign({}, collectSettingsPayload(), collectIntegrationsPayload());
   result.p35BeforeDirty = !!(pre && Object.prototype.hasOwnProperty.call(pre, 'p35'));
-  await fire(el('wifi_pass'), 'input');
+  // Values set without typing (like a browser autofill) must not be posted.
+  result.secretsBeforeDirty = ['p35', 'p26', 'p28', 'p65', 'p32'].filter(k => k in pre);
+  for (const id of secretIds) await fire(el(id), 'input');
 
   const mark = state.posts.length;
   await fire(el('saveAllBtn'), 'click');
   result.save = (state.posts.slice(mark).find(p => String(p.url).includes('/api/settings')) || {}).body || null;
+  result.secretsInMemory = ['p35', 'p26', 'p28', 'p65', 'p32'].filter(k => k in window.settings);
+  result.secretFieldsAfterSave = secretIds.filter(id => el(id).value !== '');
 
   const imm = state.posts.length;
   await fire(el('themeBtn'), 'click');

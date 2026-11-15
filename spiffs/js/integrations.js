@@ -23,6 +23,7 @@ async function loadIntegrations() {
       if (c) updateCharCounter(el(id), c);
     }
   }
+  ['p26', 'p28', 'p65', 'p32'].forEach(showSecretState); // never returned, only flagged
   initCgmDeviceType();
   updateIntegrationDots();
   checkHaUrl();
@@ -63,8 +64,8 @@ function updateIntegrationDots() {
     if (state) state.textContent = txt;
   };
   setDot('dot-ha', 'state-ha', !!(s.p25 && String(s.p25).trim()), /Home Assistant tokens:\s*[1-9]/);
-  setDot('dot-stock', 'state-stock', !!(s.p28 && String(s.p28).trim()), /Stock \(finnhub\.io\) tokens:\s*[1-9]/);
-  setDot('dot-wu', 'state-wu', !!(s.p64 && String(s.p64).trim() && s.p65 && String(s.p65).trim()), /Weather Underground: \S+, obs /);
+  setDot('dot-stock', 'state-stock', secretStored('p28'), /Stock \(finnhub\.io\) tokens:\s*[1-9]/);
+  setDot('dot-wu', 'state-wu', !!(s.p64 && String(s.p64).trim()) && secretStored('p65'), /Weather Underground: \S+, obs /);
   setDot('dot-cgm', 'state-cgm', deriveCgmType() !== 'none', /(Dexcom|FreeStyle Libre|Nightscout) active:/);
 }
 
@@ -118,12 +119,12 @@ function initCgmDeviceType() {
 /* Diff the Integrations fields against stored settings (for savebar.js). */
 function collectIntegrationsPayload() {
   const p = {};
-  const secrets = ['eeprom_ha_token', 'eeprom_stock_key', 'eeprom_wu_key', 'eeprom_glucose_password'];
   for (const [id, key] of Object.entries(INT_MAP)) {
     const e = el(id); if (!e) continue;
+    if (key in SECRET_FIELDS) { changedSecret(p, key); continue; } // typed: replace; emptied: clear
     const v = (e.tagName === 'SELECT') ? (parseInt(e.value, 10) || 0)
       : (e.type === 'number') ? (parseInt(e.value, 10) || 0) : e.value;
-    if (secrets.includes(id)) changedSecret(p, key, v); else changed(p, key, v);
+    changed(p, key, v);
   }
   return p;
 }

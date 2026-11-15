@@ -42,6 +42,16 @@ async def read_index():
     with open("spiffs/index.html", "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
 
+# Like the firmware: secrets are never returned, only flagged as stored in "secrets_set".
+SECRET_KEYS = ("p26", "p28", "p32", "p35", "p65")
+
+def public_settings(d: dict) -> dict:
+    out = {k: v for k, v in d.items() if k not in SECRET_KEYS}
+    flags = {k: bool(d[k]) for k in SECRET_KEYS if k in d}
+    if flags:
+        out["secrets_set"] = flags
+    return out
+
 @app.get("/api/settings")
 async def get_settings(group: str = None, params: str = None):
     if group == "theme":
@@ -49,8 +59,8 @@ async def get_settings(group: str = None, params: str = None):
     if group == "settings":
         keys = {f"p{i:02d}" for i in [0, 3, 9, 16, 34, 35, 36, 37, 39, 60, 61, 62, 63]}
         keys.update({"p00", "p03", "p09", "p16", "p34", "p35", "p36", "p37", "p39", "p60", "p61", "p62", "p63"})
-        return JSONResponse(content={k: settings[k] for k in keys if k in settings})
-    return JSONResponse(content=settings)
+        return JSONResponse(content=public_settings({k: settings[k] for k in keys if k in settings}))
+    return JSONResponse(content=public_settings(settings))
 
 @app.post("/api/settings")
 async def post_settings(request: Request):

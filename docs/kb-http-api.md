@@ -131,6 +131,14 @@ curl.exe -s "$HOST/api/settings?group=integrations"
 curl.exe -s "$HOST/api/settings?group=settings&params=p03,p09,p16"
 ```
 
+**Secrets are write-only.** `p35` (Wi‑Fi password), `p26` (HA token), `p28` (Finnhub key), `p65` (WU key) and `p32` (glucose password) are never returned. For each one in the requested keys, GET reports only whether a value is stored:
+
+```json
+"secrets_set": {"p35": true, "p26": true, "p28": false, "p65": false, "p32": true}
+```
+
+POST a new value to replace a secret, or `""` to clear it. A settings backup made with GET therefore has no secrets; restoring it leaves the stored ones unchanged.
+
 ### POST
 
 - Body is a JSON **object**. Send only the keys you want to change.
@@ -168,7 +176,7 @@ Curl bodies below are the `--data-binary` argument. Prefix with the POST command
 |-----|---------|--------------|--------|--------------|
 | `p00` | Hostname (mDNS label, no `.local`) | string, 1–32 chars, `[A-Za-z0-9-]`, no leading/trailing `-`. Default `frixos` | **yes** | `{"p00":"frixos"}` |
 | `p34` | Wi‑Fi SSID | string, max 32 | **yes** | `{"p34":"MyNetwork"}` |
-| `p35` | Wi‑Fi password | string, max 63 | **yes** | `{"p35":"secret"}` |
+| `p35` | Wi‑Fi password (write-only, see GET) | string, max 63 | **yes** | `{"p35":"secret"}` |
 | `p60` | Static IPv4; empty = DHCP | string, max 15, valid IPv4 if non-empty | **yes** | `{"p60":"192.168.2.50"}` |
 | `p61` | Default gateway | string, max 15, IPv4 if non-empty | **yes** | `{"p61":"192.168.2.1"}` |
 | `p62` | Subnet mask | string, max 15. Default `255.255.255.0` | **yes** | `{"p62":"255.255.255.0"}` |
@@ -302,12 +310,12 @@ curl.exe -s -X POST "$HOST/api/settings" -H "Content-Type: application/json" --d
 | Key | Meaning | Type / range | Example body |
 |-----|---------|--------------|--------------|
 | `p25` | HA base URL | string, max 199. Trailing `/` stripped | `{"p25":"http://homeassistant.local:8123"}` |
-| `p26` | HA long-lived token | string, max 254 | `{"p26":"eyJ..."}` |
+| `p26` | HA long-lived token (write-only) | string, max 254 | `{"p26":"eyJ..."}` |
 | `p27` | HA refresh | **minutes**, `1`–`7200` | `{"p27":2}` |
-| `p28` | Finnhub API key | string, max 63 | `{"p28":"api_key"}` |
+| `p28` | Finnhub API key (write-only) | string, max 63 | `{"p28":"api_key"}` |
 | `p29` | Stock refresh | **minutes**, `1`–`1440` | `{"p29":10}` |
 | `p64` | Weather Underground station ID | string, max 16, letters and digits. Any public station, not only one on the account | `{"p64":"KCASANFR123"}` |
-| `p65` | Weather Underground API key | string, max 64. From wunderground.com/member/api-keys after a device is registered | `{"p65":"api_key"}` |
+| `p65` | Weather Underground API key (write-only) | string, max 64. From wunderground.com/member/api-keys after a device is registered | `{"p65":"api_key"}` |
 | `p66` | Weather Underground refresh | **minutes**, `5`–`180`. Default 15 | `{"p66":15}` |
 
 Firmware multiplies `p27`/`p29`/`p66` by 60 when scheduling fetches. `p64`–`p66` are past the 64-bit settings mask; they are included in the unfiltered GET and in `group=integrations`.
@@ -327,7 +335,7 @@ Shared credentials: `p31`/`p32`/`p33` (username, password, refresh). Dexcom regi
 | `p30` | Dexcom region | `0`=off, `1`=US, `2`=Japan, `3`=RoW | `{"p30":0}` |
 | `p44` | Libre region | `0`=off, `1`=US, `2`=EU, `3`=DE, `4`=FR, `5`=JP, `6`=AU, `7`=global | `{"p44":0}` |
 | `p31` | Glucose username | string, max 63 | `{"p31":"user"}` |
-| `p32` | Glucose password | string, max 63 | `{"p32":"pass"}` |
+| `p32` | Glucose password / Nightscout API secret (write-only) | string, max 63 | `{"p32":"pass"}` |
 | `p33` | Glucose refresh | minutes `1`–`60` | `{"p33":5}` |
 | `p45` | Glucose validity | minutes `10`–`360` | `{"p45":45}` |
 | `p51` | High threshold | mg/dL `1`–`400` | `{"p51":180}` |

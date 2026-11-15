@@ -107,14 +107,41 @@ const setVal = (id, v) => { const e = el(id); if (e != null && v !== undefined &
 async function loadGroup(query) {
   let res = await apiGet('/api/settings?' + query);
   if (!settingsResponseHasParams(res.data)) { const full = await apiGet('/api/settings'); if (full.data) res = full; }
-  if (res.data) Object.assign(window.settings, res.data);
+  if (res.data) {
+    // A group query reports only its own secrets; keep the flags other groups set.
+    const flags = Object.assign({}, window.settings.secrets_set, res.data.secrets_set);
+    Object.assign(window.settings, res.data);
+    window.settings.secrets_set = flags;
+  }
   return window.settings;
 }
 function changed(payload, key, newVal) { if (S()[key] === undefined) return; if (String(S()[key]) !== String(newVal)) payload[key] = newVal; }
-function changedSecret(payload, key, newVal) {
-  if (!newVal) return; // blank secret field means unchanged
-  const o = S()[key];
-  if (o === undefined || String(o) !== String(newVal)) payload[key] = newVal;
+
+/* Secrets (Wi-Fi password, HA token, API keys, glucose password) are write-only: the
+   device never returns them, only "secrets_set" flags saying which are stored. A secret
+   field starts empty and is sent only after the user types in it. */
+const SECRET_FIELDS = { p35: 'wifi_pass', p26: 'eeprom_ha_token', p28: 'eeprom_stock_key',
+                        p65: 'eeprom_wu_key', p32: 'eeprom_glucose_password' };
+const secretDirty = new Set();
+Object.values(SECRET_FIELDS).forEach(id => { const e = el(id); if (e) e.addEventListener('input', () => secretDirty.add(id)); });
+function secretStored(key) { return !!(S().secrets_set && S().secrets_set[key]); }
+/* Empties the field (dropping any browser autofill) and shows whether a value is stored. */
+function showSecretState(key) {
+  const e = el(SECRET_FIELDS[key]);
+  if (!e) return;
+  if (e.dataset.phText === undefined) { e.dataset.phKey = e.getAttribute('data-i18n-placeholder') || ''; e.dataset.phText = e.placeholder; }
+  e.value = '';
+  secretDirty.delete(e.id);
+  const phKey = secretStored(key) ? 'common.secret_stored' : e.dataset.phKey;
+  if (phKey) { e.setAttribute('data-i18n-placeholder', phKey); e.placeholder = tr(phKey, secretStored(key) ? 'Stored – type to replace' : e.dataset.phText); }
+  else { e.removeAttribute('data-i18n-placeholder'); e.placeholder = e.dataset.phText; }
+}
+/* Adds a typed secret to the payload. Emptying the field clears the secret, unless allowClear is false. */
+function changedSecret(payload, key, allowClear = true) {
+  const e = el(SECRET_FIELDS[key]);
+  if (!e || !secretDirty.has(e.id)) return;
+  if (e.value === '' && !allowClear) return;
+  payload[key] = e.value;
 }
 
 /* Returns true when the save succeeded (or there was nothing to save), so the
@@ -125,6 +152,12 @@ async function saveSettings(payload, networkKeys) {
   const okMsg = res.data && res.data.status === 'ok';
   if (res.ok && okMsg) {
     Object.assign(window.settings, payload);
+    for (const key of Object.keys(SECRET_FIELDS)) {
+      if (!(key in payload)) continue;
+      window.settings.secrets_set = Object.assign({}, window.settings.secrets_set, { [key]: payload[key] !== '' });
+      delete window.settings[key]; // never keep a secret in memory
+      showSecretState(key);
+    }
     const reboot = (res.data.message || '').toLowerCase().includes('reboot') || (networkKeys || []).some(k => k in payload);
     toast(reboot ? getMessage('saved_restarting') : getMessage('settings_saved'), 'ok');
     if (reboot) waitForReboot();

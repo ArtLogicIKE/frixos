@@ -17,6 +17,7 @@
     "close": "Close",
     "show_password": "Show password",
     "hide_password": "Hide password",
+    "secret_stored": "Stored – type to replace",
     "change_language": "Change language",
     "toggle_theme": "Toggle theme",
     "insert": "Insert",
