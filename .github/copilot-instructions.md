@@ -14,7 +14,8 @@ LVGL 9 requires significantly larger stacks than LVGL 8.
 
 ### 2. LVGL Graphics & Decoding
 - `CONFIG_LV_USE_TJPGD=y` - **MANDATORY**. The clock digits are JPEG resources. Without this, the time will NOT appear.
-- `CONFIG_LV_MEM_SIZE_KILOBYTES=32` in `sdkconfig` (`24` in `sdkconfig.defaults`). The old value of 64 does not match the files. Keep the value the build uses and check the heap after changes.
+- `CONFIG_LV_MEM_SIZE=24576` (24 KB LVGL pool, static RAM taken from the system heap). Every KB added here is a KB less for TLS. Check `lvgl_pool` in `/api/status` (`max_used`, `min_biggest`) after UI changes: about 14 KB is in use at idle and a JPEG draw adds about 4.3 KB (TJPGD work buffer and decoder).
+- `CONFIG_LV_OS_NONE=y`. Do not switch to `CONFIG_LV_OS_FREERTOS`: it adds an 8 KB "swdraw" render thread, and the refresh then queues a whole strip of draw tasks in the pool while a JPEG decodes, which exhausted the 24 KB pool on full redraws (`lv_assert` at `lv_draw.c:99`).
 
 ## 🧠 Hardware & Memory Constraints (ESP32 WROOM)
 

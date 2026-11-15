@@ -2776,7 +2776,7 @@ esp_err_t status_api_handler(httpd_req_t *req)
     {
         static const char *const stack_task_names[] = {
             "display_task", "wifi_task", "integration_upd", "int_reparse", "esp_timer", "sys_evt",
-            "mdns", "Tmr Svc", "httpd", "tiT", "wifi", "DnsServerTask", "main", "IDLE0", "IDLE1"};
+            "mdns", "Tmr Svc", "httpd", "tiT", "wifi", "DnsServerTask", "main", "IDLE0", "IDLE1", "taskLVGL"};
         cJSON *stacks = cJSON_AddObjectToObject(root, "stack_free_min");
         for (size_t i = 0; stacks != NULL && i < sizeof(stack_task_names) / sizeof(stack_task_names[0]); i++)
         {
