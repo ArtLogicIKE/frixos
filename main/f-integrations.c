@@ -205,6 +205,7 @@ const int32_t int_update_secs = 60; // update timer should tick every 60 seconds
 static time_t ha_http_connect_backoff_until = 0;
 /** Set by schedule_parse_integrations(); the integration task rebuilds the token lists. */
 static volatile bool integrations_reparse_requested = false;
+static void reparse_integration_tokens(void);
 /** Set when a HA entity hit connect error; skip remaining entities this cycle. */
 static bool ha_abort_remaining_tokens = false;
 /** Freestyle backoff after failed fetches; cleared on success and on a settings change. */
@@ -956,8 +957,7 @@ static void integration_update_task(void *pvParameters)
             if (integrations_reparse_requested)
             {
                 integrations_reparse_requested = false;
-                parse_integrations();
-                force_integration_update();
+                reparse_integration_tokens();
             }
 
             check_stack_usage(); // Monitor stack usage
@@ -1326,6 +1326,53 @@ void integration_carry_token_values(integration_token_t *tokens, int count,
             }
 }
 
+// The list before the previous one. Switching between two layouts then keeps the values
+// of both, so a rotation does not need a fetch on every switch.
+static integration_token_t *retired_tokens[AVAILABLE_INTEGRATIONS];
+static int retired_tokens_count[AVAILABLE_INTEGRATIONS];
+
+// Set when a rebuild produced a token neither of the last two lists had: it needs a fetch.
+// (A token whose fetch failed keeps "-" but is not new, so it doesn't force one.)
+static bool tokens_new[AVAILABLE_INTEGRATIONS];
+
+static bool token_listed(const char *name, const integration_token_t *list, int count)
+{
+    for (int j = 0; name && list && j < count; j++)
+        if (list[j].name && strcmp(name, list[j].name) == 0)
+            return true;
+    return false;
+}
+
+// Fills tokens from index `from` that are still at "-" from the retired list.
+static void carry_missing_from_retired(int integration, int from)
+{
+    integration_token_t *t = integration_active_tokens[integration];
+    for (int i = from; t && i < integration_active_tokens_count[integration]; i++)
+    {
+        if (!token_listed(t[i].name, retired_tokens[integration], retired_tokens_count[integration]))
+            tokens_new[integration] = true;
+        else if (strcmp(t[i].value, "-") == 0)
+            integration_carry_token_values(&t[i], 1, retired_tokens[integration], retired_tokens_count[integration]);
+    }
+}
+
+void integration_carry_and_retire(int integration, integration_token_t *old, int old_count)
+{
+    integration_token_t *t = integration_active_tokens[integration];
+    tokens_new[integration] = false;
+    for (int i = 0; t && i < integration_active_tokens_count[integration]; i++)
+        if (!token_listed(t[i].name, old, old_count) &&
+            !token_listed(t[i].name, retired_tokens[integration], retired_tokens_count[integration]))
+            tokens_new[integration] = true;
+    integration_carry_token_values(t, integration_active_tokens_count[integration], old, old_count);
+    for (int i = 0; t && i < integration_active_tokens_count[integration]; i++)
+        if (strcmp(t[i].value, "-") == 0)
+            integration_carry_token_values(&t[i], 1, retired_tokens[integration], retired_tokens_count[integration]);
+    free_integration_tokens_array(retired_tokens[integration], retired_tokens_count[integration]);
+    retired_tokens[integration] = old;
+    retired_tokens_count[integration] = old_count;
+}
+
 static void build_HA_tokens(const char *input);
 
 void parse_HA_entities(const char *input)
@@ -1337,9 +1384,7 @@ void parse_HA_entities(const char *input)
     integration_active_tokens_count[INTEGRATION_HA] = 0;
 
     build_HA_tokens(input);
-    integration_carry_token_values(integration_active_tokens[INTEGRATION_HA],
-                                   integration_active_tokens_count[INTEGRATION_HA], old, old_count);
-    free_integration_tokens_array(old, old_count);
+    integration_carry_and_retire(INTEGRATION_HA, old, old_count);
 }
 
 static void build_HA_tokens(const char *input)
@@ -1605,6 +1650,67 @@ void build_integration_message_corpus(char *out, size_t out_size)
      SCREEN_STATIC_TEXT_COUNT * SCREEN_STATIC_TEXT_LENGTH * FRIXOS_SCREEN_LAYOUT_PROFILES + \
      GRAPH_TOKEN_LEN * FRIXOS_SCREEN_LAYOUT_PROFILES + 32)
 
+// Hash of the text the token lists were last built from; equal text means equal tokens.
+static uint32_t token_corpus_hash = 0;
+
+static uint32_t corpus_hash(const char *s)
+{
+    uint32_t h = 2166136261u; // FNV-1a
+    while (*s)
+        h = (h ^ (uint8_t)*s++) * 16777619u;
+    return h;
+}
+
+static void rebuild_token_lists(const char *corpus)
+{
+    if (integration_active[INTEGRATION_HA])
+    {
+        parse_HA_entities(corpus);
+        const int parsed = integration_active_tokens_count[INTEGRATION_HA];
+        add_display_schedule_ha_entities();
+        carry_missing_from_retired(INTEGRATION_HA, parsed); // the schedule tokens just added
+    }
+    if (integration_active[INTEGRATION_STOCK])
+        parse_stock_entities(corpus);
+    token_corpus_hash = corpus_hash(corpus);
+}
+
+// After a layout or message change: rebuild only the token lists, and fetch only when a
+// token has no value yet. Other integrations keep their timers and backoffs, so rotating
+// layouts does not refetch glucose or weather on every switch.
+static void reparse_integration_tokens(void)
+{
+    char *corpus = get_shared_buffer(INTEGRATION_MESSAGE_CORPUS_SIZE, "int_corpus");
+    if (corpus == NULL)
+    {
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Integration corpus buffer unavailable");
+        return;
+    }
+    build_integration_message_corpus(corpus, INTEGRATION_MESSAGE_CORPUS_SIZE);
+    if (corpus_hash(corpus) == token_corpus_hash)
+    {
+        release_shared_buffer(corpus);
+        ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Tokens unchanged, no reparse");
+        return;
+    }
+    rebuild_token_lists(corpus);
+    release_shared_buffer(corpus);
+
+    if (tokens_new[INTEGRATION_HA])
+    {
+        ha_abort_remaining_tokens = false;
+        integration_last_update[INTEGRATION_HA] = 0;
+    }
+    if (tokens_new[INTEGRATION_STOCK])
+        integration_last_update[INTEGRATION_STOCK] = 0;
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Tokens rebuilt: HA %d%s, stocks %d%s",
+                integration_active_tokens_count[INTEGRATION_HA], tokens_new[INTEGRATION_HA] ? " (new, fetching)" : "",
+                integration_active_tokens_count[INTEGRATION_STOCK], tokens_new[INTEGRATION_STOCK] ? " (new, fetching)" : "");
+
+    prepare_tokens();
+    integration_tokens_updated = true;
+}
+
 void parse_integrations(void)
 {
     ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Parse integrations");
@@ -1647,17 +1753,7 @@ void parse_integrations(void)
         ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Libre on, Dexcom/NS disabled");
     }
 
-    // Parse HA entities if HA integration is active
-    if (integration_active[INTEGRATION_HA])
-    {
-        parse_HA_entities(message_corpus);
-        add_display_schedule_ha_entities();
-    }
-
-    if (integration_active[INTEGRATION_STOCK])
-    {
-        parse_stock_entities(message_corpus);
-    }
+    rebuild_token_lists(message_corpus);
 
     if (integration_active[INTEGRATION_DEXCOM] || integration_active[INTEGRATION_FREESTYLE] || integration_active[INTEGRATION_NIGHTSCOUT])
     {

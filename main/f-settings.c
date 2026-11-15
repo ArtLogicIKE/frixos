@@ -2485,18 +2485,20 @@ esp_err_t settings_post_handler(httpd_req_t *req)
 
     // Check if message has changed and call parse_integrations if it has
     ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Orig message: %s, new message: %s", orig_message, eeprom_message);
-    if (strcmp(orig_message, eeprom_message) != 0)
+    // A full parse also rebuilds the tokens, so it covers a message change too. The
+    // deferred path only rebuilds tokens and leaves the integrations' timers alone.
+    if (integration_settings_changed)
+    {
+        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Integration settings changed, parsing integrations");
+        parse_integrations();
+    }
+    else if (strcmp(orig_message, eeprom_message) != 0)
     {
         /* Same deferred path as POST /api/screen: avoid running the full
          * integration scrape synchronously on the httpd task while shared
          * HTTP buffers are still held. */
         ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Message changed, scheduling integration parse");
         schedule_parse_integrations();
-    }
-    else if (integration_settings_changed)
-    {
-        ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Integration settings changed, parsing integrations");
-        parse_integrations();
     }
 
     // Only restart if critical settings changed, otherwise just set the flag

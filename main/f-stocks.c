@@ -245,9 +245,7 @@ void parse_stock_entities(const char *input)
     integration_active_tokens_count[INTEGRATION_STOCK] = 0;
 
     build_stock_tokens(input);
-    integration_carry_token_values(integration_active_tokens[INTEGRATION_STOCK],
-                                   integration_active_tokens_count[INTEGRATION_STOCK], old, old_count);
-    free_integration_tokens_array(old, old_count);
+    integration_carry_and_retire(INTEGRATION_STOCK, old, old_count);
 }
 
 static void build_stock_tokens(const char *input)
