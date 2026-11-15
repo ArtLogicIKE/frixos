@@ -20,6 +20,7 @@
 #include "f-dexcom.h"
 #include "f-graph.h"
 #include "f-wu.h"
+#include "f-luxlog.h"
 
 #include "time.h"
 #include "math.h"
@@ -3395,6 +3396,22 @@ static void handle_als_and_brightness(uint32_t loop_counter)
   static int64_t als_last_read_us = 0;
   uint8_t old_font_index = font_index;
 
+  bool als_read = false;
+
+  // Read the ALS every 5 s in brightness mode (time-based, independent of loop period)
+  // and every 60 s in the other modes, only for the light history.
+  if (!manufacturer_mode &&
+      (esp_timer_get_time() - als_last_read_us) >= (eeprom_dim_mode == DIM_MODE_BRIGHTNESS ? 5000000 : 60000000))
+  {
+    als_last_read_us = esp_timer_get_time();
+    int64_t t_als = esp_timer_get_time();
+    lux = ltr303_get_frixos_lux();
+    stall_note("als", esp_timer_get_time() - t_als);
+    als_read = true;
+    if (time_valid)
+      luxlog_add(lux, time(NULL));
+  }
+
   if (manufacturer_mode || eeprom_dim_mode == DIM_MODE_FULL)
   {
     font_index = 0;
@@ -3403,14 +3420,8 @@ static void handle_als_and_brightness(uint32_t loop_counter)
   {
     font_index = is_time_of_day_bright() ? 0 : 1;
   }
-  else if ((esp_timer_get_time() - als_last_read_us) >= 5000000)
+  else if (als_read)
   {
-    // read ALS sensor every 5 seconds (time-based, independent of loop period)
-    als_last_read_us = esp_timer_get_time();
-    int64_t t_als = esp_timer_get_time();
-    lux = ltr303_get_frixos_lux();
-    stall_note("als", esp_timer_get_time() - t_als);
-
     if (lux > eeprom_lux_threshold + eeprom_lux_sensitivity)
       font_index = 0;
     else if (lux < eeprom_lux_threshold - eeprom_lux_sensitivity)

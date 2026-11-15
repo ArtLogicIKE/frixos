@@ -101,6 +101,20 @@ input[type=file]::file-selector-button{ font-family:var(--ui); font-size:12.5px;
   .time-arrow{ padding-bottom:11px; }
 }
 .dim-sub{ margin-top:2px; }
+.lux-chart{ margin:0 2px 14px; }
+.lux-chart-head{ display:flex; justify-content:space-between; font-size:10.5px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); margin-bottom:6px; }
+.lux-now{ font-family:var(--mono); letter-spacing:0; text-transform:none; color:var(--ink-2); }
+#lux_svg{ display:block; width:100%; height:auto; }
+#lux_svg text{ font-family:var(--mono); font-size:10px; fill:var(--muted); }
+#lux_svg .grid{ stroke:var(--hairline-soft); stroke-width:1; }
+#lux_svg .band{ fill:var(--proj-amber); opacity:.18; }
+#lux_svg .thr{ stroke:var(--proj-amber); stroke-width:1.5; stroke-dasharray:3 3; }
+#lux_svg .edge{ stroke:var(--proj-amber); stroke-width:1; opacity:.55; }
+#lux_svg .line{ fill:none; stroke:var(--cyan); stroke-width:1.6; stroke-linejoin:round; }
+#lux_svg .dot{ fill:var(--cyan); }
+#lux_svg .old{ opacity:.4; }
+#lux_svg .now{ stroke:var(--ink-2); stroke-width:1; opacity:.6; }
+#lux_svg .empty{ font-family:var(--ui); font-size:12px; }
 
 /* ---------- ADVANCED DISCLOSURE (progressive disclosure box) ---------- */
 details.adv-box{ margin-top:14px; border-radius:16px; border:1px solid var(--hairline-soft); background:var(--net-bg); }

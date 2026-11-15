@@ -169,6 +169,10 @@
               <div class="field"><label data-i18n="advanced.brightness.light_sensitivity">Sensitivity (lux)</label><input type="number" id="lux_sensitivity" step="0.1" min="0" max="50" value="3.0"></div>
             </div>
             <p class="muted-p" data-i18n="advanced.brightness.sensitivity_help">Sensitivity avoids unwanted brightness changes. Dark = Threshold − Sensitivity, Bright = Threshold + Sensitivity.</p>
+            <div class="lux-chart">
+              <div class="lux-chart-head"><span data-i18n="advanced.brightness.lux_history">Light, last 24 hours (lux)</span><span id="lux_now" class="lux-now"></span></div>
+              <svg id="lux_svg" viewBox="0 0 320 140" role="img" aria-label="Light, last 24 hours"></svg>
+            </div>
           </div>
 
           <div id="dimTime" class="dim-sub" hidden>

@@ -35,6 +35,7 @@
 #include "esp_system.h"
 #include "esp_clk_tree.h"
 #include "esp_timer.h"
+#include "f-luxlog.h"
 #include "cJSON.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -2741,6 +2742,12 @@ esp_err_t status_api_handler(httpd_req_t *req)
     cJSON_AddStringToObject(root, "latitude", my_lat);
     cJSON_AddStringToObject(root, "longitude", my_lon);
     cJSON_AddStringToObject(root, "timezone", my_timezone);
+
+    // ?luxhist=1: rolling 24 h of 10-minute light averages for the brightness chart.
+    char luxhist_buffer[8] = {0};
+    get_request_query_param(req, "luxhist", luxhist_buffer, sizeof(luxhist_buffer));
+    if (strcmp(luxhist_buffer, "1") == 0)
+        luxlog_add_json(root);
 
     // ?stacks=1: lowest free stack (bytes) per task since boot, for sizing task stacks.
     char stacks_buffer[8] = {0};
