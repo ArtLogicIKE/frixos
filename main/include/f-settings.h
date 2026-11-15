@@ -26,6 +26,8 @@ esp_err_t files_delete_handler(httpd_req_t *req);
 esp_err_t files_rename_handler(httpd_req_t *req);
 esp_err_t screen_get_handler(httpd_req_t *req);
 esp_err_t screen_post_handler(httpd_req_t *req);
+esp_err_t screen_apply_handler(httpd_req_t *req);
+esp_err_t screen_save_handler(httpd_req_t *req);
 esp_err_t root_get_handler(httpd_req_t *req);
 esp_err_t generic_file_handler(httpd_req_t *req);
 // Portal API handler (Option 114) removed

@@ -1499,7 +1499,8 @@ static bool screen_post_content_type_ok(httpd_req_t *req)
            strstr(content_type, "application/vnd.frixos.screen-layout") != NULL;
 }
 
-esp_err_t screen_post_handler(httpd_req_t *req)
+// Receives a layout, shows it and, when persist is set, saves it to flash.
+static esp_err_t screen_receive_layout(httpd_req_t *req, bool persist)
 {
     const int expected = (int)FRIXOS_SCREEN_LAYOUT_WIRE_SIZE;
     ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Screen POST content_len=%d expected=%d", req->content_len, expected);
@@ -1578,8 +1579,7 @@ esp_err_t screen_post_handler(httpd_req_t *req)
     screen_layout_sync_legacy_eeprom(&eeprom_screen_layout);
     settings_updated = true;
 
-    esp_err_t err = write_nvs_parameters();
-    if (err != ESP_OK)
+    if (persist && write_nvs_parameters() != ESP_OK)
     {
         httpd_resp_set_status(req, "500 Internal Server Error");
         httpd_resp_set_type(req, "application/json");
@@ -1590,6 +1590,32 @@ esp_err_t screen_post_handler(httpd_req_t *req)
     schedule_parse_integrations();
 
     httpd_resp_set_type(req, "application/json");
+    httpd_resp_send(req, "{\"status\":\"ok\"}", HTTPD_RESP_USE_STRLEN);
+    return ESP_OK;
+}
+
+// POST /api/screen: show the layout and save it.
+esp_err_t screen_post_handler(httpd_req_t *req)
+{
+    return screen_receive_layout(req, true);
+}
+
+// POST /api/screen/apply: show the layout only. A reboot brings back the saved one.
+esp_err_t screen_apply_handler(httpd_req_t *req)
+{
+    return screen_receive_layout(req, false);
+}
+
+// POST /api/screen/save: save the layout on screen. The file is only written when it differs.
+esp_err_t screen_save_handler(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "application/json");
+    if (write_nvs_parameters() != ESP_OK)
+    {
+        httpd_resp_set_status(req, "500 Internal Server Error");
+        httpd_resp_send(req, "{\"status\":\"error\",\"error\":\"nvs\"}", HTTPD_RESP_USE_STRLEN);
+        return ESP_OK;
+    }
     httpd_resp_send(req, "{\"status\":\"ok\"}", HTTPD_RESP_USE_STRLEN);
     return ESP_OK;
 }
@@ -4137,6 +4163,16 @@ static esp_err_t screen_post_wrapper(httpd_req_t *req)
     return http_mutex_wrapper(req, screen_post_handler);
 }
 
+static esp_err_t screen_apply_wrapper(httpd_req_t *req)
+{
+    return http_mutex_wrapper(req, screen_apply_handler);
+}
+
+static esp_err_t screen_save_wrapper(httpd_req_t *req)
+{
+    return http_mutex_wrapper(req, screen_save_handler);
+}
+
 // Wrapper for OTA POST handler
 static esp_err_t ota_post_wrapper(httpd_req_t *req)
 {
@@ -4347,6 +4383,28 @@ esp_err_t start_webserver()
     if (ret != ESP_OK)
     {
         ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to register screen POST handler");
+        return ret;
+    }
+
+    uri_handler.uri = "/api/screen/apply";
+    uri_handler.method = HTTP_POST;
+    uri_handler.handler = screen_apply_wrapper;
+    uri_handler.user_ctx = NULL;
+    ret = httpd_register_uri_handler(server, &uri_handler);
+    if (ret != ESP_OK)
+    {
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to register screen apply handler");
+        return ret;
+    }
+
+    uri_handler.uri = "/api/screen/save";
+    uri_handler.method = HTTP_POST;
+    uri_handler.handler = screen_save_wrapper;
+    uri_handler.user_ctx = NULL;
+    ret = httpd_register_uri_handler(server, &uri_handler);
+    if (ret != ESP_OK)
+    {
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to register screen save handler");
         return ret;
     }
 

@@ -128,6 +128,35 @@ static void apply_factory_layout(void)
     screen_layout_sync_legacy_eeprom(&eeprom_screen_layout);
 }
 
+// True when the next len bytes of f equal data.
+static bool file_part_equals(FILE *f, const void *data, size_t len)
+{
+    uint8_t chunk[128];
+    const uint8_t *p = data;
+    while (len > 0)
+    {
+        size_t n = len < sizeof(chunk) ? len : sizeof(chunk);
+        if (fread(chunk, 1, n, f) != n || memcmp(chunk, p, n) != 0)
+            return false;
+        p += n;
+        len -= n;
+    }
+    return true;
+}
+
+// True when the layout file already holds exactly this header and these profiles.
+static bool layout_file_matches(const screen_layout_bin_header_t *header)
+{
+    FILE *f = fopen(SCREEN_LAYOUT_FILE_PATH, "rb");
+    if (!f)
+        return false;
+    bool same = file_part_equals(f, header, sizeof(*header)) &&
+                file_part_equals(f, eeprom_screen_layout.profile, sizeof(eeprom_screen_layout.profile)) &&
+                fgetc(f) == EOF;
+    fclose(f);
+    return same;
+}
+
 esp_err_t screen_layout_file_save(void)
 {
     if (!littlefs_is_mounted())
@@ -137,6 +166,13 @@ esp_err_t screen_layout_file_save(void)
 
     screen_layout_bin_header_t header;
     fill_wire_header(&header);
+
+    if (layout_file_matches(&header))
+    {
+        screen_layout_nvs_erase();
+        ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Layout unchanged, %s not rewritten", SCREEN_LAYOUT_FILE_PATH);
+        return ESP_OK;
+    }
 
     FILE *f = fopen(SCREEN_LAYOUT_FILE_PATH, "wb");
     if (!f)
