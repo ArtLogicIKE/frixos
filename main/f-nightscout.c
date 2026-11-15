@@ -103,6 +103,10 @@ static int direction_to_trend(const char *direction)
 
 bool init_nightscout_client(void)
 {
+    // Called from the update task and from fetch_nightscout_glucose(); do not leak a second client.
+    if (nightscout_client_initialized)
+        return true;
+
     if (eeprom_ns_url[0] == '\0' || eeprom_glucose_password[0] == '\0')
     {
         ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Nightscout URL or API secret (password) not set");
@@ -135,6 +139,7 @@ bool init_nightscout_client(void)
     esp_http_client_set_header(nightscout_client, "Accept", "application/json");
     esp_http_client_set_header(nightscout_client, "connection", "close");
 
+    nightscout_client_initialized = true;
     return true;
 }
 
