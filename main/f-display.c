@@ -1408,7 +1408,9 @@ esp_err_t startup_lvgl(void)
 #endif
       }};
   lvgl_disp = lvgl_port_add_disp(&disp_cfg);
+  lvgl_port_lock(0); // the LVGL task is already running
   lv_display_set_rotation(lvgl_disp, LV_DISPLAY_ROTATION_90);
+  lvgl_port_unlock();
 
   return ESP_OK;
 }
@@ -3676,8 +3678,12 @@ static void handle_integration_and_messages(void)
 
     ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Scroll message: %s", msg_scrolling);
 
+    // lv_mem_monitor walks the TLSF pool without LVGL's allocator mutex, so it
+    // must hold the port lock or it can fault on a block the LVGL task is changing.
     lv_mem_monitor_t mon;
+    lvgl_port_lock(0);
     lv_mem_monitor(&mon);
+    lvgl_port_unlock();
     ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Mem: total %d free %d used %d%% frag %d%% largest %d",
                 mon.total_size, mon.free_size, mon.used_pct, mon.frag_pct, mon.free_biggest_size);
 
