@@ -91,9 +91,19 @@ void f_reboot_tick(void)
 static void capture_crash(void)
 {
     esp_core_dump_summary_t *s = malloc(sizeof(*s));
-    if (s && esp_core_dump_get_summary(s) == ESP_OK)
+    esp_err_t err = s ? esp_core_dump_get_summary(s) : ESP_ERR_NO_MEM;
+    if (err != ESP_OK)
     {
-        int n = snprintf(rep_crash, sizeof(rep_crash), "%s pc %08lx bt", s->exc_task, (unsigned long)s->exc_pc);
+        // Say why there is no backtrace (e.g. an int_wdt that left no dump).
+        snprintf(rep_crash, sizeof(rep_crash), "no dump: %s", esp_err_to_name(err));
+    }
+    else
+    {
+        // Exception cause and faulting address first, so a long backtrace can't truncate them:
+        // a vaddr near 0 means a NULL pointer, anything else a stale or corrupted one.
+        int n = snprintf(rep_crash, sizeof(rep_crash), "%s pc %08lx cause %lu va %08lx bt", s->exc_task,
+                         (unsigned long)s->exc_pc, (unsigned long)s->ex_info.exc_cause,
+                         (unsigned long)s->ex_info.exc_vaddr);
         for (uint32_t i = 0; i < s->exc_bt_info.depth && i < 8 && n > 0 && n < (int)sizeof(rep_crash); i++)
             n += snprintf(rep_crash + n, sizeof(rep_crash) - n, " %08lx", (unsigned long)s->exc_bt_info.bt[i]);
         if (n > 0 && n < (int)sizeof(rep_crash))
