@@ -39,14 +39,18 @@
 #include "f-screen-layout-bin.h"
 
 // Boot fail count for auto-rescue mode (3 failed boots -> rescue once).
+// Rescue is staged: the first time only the screen layout is reset; if the
+// device keeps failing without a successful boot, the next rescue wipes NVS.
 // While OTA writes SPIFFS the bar is raised - see check_boot_fail_count().
 #define BOOT_FAIL_THRESHOLD 3
 #define BOOT_FAIL_THRESHOLD_DURING_OTA 9
 #define BOOT_SUCCESS_DELAY_SEC 10
 #define NVS_BOOT_NAMESPACE "frixos"
 #define NVS_BOOT_FAIL_KEY "boot_fail_count"
+#define NVS_RESCUE_STAGE_KEY "rescue_stage" // 1 = layout already reset, next rescue wipes NVS
 
-static int rescue_mode_this_boot = 0; // Set by check_boot_fail_count() when 3 consecutive failed boots
+static int rescue_mode_this_boot = 0;   // Set by check_boot_fail_count(): full rescue (erase NVS)
+static int rescue_layout_this_boot = 0; // Set by check_boot_fail_count(): reset the screen layout only
 
 // versioning variables
 const char app[10] = "Frixos";
@@ -587,7 +591,8 @@ void startup_diags(void)
   ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Min heap %" PRIu32, esp_get_minimum_free_heap_size());
 }
 
-/** Check boot fail count and set rescue_mode_this_boot if 3 consecutive failed boots.
+/** Check boot fail count; after 3 consecutive failed boots set rescue_layout_this_boot,
+ *  or rescue_mode_this_boot if the layout was already reset without a successful boot since.
  *  Call early in app_main, after nvs_flash_init. */
 static void check_boot_fail_count(void)
 {
@@ -616,8 +621,21 @@ static void check_boot_fail_count(void)
 
   if (fail_count > threshold) // at least threshold failed boots, next one resets settings
   {
-    rescue_mode_this_boot = 1;
-    ESP_LOGW(TAG, "Auto-rescue: %u failed boots, entering rescue mode (erase NVS, keep WiFi and POH)", (unsigned)fail_count);
+    // A crashing screen layout (LittleFS file) survives an NVS wipe, so reset it
+    // first and keep the settings; wipe NVS only if the device still fails.
+    uint8_t stage = 0;
+    nvs_get_u8(h, NVS_RESCUE_STAGE_KEY, &stage); // ignore error, default 0
+    if (stage == 0)
+    {
+      rescue_layout_this_boot = 1;
+      ESP_LOGW(TAG, "Auto-rescue: %u failed boots, resetting screen layout (settings kept)", (unsigned)fail_count);
+    }
+    else
+    {
+      rescue_mode_this_boot = 1;
+      ESP_LOGW(TAG, "Auto-rescue: %u failed boots after layout reset, entering rescue mode (erase NVS, keep WiFi and POH)", (unsigned)fail_count);
+    }
+    nvs_set_u8(h, NVS_RESCUE_STAGE_KEY, stage == 0 ? 1 : 0);
     nvs_set_u8(h, NVS_BOOT_FAIL_KEY, 0); // reset after entering rescue
     nvs_commit(h);
   }
@@ -636,6 +654,7 @@ static void clear_boot_fail_count(void)
   if (nvs_open(NVS_BOOT_NAMESPACE, NVS_READWRITE, &h) != ESP_OK)
     return;
   nvs_set_u8(h, NVS_BOOT_FAIL_KEY, 0);
+  nvs_set_u8(h, NVS_RESCUE_STAGE_KEY, 0);
   nvs_commit(h);
   nvs_close(h);
   ESP_LOGI(TAG, "Boot success: cleared fail count");
@@ -1337,6 +1356,11 @@ void app_main(void)
   }
   else
   {
+    if (rescue_layout_this_boot)
+    {
+      ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Auto-rescue: repeated failed boots, resetting screen layout to factory defaults");
+      screen_layout_file_remove(); // the load below then falls back to the factory layout
+    }
     screen_layout_file_load();
     if (eeprom_screen_layout.scroll_delay == 65 || eeprom_screen_layout.scroll_delay == 30)
     {
@@ -1362,6 +1386,13 @@ void app_main(void)
     set_scroll_message("Settings reset, restarting...");
     vTaskDelay(pdMS_TO_TICKS(2000));
     f_reboot_restart("rescue", NULL);
+  }
+  if (rescue_layout_this_boot)
+  {
+    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Auto-rescue layout reset complete, rebooting");
+    set_scroll_message("Layout reset, restarting...");
+    vTaskDelay(pdMS_TO_TICKS(2000));
+    f_reboot_restart("rescue_layout", NULL);
   }
   startup_led_pwm();
   ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Startup complete");
