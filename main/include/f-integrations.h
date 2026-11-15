@@ -39,6 +39,9 @@ esp_err_t custom_crt_bundle_attach(void *conf);
 void parse_HA_entities(const char *input);
 void integration_carry_token_values(integration_token_t *tokens, int count,
                                     const integration_token_t *old, int old_count);
+// Copies values from the old list into the new one, then keeps the old list as the
+// retired one, so a two-layout rotation keeps the values of both.
+void integration_carry_and_retire(int integration, integration_token_t *old, int old_count);
 void parse_stock_entities(const char *input);
 void parse_integrations(void);
 void add_display_schedule_ha_entities(void);

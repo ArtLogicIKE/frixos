@@ -1409,7 +1409,9 @@ esp_err_t startup_lvgl(void)
 #endif
       }};
   lvgl_disp = lvgl_port_add_disp(&disp_cfg);
+  lvgl_port_lock(0); // the LVGL task is already running
   lv_display_set_rotation(lvgl_disp, LV_DISPLAY_ROTATION_90);
+  lvgl_port_unlock();
 
   return ESP_OK;
 }
@@ -3687,8 +3689,12 @@ static void handle_integration_and_messages(void)
 
     ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Scroll message: %s", msg_scrolling);
 
+    // lv_mem_monitor walks the TLSF pool without LVGL's allocator mutex, so it
+    // must hold the port lock or it can fault on a block the LVGL task is changing.
     lv_mem_monitor_t mon;
+    lvgl_port_lock(0);
     lv_mem_monitor(&mon);
+    lvgl_port_unlock();
     ESP_LOG_WEB(ESP_LOG_VERBOSE, TAG, "Mem: total %d free %d used %d%% frag %d%% largest %d",
                 mon.total_size, mon.free_size, mon.used_pct, mon.frag_pct, mon.free_biggest_size);
 
@@ -3699,6 +3705,38 @@ static void handle_integration_and_messages(void)
     if (timeinfo.tm_min == 0)
       last_integration_update_hour = timeinfo.tm_hour;
   }
+}
+
+// LVGL draws from its own fixed pool (CONFIG_LV_MEM_SIZE); a failed allocation there
+// ends in lv_assert. Sampled once a second by the display task for /api/status.
+static lv_mem_monitor_t lv_pool_mon;
+static size_t lv_pool_min_biggest = SIZE_MAX;
+
+static void sample_lv_pool(void)
+{
+  static int64_t sampled_us = 0;
+  const int64_t now_us = esp_timer_get_time();
+  if (now_us - sampled_us < 1000000)
+    return;
+  sampled_us = now_us;
+  lvgl_port_lock(0);
+  lv_mem_monitor(&lv_pool_mon);
+  lvgl_port_unlock();
+  if (lv_pool_mon.free_biggest_size < lv_pool_min_biggest)
+    lv_pool_min_biggest = lv_pool_mon.free_biggest_size;
+}
+
+void display_lv_pool_json(cJSON *root)
+{
+  cJSON *o = cJSON_AddObjectToObject(root, "lvgl_pool");
+  if (!o)
+    return;
+  cJSON_AddNumberToObject(o, "total", lv_pool_mon.total_size);
+  cJSON_AddNumberToObject(o, "free", lv_pool_mon.free_size);
+  cJSON_AddNumberToObject(o, "biggest", lv_pool_mon.free_biggest_size);
+  cJSON_AddNumberToObject(o, "frag_pct", lv_pool_mon.frag_pct);
+  cJSON_AddNumberToObject(o, "max_used", lv_pool_mon.max_used);
+  cJSON_AddNumberToObject(o, "min_biggest", lv_pool_min_biggest == SIZE_MAX ? 0 : lv_pool_min_biggest);
 }
 
 static void sync_schedule_runners(void)
@@ -3974,6 +4012,8 @@ void display_task(void *pvParameters)
     time(&now);
     if (time_valid)
       stall_live = true;
+
+    sample_lv_pool();
 
     if (settings_updated)
     {

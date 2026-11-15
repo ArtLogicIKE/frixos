@@ -93,6 +93,11 @@ static esp_err_t dexcom_http_event_handler(esp_http_client_event_t *evt)
 
 bool init_dexcom_client(void)
 {
+    // The update task and authenticate_dexcom_account() both call this; a second
+    // esp_http_client_init() would overwrite (leak) the first client.
+    if (dexcom_client_initialized)
+        return true;
+
     const char *base_url = DEXCOM_BASE_URLS[eeprom_dexcom_region];
     if (!base_url)
         return false;
@@ -124,6 +129,7 @@ bool init_dexcom_client(void)
     esp_http_client_set_header(dexcom_client, "Accept", "application/json");
     esp_http_client_set_header(dexcom_client, "connection", "close");
 
+    dexcom_client_initialized = true;
     return true;
 }
 

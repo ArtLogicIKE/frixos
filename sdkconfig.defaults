@@ -44,7 +44,10 @@ CONFIG_MBEDTLS_DYNAMIC_FREE_CA_CERT=y
 CONFIG_LV_USE_CLIB_SPRINTF=y
 CONFIG_LV_MEM_SIZE=24576
 CONFIG_LV_DEF_REFR_PERIOD=50
-CONFIG_LV_OS_FREERTOS=y
+# No LVGL OS layer: rendering runs inline in taskLVGL instead of a separate "swdraw" thread
+# (8 KB stack), and each draw task is freed as soon as it is queued instead of a whole strip
+# of tasks piling up in the 24 KB pool while a JPEG decodes (lv_assert at lv_draw.c:99).
+CONFIG_LV_OS_NONE=y
 CONFIG_LV_DRAW_SW_SUPPORT_XRGB8888=n
 CONFIG_LV_DRAW_SW_SUPPORT_ARGB8888=n
 CONFIG_LV_DRAW_SW_SUPPORT_ARGB8888_PREMULTIPLIED=n

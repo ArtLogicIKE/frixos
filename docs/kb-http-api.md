@@ -82,7 +82,9 @@ The eight static text fields (`text_1`…`text_8`) live **only** in this blob. T
 | GET | `/api/settings` | — | JSON. Optional `?group=` / `?params=` |
 | POST | `/api/settings` | JSON | Partial update. `Content-Type: application/json` |
 | GET | `/api/screen` | — | **3912-byte** binary blob |
-| POST | `/api/screen` | binary, exact 3912 bytes | Persists and applies layout |
+| POST | `/api/screen` | binary, exact 3912 bytes | Applies and saves the layout (what the web UI uses) |
+| POST | `/api/screen/apply` | binary, exact 3912 bytes | Applies the layout without saving it; a reboot restores the saved one |
+| POST | `/api/screen/save` | empty | Saves the layout on screen; the file is rewritten only if it changed |
 | GET | `/api/status` | — | Device status JSON. `?logs=1` adds logs |
 | GET | `/api/locate` | — | IP geolocation (`lat`, `lon`, `city`, `iana`, `posix`) |
 | GET | `/api/timezone` | — | `?location=Europe/Athens` or `?lat=&lon=` |
@@ -392,12 +394,20 @@ curl.exe -s -X POST "$HOST/api/settings" -H "Content-Type: application/json" --d
 
 POST **must** be exactly 3912 bytes. Wrong `Content-Type` → `{"status":"error","error":"bad_content_type",…}`. Wrong length → `invalid_length` with `got` / `expected`. Bad magic/format/version → `bad_wire`. Success → `{"status":"ok"}`.
 
+**Apply vs. save.** `/api/screen/apply` takes the same body and errors but only changes what is on screen. Use it to switch layouts often (for example from Home Assistant every few seconds): nothing is written to flash. `/api/screen/save` (no body) stores whatever is on screen, and `/api/screen` does both in one call. Saving skips the flash write when the stored layout is already identical, so saving an unchanged layout costs nothing. Note that saving settings (`POST /api/settings`) also saves the layout on screen.
+
 ```powershell
 curl.exe -s -o layout.bin "$HOST/api/screen"
 # check size: should be 3912
 curl.exe -s -X POST "$HOST/api/screen" `
   -H "Content-Type: application/vnd.frixos.screen-layout+1" `
   --data-binary "@layout.bin"
+# show only, no flash write:
+curl.exe -s -X POST "$HOST/api/screen/apply" `
+  -H "Content-Type: application/vnd.frixos.screen-layout+1" `
+  --data-binary "@layout.bin"
+# keep what is shown:
+curl.exe -s -X POST "$HOST/api/screen/save"
 ```
 
 ```bash
