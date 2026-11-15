@@ -17,7 +17,9 @@
 static const char *TAG = "REBOOT";
 
 // RTC_NOINIT memory survives software, panic, watchdog and brownout resets, not power loss.
-#define REBOOT_REC_MAGIC 0x52425431u
+#define REBOOT_REC_MAGIC 0x52425432u // bumped when the layout changes
+// A restart with the same cause within this uptime of the last one extends the streak.
+#define REBOOT_STREAK_MAX_UP_S (12u * 3600)
 typedef struct
 {
     uint32_t magic;
@@ -25,6 +27,8 @@ typedef struct
     uint32_t min_heap; // lowest free heap at the last tick
     char cause[20];
     char detail[48];
+    char streak_cause[20]; // kept across restarts, unlike cause
+    uint32_t streak;       // consecutive restarts with streak_cause
 } reboot_rec_t;
 static RTC_NOINIT_ATTR reboot_rec_t rec;
 
@@ -58,11 +62,23 @@ static const char *reset_reason_name(esp_reset_reason_t r)
 void f_reboot_restart(const char *cause, const char *detail)
 {
     rec.magic = REBOOT_REC_MAGIC;
+    if (cause && strcmp(rec.streak_cause, cause) == 0 && esp_timer_get_time() / 1000000 < REBOOT_STREAK_MAX_UP_S)
+        rec.streak++;
+    else
+    {
+        strlcpy(rec.streak_cause, cause ? cause : "", sizeof(rec.streak_cause));
+        rec.streak = 1;
+    }
     strlcpy(rec.cause, cause ? cause : "", sizeof(rec.cause));
     strlcpy(rec.detail, detail ? detail : "", sizeof(rec.detail));
     rec.up_s = (uint32_t)(esp_timer_get_time() / 1000000);
     rec.min_heap = esp_get_minimum_free_heap_size();
     esp_restart();
+}
+
+uint32_t f_reboot_streak(const char *cause)
+{
+    return (cause && strcmp(rec.streak_cause, cause) == 0) ? rec.streak : 0;
 }
 
 void f_reboot_tick(void)
@@ -104,6 +120,12 @@ void f_reboot_capture(void)
         strlcpy(rep_detail, rec.detail, sizeof(rep_detail));
         rep_up_s = rec.up_s;
         rep_min_heap = rec.min_heap;
+        rec.streak_cause[sizeof(rec.streak_cause) - 1] = '\0';
+    }
+    else
+    {
+        rec.streak_cause[0] = '\0';
+        rec.streak = 0;
     }
     if (rep_rst == ESP_RST_PANIC || rep_rst == ESP_RST_INT_WDT || rep_rst == ESP_RST_TASK_WDT)
         capture_crash();
