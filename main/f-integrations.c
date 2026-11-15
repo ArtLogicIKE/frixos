@@ -210,6 +210,9 @@ static bool ha_abort_remaining_tokens = false;
 /** Freestyle backoff after failed fetches; cleared on success and on a settings change. */
 static uint8_t freestyle_failures = 0;
 static time_t freestyle_retry_after = 0;
+/** Dexcom backoff, same rules: a failing fetch retried every minute fragmented the heap. */
+static uint8_t dexcom_failures = 0;
+static time_t dexcom_retry_after = 0;
 
 // One TLS session at a time, device-wide. Recursive so nested helpers can re-take it.
 static SemaphoreHandle_t ssl_connection_semaphore = NULL;
@@ -226,7 +229,10 @@ static EventGroupHandle_t ssl_startup_gate = NULL;
 #define SSL_STARTUP_GATE_MAX_WAIT_MS (60 * 1000)
 static volatile uint32_t ssl_low_memory_skips = 0;
 // Restart when every TLS attempt has been skipped for low memory this long.
+// Each tls_starved restart in a row doubles the wait (30 min ... 8 h), so a
+// device whose heap keeps fragmenting stops restarting every hour.
 #define TLS_STARVED_RESTART_US (30LL * 60 * 1000000)
+#define TLS_STARVED_MAX_SHIFT 4
 static int64_t tls_last_ok_us = 0; // boot counts as OK; written under the SSL lock
 
 // The web server waits for the first fetch round (see f-provisioning.c).
@@ -296,12 +302,14 @@ bool acquire_ssl_semaphore(const char *function_name)
             ESP_LOG_WEB(ESP_LOG_WARN, TAG, "SSL skip %s: largest block %u < %u",
                         function_name ? function_name : "?", (unsigned)largest, (unsigned)TLS_MIN_FREE_BLOCK);
             // Fragmentation never heals on its own; only a restart frees the heap.
-            if (!ota_update_in_progress && now_us - tls_last_ok_us > TLS_STARVED_RESTART_US)
+            uint32_t streak = f_reboot_streak("tls_starved");
+            int64_t starved_limit_us = TLS_STARVED_RESTART_US << (streak < TLS_STARVED_MAX_SHIFT ? streak : TLS_STARVED_MAX_SHIFT);
+            if (!ota_update_in_progress && now_us - tls_last_ok_us > starved_limit_us)
             {
                 ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "No TLS for %d min (largest block %u), restarting",
                             (int)((now_us - tls_last_ok_us) / 60000000LL), (unsigned)largest);
                 char detail[24];
-                snprintf(detail, sizeof(detail), "largest %u", (unsigned)largest);
+                snprintf(detail, sizeof(detail), "largest %u streak %u", (unsigned)largest, (unsigned)streak);
                 vTaskDelay(pdMS_TO_TICKS(100));
                 f_reboot_restart("tls_starved", detail);
             }
@@ -1169,7 +1177,9 @@ static void integration_update_task(void *pvParameters)
                 if (integration_active[INTEGRATION_DEXCOM])
                 { // If not disabled
                   // has it been long enough?
-                    if (time(NULL) - integration_last_update[INTEGRATION_DEXCOM] >= (eeprom_glucose_refresh * 60))
+                    time_t now_dx = time(NULL);
+                    if (now_dx - integration_last_update[INTEGRATION_DEXCOM] >= (eeprom_glucose_refresh * 60) &&
+                        now_dx >= dexcom_retry_after)
                     {
                         if (!dexcom_client_initialized)
                         {
@@ -1180,7 +1190,24 @@ static void integration_update_task(void *pvParameters)
                         }
 
                         if (fetch_dexcom_glucose())
+                        {
                             update_ok[INTEGRATION_DEXCOM] = true;
+                            dexcom_failures = 0;
+                            dexcom_retry_after = 0;
+                        }
+                        else
+                        {
+                            // 30 s, 60 s, 120 s ... capped at the refresh interval
+                            if (dexcom_failures < 6)
+                                dexcom_failures++;
+                            time_t backoff = (time_t)30 << (dexcom_failures - 1);
+                            time_t cap = (time_t)eeprom_glucose_refresh * 60;
+                            if (cap > 0 && backoff > cap)
+                                backoff = cap;
+                            dexcom_retry_after = now_dx + backoff;
+                            ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Dexcom failed %u time(s), next try in %lds",
+                                        dexcom_failures, (long)backoff);
+                        }
                     }
                 }
 
@@ -1640,6 +1667,8 @@ void parse_integrations(void)
     // force updating of the integrations
     freestyle_failures = 0;
     freestyle_retry_after = 0;
+    dexcom_failures = 0;
+    dexcom_retry_after = 0;
     integration_last_update[INTEGRATION_HA] = 0;
     integration_last_update[INTEGRATION_STOCK] = 0;
     integration_last_update[INTEGRATION_DEXCOM] = 0;
@@ -1780,6 +1809,8 @@ void force_integration_update(void)
     ha_abort_remaining_tokens = false;
     freestyle_failures = 0;
     freestyle_retry_after = 0;
+    dexcom_failures = 0;
+    dexcom_retry_after = 0;
 
     // Reset last update times to force immediate update
     integration_last_update[INTEGRATION_HA] = 0;

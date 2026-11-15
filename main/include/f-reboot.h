@@ -9,6 +9,9 @@
 // Records cause/detail in RTC memory and restarts. detail may be NULL.
 void f_reboot_restart(const char *cause, const char *detail) __attribute__((noreturn));
 
+// How many restarts in a row (each within 12 h of boot) had this cause; 0 after power-on.
+uint32_t f_reboot_streak(const char *cause);
+
 // Early in app_main: read the reset reason, the RTC record and any core dump.
 void f_reboot_capture(void);
 

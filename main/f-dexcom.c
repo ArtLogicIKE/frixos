@@ -448,13 +448,16 @@ bool fetch_dexcom_glucose()
                 if (root)
                     cJSON_Delete(root);
 
-                if (success)
+                release_shared_buffer(dexcom_response_buffer);
+                dexcom_response_buffer = NULL;
+                release_ssl_semaphore();
+                if (!success)
                 {
-                    release_shared_buffer(dexcom_response_buffer);
-                    dexcom_response_buffer = NULL;
-                    release_ssl_semaphore();
-                    return true; // Success, exit loop
+                    // Session and connection are fine, Dexcom just has nothing to show
+                    // (sensor or Share off). Keep the client: rebuilding it costs TLS handshakes.
+                    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Dexcom: no glucose readings in the last 24 h");
                 }
+                return success;
             }
             else if (status_code == 500)
             { // could look for specific errors, like SessionIdNotFound, but what the heck, login again && strstr(dexcom_response_buffer, "SessionIdNotFound") != NULL) {
