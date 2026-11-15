@@ -111,7 +111,7 @@ Frixos supports six integration types, configured via the Integrations section o
 - **Data** — Entity states fetched and displayed in the scrolling message via tokens
 - **Config** — Home Assistant URL, long-lived access token, refresh interval (minutes)
 - **Token format** — `[HA:entity_id:path]` (e.g. `[HA:sensor.temperature:state]`, `[HA:light.living:attributes.brightness]`)
-- **Decimals** — end the token with `.N` (0–6) to round a numeric value: `[HA:sensor.ground_power.0]` shows no decimals, `[HA:sensor.temperature:state.1]` one
+- **Decimals** — end the token with `.N` (0–6) to round a numeric value: `[HA:sensor.ground_power.0]` shows no decimals, `[HA:sensor.temperature:state.1]` one. The big digits (a Home Assistant slot in the display schedule) show whole numbers unless the slot entity ends in `.1`–`.6` (`sensor.temperature.1`) or a message token for that entity does; they have room for one decimal, up to 999.9
 - **Files** — `main/f-integrations.c` (HA entity fetch, `parse_HA_entities`)
 
 The device polls Home Assistant at the configured interval and replaces tokens in the scroll message with live entity values. Use the JSON path to extract nested attributes (default `state` for the main value).
