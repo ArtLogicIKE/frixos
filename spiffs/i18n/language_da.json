@@ -357,6 +357,13 @@
       "led_levels": "LED-lysstyrkeniveauer (%)",
       "led_day": "Lysstyrke (dag)",
       "led_night": "Lysstyrke (nat)",
+      "scale_note": "Lysstyrken følger en gammakurve, ligesom en skærm. I den lave ende er hvert trin den mindste ændring, LED’en kan lave, så uret kan blive meget svækere end før; længere oppe bliver trinene større op til fuld styrke. Værdien viser det faktiske lys som andel af urets maksimum.",
+      "chart_title": "Lysudbytte efter skyderens position",
+      "chart_gamma": "Gamma 2.2 (nu)",
+      "chart_linear": "Lineær (før)",
+      "chart_hollow": "Indstilling fra før, indtil den flyttes",
+      "chart_day": "Dag",
+      "chart_night": "Nat",
       "pwm_frequency": "PWM-frekvens",
       "max_power": "Maksimal effekt"
     },

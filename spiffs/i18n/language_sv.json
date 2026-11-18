@@ -357,6 +357,13 @@
       "led_levels": "LED-ljusstyrksnivåer (%)",
       "led_day": "Ljusstyrka (dag)",
       "led_night": "Ljusstyrka (natt)",
+      "scale_note": "Ljusstyrkan följer en gammakurva, som en skärm. Längst ner är varje steg den minsta ändring lysdioden kan göra, så klockan kan bli mycket svagare än förut; högre upp blir stegen större fram till full styrka. Värdet visar det faktiska ljuset som andel av klockans maximum.",
+      "chart_title": "Ljus efter reglagets läge",
+      "chart_gamma": "Gamma 2.2 (nu)",
+      "chart_linear": "Linjär (förut)",
+      "chart_hollow": "Tidigare inställning, tills den flyttas",
+      "chart_day": "Dag",
+      "chart_night": "Natt",
       "pwm_frequency": "PWM-frekvens",
       "max_power": "Maximal effekt"
     },
