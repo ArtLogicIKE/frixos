@@ -1744,7 +1744,7 @@ void parse_integrations(void)
         integration_active[INTEGRATION_DEXCOM] = 1;
         ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Dexcom on");
     }
-    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Libre region %d user %s", eeprom_libre_region, eeprom_glucose_username);
+    ESP_LOG_WEB(ESP_LOG_WARN, TAG, "Libre region %d", eeprom_libre_region);
     if (eeprom_libre_region > 0 && eeprom_glucose_username[0] != '\0' && eeprom_glucose_password[0] != '\0')
     {
         integration_active[INTEGRATION_NIGHTSCOUT] = 0;

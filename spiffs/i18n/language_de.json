@@ -17,6 +17,7 @@
     "close": "Schließen",
     "show_password": "Passwort anzeigen",
     "hide_password": "Passwort verbergen",
+    "secret_stored": "Gespeichert – zum Ersetzen eingeben",
     "change_language": "Sprache ändern",
     "toggle_theme": "Thema wechseln",
     "current": "Aktuell",

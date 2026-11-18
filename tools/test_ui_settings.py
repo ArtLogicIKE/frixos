@@ -133,6 +133,22 @@ def check_ui(observed: dict, failures: list[str]) -> None:
 
     if observed.get("p35BeforeDirty"):
         fail("wifi password was posted before the user edited it", failures)
+    if observed.get("secretsBeforeDirty"):
+        fail("secrets posted before the user typed in them: %s" % observed["secretsBeforeDirty"], failures)
+
+    # Secrets are write-only: fields load empty and say whether a value is stored.
+    stored = {"wifi_pass": True, "eeprom_ha_token": True, "eeprom_stock_key": True,
+              "eeprom_wu_key": True, "eeprom_glucose_password": False}
+    for field, want_stored in stored.items():
+        got = (observed.get("secretsOnLoad") or {}).get(field) or {}
+        if got.get("value") != "":
+            fail("secret field %s was not empty on load: %r" % (field, got.get("value")), failures)
+        if got.get("stored") != want_stored:
+            fail("secret field %s stored placeholder: expected %r, got %r" % (field, want_stored, got.get("stored")), failures)
+    if observed.get("secretsInMemory"):
+        fail("secrets kept in window.settings after save: %s" % observed["secretsInMemory"], failures)
+    if observed.get("secretFieldsAfterSave"):
+        fail("secret fields not cleared after save: %s" % observed["secretFieldsAfterSave"], failures)
 
     # Brightness: gamma 2.2 with one hardware step minimum, same as pwm_duty_from_level().
     def duty(level: int, top: int) -> int:
