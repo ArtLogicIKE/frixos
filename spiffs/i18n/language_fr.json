@@ -359,6 +359,13 @@
       "led_levels": "Niveaux de luminosité LED (%)",
       "led_day": "Luminosité (Jour)",
       "led_night": "Luminosité (Nuit)",
+      "scale_note": "La luminosité suit une courbe gamma, comme un écran. En bas de l’échelle, chaque pas est la plus petite variation possible de la LED, l’horloge peut donc descendre bien plus bas qu’avant ; plus haut, les pas grandissent jusqu’à la pleine puissance. La valeur indique la lumière réelle en part du maximum de cette horloge.",
+      "chart_title": "Lumière selon la position du curseur",
+      "chart_gamma": "Gamma 2.2 (actuel)",
+      "chart_linear": "Linéaire (avant)",
+      "chart_hollow": "Réglage d’avant, jusqu’à ce qu’il soit déplacé",
+      "chart_day": "Jour",
+      "chart_night": "Nuit",
       "pwm_frequency": "Fréquence PWM",
       "max_power": "Puissance maximale"
     },

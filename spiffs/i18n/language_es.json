@@ -359,6 +359,13 @@
       "led_levels": "Niveles de Brillo LED (%)",
       "led_day": "Brillo (Día)",
       "led_night": "Brillo (Noche)",
+      "scale_note": "El brillo sigue una curva gamma, como una pantalla. En la parte baja cada paso es el cambio más pequeño que puede hacer el LED, así que el reloj puede atenuarse mucho más que antes; más arriba los pasos crecen hasta la potencia máxima. El valor muestra la luz real como parte del máximo de este reloj.",
+      "chart_title": "Luz según la posición del control",
+      "chart_gamma": "Gamma 2.2 (ahora)",
+      "chart_linear": "Lineal (antes)",
+      "chart_hollow": "Ajuste anterior, hasta que lo muevas",
+      "chart_day": "Día",
+      "chart_night": "Noche",
       "pwm_frequency": "Frecuencia PWM",
       "max_power": "Potencia máxima"
     },

@@ -359,6 +359,13 @@
       "led_levels": "LED-Helligkeitsstufen (%)",
       "led_day": "Helligkeit (Tag)",
       "led_night": "Helligkeit (Nacht)",
+      "scale_note": "Die Helligkeit folgt einer Gammakurve wie bei einem Bildschirm. Unten ist jeder Schritt die kleinste Änderung, die die LED kann, sodass die Uhr viel dunkler werden kann als bisher; weiter oben werden die Schritte bis zur vollen Leistung größer. Der Wert zeigt die tatsächliche Lichtleistung als Anteil des Maximums dieser Uhr.",
+      "chart_title": "Lichtleistung nach Reglerstellung",
+      "chart_gamma": "Gamma 2.2 (jetzt)",
+      "chart_linear": "Linear (vorher)",
+      "chart_hollow": "Bisherige Einstellung, bis zum Verschieben",
+      "chart_day": "Tag",
+      "chart_night": "Nacht",
       "pwm_frequency": "PWM-Frequenz",
       "max_power": "Maximale Leistung"
     },

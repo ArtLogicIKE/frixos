@@ -44,7 +44,7 @@ EXPECTED_SAVE = {
     "p22": 2,
     "p21": 20.5,
     "p20": 8.5,
-    "p23": [60, 15],
+    "p68": [60, 15],  # brightness sliders save the gamma level, not p23
     "p42": 250,
     "p43": 900,
     "p55": 7 * 60 + 30,  # 07:30 brightness-time start, not hour 7
@@ -133,6 +133,31 @@ def check_ui(observed: dict, failures: list[str]) -> None:
 
     if observed.get("p35BeforeDirty"):
         fail("wifi password was posted before the user edited it", failures)
+
+    # Brightness: gamma 2.2 with one hardware step minimum, same as pwm_duty_from_level().
+    def duty(level: int, top: int) -> int:
+        if level <= 0:
+            return 0
+        return min(top, max(level, int(top * (level / 100) ** 2.2 + 0.5)))
+
+    want_table = [duty(level, 850) for level in range(101)]
+    if observed.get("gammaTable") != want_table:
+        fail("UI gamma table differs from the reference: %s" % observed.get("gammaTable"), failures)
+
+    def level_for_percent(pct: int, top: int) -> int:
+        target = pct * top // 100
+        return 0 if target <= 0 else min(range(1, 101), key=lambda lv: (abs(duty(lv, top) - target), lv))
+
+    want_pos = [str(level_for_percent(80, 850)), str(level_for_percent(25, 850))]
+    if observed.get("ledOnLoad") != want_pos:
+        fail("brightness sliders loaded at %s, expected %s for p23 [80, 25]" % (observed.get("ledOnLoad"), want_pos), failures)
+    if observed.get("ledBeforeTouch"):
+        fail("p68 posted before a brightness slider was moved", failures)
+    # p23-only profiles show their real linear output (80% and 25%) and hollow dots.
+    if observed.get("ledLabels") != ["80%", "25%"]:
+        fail("brightness labels for p23 [80, 25] show %s" % observed.get("ledLabels"), failures)
+    if observed.get("chartMarkers") != ['class="mk day old"', 'class="mk night old"']:
+        fail("brightness diagram markers: %s" % observed.get("chartMarkers"), failures)
 
     save = observed.get("save")
     if not isinstance(save, dict):

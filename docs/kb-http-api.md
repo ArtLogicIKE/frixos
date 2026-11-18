@@ -264,7 +264,8 @@ curl.exe -s -X POST "$HOST/api/settings" -H "Content-Type: application/json" --d
 
 | Key | Meaning | Type / range | Example body |
 |-----|---------|--------------|--------------|
-| `p23` | LED brightness **array** `[day, night]` | JSON array of 1–2 numbers, each **0–100** | `{"p23":[80,40]}` |
+| `p23` | LED brightness **array** `[day, night]`, linear percent of the maximum | JSON array of 1–2 numbers, each **0–100** | `{"p23":[80,40]}` |
+| `p68` | Brightness slider **array** `[day, night]` on the gamma 2.2 scale; `null` = use `p23` | JSON array of 1–2 items, each **0–100** or `null` | `{"p68":[60,12]}` |
 | `p20` | Lux sensitivity | float `0`–`50` | `{"p20":8.0}` |
 | `p21` | Lux threshold (day/night switch) | float `0`–`500` | `{"p21":20.0}` |
 | `p22` | Dim mode | `0`=brightness, `1`=full, `2`=time-of-day | `{"p22":0}` |
@@ -278,6 +279,15 @@ curl.exe -s -X POST "$HOST/api/settings" -H "Content-Type: application/json" --d
 ```powershell
 curl.exe -s -X POST "$HOST/api/settings" -H "Content-Type: application/json" --data-binary '{"p23":[80,40]}'
 ```
+
+**Brightness scale (`p68`).** The web UI sets `p68`, a slider level per profile: duty = max(level, round(M × (level/100)^2.2)), where M is the duty at 100% (board limit × `p43`, returned by GET as `led_max_duty`). The lowest levels are single PWM counts, about 0.1–0.2% of M, much dimmer than `p23` = 1. Rules:
+
+- Where `p68` is `null`, the clock uses `p23` (linear), so existing settings keep working until the slider is moved.
+- Setting `p68` also rewrites `p23` as the rounded percent of the new light output, for clients that only know `p23` (the HA integration, scripts) and for older firmware.
+- POSTing `p23` without `p68` drops `p68` for each profile whose value changed; re-sending the same `p23` keeps it.
+- At boot, `p68` is dropped for a profile whose `p23` no longer matches the value `p68` set (for example after a downgrade or a restored backup).
+
+`/api/status` reports `led_duty` (the exact 10-bit duty in use) next to `current_brightness` (whole percent of M).
 
 `p55`/`p56` are minutes from midnight (`0`–`1439`), same as `p46`/`p47`. `450` is 07:30.
 

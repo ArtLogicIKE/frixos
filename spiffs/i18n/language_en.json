@@ -359,6 +359,13 @@
       "led_levels": "LED Brightness Levels (%)",
       "led_day": "Brightness (Day)",
       "led_night": "Brightness (Night)",
+      "scale_note": "Brightness follows a gamma curve, like a screen. At the low end each step is the smallest change the LED can make, so the clock can go much dimmer than before; further up the steps grow until full power. The value shows the actual light output as a share of this clock’s maximum.",
+      "chart_title": "Light output by slider position",
+      "chart_gamma": "Gamma 2.2 (now)",
+      "chart_linear": "Linear (before)",
+      "chart_hollow": "Setting from before, until moved",
+      "chart_day": "Day",
+      "chart_night": "Night",
       "pwm_frequency": "PWM Frequency",
       "max_power": "Max Power"
     },

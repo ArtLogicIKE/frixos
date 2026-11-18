@@ -115,6 +115,25 @@ input[type=file]::file-selector-button{ font-family:var(--ui); font-size:12.5px;
 #lux_svg .old{ opacity:.4; }
 #lux_svg .now{ stroke:var(--ink-2); stroke-width:1; opacity:.6; }
 #lux_svg .empty{ font-family:var(--ui); font-size:12px; }
+/* Brightness: gamma diagram (left) next to the day/night sliders (right). */
+.bright-row{ display:grid; grid-template-columns:minmax(0,1.3fr) minmax(0,1fr); gap:20px; align-items:center; margin-bottom:6px; }
+.bright-sliders{ display:flex; flex-direction:column; gap:10px; }
+@media(max-width:640px){ .bright-row{ grid-template-columns:1fr; } }
+.bright-legend{ display:flex; flex-wrap:wrap; gap:4px 12px; font-size:11px; color:var(--muted); margin-bottom:4px; }
+.bright-legend .lg::before{ content:""; display:inline-block; vertical-align:middle; margin-right:5px; width:16px; border-top:2px solid var(--cyan); }
+.bright-legend .lg.lin::before{ border-top:1.5px dashed var(--muted); }
+.bright-legend .lg.hollow::before{ width:7px; height:7px; border:2px solid var(--muted); border-radius:50%; }
+#bright_svg{ display:block; width:100%; height:auto; }
+#bright_svg text{ font-family:var(--mono); font-size:10px; fill:var(--muted); }
+#bright_svg .grid{ stroke:var(--hairline-soft); stroke-width:1; }
+#bright_svg .gam{ fill:none; stroke:var(--cyan); stroke-width:2; stroke-linejoin:round; }
+#bright_svg .lin{ stroke:var(--muted); stroke-width:1.2; stroke-dasharray:4 3; opacity:.7; }
+#bright_svg .mk{ stroke-width:2; cursor:ew-resize; }
+#bright_svg .mk.drag{ stroke-width:3; filter:drop-shadow(0 0 3px var(--cyan)); }
+#bright_svg .mk.day{ fill:var(--proj-amber); stroke:var(--proj-amber); }
+#bright_svg .mk.night{ fill:var(--proj-blue); stroke:var(--proj-blue); }
+#bright_svg .mk.old{ fill:var(--bg-solid); }
+#bright_svg .mk-label{ font-family:var(--ui); font-size:11px; fill:var(--ink-2); }
 
 /* ---------- ADVANCED DISCLOSURE (progressive disclosure box) ---------- */
 details.adv-box{ margin-top:14px; border-radius:16px; border:1px solid var(--hairline-soft); background:var(--net-bg); }

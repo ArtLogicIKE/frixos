@@ -1,4 +1,5 @@
 #include <string.h>
+#include <math.h>
 #include "frixos.h"
 #include "f-pwm.h"
 #include "driver/dac_oneshot.h"
@@ -9,10 +10,11 @@ static bool led_pwm_configured = false;
 static bool led_dac_configured = false;
 static dac_oneshot_handle_t led_dac_handle = NULL;
 static dac_continuous_handle_t led_dac_chop_handle = NULL;
-// Last brightness percent applied via set_led_pwm_brightness.
+// Last applied light output in percent of the board maximum (at least 1 while on).
 // Until startup_led_pwm() runs, the hardware is not driven; 100 is the
 // pre-init placeholder only.
 static uint8_t current_brightness = 100;
+static uint16_t current_duty = 0; // last applied 10-bit duty
 
 #define LED_PWM_GPIO GPIO_NUM_32
 #define LED_DAC_GPIO GPIO_NUM_25 /* DAC_CHAN_0 */
@@ -29,6 +31,11 @@ static uint8_t current_brightness = 100;
 uint8_t pwm_get_current_brightness(void)
 {
     return current_brightness;
+}
+
+uint16_t pwm_get_current_duty(void)
+{
+    return current_duty;
 }
 
 uint16_t pwm_get_safe_maximum_power(void)
@@ -50,20 +57,46 @@ uint16_t pwm_get_effective_max_power(void)
     return (uint16_t)((safe * eeprom_max_power) / PWM_SETTINGS_MAX_POWER);
 }
 
-static uint8_t active_brightness_percent(void)
-{
-    uint8_t profile = (font_index <= 1) ? font_index : 0;
-    uint8_t pct = eeprom_brightness_LED[profile];
-    if (pct > 100)
-        pct = 100;
-    return pct;
-}
-
 static uint16_t duty_from_percent(uint8_t pct)
 {
     if (pct > 100)
         pct = 100;
     return (uint16_t)(((uint32_t)pct * pwm_get_effective_max_power()) / 100);
+}
+
+// Gamma 2.2 scale for the p68 slider (0-100), as on a screen. 0 is off, and no step is smaller
+// than one PWM count, so the lowest settings are single counts (about 0.1-0.2% of the maximum).
+uint16_t pwm_duty_from_level(uint8_t level)
+{
+    if (level == 0)
+        return 0;
+    if (level > 100)
+        level = 100;
+    const uint16_t max = pwm_get_effective_max_power();
+    uint32_t duty = (uint32_t)lroundf(max * powf(level / 100.0f, 2.2f));
+    if (duty < level)
+        duty = level;
+    return duty > max ? max : (uint16_t)duty;
+}
+
+// Light output in whole percent of the maximum; at least 1 while the LED is on.
+uint8_t pwm_percent_from_duty(uint16_t duty)
+{
+    const uint16_t max = pwm_get_effective_max_power();
+    if (duty == 0 || max == 0)
+        return 0;
+    uint32_t pct = ((uint32_t)duty * 100 + max / 2) / max;
+    return pct < 1 ? 1 : (pct > 100 ? 100 : (uint8_t)pct);
+}
+
+// Day (0) or night (1) duty: the p68 slider level when set, otherwise the linear p23 percent.
+static uint16_t profile_duty(uint8_t profile)
+{
+    if (profile > 1)
+        profile = 0;
+    if (eeprom_brightness_level[profile] != BRIGHTNESS_LEVEL_UNSET)
+        return pwm_duty_from_level(eeprom_brightness_level[profile]);
+    return duty_from_percent(eeprom_brightness_LED[profile]);
 }
 
 static uint32_t normalize_pwm_frequency(uint32_t freq)
@@ -213,8 +246,7 @@ void startup_led_pwm()
     ledc_timer_t timer = LEDC_TIMER_0;
     ledc_channel_t channel = LEDC_CHANNEL_0;
     uint32_t freq = normalize_pwm_frequency(eeprom_pwm_frequency);
-    uint8_t initial_pct = active_brightness_percent();
-    uint16_t initial_duty = duty_from_percent(initial_pct);
+    uint16_t initial_duty = profile_duty(font_index);
 
     // Configure the LEDC timer
     ledc_timer_config_t ledc_timer = {
@@ -251,9 +283,9 @@ void startup_led_pwm()
         else
         {
             led_pwm_configured = true;
-            ESP_LOG_WEB(ESP_LOG_INFO, TAG, "PWM LED GPIO32 %lu Hz 10bit safe_max=%u effective_max=%u start=%u%% duty=%u",
+            ESP_LOG_WEB(ESP_LOG_INFO, TAG, "PWM LED GPIO32 %lu Hz 10bit safe_max=%u effective_max=%u start duty=%u",
                         (unsigned long)freq, pwm_get_safe_maximum_power(),
-                        pwm_get_effective_max_power(), initial_pct, initial_duty);
+                        pwm_get_effective_max_power(), initial_duty);
         }
     }
 
@@ -263,7 +295,7 @@ void startup_led_pwm()
 
     // Display only reapplies brightness when font_index changes, so boot must
     // set the saved day/night level here or the LED stays at the init duty.
-    set_led_pwm_brightness(active_brightness_percent());
+    set_led_brightness_profile(font_index);
 }
 
 // Reconfigure PWM frequency (called when settings are updated)
@@ -297,20 +329,19 @@ esp_err_t reconfigure_led_pwm_frequency(void)
 
 
 
-// accepts brightness percentage (0-100)
-void set_led_pwm_brightness(uint8_t duty)
+// Applies the day (0) or night (1) brightness.
+void set_led_brightness_profile(uint8_t profile)
 {
-
-    (duty > 100) ? (duty = 100) : (duty = duty);  // Ensure duty cycle is between 0 and 100
-    int pwm_duty = (int)duty_from_percent(duty);
+    int pwm_duty = (int)profile_duty(profile);
     uint8_t dac_val = scale_10bit_to_dac8((uint16_t)pwm_duty);
-    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "LED brightness %i%% (pwm duty %i, dac %u)", duty, pwm_duty, dac_val);
+    ESP_LOG_WEB(ESP_LOG_INFO, TAG, "LED brightness %s (pwm duty %i, dac %u)", profile ? "night" : "day", pwm_duty, dac_val);
     if (!led_pwm_configured && !led_dac_configured)
     {
         ESP_LOG_WEB(ESP_LOG_WARN, TAG, "LED brightness skipped: PWM/DAC not configured");
         return;
     }
-    current_brightness = duty;
+    current_brightness = pwm_percent_from_duty((uint16_t)pwm_duty);
+    current_duty = (uint16_t)pwm_duty;
 
     if (led_pwm_configured)
     {

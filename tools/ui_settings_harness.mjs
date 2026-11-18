@@ -118,6 +118,7 @@ function createNode(tag) {
   node.click = () => {};
   node.scrollBy = () => {};
   node.scrollIntoView = () => {};
+  node.getBoundingClientRect = () => ({ x: 0, y: 0, width: 0, height: 0, top: 0, left: 0, right: 0, bottom: 0 });
   node.scrollWidth = 0;
   node.clientWidth = 0;
   node.scrollLeft = 0;
@@ -337,7 +338,7 @@ globalThis.__done = (async () => {
     p00: 'frixos', p34: 'OldSSID', p03: 0, p09: 0, p36: 0, p37: 0, p39: 0,
     p40: 1, p41: 0, p60: '', p61: '', p62: '', p63: '',
     p17: '37.9838100', p18: '23.7275400', p19: 'GMT0', tz_iana: 'Etc/UTC',
-    p46: 480, p47: 0, p22: 1, p21: 12, p20: 3, p23: [80, 25],
+    p46: 480, p47: 0, p22: 1, p21: 12, p20: 3, p23: [80, 25], p68: [null, null], led_max_duty: 850,
     p42: 133, p43: 1023, p55: 420, p56: 1335,
     p25: 'http://old.local', p26: 'old-token', p27: 1, p28: 'old-key', p29: 5,
     p64: 'OLDSTATION', p65: 'old-wu-key', p66: 15,
@@ -348,6 +349,16 @@ globalThis.__done = (async () => {
   await sectionLoaders.settings();
   await sectionLoaders.integrations();
   loadedSections.integrations = true;
+
+  // Brightness: unset p68 shows p23 at the matching gamma position; nothing is saved untouched.
+  result.ledOnLoad = [el('brightness_LED0').value, el('brightness_LED1').value];
+  result.ledLabelOnLoad = document.querySelector('output[for="brightness_LED1"]')
+    ? document.querySelector('output[for="brightness_LED1"]').textContent : null;
+  result.gammaTable = Array.from({ length: 101 }, (_, l) => ledDutyFromLevel(l, 850));
+  result.ledBeforeTouch = 'p68' in (collectAdvancedPayload ? collectAdvancedPayload() || {} : {});
+  const svgHtml = el('bright_svg') ? String(el('bright_svg').innerHTML || '') : '';
+  result.chartMarkers = (svgHtml.match(/class="mk [^"]*"/g) || []);
+  result.ledLabels = [document.querySelector('output[for="brightness_LED0"]'), document.querySelector('output[for="brightness_LED1"]')].map(o => o ? o.textContent : null);
 
   result.reload = {
     dim_start: el('dim_start').value,
@@ -381,6 +392,8 @@ globalThis.__done = (async () => {
   el('lux_sensitivity').value = '8.5';
   el('brightness_LED0').value = '60';
   el('brightness_LED1').value = '15';
+  await fire(el('brightness_LED0'), 'input');
+  await fire(el('brightness_LED1'), 'input');
   el('pwm_frequency').value = '250';
   el('max_power').value = '900';
   el('dim_start').value = '07:30';

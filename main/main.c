@@ -113,6 +113,10 @@ char eeprom_aux_font[2][12] = {"bold", "bold"};                    // [0] = day 
 float eeprom_lux_sensitivity = 6.0;
 float eeprom_lux_threshold = 16.0;
 uint8_t eeprom_brightness_LED[2] = {100, 30}; // in pct
+// Brightness slider position on the gamma 2.2 scale (p68), day/night; BRIGHTNESS_LEVEL_UNSET = use p23.
+uint8_t eeprom_brightness_level[2] = {BRIGHTNESS_LEVEL_UNSET, BRIGHTNESS_LEVEL_UNSET};
+// p23 as it was when p68 was set: if p23 later differs, something unaware of p68 changed it.
+uint8_t eeprom_brightness_level_p23[2] = {0, 0};
 uint8_t eeprom_dim_mode = DIM_MODE_BRIGHTNESS;
 uint8_t eeprom_fahrenheit = 1;
 uint8_t eeprom_12hour = 1;
@@ -182,6 +186,8 @@ static const nvs_setting_t settings_table[] = {
     {"scroll_eng", SETTING_TYPE_U8, &eeprom_scroll_engine, 0},
     {"language", SETTING_TYPE_U8, &eeprom_language, 0},
     {"brightness", SETTING_TYPE_BLOB, eeprom_brightness_LED, sizeof(eeprom_brightness_LED)},
+    {"bright_lvl", SETTING_TYPE_BLOB, eeprom_brightness_level, sizeof(eeprom_brightness_level)},
+    {"bright_lvl_p23", SETTING_TYPE_BLOB, eeprom_brightness_level_p23, sizeof(eeprom_brightness_level_p23)},
     {"lux_sens", SETTING_TYPE_BLOB, &eeprom_lux_sensitivity, sizeof(eeprom_lux_sensitivity)},
     {"lux_thresh", SETTING_TYPE_BLOB, &eeprom_lux_threshold, sizeof(eeprom_lux_threshold)},
     {"message", SETTING_TYPE_STR, eeprom_message, sizeof(eeprom_message)},
@@ -819,6 +825,13 @@ void startup_read_eeprom(void)
       eeprom_pwm_frequency = PWM_MIN_FREQUENCY_HZ;
     if (eeprom_pwm_frequency > PWM_MAX_FREQUENCY_HZ)
       eeprom_pwm_frequency = PWM_MAX_FREQUENCY_HZ;
+
+    // A slider level (p68) only stands while p23 is still the value it set. Older firmware
+    // (after a downgrade) or a restored backup that changed p23 wins over it.
+    for (int i = 0; i < 2; i++)
+      if (eeprom_brightness_level[i] != BRIGHTNESS_LEVEL_UNSET &&
+          (eeprom_brightness_level[i] > 100 || eeprom_brightness_LED[i] != eeprom_brightness_level_p23[i]))
+        eeprom_brightness_level[i] = BRIGHTNESS_LEVEL_UNSET;
 
     // 30 ms/px (brief default) was twice as fast as intended; 65 ms beats
     // the panel refresh. Custom values are left alone.

@@ -359,6 +359,13 @@
       "led_levels": "Poziomy jasności LED (%)",
       "led_day": "Jasność (Dzień)",
       "led_night": "Jasność (Noc)",
+      "scale_note": "Jasność zmienia się według krzywej gamma, jak na ekranie. Na dole każdy krok to najmniejsza zmiana, jaką potrafi dioda, więc zegar może świecić dużo słabiej niż wcześniej; wyżej kroki rosną aż do pełnej mocy. Wartość pokazuje rzeczywiste światło jako część maksimum tego zegara.",
+      "chart_title": "Światło według pozycji suwaka",
+      "chart_gamma": "Gamma 2.2 (teraz)",
+      "chart_linear": "Liniowo (wcześniej)",
+      "chart_hollow": "Wcześniejsze ustawienie, dopóki nie przesuniesz",
+      "chart_day": "Dzień",
+      "chart_night": "Noc",
       "pwm_frequency": "Częstotliwość PWM",
       "max_power": "Maksymalna moc"
     },

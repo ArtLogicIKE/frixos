@@ -359,6 +359,13 @@
       "led_levels": "Livelli luminosità LED (%)",
       "led_day": "Luminosità (Giorno)",
       "led_night": "Luminosità (Notte)",
+      "scale_note": "La luminosità segue una curva gamma, come uno schermo. In basso ogni passo è la variazione più piccola possibile del LED, quindi l’orologio può scendere molto più in basso di prima; più in alto i passi crescono fino alla piena potenza. Il valore mostra la luce reale come quota del massimo di questo orologio.",
+      "chart_title": "Luce in base alla posizione del cursore",
+      "chart_gamma": "Gamma 2.2 (ora)",
+      "chart_linear": "Lineare (prima)",
+      "chart_hollow": "Impostazione precedente, finché non la sposti",
+      "chart_day": "Giorno",
+      "chart_night": "Notte",
       "pwm_frequency": "Frequenza PWM",
       "max_power": "Potenza massima"
     },

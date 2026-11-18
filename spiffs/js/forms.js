@@ -41,16 +41,142 @@ staticToggle.addEventListener('click', () => {
   if (window.saveBar) window.saveBar.markDirty();
 });
 
-/* Brightness sliders show their value live. */
+/* Brightness sliders use a gamma 2.2 scale (p68), the same as pwm_duty_from_level() in
+   f-pwm.c: every low step is one hardware step, so the light can go far below the old 1%.
+   The label shows the actual light output as a share of this clock's maximum (board limit
+   times max power), sent by GET /api/settings as led_max_duty. */
+const LED_SLIDERS = ['brightness_LED0', 'brightness_LED1'];
+const ledLevelTouched = new Set();
+function ledMaxDuty() { return S().led_max_duty || window._ledMaxDuty || 1023; }
+function ledDutyFromLevel(level, max) {
+  if (level <= 0) return 0;
+  level = Math.min(level, 100);
+  return Math.min(max, Math.max(level, Math.round(max * Math.pow(level / 100, 2.2))));
+}
+/* Slider position for a stored p23 percent (linear), so the slider shows today's brightness. */
+function ledLevelFromPercent(pct, max) {
+  const duty = Math.floor(pct * max / 100);
+  if (duty <= 0) return 0;
+  let best = 1;
+  for (let l = 1; l <= 100; l++) if (Math.abs(ledDutyFromLevel(l, max) - duty) < Math.abs(ledDutyFromLevel(best, max) - duty)) best = l;
+  return best;
+}
+/* What profile i (0 day, 1 night) really outputs, in % of the maximum. Until its slider is
+   moved, a profile without p68 still runs on the linear p23 percent ("linear": true); the
+   slider only sits at the nearest gamma position. Otherwise the slider level is on the curve. */
+function ledProfileState(i) {
+  const id = LED_SLIDERS[i], max = ledMaxDuty(), s = S();
+  const level = parseInt((el(id) || {}).value, 10) || 0;
+  const p68 = Array.isArray(s.p68) ? s.p68[i] : null;
+  if (!ledLevelTouched.has(id) && p68 == null && Array.isArray(s.p23))
+    return { level, out: 100 * Math.floor(s.p23[i] * max / 100) / max, linear: true };
+  return { level, out: 100 * ledDutyFromLevel(level, max) / max, linear: false };
+}
+function formatLedPercent(pct) {
+  if (pct === 0) return '0%';
+  return (pct < 1 ? pct.toFixed(2) : pct < 10 ? pct.toFixed(1) : Math.round(pct)) + '%';
+}
 function bindRangeVal(id) {
   const r = el(id); if (!r) return;
+  const i = LED_SLIDERS.indexOf(id);
   const out = r.parentElement && r.parentElement.querySelector('.range-val');
-  const upd = () => { if (out) out.textContent = r.value + '%'; };
-  r.addEventListener('input', upd);
+  const upd = () => { if (out) out.textContent = formatLedPercent(ledProfileState(i).out); };
+  r.addEventListener('input', () => { ledLevelTouched.add(id); upd(); drawBrightnessChart(); });
   r._updVal = upd; upd();
 }
-['brightness_LED0', 'brightness_LED1'].forEach(bindRangeVal);
-function refreshRangeVals() { ['brightness_LED0', 'brightness_LED1'].forEach(id => { const r = el(id); if (r && r._updVal) r._updVal(); }); }
+LED_SLIDERS.forEach(bindRangeVal);
+function refreshRangeVals() {
+  LED_SLIDERS.forEach(id => { const r = el(id); if (r && r._updVal) r._updVal(); });
+  drawBrightnessChart();
+}
+
+/* Diagram: slider position (x) against light output (y). The gamma curve is the scale in use;
+   the dashed line is the old linear scale. Day and night dots show the current settings; a
+   hollow dot is a linear p23 setting, drawn at its real output until its slider is moved. */
+let brightGeo = null, brightDrag = null; // last drawn scale and dot positions; dot being dragged
+function drawBrightnessChart() {
+  const svg = el('bright_svg'); if (!svg) return;
+  const W = Math.max(240, Math.round(svg.getBoundingClientRect().width) || 300), H = 170;
+  const L = 34, R = 10, T = 10, B = 20, pw = W - L - R, ph = H - T - B;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  const max = ledMaxDuty();
+  const X = l => L + l / 100 * pw, Y = p => T + ph - p / 100 * ph;
+  let s = '';
+  for (let g = 0; g <= 100; g += 25) {
+    const y = Y(g).toFixed(1), x = X(g).toFixed(1);
+    s += `<line class="grid" x1="${L}" x2="${W - R}" y1="${y}" y2="${y}"/><text x="${L - 4}" y="${+y + 3.5}" text-anchor="end">${g}%</text>`;
+    s += `<line class="grid" x1="${x}" x2="${x}" y1="${T}" y2="${T + ph}"/><text x="${x}" y="${H - 6}" text-anchor="${g === 0 ? 'start' : g === 100 ? 'end' : 'middle'}">${g}</text>`;
+  }
+  s += `<line class="lin" x1="${X(0)}" y1="${Y(0)}" x2="${X(100)}" y2="${Y(100)}"/>`;
+  let d = '';
+  for (let l = 0; l <= 100; l++) d += (l ? 'L' : 'M') + X(l).toFixed(1) + ' ' + Y(100 * ledDutyFromLevel(l, max) / max).toFixed(1);
+  s += `<path class="gam" d="${d}"/>`;
+  brightGeo = { W, H, L, T, pw, ph, dots: [] };
+  [['day', 0], ['night', 1]].forEach(([k, i]) => {
+    const st = ledProfileState(i), x = X(st.level), y = Y(st.out);
+    brightGeo.dots.push({ i, x, y });
+    const label = tr('advanced.brightness.chart_' + k, k === 'day' ? 'Day' : 'Night') + ' ' + formatLedPercent(st.out);
+    const right = x < L + pw * 0.62; // label beside the dot, on the side with room
+    const ly = Math.min(T + ph - 2, Math.max(T + 9, y + (i === 0 ? -8 : 14)));
+    s += `<circle class="mk ${k}${st.linear ? ' old' : ''}${brightDrag && brightDrag.i === i ? ' drag' : ''}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${brightDrag && brightDrag.i === i ? 6 : 4.5}"/>`;
+    s += `<text class="mk-label" x="${(x + (right ? 8 : -8)).toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="${right ? 'start' : 'end'}">${label}</text>`;
+  });
+  svg.innerHTML = s;
+}
+window.addEventListener('resize', () => drawBrightnessChart());
+
+/* Drag a dot sideways to move its slider (the dot follows the curve); a click without moving
+   focuses that slider for fine steps with the arrow keys. Only the dots react, so swiping
+   over the diagram on a phone still scrolls the page. */
+{
+  const svg = el('bright_svg');
+  if (svg) {
+    // Pointer position in diagram units (the viewBox drawBrightnessChart set).
+    const svgXY = e => {
+      const r = svg.getBoundingClientRect(), g = brightGeo || { W: 300, H: 170 };
+      return [(e.clientX - r.left) * g.W / r.width, (e.clientY - r.top) * g.H / r.height];
+    };
+    const dotAt = ([x, y]) => {
+      if (!brightGeo) return null;
+      const near = brightGeo.dots.map(d => [d, Math.hypot(d.x - x, d.y - y)]).filter(([, dist]) => dist <= 14)
+        .sort((a, b) => a[1] - b[1]);
+      return near.length ? near[0][0] : null;
+    };
+    const setLevel = (i, x) => {
+      const g = brightGeo, level = Math.max(0, Math.min(100, Math.round((x - g.L) / g.pw * 100)));
+      const r = el(LED_SLIDERS[i]);
+      if (String(level) === r.value && ledLevelTouched.has(r.id)) return;
+      r.value = String(level);
+      r.dispatchEvent(new Event('input', { bubbles: true })); // label, diagram, save bar and p68 as for the slider
+    };
+    // Touch: stop the page from scrolling only when the finger starts on a dot.
+    svg.addEventListener('touchstart', e => { if (dotAt(svgXY(e.touches[0]))) e.preventDefault(); }, { passive: false });
+    svg.addEventListener('pointerdown', e => {
+      const d = dotAt(svgXY(e)); if (!d) return;
+      brightDrag = { i: d.i, x0: e.clientX, moved: false };
+      try { svg.setPointerCapture(e.pointerId); } catch (err) { /* synthetic events */ }
+      drawBrightnessChart();
+      e.preventDefault();
+    });
+    svg.addEventListener('pointermove', e => {
+      if (!brightDrag) { svg.style.cursor = dotAt(svgXY(e)) ? 'ew-resize' : ''; return; }
+      if (!brightDrag.moved && Math.abs(e.clientX - brightDrag.x0) < 3) return; // a click, not a drag yet
+      brightDrag.moved = true;
+      setLevel(brightDrag.i, svgXY(e)[0]);
+    });
+    const end = () => {
+      if (!brightDrag) return;
+      const { i, moved } = brightDrag;
+      brightDrag = null;
+      drawBrightnessChart();
+      const r = el(LED_SLIDERS[i]);
+      if (moved) r.dispatchEvent(new Event('change', { bubbles: true }));
+      else r.focus();
+    };
+    svg.addEventListener('pointerup', end);
+    svg.addEventListener('pointercancel', end);
+  }
+}
 
 /* The scrolling message is edited only in the Layout palette (per day/night
    profile); there is no Device-tab field for it. */
@@ -290,7 +416,14 @@ async function loadAdvanced() {
   if (s.p21 !== undefined) setVal('lux_threshold', s.p21);
   if (s.p20 !== undefined) setVal('lux_sensitivity', s.p20);
   if (luxHistLoaded) drawLuxChart();
-  if (Array.isArray(s.p23)) { setVal('brightness_LED0', s.p23[0]); setVal('brightness_LED1', s.p23[1]); }
+  // p68 holds the slider level per profile; where it is null the clock still uses the linear
+  // p23 percent, shown at the matching slider position (display only, nothing is saved).
+  ledLevelTouched.clear();
+  LED_SLIDERS.forEach((id, i) => {
+    const lvl = Array.isArray(s.p68) ? s.p68[i] : null;
+    if (lvl != null) setVal(id, lvl);
+    else if (Array.isArray(s.p23)) setVal(id, ledLevelFromPercent(s.p23[i], ledMaxDuty()));
+  });
   refreshRangeVals();
   setVal('pwm_frequency', s.p42); setVal('max_power', s.p43);
   if (s.p55 !== undefined) el('dim_start').value = formatMinsToTimeString(s.p55);
@@ -310,8 +443,13 @@ function collectAdvancedPayload() {
   changed(p, 'p22', parseInt(dimMode.value, 10) || 0);
   changed(p, 'p21', parseFloat(el('lux_threshold').value) || 0);
   changed(p, 'p20', parseFloat(el('lux_sensitivity').value) || 0);
-  const ledNew = [parseInt(el('brightness_LED0').value, 10) || 0, parseInt(el('brightness_LED1').value, 10) || 0];
-  if (S().p23 === undefined || JSON.stringify(S().p23) !== JSON.stringify(ledNew)) p.p23 = ledNew;
+  // Only a slider the user moved is saved (as p68); the other profile keeps its stored level,
+  // or null where it still uses p23. The device keeps p23 as the rounded percent.
+  if (ledLevelTouched.size) {
+    p.p68 = LED_SLIDERS.map((id, i) => ledLevelTouched.has(id)
+      ? (parseInt(el(id).value, 10) || 0)
+      : (Array.isArray(S().p68) && S().p68[i] != null ? S().p68[i] : null));
+  }
   changed(p, 'p42', parseInt(el('pwm_frequency').value, 10) || 0);
   changed(p, 'p43', parseInt(el('max_power').value, 10) || 0);
   changed(p, 'p55', parseTimeStringToMins(el('dim_start').value));
