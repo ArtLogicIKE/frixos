@@ -56,16 +56,29 @@
     const t = $('#toast'); t.textContent = msg; t.className = 'toast show' + (kind ? ' ' + kind : '');
     clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2400);
   }
+  // Same rule as the firmware: ASCII letters, digits and hyphens, no hyphen first or last.
+  function hostnameError(v) {
+    if (!v) return 'Hostname is required.';
+    if (/:\/\/|[\/.]/.test(v)) return 'Enter a name, not a web address (for example frixos-kitchen).';
+    if (!/^[A-Za-z0-9-]+$/.test(v) || v[0] === '-' || v[v.length - 1] === '-')
+      return 'Use only letters (a-z), digits and hyphens; no hyphen at the start or end.';
+    return null;
+  }
+  function showHostnameError(msg) {
+    const host = $('#hostname'), err = $('#hostname-err');
+    if (msg) { err.textContent = msg; host.setAttribute('aria-invalid', 'true'); err.classList.add('show'); }
+    else { host.removeAttribute('aria-invalid'); err.classList.remove('show'); }
+  }
   $$('[data-save]').forEach(b => b.addEventListener('click', () => {
     const host = $('#hostname');
-    if (b.closest('#tab-settings') && host && !host.value.trim()) {
-      host.setAttribute('aria-invalid', 'true'); $('#hostname-err').classList.add('show'); host.focus(); return;
-    }
+    const msg = host && b.closest('#tab-settings') ? hostnameError(host.value.trim()) : null;
+    if (msg) { showHostnameError(msg); host.focus(); return; }
     toast(b.dataset.save, 'ok');
   }));
   const host = $('#hostname');
   if (host) host.addEventListener('input', () => {
-    if (host.value.trim()) { host.removeAttribute('aria-invalid'); $('#hostname-err').classList.remove('show'); }
+    const v = host.value.trim();
+    showHostnameError(v ? hostnameError(v) : null);
   });
 
   /* ---------- STATIC IP ---------- */

@@ -89,17 +89,40 @@ async function loadSettings() {
 const settingsLayoutLoadBtn = el('settingsLayoutLoadBtn');
 if (settingsLayoutLoadBtn) settingsLayoutLoadBtn.addEventListener('click', () => applySettingsLayoutToDevice());
 
-el('hostname').addEventListener('input', () => { if (el('hostname').value.trim()) { el('hostname').removeAttribute('aria-invalid'); el('hostname-err').classList.remove('show'); } });
+/* Same rule as the firmware (is_valid_hostname_char in f-settings.c): ASCII letters,
+   digits and hyphens, no hyphen first or last. Returns the error's i18n path or null. */
+function hostnameError(v) {
+  if (!v) return 'settings.connection.hostname_required';
+  if (/:\/\/|[\/.]/.test(v)) return 'settings.connection.hostname_url';
+  if (!/^[A-Za-z0-9-]+$/.test(v) || v[0] === '-' || v[v.length - 1] === '-') return 'settings.connection.hostname_invalid';
+  return null;
+}
+function showHostnameError(key) {
+  const host = el('hostname'), err = el('hostname-err');
+  if (key) {
+    err.setAttribute('data-i18n', key);
+    err.textContent = tr(key);
+    host.setAttribute('aria-invalid', 'true'); err.classList.add('show');
+  } else {
+    host.removeAttribute('aria-invalid'); err.classList.remove('show');
+  }
+}
+// Flag bad characters while typing; an empty field is only flagged on save.
+el('hostname').addEventListener('input', () => {
+  const v = el('hostname').value.trim();
+  showHostnameError(v ? hostnameError(v) : null);
+});
 
 /* Connection-ish fields whose change triggers a device restart on save. */
 const SETTINGS_NETWORK_KEYS = ['p00', 'p34', 'p35', 'p60', 'p61', 'p62', 'p63'];
 
 /* Diff the Device-tab basics against stored settings. Returns null when
-   validation fails (invalid hostname), an empty object when nothing changed. */
+   validation fails (empty or invalid hostname), an empty object when nothing changed. */
 function collectSettingsPayload() {
   const host = el('hostname');
-  if (!host.value.trim()) {
-    host.setAttribute('aria-invalid', 'true'); el('hostname-err').classList.add('show');
+  const hostErr = hostnameError(host.value.trim());
+  if (hostErr) {
+    showHostnameError(hostErr);
     showTab('settings'); host.focus();
     return null;
   }

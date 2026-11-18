@@ -56,6 +56,8 @@
       "ssid_placeholder": "Network name",
       "password_placeholder": "Leave blank to keep current",
       "hostname_required": "Hostname is required.",
+      "hostname_invalid": "Use only letters (a-z), digits and hyphens; no hyphen at the start or end.",
+      "hostname_url": "Enter a name, not a web address (for example frixos-kitchen).",
       "static_ip_desc": "Assign a fixed address instead of DHCP"
     },
     "wifi": {
@@ -582,7 +584,7 @@
     "sensor_data_refreshed": "Sensor data refreshed",
     "failed_refresh_sensor": "Failed to refresh sensor data",
     "correct_form_errors": "Please correct the highlighted fields before submitting",
-    "invalid_hostname": "Invalid hostname: ",
+    "invalid_hostname": "Use only letters (a-z), digits and hyphens; no hyphen at the start or end.",
     "saving_settings": "Saving settings...",
     "network_settings_changed": "Network settings changed. Device will restart...",
     "device_will_restart": "Device will restart in ",

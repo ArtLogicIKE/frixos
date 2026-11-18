@@ -165,7 +165,9 @@ function getMessage(key, ...args) {
    (never the raw English text). */
 const SERVER_MESSAGE_KEYS = {
   'update already in progress': 'reinstall_in_progress',
-  'wifi not connected': 'wifi_not_connected'
+  'wifi not connected': 'wifi_not_connected',
+  'invalid hostname: invalid character': 'invalid_hostname',
+  'invalid hostname: cannot start or end with hyphen': 'invalid_hostname'
 };
 function localizeServerMessage(message, fallbackKey) {
   const mapped = message && SERVER_MESSAGE_KEYS[String(message).trim().toLowerCase()];

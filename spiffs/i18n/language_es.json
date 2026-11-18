@@ -54,6 +54,8 @@
       "optional": "(opcional)",
       "static_dns_label": "Servidores DNS",
       "hostname_required": "El nombre de host es obligatorio.",
+      "hostname_invalid": "Usa solo letras (a-z), números y guiones; sin guion al principio ni al final.",
+      "hostname_url": "Introduce un nombre, no una dirección web (por ejemplo frixos-cocina).",
       "password_placeholder": "Dejar en blanco para mantener el actual",
       "ssid_placeholder": "Nombre de la red",
       "static_ip_desc": "Asignar una dirección fija en lugar de DHCP"
@@ -572,7 +574,7 @@
     "sensor_data_refreshed": "Datos del sensor actualizados",
     "failed_refresh_sensor": "Error al actualizar los datos del sensor",
     "correct_form_errors": "Por favor corrija los campos resaltados antes de enviar",
-    "invalid_hostname": "Nombre de host inválido: ",
+    "invalid_hostname": "Usa solo letras (a-z), números y guiones; sin guion al principio ni al final.",
     "saving_settings": "Guardando configuración...",
     "network_settings_changed": "Configuración de red cambiada. El dispositivo se reiniciará...",
     "device_will_restart": "El dispositivo se reiniciará en ",

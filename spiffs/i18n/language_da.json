@@ -54,6 +54,8 @@
       "optional": "(valgfrit)",
       "static_dns_label": "DNS-servere",
       "hostname_required": "Værtsnavn er påkrævet.",
+      "hostname_invalid": "Brug kun bogstaver (a-z), tal og bindestreger; ingen bindestreg først eller sidst.",
+      "hostname_url": "Indtast et navn, ikke en webadresse (for eksempel frixos-koekken).",
       "password_placeholder": "Lad stå tomt for at beholde nuværende",
       "ssid_placeholder": "Netværksnavn",
       "static_ip_desc": "Tildel en fast adresse i stedet for DHCP"
@@ -572,7 +574,7 @@
     "sensor_data_refreshed": "Sensordata opdateret",
     "failed_refresh_sensor": "Kunne ikke opdatere sensordata",
     "correct_form_errors": "Ret venligst de fremhævede felter før indsendelse",
-    "invalid_hostname": "Ugyldigt værtsnavn: ",
+    "invalid_hostname": "Brug kun bogstaver (a-z), tal og bindestreger; ingen bindestreg først eller sidst.",
     "saving_settings": "Gemmer indstillinger...",
     "network_settings_changed": "Netværksindstillinger ændret. Enheden vil genstarte...",
     "device_will_restart": "Enheden vil genstarte om ",

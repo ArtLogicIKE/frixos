@@ -54,6 +54,8 @@
       "optional": "(valfritt)",
       "static_dns_label": "DNS-servrar",
       "hostname_required": "Värdnamn krävs.",
+      "hostname_invalid": "Använd bara bokstäver (a-z), siffror och bindestreck; inget bindestreck först eller sist.",
+      "hostname_url": "Ange ett namn, inte en webbadress (till exempel frixos-kok).",
       "password_placeholder": "Lämna tomt för att behålla nuvarande",
       "ssid_placeholder": "Nätverksnamn",
       "static_ip_desc": "Tilldela en fast adress istället för DHCP"
@@ -572,7 +574,7 @@
     "sensor_data_refreshed": "Sensordata uppdaterade",
     "failed_refresh_sensor": "Misslyckades med att uppdatera sensordata",
     "correct_form_errors": "Vänligen korrigera de markerade fälten innan du skickar",
-    "invalid_hostname": "Ogiltigt värdnamn: ",
+    "invalid_hostname": "Använd bara bokstäver (a-z), siffror och bindestreck; inget bindestreck först eller sist.",
     "saving_settings": "Sparar inställningar...",
     "network_settings_changed": "Nätverksinställningar ändrade. Enheten kommer att starta om...",
     "device_will_restart": "Enheten kommer att starta om om ",
