@@ -142,14 +142,22 @@
       <div class="toggle"><div class="tx"><div class="tt" data-i18n="advanced.display.mirror">Mirror display</div></div><button class="gswitch" id="mirroring" type="button" role="switch" aria-checked="false" data-i18n-aria-label="advanced.display.mirror" aria-label="Mirror"></button></div>
 
       <div class="subtitle" data-i18n="advanced.brightness.title">Projection brightness</div>
-      <div class="grid2">
-        <div class="field"><label data-i18n="advanced.brightness.led_day">Brightness (day)</label>
-          <div class="range-row"><input type="range" id="brightness_LED0" min="0" max="100" value="80"><output class="range-val" for="brightness_LED0">80%</output></div>
+      <div class="bright-row">
+        <div class="bright-chart">
+          <div class="lux-chart-head"><span data-i18n="advanced.brightness.chart_title">Light output by slider position</span></div>
+          <div class="bright-legend"><span class="lg gam" data-i18n="advanced.brightness.chart_gamma">Gamma 2.2 (now)</span><span class="lg lin" data-i18n="advanced.brightness.chart_linear">Linear (before)</span><span class="lg hollow" data-i18n="advanced.brightness.chart_hollow">Setting from before, until moved</span></div>
+          <svg id="bright_svg" viewBox="0 0 300 170" role="img" aria-label="Light output by slider position"></svg>
         </div>
-        <div class="field"><label data-i18n="advanced.brightness.led_night">Brightness (night)</label>
-          <div class="range-row"><input type="range" id="brightness_LED1" min="0" max="100" value="25"><output class="range-val" for="brightness_LED1">25%</output></div>
+        <div class="bright-sliders">
+          <div class="field"><label data-i18n="advanced.brightness.led_day">Brightness (day)</label>
+            <div class="range-row"><input type="range" id="brightness_LED0" min="0" max="100" value="80"><output class="range-val" for="brightness_LED0">80%</output></div>
+          </div>
+          <div class="field"><label data-i18n="advanced.brightness.led_night">Brightness (night)</label>
+            <div class="range-row"><input type="range" id="brightness_LED1" min="0" max="100" value="25"><output class="range-val" for="brightness_LED1">25%</output></div>
+          </div>
         </div>
       </div>
+      <p class="muted-p" data-i18n="advanced.brightness.scale_note">Brightness follows a gamma curve, like a screen. At the low end each step is the smallest change the LED can make, so the clock can go much dimmer than before; further up the steps grow until full power. The value shows the actual light output as a share of this clock’s maximum.</p>
 
       <details class="adv-box">
         <summary data-i18n="common.advanced">Advanced</summary>

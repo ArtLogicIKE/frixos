@@ -795,6 +795,19 @@ static uint64_t calculate_include_mask(const char *group, const char *params)
 
 /* p64–p66 and p67 sit past the uint64 settings mask.
  * Bits: 1=p64, 2=p65, 4=p66, 8=p67 (scroll engine). */
+// True when a ?params= list names p<num> (e.g. "68"), not a longer key that starts with it.
+static bool params_list_has(const char *params, const char *num)
+{
+    const size_t n = strlen(num);
+    for (const char *p = params; p && (p = strchr(p, 'p')) != NULL;)
+    {
+        p++;
+        if (strncmp(p, num, n) == 0 && !isdigit((unsigned char)p[n]))
+            return true;
+    }
+    return false;
+}
+
 static uint8_t wu_settings_mask(const char *group, const char *params)
 {
     if ((!group || group[0] == '\0') && (!params || params[0] == '\0'))
@@ -877,6 +890,18 @@ esp_err_t send_json_settings(httpd_req_t *req)
             cJSON_AddItemToArray(brightness_array, cJSON_CreateNumber(eeprom_brightness_LED[i]));
         }
         cJSON_AddItemToObject(root, "p23", brightness_array);
+    }
+    // p68: gamma 2.2 slider level per profile, null where p23 applies. Sent along with p23.
+    if ((mask & (1ULL << 23)) || params_list_has(params_local, "68"))
+    {
+        cJSON *level_array = cJSON_CreateArray();
+        for (int i = 0; i < 2; i++)
+            cJSON_AddItemToArray(level_array, eeprom_brightness_level[i] == BRIGHTNESS_LEVEL_UNSET
+                                                  ? cJSON_CreateNull()
+                                                  : cJSON_CreateNumber(eeprom_brightness_level[i]));
+        cJSON_AddItemToObject(root, "p68", level_array);
+        // Read-only: the duty at 100%, so the UI can label slider levels without /api/status.
+        cJSON_AddNumberToObject(root, "led_max_duty", pwm_get_effective_max_power());
     }
 
     if (mask & (1ULL << 36)) cJSON_AddNumberToObject(root, "p36", eeprom_fahrenheit);
@@ -1241,6 +1266,30 @@ static bool validate_json_params(cJSON *root, char *err_buf, size_t err_size)
             {
                 int val = (int)(elem->valuedouble + 0.5); /* works for both int and float JSON numbers */
                 CHECK_RANGE("brightness_LED", val, 0, 100);
+            }
+        }
+    }
+
+    /* p68 brightness level array - [day, night], each 0-100 on the gamma scale, or null to unset */
+    if ((item = cJSON_GetObjectItem(root, "p68")))
+    {
+        if (!cJSON_IsArray(item) || cJSON_GetArraySize(item) > 2)
+        {
+            snprintf(err_buf, err_size, "Invalid brightness_level: expected an array of up to 2");
+            return false;
+        }
+        for (int i = 0; i < cJSON_GetArraySize(item); i++)
+        {
+            cJSON *elem = cJSON_GetArrayItem(item, i);
+            if (cJSON_IsNumber(elem))
+            {
+                int val = (int)(elem->valuedouble + 0.5);
+                CHECK_RANGE("brightness_level", val, 0, 100);
+            }
+            else if (!cJSON_IsNull(elem))
+            {
+                snprintf(err_buf, err_size, "Invalid brightness_level: expected a number or null");
+                return false;
             }
         }
     }
@@ -1921,6 +1970,7 @@ esp_err_t settings_post_handler(httpd_req_t *req)
 
     // Process LED brightness settings (eeprom_brightness_LED has exactly 2 elements)
     cJSON *brightness_array = cJSON_GetObjectItem(root, "p23");
+    cJSON *level_array = cJSON_GetObjectItem(root, "p68");
     if (cJSON_IsArray(brightness_array))
     {
         for (int i = 0; i < cJSON_GetArraySize(brightness_array) && i < 2; i++)
@@ -1929,7 +1979,29 @@ esp_err_t settings_post_handler(httpd_req_t *req)
             if (cJSON_IsNumber(brightness_item))
             {
                 int val = (int)(brightness_item->valuedouble + 0.5);
+                // A client that only knows p23 (HA, scripts, older UI) changed this profile:
+                // it wins over the slider level. Re-sending the same value keeps the level.
+                if (!level_array && val != eeprom_brightness_LED[i])
+                    eeprom_brightness_level[i] = BRIGHTNESS_LEVEL_UNSET;
                 eeprom_brightness_LED[i] = (uint8_t)val;
+            }
+        }
+    }
+    // p68 sets the slider level and keeps p23 as its rounded percent, so p23-only clients
+    // and older firmware still see roughly the right brightness.
+    if (cJSON_IsArray(level_array))
+    {
+        for (int i = 0; i < cJSON_GetArraySize(level_array) && i < 2; i++)
+        {
+            cJSON *level_item = cJSON_GetArrayItem(level_array, i);
+            if (cJSON_IsNull(level_item))
+                eeprom_brightness_level[i] = BRIGHTNESS_LEVEL_UNSET;
+            else if (cJSON_IsNumber(level_item))
+            {
+                uint8_t level = (uint8_t)(int)(level_item->valuedouble + 0.5);
+                eeprom_brightness_level[i] = level;
+                eeprom_brightness_LED[i] = pwm_percent_from_duty(pwm_duty_from_level(level));
+                eeprom_brightness_level_p23[i] = eeprom_brightness_LED[i];
             }
         }
     }
@@ -2466,7 +2538,7 @@ esp_err_t settings_post_handler(httpd_req_t *req)
         goto cleanup;
     }
 
-    set_led_pwm_brightness(eeprom_brightness_LED[font_index]); // set the brightness again, in case something changed
+    set_led_brightness_profile(font_index); // set the brightness again, in case something changed
 
     // Check if critical settings have changed
     bool critical_settings_changed = false;
@@ -2679,6 +2751,7 @@ esp_err_t status_api_handler(httpd_req_t *req)
     cJSON_AddNumberToObject(root, "safe_max_power", pwm_get_safe_maximum_power());
     cJSON_AddNumberToObject(root, "effective_max_power", pwm_get_effective_max_power());
     cJSON_AddNumberToObject(root, "current_brightness", pwm_get_current_brightness());
+    cJSON_AddNumberToObject(root, "led_duty", pwm_get_current_duty()); // exact 10-bit duty
 
     // Add additional system information
     esp_chip_info_t chip_info;

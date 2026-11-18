@@ -3557,7 +3557,7 @@ static void handle_als_and_brightness(uint32_t loop_counter)
   {
     ESP_LOG_WEB(ESP_LOG_INFO, TAG, "Font %u->%u (mode %u lux %.1f thres %.1f)",
                 old_font_index, font_index, eeprom_dim_mode, lux, eeprom_lux_threshold);
-    set_led_pwm_brightness(eeprom_brightness_LED[font_index]);
+    set_led_brightness_profile(font_index);
     display_apply(false);
     // The schedule did not restart, so nothing else redraws the digits for the new profile now.
     time_t now;

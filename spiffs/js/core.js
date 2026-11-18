@@ -152,6 +152,7 @@ el('themeBtn').addEventListener('click', () => {
 /* Re-render dynamic (JS-generated) text that applyI18n can't reach via
    data-i18n attributes. Called by setLanguage after each switch. */
 function refreshDynamicI18n() {
+  if (typeof drawBrightnessChart === 'function') drawBrightnessChart(); // its labels are drawn, not data-i18n
   if (window._heroOnline !== undefined) {
     const e = el('heroOnline');
     if (e) e.textContent = window._heroOnline ? tr('common.online', 'Online') : tr('common.offline', 'Offline');
@@ -277,13 +278,14 @@ function applyHeroStatus(d) {
     verBits.push('rev (' + d.revision + ')');
   }
   if (verBits.length) heroBits.push(verBits.join(' - '));
-  // actual = current brightness % × max power fraction.
-  // effective_max_power is in raw duty units (0..1023, see f-pwm.c);
-  // current_brightness is a percent (older firmware omits it -> assume 100).
+  // actual = LED duty as a share of the 10-bit range. led_duty is exact; older firmware
+  // only has current_brightness (percent of effective_max_power; missing -> assume 100).
   if (d.effective_max_power != null) {
-    const b = d.current_brightness != null ? d.current_brightness : 100;
-    const actual = Math.round(b * d.effective_max_power * 10 / 1023) / 10;
-    heroBits.push('actual ' + actual + '%');
+    window._ledMaxDuty = d.effective_max_power; // fallback for the slider labels (older firmware)
+    const duty = d.led_duty != null ? d.led_duty
+      : (d.current_brightness != null ? d.current_brightness : 100) * d.effective_max_power / 100;
+    const actual = duty * 100 / 1023;
+    heroBits.push('actual ' + (actual < 1 ? actual.toFixed(2) : (Math.round(actual * 10) / 10)) + '%');
   }
   if (d.timezone) heroBits.push('TZ ' + d.timezone);
   el('heroStatus').textContent = heroBits.join(' · ');

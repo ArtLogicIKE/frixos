@@ -93,6 +93,9 @@ extern char eeprom_aux_font[2][12]; // [0] = day aux digit font, [1] = night aux
 extern float eeprom_lux_sensitivity;
 extern float eeprom_lux_threshold;
 extern uint8_t eeprom_brightness_LED[2]; // in pct
+#define BRIGHTNESS_LEVEL_UNSET 255
+extern uint8_t eeprom_brightness_level[2];     // p68: gamma 2.2 slider position 0-100, or BRIGHTNESS_LEVEL_UNSET
+extern uint8_t eeprom_brightness_level_p23[2]; // p23 when p68 was set
 #define DIM_MODE_BRIGHTNESS 0
 #define DIM_MODE_FULL 1
 #define DIM_MODE_TIME 2
