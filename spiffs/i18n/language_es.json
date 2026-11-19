@@ -34,7 +34,8 @@
     "save": "Guardar",
     "discard": "Descartar",
     "unsaved_changes": "Tienes cambios sin guardar",
-    "retrieving_settings": "Obteniendo ajustes…"
+    "retrieving_settings": "Obteniendo ajustes…",
+    "logout": "Cerrar sesión"
   },
   "settings": {
     "connection": {
@@ -59,7 +60,16 @@
       "hostname_url": "Introduce un nombre, no una dirección web (por ejemplo frixos-cocina).",
       "password_placeholder": "Dejar en blanco para mantener el actual",
       "ssid_placeholder": "Nombre de la red",
-      "static_ip_desc": "Asignar una dirección fija en lugar de DHCP"
+      "static_ip_desc": "Asignar una dirección fija en lugar de DHCP",
+      "access_password": "Contraseña de acceso",
+      "access_password_none": "Ninguna: cualquiera en tu red puede abrir esta página",
+      "access_password_confirm": "Repite la nueva contraseña",
+      "access_password_current": "Contraseña actual",
+      "access_password_remove": "Eliminar la contraseña",
+      "access_password_mismatch": "Las contraseñas no coinciden.",
+      "access_password_current_needed": "Introduce la contraseña actual.",
+      "access_password_wrong": "La contraseña actual es incorrecta.",
+      "access_password_locked": "Demasiados intentos. Inténtalo más tarde."
     },
     "wifi": {
       "available_networks": "Redes WiFi Disponibles",
@@ -652,7 +662,9 @@
     "upload_failed": "Error al subir",
     "changes_discarded": "Cambios descartados",
     "wifi_not_connected": "El Wi-Fi no está conectado.",
-    "font_applied": "Fuente aplicada."
+    "font_applied": "Fuente aplicada.",
+    "access_password_set": "Contraseña de acceso guardada",
+    "access_password_removed": "Contraseña de acceso eliminada"
   },
   "files": {
     "delete_selected": "Eliminar seleccionados",

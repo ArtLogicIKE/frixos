@@ -34,7 +34,8 @@
     "save": "Guardar",
     "discard": "Descartar",
     "unsaved_changes": "Tem alterações por guardar",
-    "retrieving_settings": "A obter as definições…"
+    "retrieving_settings": "A obter as definições…",
+    "logout": "Terminar sessão"
   },
   "settings": {
     "connection": {
@@ -59,7 +60,16 @@
       "hostname_url": "Introduza um nome, não um endereço web (por exemplo frixos-cozinha).",
       "password_placeholder": "Deixe em branco para manter a atual",
       "ssid_placeholder": "Nome da rede",
-      "static_ip_desc": "Atribuir um endereço fixo em vez de DHCP"
+      "static_ip_desc": "Atribuir um endereço fixo em vez de DHCP",
+      "access_password": "Palavra-passe de acesso",
+      "access_password_none": "Nenhuma: qualquer pessoa na sua rede pode abrir esta página",
+      "access_password_confirm": "Repita a nova palavra-passe",
+      "access_password_current": "Palavra-passe atual",
+      "access_password_remove": "Remover a palavra-passe",
+      "access_password_mismatch": "As palavras-passe não coincidem.",
+      "access_password_current_needed": "Introduza a palavra-passe atual.",
+      "access_password_wrong": "A palavra-passe atual está errada.",
+      "access_password_locked": "Demasiadas tentativas. Tente mais tarde."
     },
     "wifi": {
       "available_networks": "Redes WiFi disponíveis",
@@ -652,7 +662,9 @@
     "upload_failed": "Falha no carregamento",
     "changes_discarded": "Alterações descartadas",
     "wifi_not_connected": "O Wi-Fi não está ligado.",
-    "font_applied": "Tipo de letra aplicado."
+    "font_applied": "Tipo de letra aplicado.",
+    "access_password_set": "Palavra-passe de acesso guardada",
+    "access_password_removed": "Palavra-passe de acesso removida"
   },
   "files": {
     "delete_selected": "Eliminar selecionados",

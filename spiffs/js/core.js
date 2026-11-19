@@ -301,6 +301,7 @@ el('navRight').addEventListener('click', () => nav.scrollBy({ left: 160, behavio
 
 /* Device-tab hero: IP · 2.56 (71) - rev 2 (E) · actual 70% · TZ … */
 function applyHeroStatus(d) {
+  if (d.auth !== undefined && window.settings.auth !== !!d.auth) { window.settings.auth = !!d.auth; showAccessState(); }
   const heroBits = [d.ip_address ? d.ip_address : 'frixos.local'];
   const verBits = [];
   if (d.version) verBits.push(d.fwversion != null ? d.version + ' (' + d.fwversion + ')' : d.version);

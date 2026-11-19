@@ -34,7 +34,8 @@
     "save": "Spara",
     "discard": "Förkasta",
     "unsaved_changes": "Du har osparade ändringar",
-    "retrieving_settings": "Hämtar inställningar…"
+    "retrieving_settings": "Hämtar inställningar…",
+    "logout": "Logga ut"
   },
   "settings": {
     "connection": {
@@ -59,7 +60,16 @@
       "hostname_url": "Ange ett namn, inte en webbadress (till exempel frixos-kok).",
       "password_placeholder": "Lämna tomt för att behålla nuvarande",
       "ssid_placeholder": "Nätverksnamn",
-      "static_ip_desc": "Tilldela en fast adress istället för DHCP"
+      "static_ip_desc": "Tilldela en fast adress istället för DHCP",
+      "access_password": "Åtkomstlösenord",
+      "access_password_none": "Inget: alla i ditt nätverk kan öppna den här sidan",
+      "access_password_confirm": "Upprepa det nya lösenordet",
+      "access_password_current": "Nuvarande lösenord",
+      "access_password_remove": "Ta bort lösenordet",
+      "access_password_mismatch": "Lösenorden matchar inte.",
+      "access_password_current_needed": "Ange det nuvarande lösenordet.",
+      "access_password_wrong": "Det nuvarande lösenordet är fel.",
+      "access_password_locked": "För många försök. Försök igen senare."
     },
     "wifi": {
       "available_networks": "Tillgängliga WiFi-nätverk",
@@ -652,7 +662,9 @@
     "upload_failed": "Uppladdningen misslyckades",
     "changes_discarded": "Ändringar förkastade",
     "wifi_not_connected": "Wi-Fi är inte anslutet.",
-    "font_applied": "Typsnitt tillämpat."
+    "font_applied": "Typsnitt tillämpat.",
+    "access_password_set": "Åtkomstlösenordet har sparats",
+    "access_password_removed": "Åtkomstlösenordet har tagits bort"
   },
   "files": {
     "delete_selected": "Ta bort markerade",

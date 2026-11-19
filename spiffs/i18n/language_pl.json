@@ -34,7 +34,8 @@
     "save": "Zapisz",
     "discard": "Odrzuć",
     "unsaved_changes": "Masz niezapisane zmiany",
-    "retrieving_settings": "Pobieranie ustawień…"
+    "retrieving_settings": "Pobieranie ustawień…",
+    "logout": "Wyloguj"
   },
   "settings": {
     "connection": {
@@ -59,7 +60,16 @@
       "hostname_url": "Wpisz nazwę, a nie adres strony (na przykład frixos-kuchnia).",
       "password_placeholder": "Pozostaw puste, aby zachować obecne",
       "ssid_placeholder": "Nazwa sieci",
-      "static_ip_desc": "Przypisz stały adres zamiast DHCP"
+      "static_ip_desc": "Przypisz stały adres zamiast DHCP",
+      "access_password": "Hasło dostępu",
+      "access_password_none": "Brak: każdy w Twojej sieci może otworzyć tę stronę",
+      "access_password_confirm": "Powtórz nowe hasło",
+      "access_password_current": "Obecne hasło",
+      "access_password_remove": "Usuń hasło",
+      "access_password_mismatch": "Hasła nie są zgodne.",
+      "access_password_current_needed": "Wpisz obecne hasło.",
+      "access_password_wrong": "Obecne hasło jest nieprawidłowe.",
+      "access_password_locked": "Zbyt wiele prób. Spróbuj później."
     },
     "wifi": {
       "available_networks": "Dostępne sieci WiFi",
@@ -652,7 +662,9 @@
     "upload_failed": "Przesyłanie nie powiodło się",
     "changes_discarded": "Zmiany odrzucone",
     "wifi_not_connected": "Wi-Fi nie jest połączone.",
-    "font_applied": "Zastosowano czcionkę."
+    "font_applied": "Zastosowano czcionkę.",
+    "access_password_set": "Hasło dostępu zapisane",
+    "access_password_removed": "Hasło dostępu usunięte"
   },
   "files": {
     "delete_selected": "Usuń zaznaczone",

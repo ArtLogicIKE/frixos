@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Frixos</title>
+<!-- Shown instead of the UI while an access password is set and the browser has no
+     session. Self-contained: the device serves nothing else before login except
+     js/auth.js, logo.jpg and favicon.ico. -->
+<style>
+  :root { --bg:#0a0c10; --card:rgba(30,38,52,.7); --ink:#eef1f5; --ink2:#aeb4bd; --line:rgba(255,255,255,.14);
+          --input:rgba(255,255,255,.06); --cyan:#00aaff; --cyan-deep:#0088cc; --err:#ff6b5e; }
+  @media (prefers-color-scheme: light) {
+    :root { --bg:#eef0f3; --card:rgba(255,255,255,.8); --ink:#2a2d33; --ink2:#5a6068; --line:rgba(150,158,170,.4);
+            --input:#fff; --err:#d0342a; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center; padding:16px;
+         background:var(--bg); color:var(--ink); font:15px/1.45 -apple-system,'Segoe UI',Inter,sans-serif; }
+  .card { width:100%; max-width:360px; padding:28px 24px; border-radius:18px; background:var(--card);
+          border:1px solid var(--line); box-shadow:0 24px 46px -24px rgba(0,0,0,.6); }
+  .brand { display:flex; align-items:center; gap:10px; margin-bottom:18px; }
+  .brand img { width:34px; height:34px; border-radius:50%; object-fit:cover; }
+  .brand span { font-size:20px; font-weight:500; letter-spacing:.06em; }
+  h1 { font-size:15px; font-weight:600; margin:0 0 14px; }
+  .pw { position:relative; }
+  input { width:100%; padding:11px 44px 11px 12px; border-radius:10px; border:1px solid var(--line);
+          background:var(--input); color:var(--ink); font-size:16px; }
+  input:focus { outline:2px solid var(--cyan); outline-offset:1px; }
+  .eye { position:absolute; right:6px; top:0; bottom:0; width:34px; border:none; background:none; color:var(--ink2);
+         cursor:pointer; font-size:15px; }
+  button.go { width:100%; margin-top:12px; padding:11px; border:none; border-radius:10px; background:var(--cyan-deep);
+              color:#fff; font-size:15px; font-weight:600; cursor:pointer; }
+  button.go:disabled { opacity:.6; cursor:default; }
+  .err { min-height:20px; margin-top:8px; color:var(--err); font-size:13.5px; }
+  .hint { margin:14px 0 0; padding-top:12px; border-top:1px solid var(--line); color:var(--ink2); font-size:12.5px; }
+</style>
+</head>
+<body>
+<form class="card" id="f" autocomplete="on">
+  <div class="brand"><img src="logo.jpg" alt=""><span>Frixos</span></div>
+  <h1 id="t">Enter the access password</h1>
+  <div class="pw">
+    <input type="password" id="pw" autocomplete="current-password" autofocus required aria-labelledby="t">
+    <button class="eye" type="button" id="eye" aria-label="Show password">👁</button>
+  </div>
+  <button class="go" type="submit" id="go">Unlock</button>
+  <div class="err" id="err" role="alert"></div>
+  <p class="hint" id="hint"></p>
+</form>
+<script src="js/auth.js"></script>
+<script>
+(function () {
+  const T = {
+    en: ['Enter the access password', 'Unlock', 'Wrong password.', 'Too many attempts. Try again in {n} s.', "Can't reach the device.",
+         'Forgot it? Unplug the device within 10 seconds of plugging it in, 3 times in a row. When you plug it in the 4th time, the password is removed and the screen layout is reset.'],
+    de: ['Zugangspasswort eingeben', 'Entsperren', 'Falsches Passwort.', 'Zu viele Versuche. Erneut versuchen in {n} s.', 'Gerät nicht erreichbar.',
+         'Vergessen? Trenne das Gerät 3-mal hintereinander innerhalb von 10 Sekunden nach dem Einstecken vom Strom. Beim 4. Einstecken wird das Passwort entfernt und das Bildschirmlayout zurückgesetzt.'],
+    fr: ["Saisissez le mot de passe d'accès", 'Déverrouiller', 'Mot de passe incorrect.', 'Trop de tentatives. Réessayez dans {n} s.', "Impossible de joindre l'appareil.",
+         "Oublié ? Débranchez l'appareil dans les 10 secondes après l'avoir branché, 3 fois de suite. Au 4e branchement, le mot de passe est supprimé et la disposition de l'écran est réinitialisée."],
+    it: ["Inserisci la password di accesso", 'Sblocca', 'Password errata.', 'Troppi tentativi. Riprova tra {n} s.', 'Dispositivo non raggiungibile.',
+         "Dimenticata? Scollega il dispositivo entro 10 secondi dall'accensione, per 3 volte di seguito. Alla 4ª accensione la password viene rimossa e il layout dello schermo viene ripristinato."],
+    pt: ['Introduza a palavra-passe de acesso', 'Desbloquear', 'Palavra-passe errada.', 'Demasiadas tentativas. Tente novamente dentro de {n} s.', 'Não é possível contactar o dispositivo.',
+         'Esqueceu-se? Desligue o dispositivo nos 10 segundos seguintes a ligá-lo, 3 vezes seguidas. Ao ligá-lo pela 4.ª vez, a palavra-passe é removida e o layout do ecrã é reposto.'],
+    sv: ['Ange åtkomstlösenordet', 'Lås upp', 'Fel lösenord.', 'För många försök. Försök igen om {n} s.', 'Kan inte nå enheten.',
+         'Glömt det? Koppla ur enheten inom 10 sekunder efter att du kopplat in den, 3 gånger i rad. När du kopplar in den 4:e gången tas lösenordet bort och skärmlayouten återställs.'],
+    da: ['Indtast adgangskoden', 'Lås op', 'Forkert adgangskode.', 'For mange forsøg. Prøv igen om {n} s.', 'Kan ikke nå enheden.',
+         'Glemt den? Tag stikket ud af enheden inden for 10 sekunder efter tilslutning, 3 gange i træk. Når du tilslutter den 4. gang, fjernes adgangskoden, og skærmlayoutet nulstilles.'],
+    pl: ['Wpisz hasło dostępu', 'Odblokuj', 'Nieprawidłowe hasło.', 'Zbyt wiele prób. Spróbuj ponownie za {n} s.', 'Brak połączenia z urządzeniem.',
+         'Nie pamiętasz? Odłącz urządzenie w ciągu 10 sekund od podłączenia, 3 razy z rzędu. Przy 4. podłączeniu hasło zostanie usunięte, a układ ekranu zresetowany.'],
+    es: ['Introduce la contraseña de acceso', 'Desbloquear', 'Contraseña incorrecta.', 'Demasiados intentos. Vuelve a intentarlo en {n} s.', 'No se puede contactar con el dispositivo.',
+         '¿La olvidaste? Desenchufa el dispositivo en los 10 segundos siguientes a enchufarlo, 3 veces seguidas. Al enchufarlo por 4.ª vez, se elimina la contraseña y se restablece el diseño de la pantalla.']
+  };
+  let lang = null;
+  try { lang = localStorage.getItem('frixos.lang'); } catch (e) { /* storage disabled */ }
+  if (!T[lang]) lang = (navigator.language || 'en').slice(0, 2).toLowerCase();
+  const s = T[lang] || T.en;
+  document.documentElement.lang = T[lang] ? lang : 'en';
+  const $ = id => document.getElementById(id);
+  $('t').textContent = s[0]; $('go').textContent = s[1]; $('hint').textContent = s[5];
+
+  let lockTimer;
+  function showLocked(n) {
+    clearInterval(lockTimer);
+    $('go').disabled = true;
+    const tick = () => {
+      if (n <= 0) { clearInterval(lockTimer); $('go').disabled = false; $('err').textContent = ''; return; }
+      $('err').textContent = s[3].replace('{n}', n--);
+    };
+    tick(); lockTimer = setInterval(tick, 1000);
+  }
+
+  $('eye').addEventListener('click', () => { const p = $('pw'); p.type = p.type === 'password' ? 'text' : 'password'; });
+  $('f').addEventListener('submit', async ev => {
+    ev.preventDefault();
+    $('go').disabled = true; $('err').textContent = '';
+    try {
+      const r = await frixosAuth.login($('pw').value);
+      if (r.ok) { location.replace('/'); return; }
+      $('pw').select();
+      if (r.data && r.data.locked) { showLocked(r.data.locked); return; }
+      $('err').textContent = s[2];
+    } catch (e) {
+      $('err').textContent = s[4];
+    }
+    $('go').disabled = false;
+  });
+
+  // No password set (any more): go straight to the UI.
+  frixosAuth.challenge().then(c => {
+    if (!c.auth) location.replace('/');
+    else if (c.locked) showLocked(c.locked);
+  }).catch(() => {});
+})();
+</script>
+</body>
+</html>

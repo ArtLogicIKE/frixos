@@ -246,7 +246,8 @@ function walkBody(doc) {
   return body;
 }
 
-const state = { baseline: {}, posts: [] };
+const state = { baseline: {}, posts: [], auth: false, authSalt: 'frixos:AABBCCDDEEFF', authNonce: '00112233445566778899aabbccddeeff' };
+
 
 function jsonResponse(data, ok = true) {
   return {
@@ -266,11 +267,13 @@ async function fetchImpl(url, opts) {
       try { body = JSON.parse(body); } catch { /* binary or plain text */ }
     }
     state.posts.push({ url: u, body });
+    if (u.includes('/api/auth/password')) { state.auth = body.hash !== ''; return jsonResponse({ status: 'ok', auth: state.auth }); }
     return jsonResponse({ status: 'ok', message: 'Settings saved' });
   }
   if (u.includes('/api/settings')) return jsonResponse(structuredClone(state.baseline));
   if (u.includes('/api/files')) return jsonResponse({ files: [] });
-  if (u.includes('/api/status')) return jsonResponse({ wifi_connected: true });
+  if (u.includes('/api/status')) return jsonResponse({ wifi_connected: true, auth: state.auth });
+  if (u.includes('/api/auth/challenge')) return jsonResponse({ auth: state.auth, salt: state.authSalt, iter: 10000, nonce: state.authNonce, locked: 0 });
   return jsonResponse({}, false);
 }
 
@@ -282,6 +285,7 @@ const sandbox = {
   clearInterval,
   queueMicrotask,
   structuredClone,
+  TextEncoder,
   AbortController,
   URL,
   URLSearchParams,
@@ -319,7 +323,7 @@ sandbox.removeEventListener = () => {};
 vm.createContext(sandbox);
 
 const scripts = [
-  'js/utils.js', 'js/core.js', 'js/forms.js', 'js/wifi.js', 'js/integrations.js',
+  'js/utils.js', 'js/auth.js', 'js/core.js', 'js/forms.js', 'js/wifi.js', 'js/integrations.js',
   'js/system.js', 'js/support.js', 'js/savebar.js', 'js/screen-editor.js',
 ];
 let source = scripts.map(rel => fs.readFileSync(path.join(spiffs, rel), 'utf8')).join('\n;\n');
@@ -466,6 +470,35 @@ globalThis.__done = (async () => {
   const sm = state.posts.length;
   await saveScreenTimeDisplaySettings();
   result.screen = (state.posts.slice(sm).find(p => String(p.url).includes('/api/settings')) || {}).body || null;
+
+  // Access password, none set: needs a matching confirmation; only the salted hash is sent.
+  const authPosts = () => state.posts.filter(p => String(p.url).includes('/api/auth/password')).map(p => p.body);
+  const visible = id => !el(id).hidden;
+  window.settings.auth = false; showAccessState();
+  result.accessRowsNoPw = ['access_confirm_row', 'access_current_row', 'access_remove_row'].filter(visible);
+  result.accessUntouched = collectAccessPassword();
+  el('access_pass').value = 'secret1'; await fire(el('access_pass'), 'input');
+  el('access_pass2').value = 'secret2';
+  result.accessRowsTyped = ['access_confirm_row', 'access_current_row', 'access_remove_row'].filter(visible);
+  result.accessMismatch = collectAccessPassword();
+  el('access_pass2').value = 'secret1';
+
+  await fire(el('saveAllBtn'), 'click');
+  result.accessSet = authPosts().slice(-1)[0] || null;
+  result.accessAfterSet = { auth: window.settings.auth, value: el('access_pass').value, logout: !el('logoutBtn').hidden,
+                            placeholder: el('access_pass').getAttribute('data-i18n-placeholder') };
+
+  // Password set: removing it needs the current password, proved against the nonce.
+  result.accessRowsPwSet = ['access_confirm_row', 'access_current_row', 'access_remove_row'].filter(visible);
+  el('access_remove').checked = true; await fire(el('access_remove'), 'change');
+  result.accessRowsRemove = ['access_confirm_row', 'access_current_row', 'access_remove_row'].filter(visible);
+  result.accessPassDisabledOnRemove = !!el('access_pass').disabled;
+  result.accessNoCurrent = collectAccessPassword();
+  el('access_current').value = 'secret1';
+  await fire(el('saveAllBtn'), 'click');
+  result.accessRemove = authPosts().slice(-1)[0] || null;
+  result.accessAfterRemove = { auth: window.settings.auth, logout: !el('logoutBtn').hidden };
+  result.authSalt = state.authSalt; result.authNonce = state.authNonce;
   return result;
 })();
 `;

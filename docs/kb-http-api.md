@@ -96,6 +96,10 @@ The eight static text fields (`text_1`…`text_8`) live **only** in this blob. T
 | GET | `/api/files` | — | List SPIFFS files |
 | POST | `/api/files/delete` | JSON `{ "files": ["…"] }` | Delete |
 | POST | `/api/files/rename` | JSON `{ "oldName", "newName" }` | Rename |
+| GET | `/api/auth/challenge` | — | `auth`, `salt`, `iter`, one-time `nonce`, `locked` (s). Always open |
+| POST | `/api/auth/login` | JSON `{ "nonce", "proof" }` | Sets the `fx_session` cookie. Always open |
+| POST | `/api/auth/logout` | empty | Clears the cookie |
+| POST | `/api/auth/password` | JSON `{ "hash", "nonce", "proof" }` | Set, change or remove the access password |
 
 Handlers may return **503** with JSON if the HTTP mutex is held (OTA or an integration fetch), wait ~15s and retry.
 
@@ -615,6 +619,24 @@ Returns `{"status":"ok","message":"Device is restarting..."}` then restarts afte
 ```powershell
 curl.exe -s -X POST "$HOST/api/ota" -H "X-Filename: user1-font.jpg" --data-binary "@user1-font.jpg"
 curl.exe -s -X POST "$HOST/api/ota/reinstall"
+```
+
+### Access password
+
+Optional. When one is set, every endpoint except `/api/auth/challenge`, `/api/auth/login`, `/api/auth/logout`, `login.html`, `js/auth.js`, `logo.jpg` and `favicon.ico` needs the `fx_session` cookie. Without it, page requests (`/`, `*.html`) get a `302` to `/login.html` and everything else `401 {"status":"error","message":"auth_required"}`. `/api/status` reports `auth: true|false`.
+
+The password never crosses the network:
+
+- `hash = PBKDF2-HMAC-SHA256(password, salt, iter, 32 bytes)`, with `salt` = `"frixos:"` + the STA MAC in uppercase hex and `iter` = 10000, both from `/api/auth/challenge`. The device stores only `hash`.
+- Login: `proof = hex(HMAC-SHA256(hash, nonce bytes))` with a nonce from `/api/auth/challenge` (single use, 60 s).
+- `/api/auth/password`: `hash` is the new hash in hex, or `""` to remove the password. When a password is set, `nonce` and `proof` must prove the current one (`403` if wrong). Setting or changing it logs out every other session and returns a new cookie.
+- Five wrong passwords lock logins for 30 s, doubling up to 10 min (`429`, `locked` in seconds).
+- Sessions last 30 days and survive restarts. On plain HTTP the cookie, and the hash at the moment it is set, can be captured on the network; the password itself cannot.
+- Forgotten password: 4 quick restarts (unplugged within 10 s of power-on, 3 times) remove it, together with the screen layout reset.
+
+```bash
+COOKIE=$(FRIXOS_PASSWORD=... python tools/frixos_login.py 192.168.2.175)
+curl -s -b "$COOKIE" http://192.168.2.175/api/status
 ```
 
 ### Wi‑Fi scan
