@@ -55,9 +55,9 @@ static int rescue_layout_this_boot = 0; // Set by check_boot_fail_count(): reset
 
 // versioning variables
 const char app[10] = "Frixos";
-const char version[10] = "2.95b";
+const char version[10] = "2.95";
 static const char *TAG = "frixos main"; // in case we use ESP_LOGE -rror/W-arning/I-info (also D-ebug/V-erbose)
-const int fwversion = 75;
+const int fwversion = 76;
 const int rescuemode = 0; // 0 = normal, 1 = rescue mode
 const char *revision = "A-G"; // 0=A-G, 1=H, 2=I; set from eeprom_board_rev
 
