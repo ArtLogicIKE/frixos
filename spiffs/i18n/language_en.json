@@ -34,7 +34,8 @@
     "save": "Save",
     "discard": "Discard",
     "unsaved_changes": "You have unsaved changes",
-    "retrieving_settings": "Retrieving settings…"
+    "retrieving_settings": "Retrieving settings…",
+    "logout": "Log out"
   },
   "settings": {
     "connection": {
@@ -59,7 +60,16 @@
       "hostname_required": "Hostname is required.",
       "hostname_invalid": "Use only letters (a-z), digits and hyphens; no hyphen at the start or end.",
       "hostname_url": "Enter a name, not a web address (for example frixos-kitchen).",
-      "static_ip_desc": "Assign a fixed address instead of DHCP"
+      "static_ip_desc": "Assign a fixed address instead of DHCP",
+      "access_password": "Access password",
+      "access_password_none": "None: anyone on your network can open this page",
+      "access_password_confirm": "Repeat the new password",
+      "access_password_current": "Current password",
+      "access_password_remove": "Remove the password",
+      "access_password_mismatch": "The passwords don't match.",
+      "access_password_current_needed": "Enter the current password.",
+      "access_password_wrong": "The current password is wrong.",
+      "access_password_locked": "Too many attempts. Try again later."
     },
     "wifi": {
       "available_networks": "Available networks",
@@ -662,7 +672,9 @@
     "device_restarting_short": "Device restarting…",
     "changes_discarded": "Changes discarded",
     "wifi_not_connected": "Wi-Fi is not connected.",
-    "font_applied": "Font applied."
+    "font_applied": "Font applied.",
+    "access_password_set": "Access password saved",
+    "access_password_removed": "Access password removed"
   },
   "system": {
     "maintenance_title": "Maintenance",

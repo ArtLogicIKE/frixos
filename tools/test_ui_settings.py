@@ -306,11 +306,32 @@ def check_firmware(failures: list[str]) -> None:
                 fail("%s UI value %s outside validation %s-%s" % (key, value, lo, hi), failures)
 
 
+def check_access_password(observed: dict, failures: list[str]) -> None:
+    import hashlib, hmac
+    salt, nonce = observed.get("authSalt", ""), bytes.fromhex(observed.get("authNonce", "00"))
+    h = lambda pw: hashlib.pbkdf2_hmac("sha256", pw.encode(), salt.encode(), 10000)
+    expect = {
+        "accessRowsNoPw": [], "accessUntouched": None, "accessRowsTyped": ["access_confirm_row"],
+        "accessMismatch": False,
+        "accessSet": {"hash": h("secret1").hex()},
+        "accessAfterSet": {"auth": True, "value": "", "logout": True, "placeholder": "common.secret_stored"},
+        "accessRowsPwSet": ["access_remove_row"],
+        "accessRowsRemove": ["access_current_row", "access_remove_row"],
+        "accessPassDisabledOnRemove": True, "accessNoCurrent": False,
+        "accessRemove": {"hash": "", "nonce": nonce.hex(), "proof": hmac.new(h("secret1"), nonce, "sha256").hexdigest()},
+        "accessAfterRemove": {"auth": False, "logout": False},
+    }
+    for key, want in expect.items():
+        if observed.get(key) != want:
+            fail("access password %s: got %r, expected %r" % (key, observed.get(key), want), failures)
+
+
 def main() -> int:
     failures: list[str] = []
     observed = run_harness(failures)
     if observed is not None:
         check_ui(observed, failures)
+        check_access_password(observed, failures)
     try:
         check_firmware(failures)
     except Exception as exc:

@@ -15,6 +15,7 @@
 #include "f-wifi.h"
 #include "f-ota.h"
 #include "f-wu.h"
+#include "f-auth.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -2754,6 +2755,7 @@ esp_err_t status_api_handler(httpd_req_t *req)
     cJSON_AddStringToObject(root, "app", app);
     cJSON_AddStringToObject(root, "version", version);
     cJSON_AddNumberToObject(root, "fwversion", fwversion);
+    cJSON_AddBoolToObject(root, "auth", auth_enabled()); // access password set
 
     cJSON_AddStringToObject(root, "revision", revision);
     cJSON_AddNumberToObject(root, "board_rev", eeprom_board_rev);
@@ -3702,7 +3704,7 @@ void restart_device(void *pvParameter)
 #define HTTP_SERVER_TIMEOUT_MS 5000
 #define HTTP_SERVER_MAX_REQ_SIZE 4096
 #define HTTP_SERVER_MAX_HEADERS 8
-#define HTTP_SERVER_MAX_URI_HANDLERS 20
+#define HTTP_SERVER_MAX_URI_HANDLERS 24
 #define HTTP_SERVER_STACK_SIZE 8192 // Increased from 4096 to 8192 bytes
 
 // Add HTTP server error tracking
@@ -4384,6 +4386,8 @@ esp_err_t start_webserver()
         vTaskDelay(pdMS_TO_TICKS(100)); // Give time for cleanup
     }
 
+    auth_init(); // before the first request is served
+
     // Start server
     esp_err_t ret = httpd_start(&server, &config);
     if (ret != ESP_OK)
@@ -4401,8 +4405,8 @@ esp_err_t start_webserver()
     // Status handler with validation
     uri_handler.uri = "/api/status";
     uri_handler.method = HTTP_GET;
-    uri_handler.handler = status_handler_wrapper;
-    uri_handler.user_ctx = NULL;
+    uri_handler.handler = auth_gate;
+    uri_handler.user_ctx = (void *)status_handler_wrapper;
     ret = httpd_register_uri_handler(server, &uri_handler);
     if (ret != ESP_OK)
     {
@@ -4412,8 +4416,8 @@ esp_err_t start_webserver()
 
     uri_handler.uri = "/api/locate";
     uri_handler.method = HTTP_GET;
-    uri_handler.handler = locate_wrapper;
-    uri_handler.user_ctx = NULL;
+    uri_handler.handler = auth_gate;
+    uri_handler.user_ctx = (void *)locate_wrapper;
     ret = httpd_register_uri_handler(server, &uri_handler);
     if (ret != ESP_OK)
     {
@@ -4423,8 +4427,8 @@ esp_err_t start_webserver()
 
     uri_handler.uri = "/api/timezone";
     uri_handler.method = HTTP_GET;
-    uri_handler.handler = timezone_lookup_wrapper;
-    uri_handler.user_ctx = NULL;
+    uri_handler.handler = auth_gate;
+    uri_handler.user_ctx = (void *)timezone_lookup_wrapper;
     ret = httpd_register_uri_handler(server, &uri_handler);
     if (ret != ESP_OK)
     {
@@ -4435,8 +4439,8 @@ esp_err_t start_webserver()
     // Settings GET handler
     uri_handler.uri = "/api/settings";
     uri_handler.method = HTTP_GET;
-    uri_handler.handler = settings_get_wrapper;
-    uri_handler.user_ctx = NULL;
+    uri_handler.handler = auth_gate;
+    uri_handler.user_ctx = (void *)settings_get_wrapper;
     ret = httpd_register_uri_handler(server, &uri_handler);
     if (ret != ESP_OK)
     {
@@ -4447,8 +4451,8 @@ esp_err_t start_webserver()
     // Settings POST handler
     uri_handler.uri = "/api/settings";
     uri_handler.method = HTTP_POST;
-    uri_handler.handler = settings_post_wrapper;
-    uri_handler.user_ctx = NULL;
+    uri_handler.handler = auth_gate;
+    uri_handler.user_ctx = (void *)settings_post_wrapper;
     ret = httpd_register_uri_handler(server, &uri_handler);
     if (ret != ESP_OK)
     {
@@ -4459,8 +4463,8 @@ esp_err_t start_webserver()
     // Screen layout GET handler
     uri_handler.uri = "/api/screen";
     uri_handler.method = HTTP_GET;
-    uri_handler.handler = screen_get_wrapper;
-    uri_handler.user_ctx = NULL;
+    uri_handler.handler = auth_gate;
+    uri_handler.user_ctx = (void *)screen_get_wrapper;
     ret = httpd_register_uri_handler(server, &uri_handler);
     if (ret != ESP_OK)
     {
@@ -4471,8 +4475,8 @@ esp_err_t start_webserver()
     // Screen layout POST handler
     uri_handler.uri = "/api/screen";
     uri_handler.method = HTTP_POST;
-    uri_handler.handler = screen_post_wrapper;
-    uri_handler.user_ctx = NULL;
+    uri_handler.handler = auth_gate;
+    uri_handler.user_ctx = (void *)screen_post_wrapper;
     ret = httpd_register_uri_handler(server, &uri_handler);
     if (ret != ESP_OK)
     {
@@ -4482,8 +4486,8 @@ esp_err_t start_webserver()
 
     uri_handler.uri = "/api/screen/apply";
     uri_handler.method = HTTP_POST;
-    uri_handler.handler = screen_apply_wrapper;
-    uri_handler.user_ctx = NULL;
+    uri_handler.handler = auth_gate;
+    uri_handler.user_ctx = (void *)screen_apply_wrapper;
     ret = httpd_register_uri_handler(server, &uri_handler);
     if (ret != ESP_OK)
     {
@@ -4493,8 +4497,8 @@ esp_err_t start_webserver()
 
     uri_handler.uri = "/api/screen/save";
     uri_handler.method = HTTP_POST;
-    uri_handler.handler = screen_save_wrapper;
-    uri_handler.user_ctx = NULL;
+    uri_handler.handler = auth_gate;
+    uri_handler.user_ctx = (void *)screen_save_wrapper;
     ret = httpd_register_uri_handler(server, &uri_handler);
     if (ret != ESP_OK)
     {
@@ -4505,8 +4509,8 @@ esp_err_t start_webserver()
     // OTA handler
     uri_handler.uri = "/api/ota";
     uri_handler.method = HTTP_POST;
-    uri_handler.handler = ota_post_wrapper;
-    uri_handler.user_ctx = NULL;
+    uri_handler.handler = auth_gate;
+    uri_handler.user_ctx = (void *)ota_post_wrapper;
     ret = httpd_register_uri_handler(server, &uri_handler);
     if (ret != ESP_OK)
     {
@@ -4516,8 +4520,8 @@ esp_err_t start_webserver()
 
     uri_handler.uri = "/api/ota/reinstall";
     uri_handler.method = HTTP_POST;
-    uri_handler.handler = ota_reinstall_post_wrapper;
-    uri_handler.user_ctx = NULL;
+    uri_handler.handler = auth_gate;
+    uri_handler.user_ctx = (void *)ota_reinstall_post_wrapper;
     ret = httpd_register_uri_handler(server, &uri_handler);
     if (ret != ESP_OK)
     {
@@ -4528,8 +4532,8 @@ esp_err_t start_webserver()
     // Reset handler
     uri_handler.uri = "/api/reset";
     uri_handler.method = HTTP_POST;
-    uri_handler.handler = reset_post_wrapper;
-    uri_handler.user_ctx = NULL;
+    uri_handler.handler = auth_gate;
+    uri_handler.user_ctx = (void *)reset_post_wrapper;
     ret = httpd_register_uri_handler(server, &uri_handler);
     if (ret != ESP_OK)
     {
@@ -4540,8 +4544,8 @@ esp_err_t start_webserver()
     // WiFi scan handlers
     uri_handler.uri = "/api/wifi/scan";
     uri_handler.method = HTTP_GET;
-    uri_handler.handler = wifi_scan_start_wrapper;
-    uri_handler.user_ctx = NULL;
+    uri_handler.handler = auth_gate;
+    uri_handler.user_ctx = (void *)wifi_scan_start_wrapper;
     ret = httpd_register_uri_handler(server, &uri_handler);
     if (ret != ESP_OK)
     {
@@ -4551,8 +4555,8 @@ esp_err_t start_webserver()
 
     uri_handler.uri = "/api/wifi/status";
     uri_handler.method = HTTP_GET;
-    uri_handler.handler = wifi_scan_status_wrapper;
-    uri_handler.user_ctx = NULL;
+    uri_handler.handler = auth_gate;
+    uri_handler.user_ctx = (void *)wifi_scan_status_wrapper;
     ret = httpd_register_uri_handler(server, &uri_handler);
     if (ret != ESP_OK)
     {
@@ -4562,8 +4566,8 @@ esp_err_t start_webserver()
 
     uri_handler.uri = "/api/files";
     uri_handler.method = HTTP_GET;
-    uri_handler.handler = files_list_wrapper;
-    uri_handler.user_ctx = NULL;
+    uri_handler.handler = auth_gate;
+    uri_handler.user_ctx = (void *)files_list_wrapper;
     ret = httpd_register_uri_handler(server, &uri_handler);
     if (ret != ESP_OK)
     {
@@ -4573,8 +4577,8 @@ esp_err_t start_webserver()
 
     uri_handler.uri = "/api/files/delete";
     uri_handler.method = HTTP_POST;
-    uri_handler.handler = files_delete_wrapper;
-    uri_handler.user_ctx = NULL;
+    uri_handler.handler = auth_gate;
+    uri_handler.user_ctx = (void *)files_delete_wrapper;
     ret = httpd_register_uri_handler(server, &uri_handler);
     if (ret != ESP_OK)
     {
@@ -4584,8 +4588,8 @@ esp_err_t start_webserver()
 
     uri_handler.uri = "/api/files/rename";
     uri_handler.method = HTTP_POST;
-    uri_handler.handler = files_rename_wrapper;
-    uri_handler.user_ctx = NULL;
+    uri_handler.handler = auth_gate;
+    uri_handler.user_ctx = (void *)files_rename_wrapper;
     ret = httpd_register_uri_handler(server, &uri_handler);
     if (ret != ESP_OK)
     {
@@ -4593,11 +4597,55 @@ esp_err_t start_webserver()
         return ret;
     }
 
+    uri_handler.uri = "/api/auth/challenge";
+    uri_handler.method = HTTP_GET;
+    uri_handler.handler = auth_gate;
+    uri_handler.user_ctx = (void *)auth_challenge_handler;
+    ret = httpd_register_uri_handler(server, &uri_handler);
+    if (ret != ESP_OK)
+    {
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to register %s", uri_handler.uri);
+        return ret;
+    }
+
+    uri_handler.uri = "/api/auth/login";
+    uri_handler.method = HTTP_POST;
+    uri_handler.handler = auth_gate;
+    uri_handler.user_ctx = (void *)auth_login_handler;
+    ret = httpd_register_uri_handler(server, &uri_handler);
+    if (ret != ESP_OK)
+    {
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to register %s", uri_handler.uri);
+        return ret;
+    }
+
+    uri_handler.uri = "/api/auth/logout";
+    uri_handler.method = HTTP_POST;
+    uri_handler.handler = auth_gate;
+    uri_handler.user_ctx = (void *)auth_logout_handler;
+    ret = httpd_register_uri_handler(server, &uri_handler);
+    if (ret != ESP_OK)
+    {
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to register %s", uri_handler.uri);
+        return ret;
+    }
+
+    uri_handler.uri = "/api/auth/password";
+    uri_handler.method = HTTP_POST;
+    uri_handler.handler = auth_gate;
+    uri_handler.user_ctx = (void *)auth_password_handler;
+    ret = httpd_register_uri_handler(server, &uri_handler);
+    if (ret != ESP_OK)
+    {
+        ESP_LOG_WEB(ESP_LOG_ERROR, TAG, "Failed to register %s", uri_handler.uri);
+        return ret;
+    }
+
     // Register wildcard handler for all other paths
     uri_handler.uri = "/*"; // Wildcard for all other paths
     uri_handler.method = HTTP_GET;
-    uri_handler.handler = generic_file_wrapper;
-    uri_handler.user_ctx = NULL;
+    uri_handler.handler = auth_gate;
+    uri_handler.user_ctx = (void *)generic_file_wrapper;
     ret = httpd_register_uri_handler(server, &uri_handler);
     if (ret != ESP_OK)
     {
@@ -4608,8 +4656,8 @@ esp_err_t start_webserver()
     // Add a catch-all handler for any other methods to prevent parsing errors
     uri_handler.uri = "/*";
     uri_handler.method = HTTP_POST;
-    uri_handler.handler = catch_all_handler;
-    uri_handler.user_ctx = NULL;
+    uri_handler.handler = auth_gate;
+    uri_handler.user_ctx = (void *)catch_all_handler;
     ret = httpd_register_uri_handler(server, &uri_handler);
     if (ret != ESP_OK)
     {

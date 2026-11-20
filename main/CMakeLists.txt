@@ -16,6 +16,7 @@ idf_component_register(SRCS
     "f-provisioning.c"
     "f-ota.c"
     "f-reboot.c"
+    "f-auth.c"
     "f-luxlog.c"
     "f-manifest.c"
     "f-dns.c"

@@ -50,6 +50,18 @@ function toggleLoading(btn, isLoading) {
    Language JSON files (/i18n/language_<lang>.json) are merged on demand. */
 let currentLanguage = 'en';
 
+/* With an access password set, the device answers 401 to every request without a
+   session (expired, or the password changed elsewhere): go to the login page. */
+(function () {
+  const realFetch = window.fetch.bind(window);
+  window.fetch = async (input, init) => {
+    const r = await realFetch(input, init);
+    const url = typeof input === 'string' ? input : (input && input.url) || '';
+    if (r.status === 401 && !url.includes('/api/auth/')) location.replace('/login.html');
+    return r;
+  };
+})();
+
 /* Language is remembered two ways: authoritatively on the device (setting p41,
    so it follows the device across browsers) and cached in localStorage so the
    UI can render in the right language immediately on load, before /api/settings

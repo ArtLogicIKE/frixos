@@ -35,6 +35,7 @@
         <div class="lang-opt" data-lang="es">Español</div>
       </div>
     </div>
+    <button class="ctrl" id="logoutBtn" type="button" hidden data-i18n-aria-label="common.logout" aria-label="Log out" title="Log out">⏻</button>
     <button class="ctrl" id="themeBtn" data-i18n-aria-label="common.toggle_theme" aria-label="Toggle theme" title="Toggle light / dark"><span id="themeIcon">☀</span></button>
   </header>
 
@@ -68,6 +69,13 @@
           <div class="field"><label><span data-i18n="settings.connection.hostname">Hostname</span> <span class="req">*</span></label>
             <input type="text" id="hostname" value="frixos" required maxlength="32">
             <span class="err" id="hostname-err" data-i18n="settings.connection.hostname_required">Hostname is required.</span>
+          </div>
+          <div class="field" id="access-field"><label><span data-i18n="settings.connection.access_password">Access password</span> <span class="opt" data-i18n="settings.connection.optional">(optional)</span></label>
+            <div class="pw"><input type="password" id="access_pass" autocomplete="new-password" maxlength="64" data-i18n-placeholder="settings.connection.access_password_none" placeholder="None: anyone on your network can open this page"><button class="eye" type="button" aria-label="Show password">👁</button></div>
+            <div class="pw access-more" id="access_confirm_row" hidden><input type="password" id="access_pass2" autocomplete="new-password" maxlength="64" data-i18n-placeholder="settings.connection.access_password_confirm" placeholder="Repeat the new password"></div>
+            <div class="pw access-more" id="access_current_row" hidden><input type="password" id="access_current" autocomplete="current-password" maxlength="64" data-i18n-placeholder="settings.connection.access_password_current" placeholder="Current password"><button class="eye" type="button" aria-label="Show password">👁</button></div>
+            <div class="access-remove" id="access_remove_row" hidden><label><input type="checkbox" id="access_remove"> <span data-i18n="settings.connection.access_password_remove">Remove the password</span></label></div>
+            <span class="err" id="access-err"></span>
           </div>
           <div class="field"><label><span data-i18n="settings.connection.wifi_ssid">WiFi SSID</span> <span class="req">*</span></label><input type="text" id="wifi_ssid" autocomplete="off" data-i18n-placeholder="settings.connection.ssid_placeholder" placeholder="Network name"></div>
           <div class="field"><label><span data-i18n="settings.connection.wifi_password">WiFi password</span> <span class="req">*</span></label>
@@ -573,6 +581,7 @@
 </div>
 
 <script src="js/utils.js"></script>
+<script src="js/auth.js"></script>
 <script src="js/core.js"></script>
 <script src="js/forms.js"></script>
 <script src="js/wifi.js"></script>

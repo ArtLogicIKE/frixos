@@ -34,7 +34,8 @@
     "save": "Gem",
     "discard": "Kassér",
     "unsaved_changes": "Du har ikke-gemte ændringer",
-    "retrieving_settings": "Henter indstillinger…"
+    "retrieving_settings": "Henter indstillinger…",
+    "logout": "Log ud"
   },
   "settings": {
     "connection": {
@@ -59,7 +60,16 @@
       "hostname_url": "Indtast et navn, ikke en webadresse (for eksempel frixos-koekken).",
       "password_placeholder": "Lad stå tomt for at beholde nuværende",
       "ssid_placeholder": "Netværksnavn",
-      "static_ip_desc": "Tildel en fast adresse i stedet for DHCP"
+      "static_ip_desc": "Tildel en fast adresse i stedet for DHCP",
+      "access_password": "Adgangskode",
+      "access_password_none": "Ingen: alle på dit netværk kan åbne denne side",
+      "access_password_confirm": "Gentag den nye adgangskode",
+      "access_password_current": "Nuværende adgangskode",
+      "access_password_remove": "Fjern adgangskoden",
+      "access_password_mismatch": "Adgangskoderne er ikke ens.",
+      "access_password_current_needed": "Indtast den nuværende adgangskode.",
+      "access_password_wrong": "Den nuværende adgangskode er forkert.",
+      "access_password_locked": "For mange forsøg. Prøv igen senere."
     },
     "wifi": {
       "available_networks": "Tilgængelige WiFi-netværk",
@@ -652,7 +662,9 @@
     "upload_failed": "Upload mislykkedes",
     "changes_discarded": "Ændringer kasseret",
     "wifi_not_connected": "Wi-Fi er ikke tilsluttet.",
-    "font_applied": "Skrifttype anvendt."
+    "font_applied": "Skrifttype anvendt.",
+    "access_password_set": "Adgangskoden er gemt",
+    "access_password_removed": "Adgangskoden er fjernet"
   },
   "files": {
     "delete_selected": "Slet valgte",

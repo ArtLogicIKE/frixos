@@ -234,6 +234,68 @@ el('hostname').addEventListener('input', () => {
   showHostnameError(v ? hostnameError(v) : null);
 });
 
+/* ---------- access password ----------
+   Saved through /api/auth/password, not /api/settings: the browser sends only the
+   salted hash (see auth.js). Changing or removing a password needs the current one. */
+function showAccessState() {
+  const set = !!S().auth;
+  ['access_pass', 'access_pass2', 'access_current'].forEach(id => { el(id).value = ''; });
+  el('access_remove').checked = false;
+  const ph = set ? 'common.secret_stored' : 'settings.connection.access_password_none';
+  el('access_pass').setAttribute('data-i18n-placeholder', ph);
+  el('access_pass').placeholder = tr(ph, set ? 'Stored – type to replace' : 'None: anyone on your network can open this page');
+  el('logoutBtn').hidden = !set;
+  showAccessError(null);
+  refreshAccessRows();
+}
+function refreshAccessRows() {
+  const set = !!S().auth, typed = el('access_pass').value !== '', remove = set && el('access_remove').checked;
+  el('access_pass').disabled = remove;
+  el('access_confirm_row').hidden = !typed || remove;
+  el('access_current_row').hidden = !set || !(typed || remove);
+  el('access_remove_row').hidden = !set;
+}
+function showAccessError(key, fallback) {
+  const e = el('access-err');
+  e.textContent = key ? tr(key, fallback) : '';
+  e.classList.toggle('show', !!key);
+}
+el('access_pass').addEventListener('input', refreshAccessRows);
+el('access_remove').addEventListener('change', refreshAccessRows);
+el('logoutBtn').addEventListener('click', async () => {
+  try { await frixosAuth.logout(); } finally { location.replace('/login.html'); }
+});
+
+/* Returns null (unchanged), false (invalid; error shown) or {newPw, currentPw}. */
+function collectAccessPassword() {
+  const set = !!S().auth, remove = set && el('access_remove').checked;
+  const newPw = remove ? '' : el('access_pass').value;
+  if (!remove && !newPw) return null;
+  const fail = (key, fb, focus) => { showAccessError(key, fb); showTab('settings'); el(focus).focus(); return false; };
+  if (!remove && newPw !== el('access_pass2').value) return fail('settings.connection.access_password_mismatch', "The passwords don't match.", 'access_pass2');
+  if (set && !el('access_current').value) return fail('settings.connection.access_password_current_needed', 'Enter the current password.', 'access_current');
+  showAccessError(null);
+  return { newPw, currentPw: el('access_current').value };
+}
+
+/* Sends a change from collectAccessPassword; true when the device accepted it. */
+async function saveAccessPassword(ch) {
+  let r;
+  try { r = await frixosAuth.setPassword(ch.newPw, ch.currentPw); } catch (e) { r = { ok: false, data: {} }; }
+  if (r.ok) {
+    window.settings.auth = !!r.data.auth;
+    showAccessState();
+    toast(tr(r.data.auth ? 'messages.access_password_set' : 'messages.access_password_removed',
+             r.data.auth ? 'Access password saved' : 'Access password removed'), 'ok');
+    return true;
+  }
+  if (r.data && r.data.locked) showAccessError('settings.connection.access_password_locked', 'Too many attempts. Try again later.');
+  else if (r.status === 403) showAccessError('settings.connection.access_password_wrong', 'The current password is wrong.');
+  else showAccessError('messages.error_saving_unknown', 'Save failed');
+  showTab('settings'); el(r.status === 403 ? 'access_current' : 'access_pass').focus();
+  return false;
+}
+
 /* Connection-ish fields whose change triggers a device restart on save. */
 const SETTINGS_NETWORK_KEYS = ['p00', 'p34', 'p35', 'p60', 'p61', 'p62', 'p63'];
 

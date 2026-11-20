@@ -23,6 +23,7 @@
 
 #include "frixos.h"
 #include "f-reboot.h"
+#include "f-auth.h"
 #include "f-display.h"
 #include "f-wifi.h"
 #include "f-pwm.h"
@@ -641,6 +642,8 @@ static void check_boot_fail_count(void)
       rescue_mode_this_boot = 1;
       ESP_LOGW(TAG, "Auto-rescue: %u failed boots after layout reset, entering rescue mode (erase NVS, keep WiFi and POH)", (unsigned)fail_count);
     }
+    auth_erase(); // the multi-restart reset is how an owner removes a forgotten access password
+    ESP_LOGW(TAG, "Auto-rescue: access password removed");
     nvs_set_u8(h, NVS_RESCUE_STAGE_KEY, stage == 0 ? 1 : 0);
     nvs_set_u8(h, NVS_BOOT_FAIL_KEY, 0); // reset after entering rescue
     nvs_commit(h);

@@ -85,6 +85,8 @@
   el('saveAllBtn').addEventListener('click', async () => {
     const sp = collectSettingsPayload();
     if (sp === null) return; // hostname validation failed; user was focused there
+    const access = collectAccessPassword();
+    if (access === false) return; // password fields invalid; error shown there
     const ap = collectAdvancedPayload();
     // Only include tabs whose values have actually been loaded into the DOM —
     // otherwise HTML defaults would be diffed against stored settings.
@@ -92,7 +94,9 @@
     const payload = Object.assign({}, sp, ap, ip);
     const btn = el('saveAllBtn');
     toggleLoading(btn, true);
-    const ok = await saveSettings(payload, SETTINGS_NETWORK_KEYS);
+    // The password first: a wrong current password should stop the whole save.
+    let ok = !access || await saveAccessPassword(access);
+    if (ok && (!access || Object.keys(payload).length)) ok = await saveSettings(payload, SETTINGS_NETWORK_KEYS);
     toggleLoading(btn, false);
     if (ok) {
       clearDirty();
