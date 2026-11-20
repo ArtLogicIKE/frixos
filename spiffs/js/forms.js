@@ -194,7 +194,6 @@ async function loadSettings() {
   showSecretState('p35'); // the device never returns the password; clears any autofill
   const s = S();
   setVal('hostname', s.p00); setVal('wifi_ssid', s.p34);
-  updateCharCounter(el('hostname'), el('hostname-counter'));
   if (s.p03 !== undefined) el('rotation').value = String(s.p03);
   setSw('mirroring', s.p09); setSw('fahrenheit', s.p36); setSw('hour12', s.p37); setSw('update_firmware', s.p39);
   const useStatic = !!(s.p60 && String(s.p60).trim());
