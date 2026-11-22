@@ -536,6 +536,7 @@
       "username": "Username",
       "username_placeholder": "Account username",
       "password": "Password",
+      "api_secret": "API secret",
       "password_placeholder": "Enter your password",
       "device_type": "Device Type",
       "nightscout_url": "Nightscout URL",

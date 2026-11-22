@@ -536,6 +536,7 @@
       "username": "Brugernavn",
       "username_placeholder": "Indtast dit brugernavn",
       "password": "Adgangskode",
+      "api_secret": "API-hemmelighed",
       "password_placeholder": "Indtast din adgangskode",
       "cgm_device_title": "CGM-enhed",
       "alternate_time_cgm": {

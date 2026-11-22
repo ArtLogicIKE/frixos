@@ -536,6 +536,7 @@
       "username": "Nome utente",
       "username_placeholder": "Inserisci il tuo nome utente",
       "password": "Password",
+      "api_secret": "Secret API",
       "password_placeholder": "Inserisci la tua password",
       "cgm_device_title": "Dispositivo CGM",
       "alternate_time_cgm": {

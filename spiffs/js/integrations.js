@@ -90,7 +90,8 @@ function applyCgmVisibility(type) {
 
 function resetCgmFieldsFor(type) {
   // Reset only the fields owned by the other two options (username/password are
-  // shared by dexcom + libre, so they survive a switch between those two).
+  // shared by dexcom + libre, so they survive a switch between those two; the
+  // password field doubles as the Nightscout API secret).
   const dx = el('eeprom_dexcom_region'), lb = el('eeprom_libre_region'), ns = el('eeprom_ns_url'),
         user = el('eeprom_glucose_username'), pass = el('eeprom_glucose_password');
   const clearSel = e => { if (e) e.value = '0'; };
