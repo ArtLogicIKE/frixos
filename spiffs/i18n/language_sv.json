@@ -536,6 +536,7 @@
       "username": "Användarnamn",
       "username_placeholder": "Ange ditt användarnamn",
       "password": "Lösenord",
+      "api_secret": "API-hemlighet",
       "password_placeholder": "Ange ditt lösenord",
       "cgm_device_title": "CGM-enhet",
       "alternate_time_cgm": {
