@@ -630,6 +630,7 @@
     "freestyle_refresh_range": "Interwał odświeżania Libre musi wynosić między 1 a 60 minut",
     "error_preparing_info": "Błąd przygotowywania informacji systemowych: ",
     "info_copied_clipboard": "Informacje systemowe skopiowane do schowka",
+    "info_copied_paste_email": "Skopiowano informacje o systemie – wklej je do wiadomości",
     "failed_copy_clipboard": "Nie udało się skopiować do schowka",
     "layout_copied": "Układ skopiowany z {source} do {target}",
     "layout_saved_to_file": "Układ zapisany do pliku",

@@ -641,6 +641,7 @@
     "freestyle_refresh_range": "Libre refresh interval must be between 1 and 60 minutes",
     "error_preparing_info": "Error preparing system information: ",
     "info_copied_clipboard": "System information copied to clipboard",
+    "info_copied_paste_email": "System information copied – paste it into the email",
     "failed_copy_clipboard": "Failed to copy to clipboard",
     "layout_copied": "Layout copied from {source} to {target}",
     "layout_saved_to_file": "Layout saved to file",

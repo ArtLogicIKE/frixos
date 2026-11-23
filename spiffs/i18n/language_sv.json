@@ -630,6 +630,7 @@
     "freestyle_refresh_range": "Freestyle Libre-uppdateringsintervall måste vara mellan 1 och 60 minuter",
     "error_preparing_info": "Fel vid förberedelse av systeminformation: ",
     "info_copied_clipboard": "Systeminformation kopierad till urklipp",
+    "info_copied_paste_email": "Systeminformation kopierad – klistra in den i e-postmeddelandet",
     "failed_copy_clipboard": "Misslyckades med att kopiera till urklipp",
     "layout_copied": "Layout kopierad från {source} till {target}",
     "layout_saved_to_file": "Layout sparad till fil",
