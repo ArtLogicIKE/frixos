@@ -113,7 +113,7 @@ char eeprom_font[2][12] = {"bold", "light"};                       // [0] = day 
 char eeprom_aux_font[2][12] = {"bold", "bold"};                    // [0] = day aux digit font, [1] = night aux
 float eeprom_lux_sensitivity = 6.0;
 float eeprom_lux_threshold = 16.0;
-uint8_t eeprom_brightness_LED[2] = {100, 30}; // in pct
+uint8_t eeprom_brightness_LED[2] = {94, 30}; // in pct
 // Brightness slider position on the gamma 2.2 scale (p68), day/night; BRIGHTNESS_LEVEL_UNSET = use p23.
 uint8_t eeprom_brightness_level[2] = {BRIGHTNESS_LEVEL_UNSET, BRIGHTNESS_LEVEL_UNSET};
 // p23 as it was when p68 was set: if p23 later differs, something unaware of p68 changed it.
