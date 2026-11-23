@@ -630,6 +630,7 @@
     "freestyle_refresh_range": "Libre opdateringsinterval skal være mellem 1 og 60 minutter",
     "error_preparing_info": "Fejl ved forberedelse af systeminformation: ",
     "info_copied_clipboard": "Systeminformation kopieret til udklipsholder",
+    "info_copied_paste_email": "Systeminformation kopieret – indsæt den i e-mailen",
     "failed_copy_clipboard": "Kunne ikke kopiere til udklipsholder",
     "layout_copied": "Layout kopieret fra {source} til {target}",
     "layout_saved_to_file": "Layout gemt til fil",

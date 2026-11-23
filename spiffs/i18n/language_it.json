@@ -630,6 +630,7 @@
     "freestyle_refresh_range": "L'intervallo di aggiornamento Freestyle Libre deve essere tra 1 e 60 minuti",
     "error_preparing_info": "Errore nella preparazione delle informazioni di sistema: ",
     "info_copied_clipboard": "Informazioni di sistema copiate negli appunti",
+    "info_copied_paste_email": "Informazioni di sistema copiate: incollale nell’e-mail",
     "failed_copy_clipboard": "Impossibile copiare negli appunti",
     "layout_copied": "Layout copiato da {source} a {target}",
     "layout_saved_to_file": "Layout salvato su file",

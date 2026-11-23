@@ -630,6 +630,7 @@
     "freestyle_refresh_range": "L'intervalle d'actualisation Libre doit être entre 1 et 60 minutes",
     "error_preparing_info": "Erreur lors de la préparation des informations système: ",
     "info_copied_clipboard": "Informations système copiées dans le presse-papiers",
+    "info_copied_paste_email": "Informations système copiées – collez-les dans l’e-mail",
     "failed_copy_clipboard": "Échec de la copie dans le presse-papiers",
     "layout_copied": "Disposition copiée de {source} vers {target}",
     "layout_saved_to_file": "Disposition enregistrée dans un fichier",

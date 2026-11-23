@@ -67,31 +67,46 @@ document.querySelectorAll('#scrollEngine .seg-btn').forEach(btn => {
   });
 });
 el('refreshStatus').addEventListener('click', () => { loadStatus(); toast(getMessage('status_refreshed'), 'ok'); });
+async function copyText(text) {
+  // navigator.clipboard only exists on https or localhost; the device page is plain http.
+  if (navigator.clipboard && window.isSecureContext) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.setAttribute('readonly', '');
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  const ok = document.execCommand('copy');
+  document.body.removeChild(ta);
+  if (!ok) throw new Error('copy failed');
+}
 el('supportCopy').addEventListener('click', async () => {
-  const text = JSON.stringify(window.statusData || {}, null, 2);
   try {
-    // navigator.clipboard only exists on https or localhost; the device page is plain http.
-    if (navigator.clipboard && window.isSecureContext) {
-      await navigator.clipboard.writeText(text);
-    } else {
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      ta.setAttribute('readonly', '');
-      ta.style.position = 'fixed';
-      ta.style.opacity = '0';
-      document.body.appendChild(ta);
-      ta.select();
-      const ok = document.execCommand('copy');
-      document.body.removeChild(ta);
-      if (!ok) throw new Error('copy failed');
-    }
+    await copyText(JSON.stringify(window.statusData || {}, null, 2));
     toast(getMessage('info_copied_clipboard'), 'ok');
   }
   catch (e) { toast(getMessage('failed_copy_clipboard'), 'err'); }
 });
-el('supportEmail').addEventListener('click', () => {
-  const b = encodeURIComponent('Frixos diagnostics:\n\n' + JSON.stringify(window.statusData || {}, null, 2));
-  location.href = 'mailto:support@buyfrixos.com?subject=Frixos%20support&body=' + b;
+// Chrome on Windows silently drops external-protocol URLs over 2083 characters
+// (INTERNET_MAX_URL_LENGTH) and mail clients truncate around 2000, so a longer
+// mailto: does nothing. Past that, the diagnostics go via the clipboard.
+const MAILTO_MAX = 2000;
+el('supportEmail').addEventListener('click', async () => {
+  const mailto = body => 'mailto:support@buyfrixos.com?subject=Frixos%20support&body=' + encodeURIComponent(body);
+  let url = mailto('Frixos diagnostics:\n\n' + JSON.stringify(window.statusData || {}));
+  if (url.length > MAILTO_MAX) {
+    try {
+      await copyText(JSON.stringify(window.statusData || {}, null, 2));
+      toast(getMessage('info_copied_paste_email'), 'ok');
+    }
+    catch (e) { toast(getMessage('failed_copy_clipboard'), 'err'); }
+    url = mailto('Frixos diagnostics: please paste them here (they were copied to your clipboard).\n\n');
+  }
+  location.href = url;
 });
 el('refreshLogs').addEventListener('click', async () => {
   const res = await apiGet('/api/status?logs=1');

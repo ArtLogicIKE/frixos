@@ -630,6 +630,7 @@
     "freestyle_refresh_range": "Libre-Aktualisierungsintervall muss zwischen 1 und 60 Minuten liegen",
     "error_preparing_info": "Fehler beim Vorbereiten der Systeminformationen: ",
     "info_copied_clipboard": "Systeminformationen in die Zwischenablage kopiert",
+    "info_copied_paste_email": "Systeminformationen kopiert – füge sie in die E-Mail ein",
     "failed_copy_clipboard": "Fehler beim Kopieren in die Zwischenablage",
     "layout_copied": "Layout von {source} nach {target} kopiert",
     "layout_saved_to_file": "Layout in Datei gespeichert",
